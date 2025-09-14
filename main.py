@@ -28,6 +28,7 @@ from core.config import get_config, Config, GmailConfig, EmailConfig, LoggingCon
 from core.email_parser import EmailParser
 from core.gmail_utils import GmailService
 from core.actions import EmailActions
+from core.auth import GmailAuthenticator, authenticate_gmail
 
 
 class FikiriCLI:
