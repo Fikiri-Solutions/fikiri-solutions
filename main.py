@@ -21,6 +21,9 @@ from typing import List, Optional, Dict, Any
 # Minimal imports only
 print("✅ Fikiri Solutions - Minimal Version Loading...")
 
+# Import configuration
+from core.config import get_config, Config, GmailConfig, EmailConfig, LoggingConfig
+
 
 class FikiriCLI:
     """Command-line interface for Fikiri Solutions Gmail Lead Responder."""
