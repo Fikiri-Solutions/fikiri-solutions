@@ -51,8 +51,11 @@ class CRMService:
                 with open(self.data_file, 'r') as f:
                     data = json.load(f)
                     for lead_data in data:
-                        lead = Lead(**lead_data)
-                        self.leads[lead.id] = lead
+                        if isinstance(lead_data, dict):
+                            lead = Lead(**lead_data)
+                            self.leads[lead.id] = lead
+                        else:
+                            self.logger.warning(f"⚠️ Skipping invalid lead data: {lead_data}")
                 self.logger.info(f"📁 Loaded {len(self.leads)} leads from {self.data_file}")
             else:
                 self.logger.info("📁 No existing leads file found, starting fresh")

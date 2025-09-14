@@ -40,6 +40,8 @@ class WorkflowManager:
         self.scheduler_thread: Optional[threading.Thread] = None
         self.running = False
         self.logger = logging.getLogger(__name__)
+        # Add scheduler attribute for compatibility
+        self.scheduler = self
     
     def start(self) -> bool:
         """Start the workflow scheduler."""

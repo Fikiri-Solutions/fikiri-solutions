@@ -814,49 +814,14 @@ Examples:
                 workflow_parser.print_help()
         
         elif args.command == 'chatbot':
-            if args.chatbot_command == 'chat':
-                # Interactive chat session
-                session_id = args.session_id or chatbot_engine.create_session(args.user_id)
-                print(f"🤖 Starting chat session: {session_id}")
-                print("Type 'quit' or 'exit' to end the session")
-                print("=" * 50)
-                
-                while True:
-                    try:
-                        user_input = input("\n👤 You: ").strip()
-                        if user_input.lower() in ['quit', 'exit', 'bye']:
-                            chatbot_engine.end_session(session_id)
-                            print("👋 Chat session ended. Goodbye!")
-                            break
-                        
-                        if not user_input:
-                            continue
-                        
-                        response = chatbot_engine.process_query(session_id, user_input, args.user_id)
-                        print(f"\n🤖 Bot: {response['answer']}")
-                        
-                        if response.get('suggestions'):
-                            print(f"\n💡 Related questions:")
-                            for suggestion in response['suggestions']:
-                                print(f"   • {suggestion}")
-                    
-                    except KeyboardInterrupt:
-                        chatbot_engine.end_session(session_id)
-                        print("\n👋 Chat session ended. Goodbye!")
-                        break
-                    except Exception as e:
-                        print(f"❌ Error: {e}")
-            
-            elif args.chatbot_command == 'query':
+            if args.chatbot_command == 'query':
                 # Single query
-                session_id = args.session_id or chatbot_engine.create_session(args.user_id)
-                response = chatbot_engine.process_query(session_id, args.query, args.user_id)
+                response = chatbot_engine.generate_response(args.query)
                 
                 print(f"🤖 Bot Response:")
                 print(f"   {response['answer']}")
                 print(f"\n📊 Confidence: {response['confidence']:.2f}")
-                print(f"📂 Category: {response['category']}")
-                print(f"🔍 Source: {response['source']}")
+                print(f"📂 Source: {response['source']}")
                 
                 if response.get('suggestions'):
                     print(f"\n💡 Related questions:")
@@ -865,86 +830,36 @@ Examples:
             
             elif args.chatbot_command == 'faq':
                 if args.faq_command == 'list':
-                    faqs = chatbot_engine.knowledge_base.faqs
+                    faqs = chatbot_engine.faq_data.get('faqs', [])
                     print(f"📋 FAQ Knowledge Base ({len(faqs)} items):")
-                    for faq_id, faq in faqs.items():
-                        print(f"\n🔹 {faq_id}")
-                        print(f"   Q: {faq.question}")
-                        print(f"   A: {faq.answer[:100]}{'...' if len(faq.answer) > 100 else ''}")
-                        print(f"   Category: {faq.category} | Priority: {faq.priority} | Usage: {faq.usage_count}")
-                
-                elif args.faq_command == 'search':
-                    results = chatbot_engine.knowledge_base.search_faqs(args.query, top_k=5)
-                    print(f"🔍 Search results for '{args.query}':")
-                    for i, (faq, confidence) in enumerate(results, 1):
-                        print(f"\n{i}. {faq.question}")
-                        print(f"   Confidence: {confidence:.2f}")
-                        print(f"   Answer: {faq.answer[:150]}{'...' if len(faq.answer) > 150 else ''}")
+                    for i, faq in enumerate(faqs, 1):
+                        print(f"\n{i}. {faq.get('question', 'No question')}")
+                        print(f"   Answer: {faq.get('answer', 'No answer')[:100]}{'...' if len(faq.get('answer', '')) > 100 else ''}")
+                        print(f"   Category: {faq.get('category', 'general')}")
                 
                 elif args.faq_command == 'add':
-                    keywords = args.keywords.split(',') if args.keywords else []
-                    faq = FAQItem(
-                        id=f"faq_{len(chatbot_engine.knowledge_base.faqs) + 1:03d}",
-                        question=args.question,
-                        answer=args.answer,
-                        keywords=[k.strip() for k in keywords],
-                        category=args.category,
-                        priority=args.priority
+                    success = chatbot_engine.add_faq(
+                        args.question,
+                        args.answer,
+                        args.keywords.split(',') if args.keywords else []
                     )
-                    chatbot_engine.knowledge_base.add_faq(faq)
-                    print(f"✅ Added FAQ: {faq.id}")
-                
-                elif args.faq_command == 'update':
-                    updates = {}
-                    if args.question:
-                        updates['question'] = args.question
-                    if args.answer:
-                        updates['answer'] = args.answer
-                    if args.keywords:
-                        updates['keywords'] = [k.strip() for k in args.keywords.split(',')]
-                    if args.category:
-                        updates['category'] = args.category
-                    if args.priority:
-                        updates['priority'] = args.priority
-                    
-                    chatbot_engine.knowledge_base.update_faq(args.id, **updates)
-                    print(f"✅ Updated FAQ: {args.id}")
-                
-                elif args.faq_command == 'delete':
-                    chatbot_engine.knowledge_base.delete_faq(args.id)
-                    print(f"✅ Deleted FAQ: {args.id}")
+                    if success:
+                        print(f"✅ Added FAQ: {args.question}")
+                    else:
+                        print(f"❌ Failed to add FAQ")
                 
                 else:
-                    chatbot_faq.print_help()
+                    print("Available FAQ commands: list, add")
             
-            elif args.chatbot_command == 'sessions':
-                sessions = chatbot_engine.sessions
-                if sessions:
-                    print(f"📋 Active Chat Sessions ({len(sessions)}):")
-                    for session_id, session in sessions.items():
-                        status = "Active" if not session.resolved else "Ended"
-                        print(f"  🔹 {session_id}")
-                        print(f"     User: {session.user_id or 'Anonymous'}")
-                        print(f"     Status: {status}")
-                        print(f"     Messages: {len(session.messages)}")
-                        print(f"     Last Activity: {session.last_activity}")
-                        print()
-                else:
-                    print("📋 No active chat sessions")
-            
-            elif args.chatbot_command == 'session-history':
-                history = chatbot_engine.get_session_history(args.session_id)
-                if history:
-                    print(f"📜 Chat History for {args.session_id}:")
-                    for msg in history:
-                        role_emoji = "👤" if msg['role'] == 'user' else "🤖"
-                        print(f"\n{role_emoji} {msg['role'].title()}: {msg['content']}")
-                        print(f"   Time: {msg['timestamp']}")
-                else:
-                    print(f"❌ No history found for session: {args.session_id}")
+            elif args.chatbot_command == 'stats':
+                stats = chatbot_engine.get_stats()
+                print("📊 Chatbot Statistics:")
+                print(f"   Total FAQs: {stats['total_faqs']}")
+                print(f"   Business: {stats['business_name']}")
+                print(f"   OpenAI Available: {'✅ Yes' if stats['openai_available'] else '❌ No'}")
             
             else:
-                chatbot_parser.print_help()
+                print("Available chatbot commands: query, faq, stats")
         
         elif args.command == 'ai-creative':
             if args.ai_command == 'generate':
