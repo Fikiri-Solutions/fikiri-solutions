@@ -107,15 +107,15 @@ class WorkflowManager:
             job_name = self.jobs[job_id].name
             del self.jobs[job_id]
             self.logger.info(f"🗑️ Removed workflow job: {job_name}")
-                return True
-            except Exception as e:
+            return True
+        except Exception as e:
             self.logger.error(f"❌ Failed to remove job: {e}")
             return False
     
     def enable_job(self, job_id: str) -> bool:
         """Enable a workflow job."""
         if job_id not in self.jobs:
-                return False
+            return False
         
         self.jobs[job_id].enabled = True
         self.logger.info(f"✅ Enabled workflow job: {self.jobs[job_id].name}")
