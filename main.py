@@ -24,6 +24,11 @@ print("✅ Fikiri Solutions - Minimal Version Loading...")
 # Import configuration
 from core.config import get_config, Config, GmailConfig, EmailConfig, LoggingConfig
 
+# Import core modules
+from core.email_parser import EmailParser
+from core.gmail_utils import GmailService
+from core.actions import EmailActions
+
 
 class FikiriCLI:
     """Command-line interface for Fikiri Solutions Gmail Lead Responder."""
