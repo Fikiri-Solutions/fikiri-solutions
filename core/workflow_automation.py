@@ -107,15 +107,15 @@ class WorkflowManager:
             job_name = self.jobs[job_id].name
             del self.jobs[job_id]
             self.logger.info(f"🗑️ Removed workflow job: {job_name}")
-            return True
-        except Exception as e:
+                return True
+            except Exception as e:
             self.logger.error(f"❌ Failed to remove job: {e}")
             return False
     
     def enable_job(self, job_id: str) -> bool:
         """Enable a workflow job."""
         if job_id not in self.jobs:
-            return False
+                return False
         
         self.jobs[job_id].enabled = True
         self.logger.info(f"✅ Enabled workflow job: {self.jobs[job_id].name}")
@@ -145,6 +145,10 @@ class WorkflowManager:
                 'metadata': job.metadata
             })
         return jobs_info
+    
+    def list_active_workflows(self) -> List[WorkflowJob]:
+        """List all active workflow jobs."""
+        return list(self.jobs.values())
     
     def _scheduler_loop(self) -> None:
         """Main scheduler loop."""
@@ -181,8 +185,8 @@ class WorkflowManager:
             job.function(**job.metadata)
             
             self.logger.info(f"✅ Completed job: {job.name}")
-            
-        except Exception as e:
+                
+            except Exception as e:
             self.logger.error(f"❌ Job execution failed: {job.name} - {e}")
             # Still update timing to prevent immediate retry
             job.last_run = datetime.now()
@@ -231,7 +235,7 @@ class WorkflowManager:
         )
     
     def schedule_lead_ingestion(self, source: str = "webhook",
-                               interval_minutes: int = 15) -> str:
+                              interval_minutes: int = 15) -> str:
         """Schedule lead ingestion."""
         def lead_ingestion_job():
             # This would integrate with lead sources

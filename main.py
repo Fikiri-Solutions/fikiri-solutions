@@ -32,7 +32,11 @@ from core.auth import GmailAuthenticator, authenticate_gmail
 from core.crm_service import CRMService, Lead
 from core.crm_followups import CRMFollowupService
 from core.workflow_automation import workflow_manager
-from core.chatbot import chatbot_engine
+try:
+    from core.chatbot import chatbot_engine
+except Exception as e:
+    print(f"⚠️ Warning: Could not import chatbot_engine: {e}")
+    chatbot_engine = None
 
 
 class FikiriCLI:
@@ -449,6 +453,9 @@ Examples:
     chatbot_sub.add_parser('sessions', help='List active chat sessions')
     chatbot_sub.add_parser('session-history', help='Get session history').add_argument('--session-id', required=True, help='Session ID')
     
+    # Stats
+    chatbot_sub.add_parser('stats', help='Show chatbot statistics')
+    
     # AI Creative command group
     ai_parser = subparsers.add_parser('ai-creative', help='AI-Enhanced Creative Services')
     ai_sub = ai_parser.add_subparsers(dest='ai_command', help='AI Creative subcommands')
@@ -814,6 +821,10 @@ Examples:
                 workflow_parser.print_help()
         
         elif args.command == 'chatbot':
+            if chatbot_engine is None:
+                print("❌ Chatbot service is not available. Check the error above.")
+                return
+            
             if args.chatbot_command == 'query':
                 # Single query
                 response = chatbot_engine.generate_response(args.query)
