@@ -1,0 +1,21 @@
+# Fikiri Solutions - Render Deployment Configuration
+# Deploy to Render.com free tier
+
+# Build Command
+pip install -r requirements.txt
+
+# Start Command
+python app.py
+
+# Environment Variables (set in Render dashboard)
+# OPENAI_API_KEY=your_openai_api_key_here
+# GMAIL_CLIENT_ID=your_gmail_client_id
+# GMAIL_CLIENT_SECRET=your_gmail_client_secret
+# FLASK_ENV=production
+# PORT=8081
+
+# Health Check
+# GET /api/health
+
+# Auto-deploy from GitHub main branch
+# Enable in Render dashboard

@@ -1,0 +1,46 @@
+# Fikiri Solutions - Google Cloud App Engine Configuration
+# Deploy to Google Cloud Platform
+
+runtime: python39
+
+# Environment variables
+env_variables:
+  OPENAI_API_KEY: "your_openai_api_key_here"
+  GMAIL_CLIENT_ID: "your_gmail_client_id"
+  GMAIL_CLIENT_SECRET: "your_gmail_client_secret"
+  FLASK_ENV: "production"
+
+# Automatic scaling
+automatic_scaling:
+  min_instances: 1
+  max_instances: 10
+  target_cpu_utilization: 0.6
+
+# Health check
+health_check:
+  enable_health_check: True
+  check_interval_sec: 30
+  timeout_sec: 4
+  unhealthy_threshold: 2
+  healthy_threshold: 2
+  restart_threshold: 60
+
+# Resources
+resources:
+  cpu: 1
+  memory_gb: 0.5
+  disk_size_gb: 10
+
+# Handlers
+handlers:
+- url: /api/health
+  script: auto
+  login: optional
+
+- url: /api/.*
+  script: auto
+  login: optional
+
+- url: /.*
+  script: auto
+  login: optional

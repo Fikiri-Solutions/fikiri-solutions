@@ -4,10 +4,11 @@ Fikiri Solutions - Flask Web Application
 Web interface for testing and deploying Fikiri services.
 """
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 # from flask_cors import CORS  # Commented out - not essential
 import json
 import os
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -23,6 +24,10 @@ from core.minimal_ml_scoring import MinimalMLScoring
 from core.minimal_vector_search import MinimalVectorSearch
 # from core.strategic_hybrid_service import StrategicHybridService  # Removed - causing issues
 from core.feature_flags import get_feature_flags
+
+# Import enterprise features
+from core.enterprise_logging import log_api_request, log_service_action, log_security_event
+from core.enterprise_security import security_manager, UserRole, Permission
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -70,55 +75,364 @@ def initialize_services():
 # Initialize services on startup
 initialize_services()
 
+# Add request logging middleware
+@app.before_request
+def log_request():
+    """Log all incoming requests."""
+    request.start_time = time.time()
+
+@app.after_request
+def log_response(response):
+    """Log all outgoing responses."""
+    if hasattr(request, 'start_time'):
+        response_time = time.time() - request.start_time
+        log_api_request(
+            endpoint=request.endpoint or request.path,
+            method=request.method,
+            status_code=response.status_code,
+            response_time=response_time,
+            user_agent=request.headers.get('User-Agent')
+        )
+    return response
+
+# Add security endpoints
+@app.route('/api/auth/login', methods=['POST'])
+def api_login():
+    """User login endpoint."""
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        password = data.get('password')  # In production, use proper password hashing
+        
+        # For demo purposes, accept any password
+        user = security_manager.authenticate_user(email, password)
+        
+        if user:
+            session_obj = security_manager.create_session(
+                user, 
+                request.remote_addr, 
+                request.headers.get('User-Agent', '')
+            )
+            
+            session['session_id'] = session_obj.session_id
+            session['user_id'] = user.id
+            
+            log_security_event(
+                event_type="user_login",
+                severity="info",
+                details={"user_id": user.id, "email": user.email}
+            )
+            
+            return jsonify({
+                'success': True,
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    'name': user.name,
+                    'role': user.role.value
+                },
+                'session_id': session_obj.session_id
+            })
+        else:
+            log_security_event(
+                event_type="failed_login",
+                severity="warning",
+                details={"email": email, "ip": request.remote_addr}
+            )
+            return jsonify({'success': False, 'error': 'Invalid credentials'}), 401
+            
+    except Exception as e:
+        log_security_event(
+            event_type="login_error",
+            severity="error",
+            details={"error": str(e)}
+        )
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/auth/logout', methods=['POST'])
+def api_logout():
+    """User logout endpoint."""
+    try:
+        session_id = session.get('session_id')
+        if session_id:
+            security_manager.revoke_session(session_id)
+            session.clear()
+            
+            log_security_event(
+                event_type="user_logout",
+                severity="info",
+                details={"session_id": session_id}
+            )
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/auth/status')
+def api_auth_status():
+    """Check authentication status."""
+    try:
+        session_id = session.get('session_id')
+        if session_id:
+            session_obj = security_manager.validate_session(session_id)
+            if session_obj:
+                user = security_manager.get_user_by_id(session_obj.user_id)
+                if user:
+                    return jsonify({
+                        'authenticated': True,
+                        'user': {
+                            'id': user.id,
+                            'email': user.email,
+                            'name': user.name,
+                            'role': user.role.value
+                        }
+                    })
+        
+        return jsonify({'authenticated': False})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/users')
+def api_admin_users():
+    """Admin endpoint to list users."""
+    try:
+        session_id = session.get('session_id')
+        if not session_id:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        session_obj = security_manager.validate_session(session_id)
+        if not session_obj:
+            return jsonify({'error': 'Invalid session'}), 401
+        
+        user = security_manager.get_user_by_id(session_obj.user_id)
+        if not user or not security_manager.check_permission(user, Permission.MANAGE_USERS):
+            return jsonify({'error': 'Permission denied'}), 403
+        
+        users = security_manager.list_users()
+        return jsonify({
+            'users': [
+                {
+                    'id': u.id,
+                    'email': u.email,
+                    'name': u.name,
+                    'role': u.role.value,
+                    'is_active': u.is_active,
+                    'created_at': u.created_at,
+                    'last_login': u.last_login
+                }
+                for u in users
+            ]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/security-stats')
+def api_admin_security_stats():
+    """Admin endpoint for security statistics."""
+    try:
+        session_id = session.get('session_id')
+        if not session_id:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        session_obj = security_manager.validate_session(session_id)
+        if not session_obj:
+            return jsonify({'error': 'Invalid session'}), 401
+        
+        user = security_manager.get_user_by_id(session_obj.user_id)
+        if not user or not security_manager.check_permission(user, Permission.SYSTEM_CONFIG):
+            return jsonify({'error': 'Permission denied'}), 403
+        
+        stats = security_manager.get_security_stats()
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/')
 def index():
     """Main dashboard page."""
     return render_template('dashboard.html')
 
-@app.route('/api/status')
-def api_status():
-    """Get system status."""
+@app.route('/api/health')
+def api_health():
+    """Comprehensive health check endpoint for system monitoring."""
     try:
-        status = {
+        health_status = {
             'timestamp': datetime.now().isoformat(),
-            'services': {},
-            'feature_flags': {},
-            'capabilities': {}
+            'status': 'healthy',
+            'version': '1.0.0',
+            'uptime': 'running',
+            'checks': {
+                'gmail_auth': {'status': 'unknown', 'details': ''},
+                'vector_db': {'status': 'unknown', 'details': ''},
+                'crm_leads': {'status': 'unknown', 'details': ''},
+                'openai_key': {'status': 'unknown', 'details': ''},
+                'services': {'status': 'unknown', 'details': ''},
+                'feature_flags': {'status': 'unknown', 'details': ''}
+            },
+            'metrics': {
+                'total_services': len(services),
+                'initialized_services': 0,
+                'authenticated_services': 0,
+                'enabled_features': 0
+            }
         }
         
-        # Check service status
-        for service_name, service in services.items():
-            if service:
-                if hasattr(service, 'is_authenticated'):
-                    status['services'][service_name] = {
-                        'initialized': True,
-                        'authenticated': service.is_authenticated()
-                    }
-                elif hasattr(service, 'is_enabled'):
-                    status['services'][service_name] = {
-                        'initialized': True,
-                        'enabled': service.is_enabled()
+        # Check Gmail Authentication
+        try:
+            if services['auth'] and services['auth'].is_authenticated():
+                health_status['checks']['gmail_auth'] = {
+                    'status': 'healthy',
+                    'details': 'Gmail OAuth authenticated successfully'
+                }
+            else:
+                health_status['checks']['gmail_auth'] = {
+                    'status': 'unhealthy',
+                    'details': 'Gmail authentication required'
+                }
+        except Exception as e:
+            health_status['checks']['gmail_auth'] = {
+                'status': 'error',
+                'details': f'Gmail auth check failed: {str(e)}'
+            }
+        
+        # Check Vector DB
+        try:
+            if services['vector_search']:
+                stats = services['vector_search'].get_stats()
+                if stats.get('document_count', 0) > 0:
+                    health_status['checks']['vector_db'] = {
+                        'status': 'healthy',
+                        'details': f'Vector DB loaded with {stats["document_count"]} documents'
                     }
                 else:
-                    status['services'][service_name] = {
-                        'initialized': True
+                    health_status['checks']['vector_db'] = {
+                        'status': 'warning',
+                        'details': 'Vector DB initialized but no documents loaded'
                     }
             else:
-                status['services'][service_name] = {
-                    'initialized': False
+                health_status['checks']['vector_db'] = {
+                    'status': 'unhealthy',
+                    'details': 'Vector search service not initialized'
                 }
+        except Exception as e:
+            health_status['checks']['vector_db'] = {
+                'status': 'error',
+                'details': f'Vector DB check failed: {str(e)}'
+            }
         
-        # Get feature flags status
-        if services['feature_flags']:
-            status['feature_flags'] = services['feature_flags'].get_status_report()
+        # Check CRM Leads
+        try:
+            if services['crm']:
+                stats = services['crm'].get_lead_stats()
+                lead_count = stats.get('total_leads', 0)
+                if lead_count > 0:
+                    health_status['checks']['crm_leads'] = {
+                        'status': 'healthy',
+                        'details': f'CRM has {lead_count} leads available'
+                    }
+                else:
+                    health_status['checks']['crm_leads'] = {
+                        'status': 'warning',
+                        'details': 'CRM initialized but no leads available'
+                    }
+            else:
+                health_status['checks']['crm_leads'] = {
+                    'status': 'unhealthy',
+                    'details': 'CRM service not initialized'
+                }
+        except Exception as e:
+            health_status['checks']['crm_leads'] = {
+                'status': 'error',
+                'details': f'CRM check failed: {str(e)}'
+            }
         
-        # Get capabilities
-        # if services['hybrid']:  # Removed - causing issues
-        #     status['capabilities'] = services['hybrid'].get_strategic_report()
+        # Check OpenAI Key
+        try:
+            if services['ai_assistant']:
+                # Try to get usage stats to verify API key
+                stats = services['ai_assistant'].get_usage_stats()
+                health_status['checks']['openai_key'] = {
+                    'status': 'healthy',
+                    'details': f'OpenAI API key valid (calls: {stats.get("total_calls", 0)})'
+                }
+            else:
+                health_status['checks']['openai_key'] = {
+                    'status': 'unhealthy',
+                    'details': 'AI Assistant service not initialized'
+                }
+        except Exception as e:
+            health_status['checks']['openai_key'] = {
+                'status': 'error',
+                'details': f'OpenAI key check failed: {str(e)}'
+            }
         
-        return jsonify(status)
+        # Check All Services
+        initialized_count = 0
+        authenticated_count = 0
+        
+        for service_name, service in services.items():
+            if service:
+                initialized_count += 1
+                if hasattr(service, 'is_authenticated') and service.is_authenticated():
+                    authenticated_count += 1
+        
+        health_status['metrics']['initialized_services'] = initialized_count
+        health_status['metrics']['authenticated_services'] = authenticated_count
+        
+        if initialized_count == len(services):
+            health_status['checks']['services'] = {
+                'status': 'healthy',
+                'details': f'All {initialized_count} services initialized'
+            }
+        else:
+            health_status['checks']['services'] = {
+                'status': 'warning',
+                'details': f'{initialized_count}/{len(services)} services initialized'
+            }
+        
+        # Check Feature Flags
+        try:
+            if services['feature_flags']:
+                flags_status = services['feature_flags'].get_status_report()
+                enabled_count = sum(1 for flag in flags_status.get('flags', {}).values() if flag.get('enabled', False))
+                health_status['metrics']['enabled_features'] = enabled_count
+                
+                health_status['checks']['feature_flags'] = {
+                    'status': 'healthy',
+                    'details': f'Feature flags system active ({enabled_count} enabled)'
+                }
+            else:
+                health_status['checks']['feature_flags'] = {
+                    'status': 'unhealthy',
+                    'details': 'Feature flags service not initialized'
+                }
+        except Exception as e:
+            health_status['checks']['feature_flags'] = {
+                'status': 'error',
+                'details': f'Feature flags check failed: {str(e)}'
+            }
+        
+        # Determine overall health status
+        unhealthy_checks = [check for check in health_status['checks'].values() 
+                          if check['status'] in ['unhealthy', 'error']]
+        
+        if unhealthy_checks:
+            health_status['status'] = 'unhealthy'
+        elif any(check['status'] == 'warning' for check in health_status['checks'].values()):
+            health_status['status'] = 'degraded'
+        
+        return jsonify(health_status)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'timestamp': datetime.now().isoformat(),
+            'status': 'error',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/status')
+def api_status():
+    """Legacy status endpoint - redirects to health."""
+    return redirect(url_for('api_health'))
 
 @app.route('/api/test/email-parser', methods=['POST'])
 def api_test_email_parser():
