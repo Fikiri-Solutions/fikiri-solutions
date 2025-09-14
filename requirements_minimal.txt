@@ -1,39 +1,48 @@
-# Fikiri Solutions - Minimal Dependencies
-# Only essential dependencies for core functionality
+# Fikiri Solutions - Minimal Requirements
+# Lightweight dependencies only
 
-# Core Python utilities
-python-dotenv>=1.0.0
-requests>=2.31.0
-python-dateutil>=2.8.0
+# Core Python libraries (usually included)
+# json, base64, pathlib, typing, argparse, sys, os - all built-in
 
-# Google API dependencies (for Gmail)
-google-auth>=2.23.0
-google-auth-oauthlib>=1.1.0
-google-auth-httplib2>=0.1.1
-google-api-python-client>=2.100.0
+# Google API (minimal)
+google-auth>=2.0.0
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.1.0
+google-api-python-client>=2.0.0
 
-# Email and HTML processing
-beautifulsoup4>=4.12.0
+# AI Services (lightweight - NO heavy ML)
+openai>=1.0.0
+
+# Document Processing
+beautifulsoup4>=4.0.0
 html5lib>=1.1
 
-# OpenAI integration
-openai>=1.107.0
+# Web Framework
+flask>=2.0.0
+flask-cors>=3.0.0
 
-# Webhooks / API server
-fastapi>=0.110.0
-uvicorn>=0.23.0
+# Workflow Automation
+fastapi>=0.100.0
+uvicorn>=0.20.0
+pyyaml>=6.0
+click>=8.0
 
-# CLI interface
-click>=8.1.0
+# Strategic Heavy Dependencies (Optional - Use Feature Flags)
+# Uncomment only what you need:
+# scikit-learn>=1.0.0                    # For enhanced ML scoring
+# sentence-transformers>=2.0.0           # For better embeddings
+# faiss-cpu>=1.7.0                       # For fast vector search
+# transformers>=4.0.0                    # For advanced NLP
+# torch>=1.0.0                           # For PyTorch models
+# tensorflow>=2.0.0                      # For TensorFlow models
+# opencv-python>=4.0.0                   # For computer vision
+# pillow>=8.0.0                          # For image processing
 
-# Configuration
-pyyaml>=6.0.0
+# Optional: For better email parsing
+# email-validator>=1.0.0  # Uncomment if needed
+
+# Optional: For logging
+# colorlog>=6.0.0  # Uncomment if needed
 
 # Development (optional)
-pytest>=7.4.0
-
-# REMOVED HEAVY DEPENDENCIES:
-# ❌ scikit-learn>=1.7.0  # Not needed for simple chatbot
-# ❌ nltk>=3.9.0          # Not needed for simple chatbot
-# ❌ faiss-cpu>=1.12.0    # Not needed for simple chatbot
-# ❌ sentence-transformers>=5.1.0 # Not needed for simple chatbot
+# pytest>=7.0.0  # Uncomment for testing

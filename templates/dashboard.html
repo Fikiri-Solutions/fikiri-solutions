@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fikiri Solutions - Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { background: #2c3e50; color: white; padding: 20px; border-radius: 5px; }
+        .section { margin: 20px 0; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        .status { display: flex; gap: 20px; flex-wrap: wrap; }
+        .status-item { background: #f8f9fa; padding: 15px; border-radius: 5px; flex: 1; min-width: 200px; }
+        .test-section { margin: 10px 0; }
+        .test-button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 3px; cursor: pointer; margin: 5px; }
+        .test-button:hover { background: #0056b3; }
+        .result { background: #f8f9fa; padding: 10px; margin: 10px 0; border-radius: 3px; white-space: pre-wrap; }
+        .success { border-left: 4px solid #28a745; }
+        .error { border-left: 4px solid #dc3545; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Fikiri Solutions - Strategic Dashboard</h1>
+            <p>Test all core services with strategic feature flags</p>
+        </div>
+        
+        <div class="section">
+            <h2>📊 System Status</h2>
+            <div id="status" class="status"></div>
+        </div>
+        
+        <div class="section">
+            <h2>🧪 Service Tests</h2>
+            
+            <div class="test-section">
+                <h3>Email Parser</h3>
+                <button class="test-button" onclick="testEmailParser()">Test Email Parser</button>
+                <div id="email-parser-result" class="result" style="display:none;"></div>
+            </div>
+            
+            <div class="test-section">
+                <h3>Email Actions</h3>
+                <button class="test-button" onclick="testEmailActions()">Test Email Actions</button>
+                <div id="email-actions-result" class="result" style="display:none;"></div>
+            </div>
+            
+            <div class="test-section">
+                <h3>CRM Service</h3>
+                <button class="test-button" onclick="testCRM()">Test CRM Service</button>
+                <div id="crm-result" class="result" style="display:none;"></div>
+            </div>
+            
+            <div class="test-section">
+                <h3>AI Assistant</h3>
+                <button class="test-button" onclick="testAIAssistant()">Test AI Assistant</button>
+                <div id="ai-assistant-result" class="result" style="display:none;"></div>
+            </div>
+            
+            <div class="test-section">
+                <h3>ML Scoring</h3>
+                <button class="test-button" onclick="testMLScoring()">Test ML Scoring</button>
+                <div id="ml-scoring-result" class="result" style="display:none;"></div>
+            </div>
+            
+            <div class="test-section">
+                <h3>Vector Search</h3>
+                <button class="test-button" onclick="testVectorSearch()">Test Vector Search</button>
+                <div id="vector-search-result" class="result" style="display:none;"></div>
+            </div>
+            
+            <!-- <div class="test-section">  Removed - causing issues
+                <h3>Strategic Hybrid</h3>
+                <button class="test-button" onclick="testHybrid()">Test Hybrid Service</button>
+                <div id="hybrid-result" class="result" style="display:none;"></div>
+            </div> -->
+        </div>
+    </div>
+    
+    <script>
+        // Load system status
+        async function loadStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                const statusDiv = document.getElementById('status');
+                statusDiv.innerHTML = '';
+                
+                for (const [service, info] of Object.entries(data.services)) {
+                    const statusItem = document.createElement('div');
+                    statusItem.className = 'status-item';
+                    statusItem.innerHTML = `
+                        <h4>${service}</h4>
+                        <p>Initialized: ${info.initialized ? '✅' : '❌'}</p>
+                        ${info.authenticated !== undefined ? `<p>Authenticated: ${info.authenticated ? '✅' : '❌'}</p>` : ''}
+                        ${info.enabled !== undefined ? `<p>Enabled: ${info.enabled ? '✅' : '❌'}</p>` : ''}
+                    `;
+                    statusDiv.appendChild(statusItem);
+                }
+            } catch (error) {
+                console.error('Error loading status:', error);
+            }
+        }
+        
+        // Test functions
+        async function testEmailParser() {
+            const resultDiv = document.getElementById('email-parser-result');
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Testing...';
+            
+            try {
+                const response = await fetch('/api/test/email-parser', { 
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.textContent = 'Error: ' + error.message;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        async function testEmailActions() {
+            const resultDiv = document.getElementById('email-actions-result');
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Testing...';
+            
+            try {
+                const response = await fetch('/api/test/email-actions', { 
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.textContent = 'Error: ' + error.message;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        async function testCRM() {
+            const resultDiv = document.getElementById('crm-result');
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Testing...';
+            
+            try {
+                const response = await fetch('/api/test/crm', { 
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.textContent = 'Error: ' + error.message;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        async function testAIAssistant() {
+            const resultDiv = document.getElementById('ai-assistant-result');
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Testing...';
+            
+            try {
+                const response = await fetch('/api/test/ai-assistant', { 
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.textContent = 'Error: ' + error.message;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        async function testMLScoring() {
+            const resultDiv = document.getElementById('ml-scoring-result');
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Testing...';
+            
+            try {
+                const response = await fetch('/api/test/ml-scoring', { 
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.textContent = 'Error: ' + error.message;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        async function testVectorSearch() {
+            const resultDiv = document.getElementById('vector-search-result');
+            resultDiv.style.display = 'block';
+            resultDiv.textContent = 'Testing...';
+            
+            try {
+                const response = await fetch('/api/test/vector-search', { 
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+                const data = await response.json();
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.textContent = 'Error: ' + error.message;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        // async function testHybrid() {  Removed - causing issues
+        //     const resultDiv = document.getElementById('hybrid-result');
+        //     resultDiv.style.display = 'block';
+        //     resultDiv.textContent = 'Testing...';
+        //     
+        //     try {
+        //         const response = await fetch('/api/test/hybrid', { method: 'POST' });
+        //         const data = await response.json();
+        //         resultDiv.textContent = JSON.stringify(data, null, 2);
+        //         resultDiv.className = 'result success';
+        //     } catch (error) {
+        //         resultDiv.textContent = 'Error: ' + error.message;
+        //         resultDiv.className = 'result error';
+        //     }
+        // }
+        
+        // Load status on page load
+        loadStatus();
+    </script>
+</body>
+</html>

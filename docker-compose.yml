@@ -1,6 +1,0 @@
-services:
-  fikiri:
-    image: fikiri
-    build:
-      context: .
-      dockerfile: ./Dockerfile
