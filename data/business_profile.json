@@ -1,0 +1,20 @@
+{
+  "business_type": "general",
+  "priority_keywords": [
+    "business",
+    "automation",
+    "efficiency"
+  ],
+  "document_types": [
+    "emails",
+    "documents",
+    "reports"
+  ],
+  "response_tone": "professional",
+  "custom_prompts": {
+    "email": "Write a professional email about {topic}",
+    "blog": "Create an engaging blog post about {topic}",
+    "proposal": "Draft a business proposal for {topic}"
+  },
+  "created_at": "2025-09-12 21:39:52.720659"
+}

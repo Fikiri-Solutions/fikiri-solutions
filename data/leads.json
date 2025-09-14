@@ -1,0 +1,90 @@
+{
+  "leads": [
+    {
+      "id": "856630ba-0c1a-4aae-8587-b6878aad094d",
+      "name": "Jane Doe",
+      "email": "jane@example.com",
+      "source": "typeform",
+      "phone": null,
+      "company": null,
+      "notes": null,
+      "tags": [],
+      "stage": "new",
+      "score": null,
+      "created_at": "2025-09-11T06:19:38.830042",
+      "updated_at": "2025-09-11T06:19:38.830204"
+    },
+    {
+      "id": "29ff22ef-1b98-489b-b999-7ef58e584b90",
+      "name": "John Smith",
+      "email": "john@acme.co",
+      "source": "manual",
+      "phone": null,
+      "company": "Acme",
+      "notes": null,
+      "tags": [
+        "vip"
+      ],
+      "stage": "contacted",
+      "score": null,
+      "created_at": "2025-09-11T06:19:38.830472",
+      "updated_at": "2025-09-11T06:19:38.830474"
+    },
+    {
+      "id": "f978ca5d-c6b1-489b-8b5a-c04cdfa4ba8e",
+      "name": "John Smith",
+      "email": "john@acme.com",
+      "source": "csv",
+      "phone": "555-1234",
+      "company": "Acme Corp",
+      "notes": "Need urgent quote",
+      "tags": "vip",
+      "stage": "contacted",
+      "score": 8.0,
+      "created_at": "2025-09-11T21:24:23.755908",
+      "updated_at": "2025-09-11T21:24:35.955460"
+    },
+    {
+      "id": "3274feae-6850-49b0-9fda-2fdbb3f8d455",
+      "name": "Jane Doe",
+      "email": "jane@startup.io",
+      "source": "csv",
+      "phone": "555-5678",
+      "company": "Startup Inc",
+      "notes": "Interested in automation",
+      "tags": "lead",
+      "stage": "new",
+      "score": 1.0,
+      "created_at": "2025-09-11T21:24:23.756242",
+      "updated_at": "2025-09-11T21:24:23.756244"
+    },
+    {
+      "id": "2a18fe8b-db0f-41e3-ba66-1fa65b003ca6",
+      "name": "Test Lead",
+      "email": "test@example.com",
+      "source": "manual",
+      "phone": null,
+      "company": "Test Corp",
+      "notes": null,
+      "tags": [],
+      "stage": "new",
+      "score": 1.0,
+      "created_at": "2025-09-13T01:07:20.119284",
+      "updated_at": "2025-09-13T01:07:20.119457"
+    },
+    {
+      "id": "071853a6-406c-4aca-952a-6cbceba72cdc",
+      "name": "Alice Johnson",
+      "email": "alice@startup.com",
+      "source": "tally",
+      "phone": null,
+      "company": null,
+      "notes": "Need urgent help with automation setup",
+      "tags": [],
+      "stage": "new",
+      "score": 4.0,
+      "created_at": "2025-09-13T01:09:50.574521",
+      "updated_at": "2025-09-13T01:09:50.574526"
+    }
+  ]
+}

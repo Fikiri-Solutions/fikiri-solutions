@@ -1,0 +1,35 @@
+Hi {sender_name},
+
+Thank you for contacting Fikiri Solutions support! 🛠️
+
+I've received your message regarding "{subject}" and I understand you need assistance. Our support team is committed to resolving your issue quickly and efficiently.
+
+**Support Process:**
+🔍 **Issue Review**: We'll analyze your request within 2 hours
+📋 **Priority Assessment**: Urgent issues are escalated immediately
+👨‍💻 **Technical Support**: Our experts will provide detailed assistance
+✅ **Resolution Tracking**: We'll follow up until your issue is resolved
+
+**Immediate Support Options:**
+📞 **Phone Support**: (555) 123-4567 (Mon-Fri, 9AM-6PM EST)
+📧 **Email Support**: support@fikirisolutions.com
+💬 **Live Chat**: Available on our website
+📚 **Knowledge Base**: https://fikirisolutions.com/support
+
+**Common Solutions:**
+• Gmail API authentication issues
+• Email parsing configuration
+• Template customization
+• Integration troubleshooting
+• Performance optimization
+
+**For Urgent Issues:**
+If this is a critical business issue affecting your operations, please call us directly at (555) 123-4567 and mention "URGENT" for immediate assistance.
+
+We're here to ensure your Fikiri Solutions experience is smooth and successful! 🎯
+
+Best regards,
+Fikiri Solutions Support Team
+
+---
+*This is an automated response. A support specialist will follow up within 2 hours.*

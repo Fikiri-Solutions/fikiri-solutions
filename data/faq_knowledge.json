@@ -1,0 +1,178 @@
+{
+  "faqs": [
+    {
+      "id": "faq_001",
+      "question": "What services does Fikiri Solutions offer?",
+      "answer": "Fikiri Solutions offers comprehensive business automation services including AI Email Assistant, Intelligent CRM Automations, AI Document & Form Assistants, Business Workflow Automations, and more. We help businesses streamline their operations and reduce manual work.",
+      "keywords": [
+        "services",
+        "offer",
+        "business",
+        "automation",
+        "email",
+        "crm"
+      ],
+      "category": "general",
+      "priority": 5,
+      "created_at": "2025-09-12T21:30:38.794113",
+      "updated_at": "2025-09-12T21:30:38.794118",
+      "usage_count": 1
+    },
+    {
+      "id": "faq_002",
+      "question": "How do I get started with Fikiri Solutions?",
+      "answer": "To get started, you can contact us at info@fikirisolutions.com or visit our website at https://fikirisolutions.com. We'll schedule a consultation to understand your needs and recommend the best automation solutions for your business.",
+      "keywords": [
+        "start",
+        "begin",
+        "get started",
+        "contact",
+        "consultation"
+      ],
+      "category": "getting_started",
+      "priority": 5,
+      "created_at": "2025-09-12T21:30:38.794120",
+      "updated_at": "2025-09-12T21:30:38.794121",
+      "usage_count": 0
+    },
+    {
+      "id": "faq_003",
+      "question": "What is the AI Email Assistant?",
+      "answer": "Our AI Email Assistant automatically processes your Gmail inbox, identifies leads, sends personalized responses, and manages your email workflow. It reduces inbox clutter and ensures fast response times to potential customers.",
+      "keywords": [
+        "email",
+        "assistant",
+        "gmail",
+        "inbox",
+        "leads",
+        "automation"
+      ],
+      "category": "email_assistant",
+      "priority": 4,
+      "created_at": "2025-09-12T21:30:38.794122",
+      "updated_at": "2025-09-12T21:30:38.794122",
+      "usage_count": 1
+    },
+    {
+      "id": "faq_004",
+      "question": "How does the CRM automation work?",
+      "answer": "Our Intelligent CRM Automations automatically capture leads from webhooks, score them based on keywords and behavior, track their progress through sales stages, and generate personalized follow-up emails. It's a custom-built CRM tailored to your pipeline.",
+      "keywords": [
+        "crm",
+        "leads",
+        "scoring",
+        "stages",
+        "follow-up",
+        "automation"
+      ],
+      "category": "crm",
+      "priority": 4,
+      "created_at": "2025-09-12T21:30:38.794123",
+      "updated_at": "2025-09-12T21:30:38.794124",
+      "usage_count": 0
+    },
+    {
+      "id": "faq_005",
+      "question": "What are Business Workflow Automations?",
+      "answer": "Business Workflow Automations (BWA) schedule and execute repetitive tasks automatically. This includes scheduled email processing, CRM follow-ups, lead ingestion, and business hours workflows. Your team works less on repetitive tasks and more on creative work.",
+      "keywords": [
+        "workflow",
+        "automation",
+        "schedule",
+        "tasks",
+        "repetitive"
+      ],
+      "category": "workflow",
+      "priority": 3,
+      "created_at": "2025-09-12T21:30:38.794125",
+      "updated_at": "2025-09-12T21:30:38.794125",
+      "usage_count": 0
+    },
+    {
+      "id": "faq_006",
+      "question": "How much does Fikiri Solutions cost?",
+      "answer": "Our pricing is customized based on your specific needs and the services you require. We offer flexible packages that scale with your business. Contact us at info@fikirisolutions.com for a personalized quote.",
+      "keywords": [
+        "cost",
+        "price",
+        "pricing",
+        "quote",
+        "money"
+      ],
+      "category": "pricing",
+      "priority": 4,
+      "created_at": "2025-09-12T21:30:38.794126",
+      "updated_at": "2025-09-12T21:30:38.794127",
+      "usage_count": 0
+    },
+    {
+      "id": "faq_007",
+      "question": "Do you offer support?",
+      "answer": "Yes! We provide comprehensive support for all our services. You can reach our support team at support@fikirisolutions.com or visit https://fikirisolutions.com/support for additional resources and documentation.",
+      "keywords": [
+        "support",
+        "help",
+        "assistance",
+        "contact"
+      ],
+      "category": "support",
+      "priority": 3,
+      "created_at": "2025-09-12T21:30:38.794130",
+      "updated_at": "2025-09-12T21:30:38.794131",
+      "usage_count": 0
+    },
+    {
+      "id": "faq_008",
+      "question": "Is my data secure?",
+      "answer": "Absolutely. We take data security seriously and implement industry-standard security measures to protect your information. All data is encrypted in transit and at rest, and we comply with relevant privacy regulations.",
+      "keywords": [
+        "security",
+        "data",
+        "privacy",
+        "safe",
+        "encrypted"
+      ],
+      "category": "security",
+      "priority": 4,
+      "created_at": "2025-09-12T21:30:38.794132",
+      "updated_at": "2025-09-12T21:30:38.794132",
+      "usage_count": 0
+    },
+    {
+      "id": "faq_009",
+      "question": "Can I integrate with my existing tools?",
+      "answer": "Yes! Our solutions are designed to integrate with popular business tools and platforms. We support webhook integrations with Tally, Typeform, Calendly, and many other services. Contact us to discuss your specific integration needs.",
+      "keywords": [
+        "integrate",
+        "tools",
+        "platforms",
+        "webhook",
+        "existing"
+      ],
+      "category": "integration",
+      "priority": 3,
+      "created_at": "2025-09-12T21:30:38.794133",
+      "updated_at": "2025-09-12T21:30:38.794134",
+      "usage_count": 0
+    },
+    {
+      "id": "faq_010",
+      "question": "How long does implementation take?",
+      "answer": "Implementation time varies based on the complexity of your requirements. Simple setups can be completed in a few days, while more complex integrations may take a few weeks. We'll provide a detailed timeline during our consultation.",
+      "keywords": [
+        "implementation",
+        "time",
+        "setup",
+        "timeline",
+        "days",
+        "weeks"
+      ],
+      "category": "implementation",
+      "priority": 3,
+      "created_at": "2025-09-12T21:30:38.794135",
+      "updated_at": "2025-09-12T21:30:38.794135",
+      "usage_count": 0
+    }
+  ],
+  "last_updated": "2025-09-12T21:31:16.636264"
+}

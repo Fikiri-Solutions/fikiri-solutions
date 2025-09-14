@@ -1,0 +1,37 @@
+Hi {sender_name},
+
+Thank you for contacting Fikiri Solutions! 📧
+
+I've received your message regarding "{subject}" and I appreciate you reaching out. Our team will review your inquiry and get back to you with a personalized response.
+
+**Response Timeline:**
+📅 **Standard Response**: Within 24 hours during business days
+📋 **Review Process**: Your message will be categorized and routed appropriately
+👨‍💻 **Team Assignment**: The most qualified specialist will handle your inquiry
+📞 **Follow-up**: We'll contact you via your preferred method
+
+**Contact Information:**
+📧 **Email**: info@fikirisolutions.com
+📞 **Phone**: (555) 123-4567
+🌐 **Website**: https://fikirisolutions.com
+🕒 **Hours**: Monday-Friday, 9AM-6PM EST
+
+**About Fikiri Solutions:**
+We're a leading provider of AI automation solutions for small businesses. Our platform helps streamline workflows, automate email responses, and integrate with your existing business tools.
+
+**Our Services:**
+• Gmail Lead Response Automation
+• Appointment Scheduling Systems
+• AI-Powered CRM Integration
+• Smart Analytics Dashboards
+• Custom Workflow Automation
+
+If you have any questions or need immediate assistance, please don't hesitate to call us directly at (555) 123-4567.
+
+Thank you for considering Fikiri Solutions for your automation needs! 🚀
+
+Best regards,
+The Fikiri Solutions Team
+
+---
+*This is an automated response. A team member will follow up personally within 24 hours.*
