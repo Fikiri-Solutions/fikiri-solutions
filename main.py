@@ -32,6 +32,7 @@ from core.auth import GmailAuthenticator, authenticate_gmail
 from core.crm_service import CRMService, Lead
 from core.crm_followups import CRMFollowupService
 from core.workflow_automation import workflow_manager
+from core.chatbot import chatbot_engine
 
 
 class FikiriCLI:
