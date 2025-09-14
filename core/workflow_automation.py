@@ -7,7 +7,7 @@ Handles automated workflows and scheduling.
 import logging
 import threading
 import time
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional, Callable, List
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 import uuid
