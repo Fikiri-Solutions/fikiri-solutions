@@ -31,6 +31,7 @@ from core.actions import EmailActions
 from core.auth import GmailAuthenticator, authenticate_gmail
 from core.crm_service import CRMService, Lead
 from core.crm_followups import CRMFollowupService
+from core.workflow_automation import workflow_manager
 
 
 class FikiriCLI:
