@@ -1,6 +1,6 @@
-# Fikiri Solutions - Gmail Lead Responder
+# Fikiri Solutions - Gmail Lead Responder & AI Automation Suite
 
-A modular AI automation platform focused on helping small businesses streamline workflows using Gmail API, email processing, and automated responses.
+A lightweight, AI-powered business automation platform focused on Gmail integration, email processing, and intelligent lead management. Built with simplicity and extensibility in mind.
 
 ## 🚀 Features
 
@@ -8,28 +8,40 @@ A modular AI automation platform focused on helping small businesses streamline 
 - **Email Processing**: Comprehensive email parsing with MIME support
 - **Automated Responses**: Template-based automatic reply system
 - **Email Management**: Mark as read/unread, archive, delete, star, and label operations
-- **CLI Interface**: Easy-to-use command-line interface
+- **CLI Interface**: Easy-to-use command-line interface with comprehensive commands
 - **Configuration Management**: Flexible configuration with environment variable support
+- **Docker Support**: Containerized deployment with Docker Compose
+- **Monitoring**: Prometheus and Grafana integration for system monitoring
 - **Type Safety**: Full type hints throughout the codebase
 - **Modular Design**: Clean, extensible architecture for future integrations
 
 ## 📁 Project Structure
 
 ```
-fikiri_gmail_assistant/
-├── core/
-│   ├── auth.py          # Gmail API authentication
-│   ├── gmail_utils.py   # Gmail service operations
-│   ├── email_parser.py  # Email parsing and MIME handling
-│   ├── actions.py       # Email management operations
-│   └── config.py        # Configuration management
-├── auth/
-│   ├── credentials.json # Google OAuth2 credentials (you provide)
-│   └── token.pkl        # Authentication token (auto-generated)
-├── main.py              # CLI entry point
-├── requirements.txt     # Python dependencies
-├── config.json          # Configuration file (auto-generated)
-└── README.md            # This file
+fikiri-solutions/
+├── core/                    # Core business logic (simplified)
+├── auth/                    # Authentication files
+│   ├── credentials.json.template
+│   └── token.pkl
+├── data/                    # Data storage
+│   ├── business_profile.json
+│   ├── faq_knowledge.json
+│   ├── leads.csv
+│   └── leads.json
+├── templates/               # Email response templates
+│   ├── general_response.txt
+│   ├── lead_response.txt
+│   ├── support_response.txt
+│   └── urgent_response.txt
+├── monitoring/              # Monitoring configuration
+│   ├── prometheus.yml
+│   └── grafana/
+├── tests/                   # Test files
+├── main.py                  # CLI entry point
+├── requirements.txt         # Python dependencies
+├── Dockerfile              # Docker configuration
+├── docker-compose.yml      # Docker Compose setup
+└── README.md               # This file
 ```
 
 ## 🛠 Installation
@@ -40,12 +52,12 @@ fikiri_gmail_assistant/
 - Google Cloud Platform account
 - Gmail API enabled
 
-### Setup
+### Quick Start
 
-1. **Clone or download the project**:
+1. **Clone the repository**:
    ```bash
-   # If you have the files locally, navigate to the directory
-   cd /path/to/fikiri_gmail_assistant
+   git clone https://github.com/Fikiri-Solutions/fikiri-solutions.git
+   cd fikiri-solutions
    ```
 
 2. **Install dependencies**:
@@ -61,10 +73,9 @@ fikiri_gmail_assistant/
    - Download the credentials JSON file
    - Place it in the `auth/` directory as `credentials.json`
 
-4. **Create auth directory**:
+4. **Authenticate with Gmail**:
    ```bash
-   mkdir -p auth
-   # Place your credentials.json file in the auth/ directory
+   python main.py auth
    ```
 
 ## 🔐 Authentication
@@ -92,91 +103,77 @@ fikiri_gmail_assistant/
 
 ### Command Line Interface
 
-#### List Emails
+The CLI supports multiple commands for different operations:
+
+#### Authentication
+```bash
+# Authenticate with Gmail
+python main.py auth
+
+# Check authentication status
+python main.py status
+```
+
+#### Email Operations
 ```bash
 # List unread emails
 python main.py list --query "is:unread" --max 10
 
-# List emails from specific sender
-python main.py list --query "from:example@gmail.com"
+# Fetch emails with details
+python main.py fetch --query "is:unread" --detailed
 
-# List emails with specific subject
-python main.py list --query "subject:urgent"
-```
-
-#### Process Emails
-```bash
-# Process unread emails (dry run)
+# Process emails (dry run)
 python main.py process --query "is:unread" --dry-run
 
 # Process emails with auto-reply
 python main.py process --query "is:unread" --auto-reply
-
-# Process specific message
-python main.py process --msg-id "MESSAGE_ID_HERE"
 ```
 
 #### Email Management
-```python
-from core.auth import authenticate_gmail
-from core.actions import EmailActions
+```bash
+# Send test reply
+python main.py reply --msg-id "MESSAGE_ID" --text "Test reply"
 
-# Authenticate
-service = authenticate_gmail('auth/credentials.json', 'auth/token.pkl')
-actions = EmailActions(service)
-
-# Mark as read
-actions.mark_as_read('MESSAGE_ID')
-
-# Archive message
-actions.archive_message('MESSAGE_ID')
-
-# Star message
-actions.star_message('MESSAGE_ID')
-
-# Add custom labels
-actions.add_labels('MESSAGE_ID', ['LABEL_ID_1', 'LABEL_ID_2'])
+# Email actions
+python main.py actions --msg-id "MESSAGE_ID" --action read
+python main.py actions --msg-id "MESSAGE_ID" --action archive
+python main.py actions --msg-id "MESSAGE_ID" --action star
 ```
 
-### Programmatic Usage
+#### CRM Operations
+```bash
+# Ingest leads from JSON
+python main.py crm ingest --json '[{"name":"Test Lead","email":"test@example.com"}]'
 
-```python
-from core.auth import GmailAuthenticator
-from core.gmail_utils import GmailService
-from core.email_parser import EmailParser
-from core.actions import EmailActions
+# Ingest leads from CSV
+python main.py crm ingest --from-csv data/leads.csv
 
-# Initialize services
-authenticator = GmailAuthenticator('auth/credentials.json', 'auth/token.pkl')
-service = authenticator.authenticate()
+# List all leads
+python main.py crm list
 
-gmail_service = GmailService(service)
-email_parser = EmailParser()
-email_actions = EmailActions(service)
+# Generate follow-ups (preview)
+python main.py crm followup --stage new
 
-# List and process emails
-messages = gmail_service.list_messages("is:unread", max_results=5)
+# Send follow-ups
+python main.py crm followup --stage contacted --send
 
-for message in messages:
-    msg_id = message['id']
-    
-    # Get full message
-    full_message = gmail_service.get_message(msg_id)
-    
-    # Parse email
-    parsed_data = email_parser.parse_message(full_message)
-    
-    # Process based on content
-    sender = parsed_data['headers']['from']
-    subject = parsed_data['headers']['subject']
-    body = parsed_data['body']['text']
-    
-    print(f"From: {sender}")
-    print(f"Subject: {subject}")
-    print(f"Body: {body[:100]}...")
-    
-    # Mark as read
-    email_actions.mark_as_read(msg_id)
+# Update lead stage
+python main.py crm stage --id <lead_id> --to replied
+```
+
+#### Workflow Automation
+```bash
+# Schedule email processing
+python main.py workflow schedule-email --query "is:unread" --interval 30 --auto-reply
+
+# Schedule CRM follow-ups
+python main.py workflow schedule-crm --interval-hours 24 --send
+
+# List active workflows
+python main.py workflow list
+
+# Stop workflows
+python main.py workflow stop --all
 ```
 
 ## ⚙️ Configuration
@@ -193,7 +190,7 @@ GMAIL_MAX_RESULTS=10
 
 # Email settings
 AUTO_REPLY_ENABLED=true
-REPLY_TEMPLATE="Hi {sender_name},\n\nThank you for your email regarding \"{subject}\".\n\nI have received your message and will get back to you as soon as possible.\n\nBest regards,\nYour Name"
+REPLY_TEMPLATE="Hi {sender_name},\n\nThank you for your email regarding \"{subject}\".\n\nI have received your message and will get back to you as soon as possible.\n\nBest regards,\nFikiri Solutions Team"
 EMAIL_SIGNATURE="\n\n---\nFikiri Solutions\nAutomated Response System"
 
 # General settings
@@ -201,44 +198,68 @@ DEBUG=false
 DRY_RUN=false
 ```
 
-### Configuration File
+### Dry Run Mode
 
-The system automatically creates a `config.json` file with default settings:
+Test your configuration without sending actual emails:
 
-```json
-{
-  "gmail": {
-    "credentials_path": "auth/credentials.json",
-    "token_path": "auth/token.pkl",
-    "scopes": ["https://www.googleapis.com/auth/gmail.modify"],
-    "user_id": "me",
-    "max_results": 10,
-    "batch_size": 100
-  },
-  "email": {
-    "auto_reply_enabled": false,
-    "reply_template": "",
-    "signature": "",
-    "max_attachments": 5,
-    "supported_mime_types": [
-      "text/plain",
-      "text/html",
-      "multipart/alternative",
-      "multipart/mixed",
-      "multipart/related"
-    ]
-  },
-  "logging": {
-    "level": "INFO",
-    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    "file_path": null,
-    "max_file_size": 10485760,
-    "backup_count": 5
-  },
-  "debug": false,
-  "dry_run": false
-}
+```bash
+# Set environment variable
+export DRY_RUN=true
+
+# Or use command flag
+python main.py process --query "is:unread" --dry-run
 ```
+
+## 🐳 Docker Deployment
+
+### Using Docker Compose
+
+1. **Start the services**:
+   ```bash
+   docker-compose up -d
+   ```
+
+2. **View logs**:
+   ```bash
+   docker-compose logs -f
+   ```
+
+3. **Stop services**:
+   ```bash
+   docker-compose down
+   ```
+
+### Manual Docker Build
+
+```bash
+# Build the image
+docker build -t fikiri-solutions .
+
+# Run the container
+docker run -it --rm fikiri-solutions python main.py --help
+```
+
+## 📊 Monitoring
+
+The project includes monitoring setup with Prometheus and Grafana:
+
+### Start Monitoring Stack
+
+```bash
+# Start monitoring services
+docker-compose -f monitoring/docker-compose.yml up -d
+
+# Access Grafana dashboard
+open http://localhost:3000
+# Default credentials: admin/admin
+```
+
+### Available Dashboards
+
+- **System Metrics**: CPU, memory, disk usage
+- **Email Processing**: Email counts, processing times
+- **CRM Metrics**: Lead counts, conversion rates
+- **Error Tracking**: Error rates and types
 
 ## 🔍 Gmail Search Queries
 
@@ -271,84 +292,30 @@ subject:invoice is:unread    # Unread invoices
 
 ## 🧪 Testing
 
-### Dry Run Mode
+### Test in Google Colab
 
-Test your configuration without sending actual emails:
+1. **Open Google Colab**: https://colab.research.google.com/
+2. **Clone the repository**:
+   ```python
+   !git clone https://github.com/Fikiri-Solutions/fikiri-solutions.git
+   !cd fikiri-solutions && pip install -r requirements.txt
+   ```
+3. **Test the CLI**:
+   ```python
+   !python main.py --help
+   ```
+
+### Local Testing
 
 ```bash
-python main.py process --query "is:unread" --dry-run
-```
+# Test authentication
+python main.py auth
 
-### CRM Testing
+# Test email listing
+python main.py list --query "is:unread" --max 5
 
-Test CRM functionality:
-
-```bash
-# Test CRM ingestion
-python3 main.py crm ingest --json '[{"name":"Test Lead","email":"test@example.com"}]'
-
-# Test follow-up generation (dry-run)
-python3 main.py crm followup --stage new
-
-# Test webhook endpoints
-uvicorn core.crm_sources:app --port 8000
-# POST to http://localhost:8000/webhook/tally
-```
-
-### Manual Testing
-
-```python
-# Test email parsing
-from core.email_parser import EmailParser
-
-parser = EmailParser()
-# Use with mock data or real message IDs
-
-# Test CRM service
-from core.crm_service import CRMService
-crm = CRMService()
-leads = crm.list()
-```
-
-## 📊 CRM Features
-
-### Intelligent CRM Automations
-
-The platform includes a comprehensive CRM system for lead management:
-
-#### Lead Ingestion
-- **CSV Import**: `
-python3 main.py crm ingest --from-csv data/leads.csv`
-- **JSON Import**: `python3 main.py crm ingest --json '[{"name":"Lead","email":"lead@example.com"}]'`
-- **Webhook Endpoints**: `/webhook/tally`, `/webhook/typeform`, `/webhook/calendly`
-
-#### Storage Options
-- **Local JSON**: Default storage in `data/leads.json`
-- **Google Sheets**: Set `ENABLE_GOOGLE_SHEETS=1` and `GOOGLE_SHEET_ID`
-- **Notion**: Set `ENABLE_NOTION=1`, `NOTION_API_KEY`, and `NOTION_DB_ID`
-
-#### Lead Management
-- **Deduplication**: Automatic deduplication by email address
-- **Scoring**: Keyword-based lead scoring (1-10 scale)
-- **Stage Tracking**: `new`, `contacted`, `replied`, `won`, `lost`
-- **Follow-ups**: AI-generated follow-up emails with Gmail integration
-
-#### CRM Commands
-```bash
-# List all leads
-python3 main.py crm list
-
-# Generate follow-ups (dry-run)
-python3 main.py crm followup --stage new
-
-# Send follow-ups
-python3 main.py crm followup --stage contacted --send
-
-# Update lead stage
-python3 main.py crm stage --id <lead_id> --to replied
-
-# Daily follow-up trigger
-curl -X POST http://localhost:8000/trigger/followups
+# Test CRM functionality
+python main.py crm list
 ```
 
 ## 🚀 Future Enhancements
@@ -361,23 +328,6 @@ curl -X POST http://localhost:8000/trigger/followups
 - **Advanced Analytics**: Email metrics and CRM reporting
 - **Multi-account Support**: Handle multiple Gmail accounts
 - **Advanced Scheduling**: APScheduler integration for automated workflows
-
-### Integration Examples
-
-```python
-# Future AI integration
-from core.ai_classifier import EmailClassifier
-
-classifier = EmailClassifier()
-email_type = classifier.classify_email(parsed_data)
-# Returns: 'lead', 'support', 'spam', 'urgent', etc.
-
-# Future webhook integration
-from core.webhooks import WebhookManager
-
-webhook = WebhookManager()
-webhook.trigger_lead_notification(parsed_data)
-```
 
 ## 🛡️ Security
 
@@ -453,3 +403,10 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ---
 
 **Fikiri Solutions** - Streamlining business workflows with intelligent automation.
+
+## 🔗 Links
+
+- **GitHub Repository**: https://github.com/Fikiri-Solutions/fikiri-solutions
+- **Documentation**: See `API_DOCUMENTATION.md` for detailed API reference
+- **Authentication Setup**: See `AUTHENTICATION_SETUP.md` for detailed setup instructions
+- **Performance Optimization**: See `PERFORMANCE_OPTIMIZATION.md` for optimization tips
