@@ -32,11 +32,7 @@ from core.auth import GmailAuthenticator, authenticate_gmail
 from core.crm_service import CRMService, Lead
 from core.crm_followups import CRMFollowupService
 from core.workflow_automation import workflow_manager
-try:
-    from core.chatbot import chatbot_engine
-except Exception as e:
-    print(f"⚠️ Warning: Could not import chatbot_engine: {e}")
-    chatbot_engine = None
+# Chatbot functionality removed for now
 
 
 class FikiriCLI:
@@ -410,51 +406,7 @@ Examples:
     workflow_sub.add_parser('start', help='Start workflow scheduler')
     workflow_sub.add_parser('stop-scheduler', help='Stop workflow scheduler')
     
-    # Chatbot command group
-    chatbot_parser = subparsers.add_parser('chatbot', help='Chatbot Integration & Smart FAQs')
-    chatbot_sub = chatbot_parser.add_subparsers(dest='chatbot_command', help='Chatbot subcommands')
-
-    # Chat with bot
-    chatbot_chat = chatbot_sub.add_parser('chat', help='Start interactive chat session')
-    chatbot_chat.add_argument('--session-id', help='Continue existing session')
-    chatbot_chat.add_argument('--user-id', help='User identifier')
-
-    # Query bot
-    chatbot_query = chatbot_sub.add_parser('query', help='Send a single query to the bot')
-    chatbot_query.add_argument('query', help='Query to send to the bot')
-    chatbot_query.add_argument('--session-id', help='Session ID to use')
-    chatbot_query.add_argument('--user-id', help='User identifier')
-
-    # FAQ management
-    chatbot_faq = chatbot_sub.add_parser('faq', help='FAQ management')
-    chatbot_faq_sub = chatbot_faq.add_subparsers(dest='faq_command', help='FAQ subcommands')
-    
-    chatbot_faq_sub.add_parser('list', help='List all FAQs')
-    chatbot_faq_sub.add_parser('search', help='Search FAQs').add_argument('query', help='Search query')
-    
-    chatbot_faq_add = chatbot_faq_sub.add_parser('add', help='Add new FAQ')
-    chatbot_faq_add.add_argument('--question', required=True, help='FAQ question')
-    chatbot_faq_add.add_argument('--answer', required=True, help='FAQ answer')
-    chatbot_faq_add.add_argument('--keywords', help='Comma-separated keywords')
-    chatbot_faq_add.add_argument('--category', default='general', help='FAQ category')
-    chatbot_faq_add.add_argument('--priority', type=int, default=1, help='Priority (1-5)')
-    
-    chatbot_faq_update = chatbot_faq_sub.add_parser('update', help='Update FAQ')
-    chatbot_faq_update.add_argument('--id', required=True, help='FAQ ID')
-    chatbot_faq_update.add_argument('--question', help='New question')
-    chatbot_faq_update.add_argument('--answer', help='New answer')
-    chatbot_faq_update.add_argument('--keywords', help='New keywords')
-    chatbot_faq_update.add_argument('--category', help='New category')
-    chatbot_faq_update.add_argument('--priority', type=int, help='New priority')
-    
-    chatbot_faq_sub.add_parser('delete', help='Delete FAQ').add_argument('--id', required=True, help='FAQ ID')
-
-    # Session management
-    chatbot_sub.add_parser('sessions', help='List active chat sessions')
-    chatbot_sub.add_parser('session-history', help='Get session history').add_argument('--session-id', required=True, help='Session ID')
-    
-    # Stats
-    chatbot_sub.add_parser('stats', help='Show chatbot statistics')
+    # Chatbot functionality removed for now
     
     # AI Creative command group
     ai_parser = subparsers.add_parser('ai-creative', help='AI-Enhanced Creative Services')
@@ -820,57 +772,7 @@ Examples:
             else:
                 workflow_parser.print_help()
         
-        elif args.command == 'chatbot':
-            if chatbot_engine is None:
-                print("❌ Chatbot service is not available. Check the error above.")
-                return
-            
-            if args.chatbot_command == 'query':
-                # Single query
-                response = chatbot_engine.generate_response(args.query)
-                
-                print(f"🤖 Bot Response:")
-                print(f"   {response['answer']}")
-                print(f"\n📊 Confidence: {response['confidence']:.2f}")
-                print(f"📂 Source: {response['source']}")
-                
-                if response.get('suggestions'):
-                    print(f"\n💡 Related questions:")
-                    for suggestion in response['suggestions']:
-                        print(f"   • {suggestion}")
-            
-            elif args.chatbot_command == 'faq':
-                if args.faq_command == 'list':
-                    faqs = chatbot_engine.faq_data.get('faqs', [])
-                    print(f"📋 FAQ Knowledge Base ({len(faqs)} items):")
-                    for i, faq in enumerate(faqs, 1):
-                        print(f"\n{i}. {faq.get('question', 'No question')}")
-                        print(f"   Answer: {faq.get('answer', 'No answer')[:100]}{'...' if len(faq.get('answer', '')) > 100 else ''}")
-                        print(f"   Category: {faq.get('category', 'general')}")
-                
-                elif args.faq_command == 'add':
-                    success = chatbot_engine.add_faq(
-                        args.question,
-                        args.answer,
-                        args.keywords.split(',') if args.keywords else []
-                    )
-                    if success:
-                        print(f"✅ Added FAQ: {args.question}")
-                    else:
-                        print(f"❌ Failed to add FAQ")
-                
-                else:
-                    print("Available FAQ commands: list, add")
-            
-            elif args.chatbot_command == 'stats':
-                stats = chatbot_engine.get_stats()
-                print("📊 Chatbot Statistics:")
-                print(f"   Total FAQs: {stats['total_faqs']}")
-                print(f"   Business: {stats['business_name']}")
-                print(f"   OpenAI Available: {'✅ Yes' if stats['openai_available'] else '❌ No'}")
-            
-            else:
-                print("Available chatbot commands: query, faq, stats")
+        # Chatbot functionality removed for now
         
         elif args.command == 'ai-creative':
             if args.ai_command == 'generate':
