@@ -2,41 +2,49 @@ import React, { useState, useEffect } from 'react'
 import { Mail, Users, Brain, TrendingUp, Clock, CheckCircle } from 'lucide-react'
 import { ServiceCard } from '../components/ServiceCard'
 import { MetricCard } from '../components/MetricCard'
+import { config, getFeatureConfig } from '../config'
+import { mockServices, mockMetrics, mockActivity, MockApiClient } from '../mockData'
 
 export const Dashboard: React.FC = () => {
-  const [services, setServices] = useState([
-    { id: 'ai-assistant', name: 'AI Email Assistant', status: 'active', description: 'Automated email responses and lead management' },
-    { id: 'crm', name: 'CRM Service', status: 'active', description: 'Lead tracking and customer relationship management' },
-    { id: 'email-parser', name: 'Email Parser', status: 'active', description: 'Intelligent email content analysis' },
-    { id: 'ml-scoring', name: 'ML Lead Scoring', status: 'active', description: 'AI-powered lead prioritization' },
-  ])
-
-  const [metrics, setMetrics] = useState({
-    totalEmails: 0,
-    activeLeads: 0,
-    aiResponses: 0,
-    avgResponseTime: 0
-  })
+  const features = getFeatureConfig()
+  const [services, setServices] = useState(mockServices)
+  const [metrics, setMetrics] = useState(mockMetrics)
+  const [activity, setActivity] = useState(mockActivity)
+  const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
-    // Fetch real data from API
-    fetchMetrics()
+    fetchData()
   }, [])
 
-  const fetchMetrics = async () => {
+  const fetchData = async () => {
+    setIsLoading(true)
     try {
-      const response = await fetch('/api/health')
-      const data = await response.json()
-      
-      // Mock metrics for now - replace with real API calls
-      setMetrics({
-        totalEmails: 156,
-        activeLeads: 23,
-        aiResponses: 89,
-        avgResponseTime: 2.3
-      })
+      if (features.useMockData) {
+        // Use mock data for local testing
+        await new Promise(resolve => setTimeout(resolve, 500)) // Simulate API delay
+        setServices(mockServices)
+        setMetrics(mockMetrics)
+        setActivity(mockActivity)
+      } else {
+        // Use real API
+        const apiClient = new MockApiClient() // Replace with real API client
+        const [servicesRes, metricsRes, activityRes] = await Promise.all([
+          apiClient.get('/api/services'),
+          apiClient.get('/api/metrics'),
+          apiClient.get('/api/activity')
+        ])
+        setServices(servicesRes.data)
+        setMetrics(metricsRes.data)
+        setActivity(activityRes.data)
+      }
     } catch (error) {
-      console.error('Failed to fetch metrics:', error)
+      console.error('Failed to fetch dashboard data:', error)
+      // Fallback to mock data on error
+      setServices(mockServices)
+      setMetrics(mockMetrics)
+      setActivity(mockActivity)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -94,30 +102,34 @@ export const Dashboard: React.FC = () => {
 
       {/* Recent Activity */}
       <div className="card">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Activity</h3>
-        <div className="space-y-3">
-          <div className="flex items-center space-x-3">
-            <CheckCircle className="h-5 w-5 text-green-500" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-gray-900">AI Assistant responded to inquiry from john@acme.com</p>
-              <p className="text-xs text-gray-500">2 minutes ago</p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-3">
-            <CheckCircle className="h-5 w-5 text-green-500" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-gray-900">New lead added: Jane Smith from Startup Inc</p>
-              <p className="text-xs text-gray-500">15 minutes ago</p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-3">
-            <CheckCircle className="h-5 w-5 text-green-500" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-gray-900">Email automation triggered for urgent inquiry</p>
-              <p className="text-xs text-gray-500">1 hour ago</p>
-            </div>
-          </div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Recent Activity</h3>
+          {features.debugMode && (
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+              {features.useMockData ? 'Mock Data' : 'Live Data'}
+            </span>
+          )}
         </div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {activity.map((item) => (
+              <div key={item.id} className="flex items-center space-x-3">
+                <CheckCircle className={`h-5 w-5 ${
+                  item.status === 'success' ? 'text-green-500' : 
+                  item.status === 'warning' ? 'text-yellow-500' : 'text-red-500'
+                }`} />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-900">{item.message}</p>
+                  <p className="text-xs text-gray-500">{item.timestamp}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
