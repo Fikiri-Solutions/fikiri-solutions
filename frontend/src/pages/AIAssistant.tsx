@@ -86,25 +86,6 @@ export const AIAssistant: React.FC = () => {
     }
   }
 
-  const getUrgencyColor = (urgency: string) => {
-    switch (urgency) {
-      case 'high':
-        return 'text-red-600 bg-red-100'
-      case 'medium':
-        return 'text-yellow-600 bg-yellow-100'
-      case 'low':
-        return 'text-green-600 bg-green-100'
-      default:
-        return 'text-gray-600 bg-gray-100'
-    }
-  }
-
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.8) return 'text-green-600'
-    if (confidence >= 0.6) return 'text-yellow-600'
-    return 'text-red-600'
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -173,24 +154,6 @@ export const AIAssistant: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                
-                {/* Classification Info for AI Messages */}
-                {message.classification && (
-                  <div className="mt-2 pt-2 border-t border-gray-200">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className={`px-2 py-1 rounded-full ${getUrgencyColor(message.classification.urgency)}`}>
-                        {message.classification.urgency} priority
-                      </span>
-                      <span className={`font-medium ${getConfidenceColor(message.classification.confidence)}`}>
-                        {Math.round(message.classification.confidence * 100)}% confidence
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-600 mt-1">
-                      Intent: {message.classification.intent} | 
-                      Action: {message.classification.suggested_action}
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
           ))}
