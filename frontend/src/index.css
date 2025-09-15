@@ -27,10 +27,36 @@
   @media (max-width: 768px) {
     body {
       font-size: 16px; /* Prevent zoom on iOS */
+      /* Better touch scrolling */
+      -webkit-overflow-scrolling: touch;
+      /* Prevent bounce effect on iOS */
+      overscroll-behavior: none;
     }
     
     input, textarea, select {
       font-size: 16px; /* Prevent zoom on iOS */
+      /* Better touch targets */
+      min-height: 44px;
+      /* Remove iOS styling */
+      -webkit-appearance: none;
+      border-radius: 8px;
+    }
+    
+    /* Prevent horizontal scroll on mobile */
+    * {
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+    
+    /* Better mobile viewport handling */
+    html {
+      height: 100%;
+      height: -webkit-fill-available;
+    }
+    
+    body {
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
     }
   }
   
@@ -169,5 +195,44 @@
   
   .fikiri-button:hover {
     box-shadow: 0 6px 20px 0 rgba(59, 130, 246, 0.4);
+  }
+  
+  /* Mobile-optimized toast styles */
+  .mobile-optimized-toast {
+    @apply text-sm;
+    max-width: calc(100vw - 2rem);
+    margin: 0 1rem;
+  }
+  
+  /* Safe area support for mobile devices */
+  .safe-area-pb {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-area-pt {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-area-pl {
+    padding-left: env(safe-area-inset-left);
+  }
+  
+  .safe-area-pr {
+    padding-right: env(safe-area-inset-right);
+  }
+  
+  @media (max-width: 768px) {
+    .mobile-optimized-toast {
+      font-size: 14px;
+      padding: 12px;
+      border-radius: 8px;
+      margin: 0 0.5rem;
+      max-width: calc(100vw - 1rem);
+    }
+    
+    /* Better mobile spacing */
+    .mobile-nav-spacing {
+      padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+    }
   }
 }
