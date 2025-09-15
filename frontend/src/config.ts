@@ -32,8 +32,7 @@ export const config = {
   // API Configuration
   apiUrl: features.mockData 
     ? 'http://localhost:3000/api'  // Mock API for local testing
-    : '
-    https://fikirisolutions.com/api',  // Real backend
+    : 'https://fikirisolutions.com/api',  // Real backend
   
   // Domain Configuration
   domain: 'fikirisolutions.com',
