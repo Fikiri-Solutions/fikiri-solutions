@@ -60,6 +60,9 @@ class MinimalLead:
         if isinstance(lead.tags, str):
             lead.tags = [lead.tags] if lead.tags else []
         lead.notes = data.get("notes", [])
+        # Handle case where notes might be None or not a list
+        if lead.notes is None or not isinstance(lead.notes, list):
+            lead.notes = []
         lead.last_contact = data.get("last_contact")
         lead.contact_count = data.get("contact_count", 0)
         return lead
