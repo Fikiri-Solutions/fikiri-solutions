@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Users, Mail, Phone, Building, Calendar, Star, Filter, Search, Plus } from 'lucide-react'
 import { apiClient, LeadData } from '../services/apiClient'
+import { EmptyState } from '../components/EmptyState'
 
 export const CRM: React.FC = () => {
   const [leads, setLeads] = useState<LeadData[]>([])
@@ -270,16 +271,13 @@ export const CRM: React.FC = () => {
             </table>
             
             {filteredLeads.length === 0 && (
-              <div className="text-center py-8">
-                <Users className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No leads found</h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  {searchTerm || filterStage !== 'all' 
-                    ? 'Try adjusting your search or filter criteria.'
-                    : 'Get started by adding your first lead.'
-                  }
-                </p>
-              </div>
+              <EmptyState 
+                type="crm" 
+                onAction={searchTerm || filterStage !== 'all' ? undefined : () => {
+                  // Add lead functionality would go here
+                  console.log('Add lead clicked')
+                }}
+              />
             )}
           </div>
         )}

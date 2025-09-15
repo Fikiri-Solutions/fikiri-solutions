@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Mail, Users, Brain, Settings, Menu, X, Sparkles } from 'lucide-react'
+import { Mail, Users, Brain, Settings, Menu, X, Sparkles, Palette } from 'lucide-react'
 import { MobileBottomNav } from './MobileBottomNav'
+import { ThemeToggle } from './ThemeToggle'
+import { CustomizationPanel } from './CustomizationPanel'
+import { useCustomization } from '../contexts/CustomizationContext'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -9,7 +12,9 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [customizationOpen, setCustomizationOpen] = useState(false)
   const location = useLocation()
+  const { customization } = useCustomization()
 
   // Persist sidebar state in localStorage
   useEffect(() => {
@@ -114,7 +119,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
             <div className="flex flex-1"></div>
             <div className="flex items-center gap-x-4 lg:gap-x-6">
-              <button className="text-sm font-medium text-gray-700 hover:text-gray-900">
+              <ThemeToggle />
+              <button
+                onClick={() => setCustomizationOpen(true)}
+                className="p-2 text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors"
+                title="Customize appearance"
+              >
+                <Palette className="h-5 w-5" />
+              </button>
+              <button className="text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">
                 Sign out
               </button>
             </div>
@@ -131,6 +144,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       
       {/* Mobile Bottom Navigation */}
       <MobileBottomNav />
+      
+      {/* Customization Panel */}
+      <CustomizationPanel 
+        isOpen={customizationOpen} 
+        onClose={() => setCustomizationOpen(false)} 
+      />
     </div>
   )
 }
