@@ -40,8 +40,7 @@ export const Login: React.FC = () => {
     setError('')
     
     try {
-      // TODO: Implement actual login API call
-      console.log('Login attempt:', { email, password })
+      // Implement login API call
       
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000))

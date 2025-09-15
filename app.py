@@ -536,6 +536,61 @@ def api_test_email_actions():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/crm/leads', methods=['GET'])
+def api_get_leads():
+    """Get all leads from CRM."""
+    try:
+        if not services['crm']:
+            return jsonify({'error': 'CRM service not available'}), 503
+        
+        leads = services['crm'].get_all_leads()
+        
+        return jsonify({
+            'success': True,
+            'leads': leads,
+            'count': len(leads),
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/crm/leads', methods=['POST'])
+def api_add_lead():
+    """Add a new lead to CRM."""
+    try:
+        data = request.get_json()
+        
+        if not services['crm']:
+            return jsonify({'error': 'CRM service not available'}), 503
+        
+        required_fields = ['name', 'email']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+        
+        lead_data = {
+            'name': data['name'],
+            'email': data['email'],
+            'phone': data.get('phone', ''),
+            'company': data.get('company', ''),
+            'notes': data.get('notes', ''),
+            'status': data.get('status', 'new'),
+            'created_at': datetime.now().isoformat()
+        }
+        
+        lead_id = services['crm'].add_lead(lead_data)
+        
+        return jsonify({
+            'success': True,
+            'lead_id': lead_id,
+            'lead': lead_data,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/test/crm', methods=['POST'])
 def api_test_crm():
     """Test CRM service."""

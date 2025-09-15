@@ -233,40 +233,8 @@ class ApiClient {
 
   // CRM endpoints
   async getLeads(): Promise<LeadData[]> {
-    // For now, return mock data
-    // In the future, this could be a dedicated leads endpoint
-    return [
-      {
-        id: '1',
-        name: 'John Smith',
-        email: 'john@acme.com',
-        company: 'Acme Corp',
-        stage: 'qualified',
-        score: 8.5,
-        lastContact: '2 hours ago',
-        source: 'email'
-      },
-      {
-        id: '2',
-        name: 'Jane Doe',
-        email: 'jane@startup.io',
-        company: 'Startup Inc',
-        stage: 'new',
-        score: 6.2,
-        lastContact: '1 day ago',
-        source: 'website'
-      },
-      {
-        id: '3',
-        name: 'Bob Johnson',
-        email: 'bob@tech.com',
-        company: 'Tech Solutions',
-        stage: 'contacted',
-        score: 7.8,
-        lastContact: '3 hours ago',
-        source: 'referral'
-      }
-    ]
+    const response = await this.client.get('/crm/leads')
+    return response.data.leads || []
   }
 
   // Utility methods

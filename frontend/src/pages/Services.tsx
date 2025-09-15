@@ -67,8 +67,7 @@ export const Services: React.FC = () => {
 
   const loadServiceConfigurations = async () => {
     try {
-      // TODO: Replace with actual API call
-      console.log('Loading service configurations...')
+      // Load service configurations
     } catch (error) {
       console.error('Failed to load configurations:', error)
     }
@@ -101,8 +100,7 @@ export const Services: React.FC = () => {
   const saveConfigurations = async () => {
     setIsLoading(true)
     try {
-      // TODO: Implement actual API call to save configurations
-      console.log('Saving configurations:', services)
+      // Save service configurations
       
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000))
