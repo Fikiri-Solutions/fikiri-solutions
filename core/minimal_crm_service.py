@@ -56,6 +56,9 @@ class MinimalLead:
         lead.created_at = data.get("created_at", datetime.now().isoformat())
         lead.updated_at = data.get("updated_at", datetime.now().isoformat())
         lead.tags = data.get("tags", [])
+        # Handle case where tags might be a string instead of list
+        if isinstance(lead.tags, str):
+            lead.tags = [lead.tags] if lead.tags else []
         lead.notes = data.get("notes", [])
         lead.last_contact = data.get("last_contact")
         lead.contact_count = data.get("contact_count", 0)
