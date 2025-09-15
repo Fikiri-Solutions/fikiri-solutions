@@ -28,6 +28,7 @@ fastapi>=0.100.0
 uvicorn>=0.20.0
 pyyaml>=6.0
 click>=8.0
+aiohttp>=3.9.0
 
 # Strategic Heavy Dependencies (Optional - Use Feature Flags)
 # Uncomment only what you need:
