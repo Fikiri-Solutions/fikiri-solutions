@@ -5,7 +5,7 @@ Web interface for testing and deploying Fikiri services.
 """
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
-# from flask_cors import CORS  # Commented out - not essential
+from flask_cors import CORS
 import json
 import os
 import time
@@ -43,7 +43,12 @@ except Exception as e:
 
 # Initialize Flask app
 app = Flask(__name__)
-# CORS(app)  # Commented out - not essential
+CORS(app, origins=[
+    'http://localhost:3000',  # Local development
+    'https://fikirisolutions.vercel.app',  # Vercel deployment
+    'https://fikirisolutions.com',  # Custom domain
+    'https://www.fikirisolutions.com'  # Custom domain with www
+])
 app.secret_key = 'fikiri-secret-key-2024'
 
 # Global service instances

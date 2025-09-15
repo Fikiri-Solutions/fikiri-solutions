@@ -34,6 +34,10 @@ export const config = {
     ? 'http://localhost:3000/api'  // Mock API for local testing
     : 'https://fikirisolutions.onrender.com/api',  // Real backend
   
+  // Domain Configuration
+  domain: 'fikirisolutions.com',
+  productionUrl: 'https://fikirisolutions.com',
+  
   // App Configuration
   appName: 'Fikiri Solutions',
   version: '1.0.0',
