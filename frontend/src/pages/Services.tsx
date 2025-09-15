@@ -91,7 +91,7 @@ export const Services: React.FC = () => {
             settings: { 
               ...service.settings, 
               [settingKey]: value 
-            } 
+            } as any
           }
         : service
     ))
