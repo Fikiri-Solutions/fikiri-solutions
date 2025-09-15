@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Mail, Users, Brain, Settings, Menu, X, Sparkles } from 'lucide-react'
 
@@ -9,6 +9,25 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
+
+  // Persist sidebar state in localStorage
+  useEffect(() => {
+    const savedSidebarState = localStorage.getItem('sidebarOpen')
+    if (savedSidebarState !== null) {
+      setSidebarOpen(JSON.parse(savedSidebarState))
+    }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem('sidebarOpen', JSON.stringify(sidebarOpen))
+  }, [sidebarOpen])
+
+  // Close sidebar on mobile when route changes
+  useEffect(() => {
+    if (window.innerWidth < 1024) {
+      setSidebarOpen(false)
+    }
+  }, [location.pathname])
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: Mail },

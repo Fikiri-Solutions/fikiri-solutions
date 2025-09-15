@@ -8,6 +8,7 @@ import { CRM } from './pages/CRM'
 import { AIAssistant } from './pages/AIAssistant'
 import { Layout } from './components/Layout'
 import { QueryProvider } from './providers/QueryProvider'
+import { ScrollToTop } from './components/ScrollToTop'
 import { getFeatureConfig } from './config'
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
   return (
     <QueryProvider>
       <Router>
+        <ScrollToTop />
         <div className="min-h-screen bg-gray-50">
           <Routes>
             <Route path="/login" element={<Login />} />

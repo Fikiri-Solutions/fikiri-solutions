@@ -16,6 +16,8 @@
     -webkit-text-size-adjust: 100%;
     /* Smooth scrolling on mobile */
     -webkit-overflow-scrolling: touch;
+    /* Prevent horizontal scroll */
+    overflow-x: hidden;
   }
   
   /* Mobile-specific improvements */
@@ -27,6 +29,11 @@
     input, textarea, select {
       font-size: 16px; /* Prevent zoom on iOS */
     }
+  }
+  
+  /* Ensure minimum width for very small screens */
+  .min-screen-width {
+    min-width: 320px;
   }
 }
 
@@ -58,5 +65,41 @@
     /* Mobile improvements */
     min-height: 44px; /* iOS recommended touch target */
     font-size: 16px; /* Prevent zoom on iOS */
+  }
+  
+  /* Responsive text truncation */
+  .text-truncate {
+    @apply truncate;
+  }
+  
+  .text-truncate-2 {
+    @apply line-clamp-2;
+  }
+  
+  .text-truncate-3 {
+    @apply line-clamp-3;
+  }
+  
+  /* Responsive grid improvements */
+  .responsive-grid {
+    @apply grid grid-cols-1 gap-4;
+  }
+  
+  @media (min-width: 640px) {
+    .responsive-grid {
+      @apply grid-cols-2;
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    .responsive-grid {
+      @apply grid-cols-3;
+    }
+  }
+  
+  @media (min-width: 1280px) {
+    .responsive-grid {
+      @apply grid-cols-4;
+    }
   }
 }

@@ -9,6 +9,13 @@ const queryClient = new QueryClient({
       gcTime: 10 * 60 * 1000, // 10 minutes
       retry: 3,
       refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      refetchOnMount: true,
+      // Keep previous data while fetching new data
+      placeholderData: (previousData) => previousData,
+    },
+    mutations: {
+      retry: 1,
     },
   },
 })

@@ -5,6 +5,7 @@ import { Mail, Users, Brain, Clock, Bot, UserPlus, Zap, AlertTriangle, CheckCirc
 import { ServiceCard } from '../components/ServiceCard'
 import { MetricCard } from '../components/MetricCard'
 import { DashboardCharts } from '../components/DashboardCharts'
+import { MetricCardSkeleton, ServiceCardSkeleton, ChartSkeleton, ActivitySkeleton } from '../components/Skeleton'
 import { config, getFeatureConfig } from '../config'
 import { apiClient, ServiceData, MetricData, ActivityItem } from '../services/apiClient'
 import { mockServices, mockMetrics, mockActivity } from '../mockData'
@@ -105,9 +106,12 @@ export const Dashboard: React.FC = () => {
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {metricsLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          </div>
+          <>
+            <MetricCardSkeleton />
+            <MetricCardSkeleton />
+            <MetricCardSkeleton />
+            <MetricCardSkeleton />
+          </>
         ) : (
           <>
             <MetricCard
@@ -150,14 +154,31 @@ export const Dashboard: React.FC = () => {
       <div>
         <h2 className="text-lg font-medium text-gray-900 mb-4">Service Status</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {services.map((service) => (
-            <ServiceCard key={service.id} service={service} />
-          ))}
+          {servicesLoading ? (
+            <>
+              <ServiceCardSkeleton />
+              <ServiceCardSkeleton />
+              <ServiceCardSkeleton />
+              <ServiceCardSkeleton />
+            </>
+          ) : (
+            services.map((service) => (
+              <ServiceCard key={service.id} service={service} />
+            ))
+          )}
         </div>
       </div>
 
       {/* Professional Charts */}
-      <DashboardCharts data={chartData} />
+      {metricsLoading ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ChartSkeleton />
+          <ChartSkeleton />
+          <ChartSkeleton className="lg:col-span-2" />
+        </div>
+      ) : (
+        <DashboardCharts data={chartData} />
+      )}
 
       {/* Recent Activity */}
       <div className="card">
@@ -170,9 +191,7 @@ export const Dashboard: React.FC = () => {
           )}
         </div>
         {activityLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          </div>
+          <ActivitySkeleton />
         ) : (
           <div className="space-y-3">
             {activity.map((item) => (
