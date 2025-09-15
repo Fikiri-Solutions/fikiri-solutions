@@ -261,6 +261,140 @@ Fikiri Solutions Team"""
             "api_key_configured": bool(self.api_key),
             "client_initialized": self.client is not None
         }
+    
+    def generate_chat_response(self, user_message: str, conversation_history: List[Dict] = None) -> str:
+        """Generate AI response for chat interface."""
+        if not self.is_enabled():
+            return self._enhanced_fallback_response(user_message)
+        
+        try:
+            # Build conversation context
+            messages = []
+            
+            # Add system context with more specific instructions
+            messages.append({
+                "role": "system", 
+                "content": """You are Fikiri Solutions AI Assistant. You help businesses with:
+                - Email automation and responses
+                - Lead management and CRM
+                - Business process optimization
+                - Customer communication strategies
+                
+                Be helpful, professional, and concise. When users ask about specific data (like "how many emails do I have"), provide helpful guidance about setting up integrations. Always suggest actionable next steps."""
+            })
+            
+            # Add conversation history
+            if conversation_history:
+                for msg in conversation_history[-6:]:  # Last 6 messages for context
+                    messages.append({
+                        "role": "user" if msg.get('type') == 'user' else "assistant",
+                        "content": msg.get('content', '')
+                    })
+            
+            # Add current user message
+            messages.append({
+                "role": "user",
+                "content": user_message
+            })
+            
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                max_tokens=400,
+                temperature=0.7
+            )
+            
+            generated_response = response.choices[0].message.content.strip()
+            print(f"✅ Chat response generated")
+            return generated_response
+            
+        except Exception as e:
+            print(f"❌ Chat response generation failed: {e}")
+            return self._enhanced_fallback_response(user_message)
+    
+    def _enhanced_fallback_response(self, user_message: str) -> str:
+        """Enhanced fallback response with system integration."""
+        message_lower = user_message.lower()
+        
+        # Email-related queries
+        if any(word in message_lower for word in ["email", "emails", "inbox", "message", "messages", "received", "unread"]):
+            if "how many" in message_lower or "count" in message_lower:
+                return "I can help you check your email count! To get the exact number of emails in your inbox, I need to connect to your email service. Please set up your Gmail or Outlook integration in the Services section, and I'll be able to show you real-time email statistics."
+            elif "last" in message_lower or "recent" in message_lower:
+                return "I'd be happy to show you your most recent emails! To access your latest messages, I need to connect to your email service (Gmail, Outlook, etc.). Please set up your email integration in the Services section."
+            else:
+                return "I can help you manage your emails! To access your inbox, I need to connect to your email service. Please set up your Gmail or Outlook integration in the Services section."
+        
+        # Lead/Customer queries - try to get real data
+        elif any(word in message_lower for word in ["lead", "leads", "customer", "customers", "client", "clients", "prospect", "prospects"]):
+            if "how many" in message_lower or "count" in message_lower:
+                # Try to get actual lead count from CRM if available
+                try:
+                    from core.minimal_crm_service import MinimalCRMService
+                    crm = MinimalCRMService()
+                    leads = crm.get_all_leads()
+                    lead_count = len(leads)
+                    return f"Great question! I can see you currently have {lead_count} leads in your CRM system. You can view and manage all your leads in the CRM section. I can also help automate lead scoring and follow-ups once your email integration is set up."
+                except:
+                    return "I can help you check your lead count! To get the exact number of leads in your CRM, please visit the CRM section. I can also help automate lead scoring and follow-ups once your email integration is set up."
+            elif "last" in message_lower or "recent" in message_lower:
+                return "I can help you find your most recent leads! Check out the CRM section to view and manage your contacts. I can also help automate lead scoring and follow-ups."
+            else:
+                return "I can help you manage leads and customers! Check out the CRM section to view and manage your contacts. I can also help automate lead scoring and follow-ups."
+        
+        # Service/System queries
+        elif any(word in message_lower for word in ["service", "services", "system", "status", "working", "down"]):
+            return "I can help you check your service status! Visit the Services section to see the status of all your integrations (Gmail, Outlook, AI Assistant, CRM). You can also test each service to ensure everything is working properly."
+        
+        # Help/Support queries
+        elif any(word in message_lower for word in ["help", "support", "assistance", "how to", "how do i"]):
+            return "I'm here to help! I can assist with email automation, lead management, customer communication, and business process optimization. What specific area would you like help with? You can also check the Services section to set up integrations."
+        
+        # Greeting queries
+        elif any(word in message_lower for word in ["hello", "hi", "hey", "good morning", "good afternoon", "good evening"]):
+            return "Hello! I'm your Fikiri Solutions AI Assistant. I can help you with email automation, lead management, and customer communication. To get started, you can set up your email integration in the Services section."
+        
+        # Default response with more context
+        else:
+            return "I'm Fikiri Solutions AI Assistant! I can help you with email automation, lead management, and customer communication. To provide more specific assistance, please set up your email integration in the Services section. How can I assist you today?"
+    
+    def _fallback_chat_response(self, user_message: str) -> str:
+        """Enhanced fallback chat response without AI."""
+        message_lower = user_message.lower()
+        
+        # Email-related queries
+        if any(word in message_lower for word in ["email", "emails", "inbox", "message", "messages", "received", "unread"]):
+            if "how many" in message_lower or "count" in message_lower:
+                return "I can help you check your email count! To get the exact number of emails in your inbox, I need to connect to your email service. Please set up your Gmail or Outlook integration in the Services section, and I'll be able to show you real-time email statistics."
+            elif "last" in message_lower or "recent" in message_lower:
+                return "I'd be happy to show you your most recent emails! To access your latest messages, I need to connect to your email service (Gmail, Outlook, etc.). Please set up your email integration in the Services section."
+            else:
+                return "I can help you manage your emails! To access your inbox, I need to connect to your email service. Please set up your Gmail or Outlook integration in the Services section."
+        
+        # Lead/Customer queries
+        elif any(word in message_lower for word in ["lead", "leads", "customer", "customers", "client", "clients", "prospect", "prospects"]):
+            if "how many" in message_lower or "count" in message_lower:
+                return "I can help you check your lead count! To get the exact number of leads in your CRM, please visit the CRM section. I can also help automate lead scoring and follow-ups once your email integration is set up."
+            elif "last" in message_lower or "recent" in message_lower:
+                return "I can help you find your most recent leads! Check out the CRM section to view and manage your contacts. I can also help automate lead scoring and follow-ups."
+            else:
+                return "I can help you manage leads and customers! Check out the CRM section to view and manage your contacts. I can also help automate lead scoring and follow-ups."
+        
+        # Service/System queries
+        elif any(word in message_lower for word in ["service", "services", "system", "status", "working", "down"]):
+            return "I can help you check your service status! Visit the Services section to see the status of all your integrations (Gmail, Outlook, AI Assistant, CRM). You can also test each service to ensure everything is working properly."
+        
+        # Help/Support queries
+        elif any(word in message_lower for word in ["help", "support", "assistance", "how to", "how do i"]):
+            return "I'm here to help! I can assist with email automation, lead management, customer communication, and business process optimization. What specific area would you like help with? You can also check the Services section to set up integrations."
+        
+        # Greeting queries
+        elif any(word in message_lower for word in ["hello", "hi", "hey", "good morning", "good afternoon", "good evening"]):
+            return "Hello! I'm your Fikiri Solutions AI Assistant. I can help you with email automation, lead management, and customer communication. To get started, you can set up your email integration in the Services section."
+        
+        # Default response with more context
+        else:
+            return "I'm Fikiri Solutions AI Assistant! I can help you with email automation, lead management, and customer communication. To provide more specific assistance, please set up your email integration in the Services section. How can I assist you today?"
 
 def create_ai_assistant(api_key: Optional[str] = None) -> MinimalAIEmailAssistant:
     """Create and return an AI email assistant instance."""

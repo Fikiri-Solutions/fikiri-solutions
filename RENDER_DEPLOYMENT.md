@@ -12,7 +12,7 @@
 ### ✅ **Credentials Ready**
 - [x] OpenAI API key: `sk-proj-***[YOUR_OPENAI_API_KEY]`
 - [x] Gmail Client ID: `372352843601-m2gsmmcm1nf6msi5c7odq1i0bqm1kc44.apps.googleusercontent.com`
-- [x] Gmail Client Secret: `[YOUR_SECRET]`
+- [x] Gmail Client Secret: `[YOUR_GMAIL_CLIENT_SECRET]`
 
 ## 🎯 **Render Deployment Steps**
 

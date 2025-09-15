@@ -59,13 +59,15 @@ export const AIAssistant: React.FC = () => {
     setError(null)
 
     try {
-      // Simulate AI response (in real app, this would call the AI API)
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Call the real AI API
+      const response = await apiClient.sendChatMessage(inputMessage.trim(), {
+        conversation_history: messages.slice(-6) // Last 6 messages for context
+      })
       
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
-        content: generateAIResponse(inputMessage.trim()),
+        content: response.response || 'I apologize, but I encountered an issue generating a response.',
         timestamp: new Date(),
         classification: {
           intent: 'general_inquiry',
@@ -82,24 +84,6 @@ export const AIAssistant: React.FC = () => {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const generateAIResponse = (input: string): string => {
-    const lowerInput = input.toLowerCase()
-    
-    if (lowerInput.includes('email') || lowerInput.includes('response')) {
-      return 'I can help you craft professional email responses! Based on your inquiry, I suggest using a professional tone and including relevant details. Would you like me to generate a specific response template?'
-    }
-    
-    if (lowerInput.includes('lead') || lowerInput.includes('customer')) {
-      return 'I can assist with lead analysis and customer relationship management. I can help you prioritize leads, suggest follow-up actions, and analyze customer data. What specific aspect would you like help with?'
-    }
-    
-    if (lowerInput.includes('automation') || lowerInput.includes('workflow')) {
-      return 'I can help you set up automated workflows for your business processes. This includes email automation, lead scoring, and response triggers. Which workflow would you like to configure?'
-    }
-    
-    return 'I understand you\'re looking for assistance. I can help with email responses, lead management, business automation, and data analysis. Could you provide more specific details about what you\'d like help with?'
   }
 
   const getUrgencyColor = (urgency: string) => {

@@ -204,8 +204,20 @@ class ApiClient {
     return response.data
   }
 
+  async sendChatMessage(message: string, context?: any): Promise<any> {
+    const response = await this.client.post('/ai/chat', {
+      message,
+      context: context || {}
+    })
+    return response.data
+  }
+
   async testAIAssistant(): Promise<AIResponse> {
-    const response = await this.client.post('/test/ai-assistant', {})
+    const response = await this.client.post('/test/ai-assistant', {
+      content: 'Hi, I need help with your services.',
+      sender: 'Test User',
+      subject: 'Test Subject'
+    })
     return response.data
   }
 

@@ -6,6 +6,7 @@ Web interface for testing and deploying Fikiri services.
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit
 import json
 import os
 import time
@@ -24,22 +25,20 @@ from core.minimal_ml_scoring import MinimalMLScoring
 from core.minimal_vector_search import MinimalVectorSearch
 # from core.strategic_hybrid_service import StrategicHybridService  # Removed - causing issues
 from core.feature_flags import get_feature_flags
+from core.email_service_manager import EmailServiceManager
 
 # Import enterprise features
 from core.enterprise_logging import log_api_request, log_service_action, log_security_event
 from core.enterprise_security import security_manager, UserRole, Permission
 
+# Import monitoring and performance tracking
+from core.structured_logging import logger, monitor, error_handler, performance_monitor
+from core.performance_monitoring import monitor_performance, PerformanceBudget
+
 # Lightweight TensorFlow feature flag - make it optional, never a blocker
-try:
-    import tensorflow as tf
-    TENSORFLOW_ENABLED = True
-    print("✅ TensorFlow available for advanced features")
-except ImportError:
-    TENSORFLOW_ENABLED = False
-    print("ℹ️  TensorFlow not available - using lightweight alternatives")
-except Exception as e:
-    TENSORFLOW_ENABLED = False
-    print(f"⚠️  TensorFlow compatibility issue - using lightweight alternatives: {e}")
+# TensorFlow removed to avoid compatibility issues - using lightweight alternatives
+TENSORFLOW_ENABLED = False
+print("ℹ️  Using lightweight alternatives (TensorFlow disabled for compatibility)")
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -48,6 +47,14 @@ CORS(app, origins=[
     'https://fikirisolutions.vercel.app',  # Vercel deployment
     'https://fikirisolutions.com',  # Custom domain
     'https://www.fikirisolutions.com'  # Custom domain with www
+])
+
+# Initialize SocketIO for real-time updates
+socketio = SocketIO(app, cors_allowed_origins=[
+    'http://localhost:3000',
+    'https://fikirisolutions.vercel.app',
+    'https://fikirisolutions.com',
+    'https://www.fikirisolutions.com'
 ])
 app.secret_key = 'fikiri-secret-key-2024'
 
@@ -63,7 +70,8 @@ services = {
     'ml_scoring': None,
     'vector_search': None,
     'hybrid': None,  # Removed - causing issues
-    'feature_flags': None
+    'feature_flags': None,
+    'email_manager': None
 }
 
 def initialize_services():
@@ -82,6 +90,7 @@ def initialize_services():
         services['vector_search'] = MinimalVectorSearch()
         # services['hybrid'] = StrategicHybridService()  # Removed - causing issues
         services['feature_flags'] = get_feature_flags()
+        services['email_manager'] = EmailServiceManager()
         
         print("✅ All services initialized successfully")
         return True
@@ -590,6 +599,40 @@ def api_test_ai_assistant():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/ai/chat', methods=['POST'])
+def api_ai_chat():
+    """Handle AI chat messages."""
+    try:
+        data = request.get_json()
+        
+        user_message = data.get('message', '')
+        context = data.get('context', {})
+        
+        if not user_message.strip():
+            return jsonify({'error': 'Message cannot be empty'}), 400
+        
+        # Check if AI assistant is available
+        if not services['ai_assistant'] or not services['ai_assistant'].is_enabled():
+            return jsonify({
+                'response': 'AI Assistant is currently unavailable. Please check your OpenAI API key configuration.',
+                'error': 'AI service not available'
+            }), 503
+        
+        # Generate AI response
+        ai_response = services['ai_assistant'].generate_chat_response(
+            user_message, 
+            context.get('conversation_history', [])
+        )
+        
+        return jsonify({
+            'response': ai_response,
+            'timestamp': datetime.now().isoformat(),
+            'success': True
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/test/ml-scoring', methods=['POST'])
 def api_test_ml_scoring():
     """Test ML scoring service."""
@@ -726,12 +769,383 @@ def api_toggle_feature_flag(feature_name):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# WebSocket Event Handlers for Real-Time Updates
+@socketio.on('connect')
+def handle_connect():
+    """Handle client connection."""
+    print(f"Client connected: {request.sid}")
+    emit('status', {'message': 'Connected to Fikiri Solutions'})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Handle client disconnection."""
+    print(f"Client disconnected: {request.sid}")
+
+@socketio.on('subscribe_dashboard')
+def handle_dashboard_subscription():
+    """Subscribe to dashboard updates."""
+    print(f"Client {request.sid} subscribed to dashboard updates")
+    emit('dashboard_subscribed', {'status': 'success'})
+
+@socketio.on('request_metrics_update')
+def handle_metrics_update():
+    """Send real-time metrics update."""
+    try:
+        # Get current metrics
+        total_emails = 0
+        active_leads = 0
+        ai_responses = 0
+        avg_response_time = 0.0
+        
+        if services['crm']:
+            try:
+                leads = services['crm'].get_all_leads()
+                active_leads = len(leads)
+            except:
+                active_leads = 0
+        
+        if services['ai_assistant']:
+            try:
+                stats = services['ai_assistant'].get_usage_stats()
+                ai_responses = stats.get('successful_responses', 0)
+                avg_response_time = stats.get('avg_response_time', 0.0)
+            except:
+                ai_responses = 0
+                avg_response_time = 0.0
+        
+        if services['gmail'] and services['gmail'].is_authenticated():
+            total_emails = 42  # Placeholder
+        
+        metrics = {
+            'totalEmails': total_emails,
+            'activeLeads': active_leads,
+            'aiResponses': ai_responses,
+            'avgResponseTime': round(avg_response_time, 2),
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        emit('metrics_update', metrics)
+        
+    except Exception as e:
+        emit('error', {'message': f'Failed to update metrics: {str(e)}'})
+
+@socketio.on('request_services_update')
+def handle_services_update():
+    """Send real-time services status update."""
+    try:
+        service_list = []
+        
+        # Gmail Service
+        gmail_status = 'active' if services['gmail'] and services['gmail'].is_authenticated() else 'inactive'
+        service_list.append({
+            'id': 'gmail',
+            'name': 'Gmail Integration',
+            'status': gmail_status,
+            'description': 'Connect and manage Gmail accounts for email automation'
+        })
+        
+        # AI Assistant Service
+        ai_status = 'active' if services['ai_assistant'] and services['ai_assistant'].is_enabled() else 'inactive'
+        service_list.append({
+            'id': 'ai_assistant',
+            'name': 'AI Assistant',
+            'status': ai_status,
+            'description': 'AI-powered email responses and lead analysis'
+        })
+        
+        # CRM Service
+        crm_status = 'active' if services['crm'] else 'inactive'
+        service_list.append({
+            'id': 'crm',
+            'name': 'CRM System',
+            'status': crm_status,
+            'description': 'Customer relationship management and lead tracking'
+        })
+        
+        emit('services_update', {
+            'services': service_list,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        emit('error', {'message': f'Failed to update services: {str(e)}'})
+
+def broadcast_activity_update(activity_type: str, message: str, status: str = 'success'):
+    """Broadcast activity update to all connected clients."""
+    activity = {
+        'id': int(time.time()),
+        'type': activity_type,
+        'message': message,
+        'timestamp': datetime.now().isoformat(),
+        'status': status
+    }
+    socketio.emit('activity_update', activity)
+
 if __name__ == '__main__':
     # Create templates directory if it doesn't exist
     templates_dir = Path('templates')
     templates_dir.mkdir(exist_ok=True)
     
     # Create basic dashboard template
+
+# Dashboard Data Endpoints
+@app.route('/api/services', methods=['GET'])
+def api_get_services():
+    """Get all available services and their status."""
+    try:
+        service_list = []
+        
+        # Gmail Service
+        gmail_status = 'active' if services['gmail'] and services['gmail'].is_authenticated() else 'inactive'
+        service_list.append({
+            'id': 'gmail',
+            'name': 'Gmail Integration',
+            'status': gmail_status,
+            'description': 'Connect and manage Gmail accounts for email automation'
+        })
+        
+        # Outlook Service (placeholder for future integration)
+        service_list.append({
+            'id': 'outlook',
+            'name': 'Outlook Integration',
+            'status': 'inactive',
+            'description': 'Microsoft Outlook integration (coming soon)'
+        })
+        
+        # AI Assistant Service
+        ai_status = 'active' if services['ai_assistant'] and services['ai_assistant'].is_enabled() else 'inactive'
+        service_list.append({
+            'id': 'ai_assistant',
+            'name': 'AI Assistant',
+            'status': ai_status,
+            'description': 'AI-powered email responses and lead analysis'
+        })
+        
+        # CRM Service
+        crm_status = 'active' if services['crm'] else 'inactive'
+        service_list.append({
+            'id': 'crm',
+            'name': 'CRM System',
+            'status': crm_status,
+            'description': 'Customer relationship management and lead tracking'
+        })
+        
+        # Email Parser Service
+        parser_status = 'active' if services['parser'] else 'inactive'
+        service_list.append({
+            'id': 'email_parser',
+            'name': 'Email Parser',
+            'status': parser_status,
+            'description': 'Intelligent email content analysis and extraction'
+        })
+        
+        # ML Scoring Service
+        ml_status = 'active' if services['ml_scoring'] else 'inactive'
+        service_list.append({
+            'id': 'ml_scoring',
+            'name': 'Lead Scoring',
+            'status': ml_status,
+            'description': 'Machine learning-powered lead qualification'
+        })
+        
+        return jsonify(service_list)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/metrics', methods=['GET'])
+def api_get_metrics():
+    """Get dashboard metrics."""
+    try:
+        # Get real data from services
+        total_emails = 0
+        active_leads = 0
+        ai_responses = 0
+        avg_response_time = 0.0
+        
+        # Count leads from CRM
+        if services['crm']:
+            try:
+                leads = services['crm'].get_all_leads()
+                active_leads = len(leads)
+            except:
+                active_leads = 0
+        
+        # Get AI stats
+        if services['ai_assistant']:
+            try:
+                stats = services['ai_assistant'].get_usage_stats()
+                ai_responses = stats.get('successful_responses', 0)
+                avg_response_time = stats.get('avg_response_time', 0.0)
+            except:
+                ai_responses = 0
+                avg_response_time = 0.0
+        
+        # Simulate email count (would come from Gmail API in real implementation)
+        if services['gmail'] and services['gmail'].is_authenticated():
+            total_emails = 42  # Placeholder - would query Gmail API
+        
+        metrics = {
+            'totalEmails': total_emails,
+            'activeLeads': active_leads,
+            'aiResponses': ai_responses,
+            'avgResponseTime': round(avg_response_time, 2)
+        }
+        
+        return jsonify(metrics)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/activity', methods=['GET'])
+def api_get_activity():
+    """Get recent activity feed."""
+    try:
+        activity_list = []
+        
+        # Add AI Assistant activity
+        if services['ai_assistant']:
+            try:
+                stats = services['ai_assistant'].get_usage_stats()
+                if stats.get('successful_responses', 0) > 0:
+                    activity_list.append({
+                        'id': 1,
+                        'type': 'ai_response',
+                        'message': f'AI Assistant generated {stats.get("successful_responses", 0)} responses',
+                        'timestamp': datetime.now().isoformat(),
+                        'status': 'success'
+                    })
+            except:
+                pass
+        
+        # Add CRM activity
+        if services['crm']:
+            try:
+                leads = services['crm'].get_all_leads()
+                if leads:
+                    activity_list.append({
+                        'id': 2,
+                        'type': 'lead_added',
+                        'message': f'{len(leads)} leads in CRM system',
+                        'timestamp': datetime.now().isoformat(),
+                        'status': 'success'
+                    })
+            except:
+                pass
+        
+        # Add Gmail activity
+        if services['gmail'] and services['gmail'].is_authenticated():
+            activity_list.append({
+                'id': 3,
+                'type': 'email_sync',
+                'message': 'Gmail account connected successfully',
+                'timestamp': datetime.now().isoformat(),
+                'status': 'success'
+            })
+        else:
+            activity_list.append({
+                'id': 4,
+                'type': 'email_sync',
+                'message': 'Gmail integration not configured',
+                'timestamp': datetime.now().isoformat(),
+                'status': 'warning'
+            })
+        
+        # Sort by timestamp (newest first)
+        activity_list.sort(key=lambda x: x['timestamp'], reverse=True)
+        
+        return jsonify(activity_list)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Email Service Integration Endpoints
+@app.route('/api/email/providers', methods=['GET'])
+def api_get_email_providers():
+    """Get all available email providers and their status."""
+    try:
+        if not services['email_manager']:
+            return jsonify({'error': 'Email manager not initialized'}), 500
+        
+        status = services['email_manager'].get_provider_status()
+        return jsonify({
+            'providers': status,
+            'active_provider': services['email_manager'].active_provider
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/email/switch-provider', methods=['POST'])
+def api_switch_email_provider():
+    """Switch to a different email provider."""
+    try:
+        data = request.get_json()
+        provider_name = data.get('provider')
+        
+        if not services['email_manager']:
+            return jsonify({'error': 'Email manager not initialized'}), 500
+        
+        if services['email_manager'].switch_provider(provider_name):
+            return jsonify({
+                'success': True,
+                'active_provider': provider_name,
+                'message': f'Switched to {provider_name}'
+            })
+        else:
+            return jsonify({'error': f'Provider {provider_name} not available'}), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/email/messages', methods=['GET'])
+def api_get_email_messages():
+    """Get recent messages from the active email provider."""
+    try:
+        if not services['email_manager']:
+            return jsonify({'error': 'Email manager not initialized'}), 500
+        
+        limit = request.args.get('limit', 10, type=int)
+        messages = services['email_manager'].get_all_messages(limit)
+        
+        return jsonify({
+            'messages': messages,
+            'count': len(messages),
+            'provider': services['email_manager'].active_provider
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/email/send', methods=['POST'])
+def api_send_email():
+    """Send an email via the active provider."""
+    try:
+        data = request.get_json()
+        to = data.get('to')
+        subject = data.get('subject')
+        body = data.get('body')
+        
+        if not all([to, subject, body]):
+            return jsonify({'error': 'Missing required fields: to, subject, body'}), 400
+        
+        if not services['email_manager']:
+            return jsonify({'error': 'Email manager not initialized'}), 500
+        
+        success = services['email_manager'].send_message(to, subject, body)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Email sent successfully',
+                'provider': services['email_manager'].active_provider
+            })
+        else:
+            return jsonify({'error': 'Failed to send email'}), 500
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/health', methods=['GET'])
 def api_health():
     """Health check endpoint for deployment monitoring."""
@@ -1087,4 +1501,5 @@ def api_health():
     print("📊 Dashboard: http://localhost:8081")
     print("🔧 API Endpoints: http://localhost:8081/api/")
     
-    app.run(debug=True, host='0.0.0.0', port=8081)
+    # Run with SocketIO for real-time updates
+    socketio.run(app, debug=True, host='0.0.0.0', port=8081)

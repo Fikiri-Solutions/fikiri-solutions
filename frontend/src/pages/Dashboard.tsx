@@ -7,6 +7,7 @@ import { MetricCard } from '../components/MetricCard'
 import { DashboardCharts } from '../components/DashboardCharts'
 import { MetricCardSkeleton, ServiceCardSkeleton, ChartSkeleton, ActivitySkeleton } from '../components/Skeleton'
 import { useToast } from '../components/Toast'
+import { useWebSocket } from '../hooks/useWebSocket'
 import { config, getFeatureConfig } from '../config'
 import { apiClient, ServiceData, MetricData, ActivityItem } from '../services/apiClient'
 import { mockServices, mockMetrics, mockActivity } from '../mockData'
@@ -15,6 +16,7 @@ export const Dashboard: React.FC = () => {
   const navigate = useNavigate()
   const features = getFeatureConfig()
   const { addToast } = useToast()
+  const { isConnected, data, requestMetricsUpdate, requestServicesUpdate } = useWebSocket()
 
   // Show performance toast on first load
   React.useEffect(() => {
@@ -32,27 +34,40 @@ export const Dashboard: React.FC = () => {
     }
   }, [addToast])
 
-  // TanStack Query hooks for smart data fetching
-  const { data: services = [], isLoading: servicesLoading } = useQuery({
+  // TanStack Query hooks for smart data fetching with real-time updates
+  const { data: servicesData = [], isLoading: servicesLoading } = useQuery({
     queryKey: ['services'],
     queryFn: () => features.useMockData ? Promise.resolve(mockServices) : apiClient.getServices(),
     staleTime: 1 * 60 * 1000, // 1 minute (faster updates)
     enabled: true, // Always enabled for immediate loading
   })
 
-  const { data: metrics, isLoading: metricsLoading } = useQuery({
+  const { data: metricsData, isLoading: metricsLoading } = useQuery({
     queryKey: ['metrics'],
     queryFn: () => features.useMockData ? Promise.resolve(mockMetrics) : apiClient.getMetrics(),
     staleTime: 30 * 1000, // 30 seconds (very fast updates)
     enabled: true, // Always enabled for immediate loading
   })
 
-  const { data: activity = [], isLoading: activityLoading } = useQuery({
+  const { data: activityData = [], isLoading: activityLoading } = useQuery({
     queryKey: ['activity'],
     queryFn: () => features.useMockData ? Promise.resolve(mockActivity) : apiClient.getActivity(),
     staleTime: 30 * 1000, // 30 seconds (very fast updates)
     enabled: true, // Always enabled for immediate loading
   })
+
+  // Combine API data with real-time WebSocket updates
+  const services = data.services?.services || servicesData
+  const metrics = data.metrics || metricsData
+  const activity = data.activity ? [data.activity, ...activityData] : activityData
+
+  // Request real-time updates when WebSocket connects
+  React.useEffect(() => {
+    if (isConnected) {
+      requestMetricsUpdate()
+      requestServicesUpdate()
+    }
+  }, [isConnected, requestMetricsUpdate, requestServicesUpdate])
 
   // Chart data
   const chartData = [
@@ -131,10 +146,23 @@ export const Dashboard: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Welcome back! Here's what's happening with your Fikiri Solutions.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+            <p className="mt-1 text-sm text-gray-600">
+              Welcome back! Here's what's happening with your Fikiri Solutions.
+            </p>
+          </div>
+          
+          {/* WebSocket Connection Status */}
+          <div className="flex items-center space-x-2">
+            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span className="text-xs text-gray-500">
+              {isConnected ? 'Live Updates' : 'Offline'}
+            </span>
+          </div>
+        </div>
+        
         {(servicesLoading || metricsLoading || activityLoading) && (
           <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
             <div className="flex items-center space-x-2">

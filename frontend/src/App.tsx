@@ -7,6 +7,8 @@ import { Services } from './pages/Services'
 import { CRM } from './pages/CRM'
 import { AIAssistant } from './pages/AIAssistant'
 import { NotFoundPage, ErrorPage } from './pages/ErrorPages'
+import { ServicesLanding } from './pages/ServicesLanding'
+import { AIAssistantLanding } from './pages/AIAssistantLanding'
 import { Layout } from './components/Layout'
 import { QueryProvider } from './providers/QueryProvider'
 import { ToastProvider } from './components/Toast'
@@ -31,6 +33,8 @@ function App() {
                   {features.showOnboarding && <Route path="/onboarding" element={<Onboarding />} />}
                   <Route path="/" element={<Layout><Dashboard /></Layout>} />
                   <Route path="/services" element={<Layout><Services /></Layout>} />
+                  <Route path="/services-landing" element={<ServicesLanding />} />
+                  <Route path="/ai-landing" element={<AIAssistantLanding />} />
                   <Route path="/crm" element={<Layout><CRM /></Layout>} />
                   <Route path="/ai" element={<Layout><AIAssistant /></Layout>} />
                   <Route path="/assistant" element={<Layout><AIAssistant /></Layout>} />

@@ -16,6 +16,8 @@ html5lib>=1.1
 
 # Web Framework
 flask>=3.0.0,<4.0.0
+flask-socketio>=5.0.0
+flask-cors>=4.0.0
 gunicorn>=20.0.0
 
 # Workflow Automation
@@ -33,6 +35,13 @@ click>=8.0
 # torch>=1.0.0                           # For PyTorch models
 # tensorflow>=2.0.0                      # For TensorFlow models
 
-# Development (optional)
-# pytest>=7.0.0  # Uncomment for testing
+# Development and Testing Tools
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+aiohttp>=3.9.0
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.7.0
+bandit>=1.7.0
+isort>=5.12.0
 

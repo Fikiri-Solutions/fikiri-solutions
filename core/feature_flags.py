@@ -120,7 +120,7 @@ class FeatureFlags:
             "beautifulsoup4": self._check_import("bs4"),
             "transformers": self._check_import("transformers"),
             "torch": self._check_import("torch"),
-            "tensorflow": self._check_import("tensorflow"),
+            "tensorflow": False,  # Disabled due to AVX compatibility issues
             "opencv-python": self._check_import("cv2"),
             "pillow": self._check_import("PIL")
         }
@@ -133,15 +133,16 @@ class FeatureFlags:
     def _check_import(self, module_name: str) -> bool:
         """Check if a module can be imported."""
         try:
-            __import__(module_name)
-            return True
+            if module_name == "tensorflow":
+                # Skip TensorFlow check entirely to avoid AVX issues
+                return False
+            else:
+                __import__(module_name)
+                return True
         except ImportError:
             return False
         except Exception as e:
-            # Handle TensorFlow AVX errors and other import issues gracefully
-            if "tensorflow" in module_name.lower():
-                print(f"⚠️  TensorFlow compatibility issue detected, skipping {module_name}")
-                return False
+            print(f"⚠️  Import check failed for {module_name}: {e}")
             return False
     
     def _auto_adjust_features(self):
