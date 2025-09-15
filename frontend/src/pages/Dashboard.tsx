@@ -1,16 +1,62 @@
 import React, { useState, useEffect } from 'react'
-import { Mail, Users, Brain, TrendingUp, Clock, CheckCircle } from 'lucide-react'
+import { Mail, Users, Brain, TrendingUp, Clock, CheckCircle, Bot, UserPlus, Zap, AlertTriangle } from 'lucide-react'
 import { ServiceCard } from '../components/ServiceCard'
 import { MetricCard } from '../components/MetricCard'
 import { config, getFeatureConfig } from '../config'
-import { mockServices, mockMetrics, mockActivity, MockApiClient } from '../mockData'
+import { apiClient, ServiceData, MetricData, ActivityItem } from '../services/apiClient'
+import { mockServices, mockMetrics, mockActivity } from '../mockData'
 
 export const Dashboard: React.FC = () => {
   const features = getFeatureConfig()
-  const [services, setServices] = useState(mockServices)
-  const [metrics, setMetrics] = useState(mockMetrics)
-  const [activity, setActivity] = useState(mockActivity)
+  const [services, setServices] = useState<ServiceData[]>([])
+  const [metrics, setMetrics] = useState<MetricData>({
+    totalEmails: 0,
+    activeLeads: 0,
+    aiResponses: 0,
+    avgResponseTime: 0
+  })
+  const [activity, setActivity] = useState<ActivityItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleMetricClick = (metricType: string) => {
+    switch (metricType) {
+      case 'emails':
+        window.location.href = '/crm?filter=emails'
+        break
+      case 'leads':
+        window.location.href = '/crm?filter=active'
+        break
+      case 'responses':
+        window.location.href = '/services'
+        break
+      case 'responseTime':
+        window.location.href = '/services'
+        break
+      default:
+        console.log(`Clicked ${metricType}`)
+    }
+  }
+
+  const getActivityIcon = (type: string, status: string) => {
+    const iconClass = `h-5 w-5 ${
+      status === 'success' ? 'text-green-500' :
+      status === 'warning' ? 'text-yellow-500' : 'text-red-500'
+    }`
+
+    switch (type) {
+      case 'ai_response':
+        return <Bot className={iconClass} />
+      case 'lead_added':
+        return <UserPlus className={iconClass} />
+      case 'email_processed':
+        return <Zap className={iconClass} />
+      case 'service_error':
+        return <AlertTriangle className={iconClass} />
+      default:
+        return <CheckCircle className={iconClass} />
+    }
+  }
 
   useEffect(() => {
     fetchData()
@@ -18,6 +64,8 @@ export const Dashboard: React.FC = () => {
 
   const fetchData = async () => {
     setIsLoading(true)
+    setError(null)
+    
     try {
       if (features.useMockData) {
         // Use mock data for local testing
@@ -27,22 +75,29 @@ export const Dashboard: React.FC = () => {
         setActivity(mockActivity)
       } else {
         // Use real API
-        const apiClient = new MockApiClient() // Replace with real API client
-        const [servicesRes, metricsRes, activityRes] = await Promise.all([
-          apiClient.get('/api/services'),
-          apiClient.get('/api/metrics'),
-          apiClient.get('/api/activity')
+        console.log('🔄 Fetching data from backend API...')
+        
+        const [servicesData, metricsData, activityData] = await Promise.all([
+          apiClient.getServices(),
+          apiClient.getMetrics(),
+          apiClient.getActivity()
         ])
-        setServices(servicesRes.data)
-        setMetrics(metricsRes.data)
-        setActivity(activityRes.data)
+        
+        setServices(servicesData)
+        setMetrics(metricsData)
+        setActivity(activityData)
+        
+        console.log('✅ Data fetched successfully from backend')
       }
     } catch (error) {
-      console.error('Failed to fetch dashboard data:', error)
+      console.error('❌ Failed to fetch dashboard data:', error)
+      setError(apiClient.handleError(error))
+      
       // Fallback to mock data on error
       setServices(mockServices)
       setMetrics(mockMetrics)
       setActivity(mockActivity)
+      console.log('🔄 Fallback to mock data due to API error')
     } finally {
       setIsLoading(false)
     }
@@ -56,6 +111,19 @@ export const Dashboard: React.FC = () => {
         <p className="mt-1 text-sm text-gray-600">
           Welcome back! Here's what's happening with your Fikiri Solutions.
         </p>
+        {error && (
+          <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-sm text-red-600">
+              <strong>API Error:</strong> {error}
+            </p>
+            <button 
+              onClick={fetchData}
+              className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+            >
+              Retry
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Metrics Grid */}
@@ -66,6 +134,7 @@ export const Dashboard: React.FC = () => {
           icon={Mail}
           change="+12%"
           changeType="positive"
+          onClick={() => handleMetricClick('emails')}
         />
         <MetricCard
           title="Active Leads"
@@ -73,6 +142,7 @@ export const Dashboard: React.FC = () => {
           icon={Users}
           change="+8%"
           changeType="positive"
+          onClick={() => handleMetricClick('leads')}
         />
         <MetricCard
           title="AI Responses"
@@ -80,6 +150,7 @@ export const Dashboard: React.FC = () => {
           icon={Brain}
           change="+23%"
           changeType="positive"
+          onClick={() => handleMetricClick('responses')}
         />
         <MetricCard
           title="Avg Response Time"
@@ -87,6 +158,7 @@ export const Dashboard: React.FC = () => {
           icon={Clock}
           change="-15%"
           changeType="positive"
+          onClick={() => handleMetricClick('responseTime')}
         />
       </div>
 
@@ -106,7 +178,7 @@ export const Dashboard: React.FC = () => {
           <h3 className="text-lg font-medium text-gray-900">Recent Activity</h3>
           {features.debugMode && (
             <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-              {features.useMockData ? 'Mock Data' : 'Live Data'}
+              {features.useMockData ? 'Mock Data' : 'Live API Data'}
             </span>
           )}
         </div>
@@ -118,10 +190,7 @@ export const Dashboard: React.FC = () => {
           <div className="space-y-3">
             {activity.map((item) => (
               <div key={item.id} className="flex items-center space-x-3">
-                <CheckCircle className={`h-5 w-5 ${
-                  item.status === 'success' ? 'text-green-500' : 
-                  item.status === 'warning' ? 'text-yellow-500' : 'text-red-500'
-                }`} />
+                {getActivityIcon(item.type, item.status)}
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-900">{item.message}</p>
                   <p className="text-xs text-gray-500">{item.timestamp}</p>

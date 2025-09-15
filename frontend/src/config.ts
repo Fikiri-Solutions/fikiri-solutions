@@ -12,7 +12,7 @@ export const features = {
   services: true,
   
   // Advanced features (hide until ready)
-  crmPage: false,        // Hide CRM page until backend is stable
+  crmPage: true,         // Enable CRM page
   darkMode: false,       // Dark mode toggle
   analytics: false,     // Advanced analytics dashboard
   
@@ -22,7 +22,7 @@ export const features = {
   
   // Debug features
   debugMode: false,     // Show debug info in development
-  mockData: true,        // Use mock data instead of real API calls
+  mockData: false,       // Use real API calls instead of mock data
 } as const
 
 /**
@@ -39,8 +39,8 @@ export const config = {
   version: '1.0.0',
   
   // Development flags
-  isDevelopment: import.meta.env.DEV,
-  isProduction: import.meta.env.PROD,
+  isDevelopment: typeof window !== 'undefined' && window.location.hostname === 'localhost',
+  isProduction: typeof window !== 'undefined' && window.location.hostname !== 'localhost',
 } as const
 
 /**
@@ -61,3 +61,4 @@ export const getFeatureConfig = () => ({
   useMockData: isFeatureEnabled('mockData'),
   debugMode: isFeatureEnabled('debugMode'),
 })
+

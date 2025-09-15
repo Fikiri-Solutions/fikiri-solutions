@@ -4,6 +4,8 @@ import { Dashboard } from './pages/Dashboard'
 import { Login } from './pages/Login'
 import { Onboarding } from './pages/Onboarding'
 import { Services } from './pages/Services'
+import { CRM } from './pages/CRM'
+import { AIAssistant } from './pages/AIAssistant'
 import { Layout } from './components/Layout'
 import { getFeatureConfig } from './config'
 
@@ -18,7 +20,8 @@ function App() {
           {features.showOnboarding && <Route path="/onboarding" element={<Onboarding />} />}
           <Route path="/" element={<Layout><Dashboard /></Layout>} />
           <Route path="/services" element={<Layout><Services /></Layout>} />
-          {features.showCrmPage && <Route path="/crm" element={<Layout><div>CRM Page (Coming Soon)</div></Layout>} />}
+          <Route path="/crm" element={<Layout><CRM /></Layout>} />
+          <Route path="/ai" element={<Layout><AIAssistant /></Layout>} />
         </Routes>
       </div>
     </Router>

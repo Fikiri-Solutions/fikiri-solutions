@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Settings, ToggleLeft, ToggleRight, Save, RefreshCw } from 'lucide-react'
+import { apiClient } from '../services/apiClient'
 
 export const Services: React.FC = () => {
   const [services, setServices] = useState([
@@ -111,15 +112,38 @@ export const Services: React.FC = () => {
 
   const testService = async (serviceId: string) => {
     try {
-      // TODO: Implement actual service testing
-      console.log(`Testing service: ${serviceId}`)
+      console.log(`🧪 Testing service: ${serviceId}`)
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      let result
+      switch (serviceId) {
+        case 'ai-assistant':
+          result = await apiClient.testAIAssistant()
+          break
+        case 'email-parser':
+          result = await apiClient.testEmailParser()
+          break
+        case 'email-actions':
+          result = await apiClient.testEmailActions()
+          break
+        case 'crm':
+          result = await apiClient.testCRM()
+          break
+        case 'ml-scoring':
+          result = await apiClient.testMLScoring()
+          break
+        case 'vector-search':
+          result = await apiClient.testVectorSearch()
+          break
+        default:
+          throw new Error(`Unknown service: ${serviceId}`)
+      }
       
-      // Show test results
+      console.log(`✅ Service ${serviceId} test result:`, result)
+      alert(`Service ${serviceId} tested successfully!\n\nResult: ${JSON.stringify(result, null, 2)}`)
     } catch (error) {
-      console.error('Service test failed:', error)
+      console.error('❌ Service test failed:', error)
+      const errorMessage = apiClient.handleError(error)
+      alert(`Service ${serviceId} test failed:\n\n${errorMessage}`)
     }
   }
 

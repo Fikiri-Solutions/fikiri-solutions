@@ -6,6 +6,33 @@ export const Login: React.FC = () => {
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [emailError, setEmailError] = useState('')
+  const [passwordError, setPasswordError] = useState('')
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setEmail(value)
+    setEmailError('')
+    
+    if (value && !validateEmail(value)) {
+      setEmailError('Please enter a valid email address')
+    }
+  }
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setPassword(value)
+    setPasswordError('')
+    
+    if (value && value.length < 6) {
+      setPasswordError('Password must be at least 6 characters')
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -71,12 +98,15 @@ export const Login: React.FC = () => {
                   type="email"
                   autoComplete="email"
                   required
-                  className="input-field pl-10"
+                  className={`input-field pl-10 ${emailError ? 'border-red-300 focus:border-red-500' : ''}`}
                   placeholder="Enter your email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={handleEmailChange}
                 />
               </div>
+              {emailError && (
+                <p className="mt-1 text-sm text-red-600">{emailError}</p>
+              )}
             </div>
             
             <div>
@@ -93,12 +123,15 @@ export const Login: React.FC = () => {
                   type="password"
                   autoComplete="current-password"
                   required
-                  className="input-field pl-10"
+                  className={`input-field pl-10 ${passwordError ? 'border-red-300 focus:border-red-500' : ''}`}
                   placeholder="Enter your password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={handlePasswordChange}
                 />
               </div>
+              {passwordError && (
+                <p className="mt-1 text-sm text-red-600">{passwordError}</p>
+              )}
             </div>
           </div>
 

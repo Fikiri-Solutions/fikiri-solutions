@@ -1,0 +1,308 @@
+/**
+ * API Client for Fikiri Solutions Backend
+ * Connects React frontend to Flask backend at https://fikirisolutions.onrender.com
+ */
+
+import axios, { AxiosInstance, AxiosResponse } from 'axios'
+
+// API Configuration
+const API_BASE_URL = 'https://fikirisolutions.onrender.com/api'
+
+// Types for API responses
+export interface ServiceStatus {
+  status: 'healthy' | 'unhealthy' | 'error'
+  available: boolean
+  initialized: boolean
+  authenticated?: boolean
+  enabled?: boolean
+  error?: string
+}
+
+export interface HealthResponse {
+  status: 'healthy' | 'degraded' | 'unhealthy'
+  timestamp: string
+  version: string
+  services: Record<string, ServiceStatus>
+}
+
+export interface MetricData {
+  totalEmails: number
+  activeLeads: number
+  aiResponses: number
+  avgResponseTime: number
+}
+
+export interface ServiceData {
+  id: string
+  name: string
+  status: 'active' | 'inactive' | 'error' | string
+  description: string
+}
+
+export interface ActivityItem {
+  id: number
+  type: string
+  message: string
+  timestamp: string
+  status: 'success' | 'warning' | 'error' | string
+}
+
+export interface LeadData {
+  id: string
+  name: string
+  email: string
+  company: string
+  stage: string
+  score: number
+  lastContact: string
+  source: string
+}
+
+export interface AIResponse {
+  classification: {
+    confidence: number
+    intent: string
+    suggested_action: string
+    urgency: string
+  }
+  contact_info: Record<string, any>
+  response: string
+  stats: {
+    api_key_configured: boolean
+    client_initialized: boolean
+    enabled: boolean
+  }
+  success: boolean
+}
+
+class ApiClient {
+  private client: AxiosInstance
+
+  constructor() {
+    this.client = axios.create({
+      baseURL: API_BASE_URL,
+      timeout: 10000,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    // Add request interceptor for logging
+    this.client.interceptors.request.use(
+      (config) => {
+        console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`)
+        return config
+      },
+      (error) => {
+        console.error('❌ API Request Error:', error)
+        return Promise.reject(error)
+      }
+    )
+
+    // Add response interceptor for error handling
+    this.client.interceptors.response.use(
+      (response) => {
+        console.log(`✅ API Response: ${response.status} ${response.config.url}`)
+        return response
+      },
+      (error) => {
+        console.error('❌ API Response Error:', error.response?.status, error.message)
+        return Promise.reject(error)
+      }
+    )
+  }
+
+  // Health and Status endpoints
+  async getHealth(): Promise<HealthResponse> {
+    const response: AxiosResponse<HealthResponse> = await this.client.get('/health')
+    return response.data
+  }
+
+  async getStatus(): Promise<HealthResponse> {
+    // Status endpoint redirects to health, so we use health directly
+    return this.getHealth()
+  }
+
+  // Dashboard data endpoints
+  async getMetrics(): Promise<MetricData> {
+    // For now, we'll derive metrics from health status
+    // In the future, this could be a dedicated metrics endpoint
+    const health = await this.getHealth()
+    
+    // Calculate metrics based on service status
+    const totalServices = Object.keys(health.services).length
+    const healthyServices = Object.values(health.services).filter(s => s.status === 'healthy').length
+    
+    return {
+      totalEmails: Math.floor(Math.random() * 1000) + 100, // Mock for now
+      activeLeads: Math.floor(Math.random() * 50) + 10,   // Mock for now
+      aiResponses: Math.floor(Math.random() * 100) + 50,  // Mock for now
+      avgResponseTime: Math.random() * 5 + 1              // Mock for now
+    }
+  }
+
+  async getServices(): Promise<ServiceData[]> {
+    const health = await this.getHealth()
+    
+    return Object.entries(health.services).map(([id, status]) => ({
+      id,
+      name: this.formatServiceName(id),
+      status: status.status === 'healthy' ? 'active' : 'inactive',
+      description: this.getServiceDescription(id)
+    }))
+  }
+
+  async getActivity(): Promise<ActivityItem[]> {
+    // For now, return mock activity data
+    // In the future, this could be a dedicated activity endpoint
+    return [
+      {
+        id: 1,
+        type: 'ai_response',
+        message: 'AI Assistant responded to inquiry from john@acme.com',
+        timestamp: '2 minutes ago',
+        status: 'success'
+      },
+      {
+        id: 2,
+        type: 'lead_added',
+        message: 'New lead added: Jane Smith from Startup Inc',
+        timestamp: '15 minutes ago',
+        status: 'success'
+      },
+      {
+        id: 3,
+        type: 'email_processed',
+        message: 'Email automation triggered for urgent inquiry',
+        timestamp: '1 hour ago',
+        status: 'success'
+      },
+      {
+        id: 4,
+        type: 'service_error',
+        message: 'ML Scoring service temporarily unavailable',
+        timestamp: '2 hours ago',
+        status: 'warning'
+      }
+    ]
+  }
+
+  // Service test endpoints
+  async testEmailParser(): Promise<any> {
+    const response = await this.client.post('/test/email-parser', {})
+    return response.data
+  }
+
+  async testEmailActions(): Promise<any> {
+    const response = await this.client.post('/test/email-actions', {})
+    return response.data
+  }
+
+  async testCRM(): Promise<any> {
+    const response = await this.client.post('/test/crm', {})
+    return response.data
+  }
+
+  async testAIAssistant(): Promise<AIResponse> {
+    const response = await this.client.post('/test/ai-assistant', {})
+    return response.data
+  }
+
+  async testMLScoring(): Promise<any> {
+    const response = await this.client.post('/test/ml-scoring', {})
+    return response.data
+  }
+
+  async testVectorSearch(): Promise<any> {
+    const response = await this.client.post('/test/vector-search', {})
+    return response.data
+  }
+
+  // CRM endpoints
+  async getLeads(): Promise<LeadData[]> {
+    // For now, return mock data
+    // In the future, this could be a dedicated leads endpoint
+    return [
+      {
+        id: '1',
+        name: 'John Smith',
+        email: 'john@acme.com',
+        company: 'Acme Corp',
+        stage: 'qualified',
+        score: 8.5,
+        lastContact: '2 hours ago',
+        source: 'email'
+      },
+      {
+        id: '2',
+        name: 'Jane Doe',
+        email: 'jane@startup.io',
+        company: 'Startup Inc',
+        stage: 'new',
+        score: 6.2,
+        lastContact: '1 day ago',
+        source: 'website'
+      },
+      {
+        id: '3',
+        name: 'Bob Johnson',
+        email: 'bob@tech.com',
+        company: 'Tech Solutions',
+        stage: 'contacted',
+        score: 7.8,
+        lastContact: '3 hours ago',
+        source: 'referral'
+      }
+    ]
+  }
+
+  // Utility methods
+  private formatServiceName(id: string): string {
+    const nameMap: Record<string, string> = {
+      'config': 'Configuration',
+      'auth': 'Authentication',
+      'parser': 'Email Parser',
+      'gmail': 'Gmail Service',
+      'actions': 'Email Actions',
+      'crm': 'CRM Service',
+      'ai_assistant': 'AI Assistant',
+      'ml_scoring': 'ML Lead Scoring',
+      'vector_search': 'Vector Search',
+      'feature_flags': 'Feature Flags'
+    }
+    return nameMap[id] || id.charAt(0).toUpperCase() + id.slice(1)
+  }
+
+  private getServiceDescription(id: string): string {
+    const descMap: Record<string, string> = {
+      'config': 'System configuration and settings',
+      'auth': 'User authentication and authorization',
+      'parser': 'Intelligent email content analysis',
+      'gmail': 'Gmail API integration and email management',
+      'actions': 'Automated email actions and responses',
+      'crm': 'Customer relationship management',
+      'ai_assistant': 'AI-powered email responses and classification',
+      'ml_scoring': 'Machine learning lead scoring and prioritization',
+      'vector_search': 'Semantic search and document retrieval',
+      'feature_flags': 'Feature flag management and control'
+    }
+    return descMap[id] || 'Service description not available'
+  }
+
+  // Error handling
+  handleError(error: any): string {
+    if (error.response) {
+      // Server responded with error status
+      return `Server error: ${error.response.status} - ${error.response.data?.error || error.message}`
+    } else if (error.request) {
+      // Request was made but no response received
+      return 'Network error: Unable to connect to server'
+    } else {
+      // Something else happened
+      return `Error: ${error.message}`
+    }
+  }
+}
+
+// Export singleton instance
+export const apiClient = new ApiClient()

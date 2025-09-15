@@ -7,6 +7,7 @@ interface MetricCardProps {
   icon: React.ComponentType<{ className?: string }>
   change?: string
   changeType?: 'positive' | 'negative'
+  onClick?: () => void
 }
 
 export const MetricCard: React.FC<MetricCardProps> = ({ 
@@ -14,10 +15,11 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   value, 
   icon: Icon, 
   change, 
-  changeType = 'positive' 
+  changeType = 'positive',
+  onClick
 }) => {
   return (
-    <div className="card">
+    <div className="card cursor-pointer hover:shadow-md transition-shadow duration-200" onClick={onClick}>
       <div className="flex items-center">
         <div className="flex-shrink-0">
           <Icon className="h-6 w-6 text-gray-400" />
@@ -47,3 +49,4 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     </div>
   )
 }
+
