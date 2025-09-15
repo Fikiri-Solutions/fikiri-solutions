@@ -5,27 +5,58 @@
 @layer base {
   html {
     font-family: 'Inter', system-ui, sans-serif;
+    /* Mobile optimization */
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
   }
   
   body {
     @apply bg-gray-50 text-gray-900;
+    /* Prevent mobile zoom on input focus */
+    -webkit-text-size-adjust: 100%;
+    /* Smooth scrolling on mobile */
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Mobile-specific improvements */
+  @media (max-width: 768px) {
+    body {
+      font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    input, textarea, select {
+      font-size: 16px; /* Prevent zoom on iOS */
+    }
   }
 }
 
 @layer components {
   .btn-primary {
     @apply bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+    /* Mobile touch improvements */
+    min-height: 44px; /* iOS recommended touch target */
+    min-width: 44px;
+    -webkit-tap-highlight-color: transparent;
   }
   
   .btn-secondary {
     @apply bg-gray-200 hover:bg-gray-300 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-gray-900 font-medium py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+    /* Mobile touch improvements */
+    min-height: 44px; /* iOS recommended touch target */
+    min-width: 44px;
+    -webkit-tap-highlight-color: transparent;
   }
   
   .card {
     @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200;
+    /* Mobile touch improvements */
+    -webkit-tap-highlight-color: transparent;
   }
   
   .input-field {
     @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-200;
+    /* Mobile improvements */
+    min-height: 44px; /* iOS recommended touch target */
+    font-size: 16px; /* Prevent zoom on iOS */
   }
 }

@@ -1,4 +1,5 @@
 import React from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { Mail, Users, Brain, Settings, Menu, X, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 
@@ -8,6 +9,7 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const location = useLocation()
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: Mail },
@@ -33,14 +35,19 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
           <nav className="flex-1 px-4 py-4">
             {navigation.map((item) => (
-              <a
+              <Link
                 key={item.name}
-                href={item.href}
-                className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100"
+                to={item.href}
+                className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                  location.pathname === item.href
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+                onClick={() => setSidebarOpen(false)}
               >
                 <item.icon className="mr-3 h-5 w-5" />
                 {item.name}
-              </a>
+              </Link>
             ))}
           </nav>
         </div>
@@ -57,14 +64,18 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
           <nav className="flex-1 px-4 py-4">
             {navigation.map((item) => (
-              <a
+              <Link
                 key={item.name}
-                href={item.href}
-                className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100"
+                to={item.href}
+                className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                  location.pathname === item.href
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
               >
                 <item.icon className="mr-3 h-5 w-5" />
                 {item.name}
-              </a>
+              </Link>
             ))}
           </nav>
         </div>
