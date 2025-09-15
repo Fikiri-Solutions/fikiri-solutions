@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
-import { websocketService } from './websocketService'
+import { websocketService } from '../services/websocketService'
 
 interface WebSocketData {
   metrics?: any
