@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Mail, Users, Brain, TrendingUp, Clock, CheckCircle, Bot, UserPlus, Zap, AlertTriangle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Mail, Users, Brain, TrendingUp, Clock, Bot, UserPlus, Zap, AlertTriangle, CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
 import { ServiceCard } from '../components/ServiceCard'
 import { MetricCard } from '../components/MetricCard'
 import { config, getFeatureConfig } from '../config'
@@ -7,6 +8,7 @@ import { apiClient, ServiceData, MetricData, ActivityItem } from '../services/ap
 import { mockServices, mockMetrics, mockActivity } from '../mockData'
 
 export const Dashboard: React.FC = () => {
+  const navigate = useNavigate()
   const features = getFeatureConfig()
   const [services, setServices] = useState<ServiceData[]>([])
   const [metrics, setMetrics] = useState<MetricData>({
@@ -22,16 +24,16 @@ export const Dashboard: React.FC = () => {
   const handleMetricClick = (metricType: string) => {
     switch (metricType) {
       case 'emails':
-        window.location.href = '/crm?filter=emails'
+        navigate('/crm?filter=emails')
         break
       case 'leads':
-        window.location.href = '/crm?filter=active'
+        navigate('/crm?filter=active')
         break
       case 'responses':
-        window.location.href = '/services'
+        navigate('/services')
         break
       case 'responseTime':
-        window.location.href = '/services'
+        navigate('/services')
         break
       default:
         console.log(`Clicked ${metricType}`)
@@ -54,7 +56,9 @@ export const Dashboard: React.FC = () => {
       case 'service_error':
         return <AlertTriangle className={iconClass} />
       default:
-        return <CheckCircle className={iconClass} />
+        return status === 'success' ? <CheckCircle2 className={iconClass} /> : 
+               status === 'warning' ? <AlertCircle className={iconClass} /> : 
+               <XCircle className={iconClass} />
     }
   }
 
@@ -154,7 +158,7 @@ export const Dashboard: React.FC = () => {
         />
         <MetricCard
           title="Avg Response Time"
-          value={`${metrics.avgResponseTime}h`}
+          value={`${Math.round(metrics.avgResponseTime * 100) / 100}h`}
           icon={Clock}
           change="-15%"
           changeType="positive"

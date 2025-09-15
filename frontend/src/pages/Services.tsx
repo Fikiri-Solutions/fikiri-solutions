@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Settings, ToggleLeft, ToggleRight, Save, RefreshCw, X, CheckCircle, AlertCircle, Clock } from 'lucide-react'
+import { Settings, ToggleLeft, ToggleRight, Save, RefreshCw, X, CheckCircle, AlertCircle, Clock, Play, Zap } from 'lucide-react'
 import { apiClient } from '../services/apiClient'
 
 export const Services: React.FC = () => {
@@ -379,9 +379,9 @@ export const Services: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Service Configuration</h1>
+          <h1 className="text-2xl font-bold text-gray-900">🚀 Strategic Service Dashboard</h1>
           <p className="mt-1 text-sm text-gray-600">
-            Configure and manage your Fikiri Solutions services
+            Test and configure all core Fikiri Solutions services with strategic feature flags
           </p>
         </div>
         <div className="flex space-x-3">
@@ -436,9 +436,11 @@ export const Services: React.FC = () => {
               <div className="ml-6">
                 <button
                   onClick={() => testService(service.id)}
-                  className="btn-secondary text-sm"
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isLoading}
                 >
-                  Test Connection
+                  <Zap className="h-4 w-4" />
+                  <span>Test Service</span>
                 </button>
               </div>
             </div>
