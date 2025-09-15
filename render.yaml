@@ -1,10 +1,10 @@
 # Fikiri Solutions - Render Deployment Configuration
-# Deploy to Render.com free tier
+# Optimized for production deployment
 
 # Build Command
-pip install -r requirements.txt
+pip install -r requirements_minimal.txt
 
-# Start Command
+# Start Command  
 python app.py
 
 # Environment Variables (set in Render dashboard)
@@ -14,8 +14,15 @@ python app.py
 # FLASK_ENV=production
 # PORT=8081
 
-# Health Check
+# Health Check Endpoint
 # GET /api/health
 
 # Auto-deploy from GitHub main branch
 # Enable in Render dashboard
+
+# Render Service Configuration:
+# - Runtime: Python 3
+# - Plan: Free (or Starter for $7/month)
+# - Region: Oregon (US West)
+# - Auto-Deploy: Yes
+# - Health Check: /api/health

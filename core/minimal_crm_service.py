@@ -76,7 +76,18 @@ class MinimalCRMService:
             if self.data_path.exists():
                 with open(self.data_path, 'r') as f:
                     data = json.load(f)
-                    self.leads = [MinimalLead.from_dict(lead_data) for lead_data in data]
+                    
+                    # Handle different JSON structures
+                    if isinstance(data, dict) and 'leads' in data:
+                        # Handle wrapped format: {"leads": [...]}
+                        leads_data = data['leads']
+                    elif isinstance(data, list):
+                        # Handle direct array format: [...]
+                        leads_data = data
+                    else:
+                        leads_data = []
+                    
+                    self.leads = [MinimalLead.from_dict(lead_data) for lead_data in leads_data]
                 print(f"✅ Loaded {len(self.leads)} leads from {self.data_path}")
                 return True
             else:

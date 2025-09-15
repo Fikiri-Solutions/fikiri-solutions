@@ -137,6 +137,12 @@ class FeatureFlags:
             return True
         except ImportError:
             return False
+        except Exception as e:
+            # Handle TensorFlow AVX errors and other import issues gracefully
+            if "tensorflow" in module_name.lower():
+                print(f"⚠️  TensorFlow compatibility issue detected, skipping {module_name}")
+                return False
+            return False
     
     def _auto_adjust_features(self):
         """Automatically adjust feature levels based on available dependencies."""

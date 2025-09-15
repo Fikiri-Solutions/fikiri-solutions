@@ -29,6 +29,18 @@ from core.feature_flags import get_feature_flags
 from core.enterprise_logging import log_api_request, log_service_action, log_security_event
 from core.enterprise_security import security_manager, UserRole, Permission
 
+# Lightweight TensorFlow feature flag - make it optional, never a blocker
+try:
+    import tensorflow as tf
+    TENSORFLOW_ENABLED = True
+    print("✅ TensorFlow available for advanced features")
+except ImportError:
+    TENSORFLOW_ENABLED = False
+    print("ℹ️  TensorFlow not available - using lightweight alternatives")
+except Exception as e:
+    TENSORFLOW_ENABLED = False
+    print(f"⚠️  TensorFlow compatibility issue - using lightweight alternatives: {e}")
+
 # Initialize Flask app
 app = Flask(__name__)
 # CORS(app)  # Commented out - not essential
@@ -715,6 +727,63 @@ if __name__ == '__main__':
     templates_dir.mkdir(exist_ok=True)
     
     # Create basic dashboard template
+@app.route('/api/health', methods=['GET'])
+def api_health():
+    """Health check endpoint for deployment monitoring."""
+    try:
+        health_status = {
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'version': '1.0.0',
+            'services': {}
+        }
+        
+        # Check each service
+        service_checks = {
+            'config': lambda: services['config'] is not None,
+            'auth': lambda: services['auth'] is not None,
+            'parser': lambda: services['parser'] is not None,
+            'gmail': lambda: services['gmail'] is not None,
+            'actions': lambda: services['actions'] is not None,
+            'crm': lambda: services['crm'] is not None,
+            'ai_assistant': lambda: services['ai_assistant'] is not None,
+            'ml_scoring': lambda: services['ml_scoring'] is not None,
+            'vector_search': lambda: services['vector_search'] is not None,
+            'feature_flags': lambda: services['feature_flags'] is not None
+        }
+        
+        all_healthy = True
+        for service_name, check_func in service_checks.items():
+            try:
+                is_healthy = check_func()
+                health_status['services'][service_name] = {
+                    'status': 'healthy' if is_healthy else 'unhealthy',
+                    'available': is_healthy
+                }
+                if not is_healthy:
+                    all_healthy = False
+            except Exception as e:
+                health_status['services'][service_name] = {
+                    'status': 'error',
+                    'error': str(e),
+                    'available': False
+                }
+                all_healthy = False
+        
+        # Overall status
+        if not all_healthy:
+            health_status['status'] = 'degraded'
+        
+        status_code = 200 if all_healthy else 503
+        return jsonify(health_status), status_code
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'timestamp': datetime.now().isoformat(),
+            'error': str(e)
+        }), 500
+
     dashboard_html = '''<!DOCTYPE html>
 <html>
 <head>
