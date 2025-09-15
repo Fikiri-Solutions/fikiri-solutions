@@ -752,21 +752,52 @@ def api_health():
             'feature_flags': lambda: services['feature_flags'] is not None
         }
         
+        # Service-specific status checks
+        service_status_checks = {
+            'auth': lambda: {
+                'authenticated': services['auth'].check_token_file() if services['auth'] else False,
+                'enabled': True
+            },
+            'ai_assistant': lambda: {
+                'authenticated': services['ai_assistant'].is_enabled() if services['ai_assistant'] else False,
+                'enabled': services['ai_assistant'].is_enabled() if services['ai_assistant'] else False
+            },
+            'gmail': lambda: {
+                'authenticated': services['gmail'].is_authenticated() if services['gmail'] else False,
+                'enabled': True
+            }
+        }
+        
         all_healthy = True
         for service_name, check_func in service_checks.items():
             try:
                 is_healthy = check_func()
-                health_status['services'][service_name] = {
+                
+                # Base status
+                service_status = {
                     'status': 'healthy' if is_healthy else 'unhealthy',
-                    'available': is_healthy
+                    'available': is_healthy,
+                    'initialized': is_healthy
                 }
+                
+                # Add service-specific status if available
+                if service_name in service_status_checks:
+                    try:
+                        specific_status = service_status_checks[service_name]()
+                        service_status.update(specific_status)
+                    except Exception as e:
+                        print(f"Warning: Could not get specific status for {service_name}: {e}")
+                
+                health_status['services'][service_name] = service_status
+                
                 if not is_healthy:
                     all_healthy = False
             except Exception as e:
                 health_status['services'][service_name] = {
                     'status': 'error',
                     'error': str(e),
-                    'available': False
+                    'available': False,
+                    'initialized': False
                 }
                 all_healthy = False
         
