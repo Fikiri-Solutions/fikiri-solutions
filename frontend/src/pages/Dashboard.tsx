@@ -16,23 +16,42 @@ export const Dashboard: React.FC = () => {
   const features = getFeatureConfig()
   const { addToast } = useToast()
 
+  // Show performance toast on first load
+  React.useEffect(() => {
+    const hasSeenPerformanceToast = localStorage.getItem('hasSeenPerformanceToast')
+    if (!hasSeenPerformanceToast) {
+      setTimeout(() => {
+        addToast({
+          type: 'success',
+          title: '⚡ Performance Optimized!',
+          message: 'Dashboard now loads instantly with smart caching',
+          duration: 3000
+        })
+        localStorage.setItem('hasSeenPerformanceToast', 'true')
+      }, 1000)
+    }
+  }, [addToast])
+
   // TanStack Query hooks for smart data fetching
   const { data: services = [], isLoading: servicesLoading } = useQuery({
     queryKey: ['services'],
     queryFn: () => features.useMockData ? Promise.resolve(mockServices) : apiClient.getServices(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 1 * 60 * 1000, // 1 minute (faster updates)
+    enabled: true, // Always enabled for immediate loading
   })
 
   const { data: metrics, isLoading: metricsLoading } = useQuery({
     queryKey: ['metrics'],
     queryFn: () => features.useMockData ? Promise.resolve(mockMetrics) : apiClient.getMetrics(),
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 30 * 1000, // 30 seconds (very fast updates)
+    enabled: true, // Always enabled for immediate loading
   })
 
   const { data: activity = [], isLoading: activityLoading } = useQuery({
     queryKey: ['activity'],
     queryFn: () => features.useMockData ? Promise.resolve(mockActivity) : apiClient.getActivity(),
-    staleTime: 1 * 60 * 1000, // 1 minute
+    staleTime: 30 * 1000, // 30 seconds (very fast updates)
+    enabled: true, // Always enabled for immediate loading
   })
 
   // Chart data
@@ -117,10 +136,13 @@ export const Dashboard: React.FC = () => {
           Welcome back! Here's what's happening with your Fikiri Solutions.
         </p>
         {(servicesLoading || metricsLoading || activityLoading) && (
-          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-600">
-              <strong>Loading:</strong> Fetching latest data...
-            </p>
+          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="flex items-center space-x-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              <p className="text-sm text-blue-600">
+                <strong>Loading:</strong> Fetching latest data...
+              </p>
+            </div>
           </div>
         )}
       </div>

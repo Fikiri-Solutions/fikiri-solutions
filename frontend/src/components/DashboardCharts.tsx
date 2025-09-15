@@ -51,7 +51,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data }) => {
               strokeWidth={3}
               dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
               activeDot={{ r: 6, stroke: '#3B82F6', strokeWidth: 2 }}
-              animationDuration={1000}
+              animationDuration={300}
             />
             <Line 
               type="monotone" 
@@ -60,7 +60,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data }) => {
               strokeWidth={3}
               dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
               activeDot={{ r: 6, stroke: '#10B981', strokeWidth: 2 }}
-              animationDuration={1000}
+              animationDuration={300}
             />
             <Line 
               type="monotone" 
@@ -69,7 +69,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data }) => {
               strokeWidth={3}
               dot={{ fill: '#F59E0B', strokeWidth: 2, r: 4 }}
               activeDot={{ r: 6, stroke: '#F59E0B', strokeWidth: 2 }}
-              animationDuration={1000}
+              animationDuration={300}
             />
           </LineChart>
         </ResponsiveContainer>
@@ -105,7 +105,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data }) => {
               dataKey="value" 
               fill="url(#colorGradient)"
               radius={[4, 4, 0, 0]}
-              animationDuration={1000}
+              animationDuration={300}
             />
             <defs>
               <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
@@ -135,7 +135,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data }) => {
                 outerRadius={80}
                 fill="#8884d8"
                 dataKey="value"
-                animationDuration={1000}
+                animationDuration={300}
               >
                 {data.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

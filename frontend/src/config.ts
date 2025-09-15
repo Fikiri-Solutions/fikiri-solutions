@@ -22,7 +22,7 @@ export const features = {
   
   // Debug features
   debugMode: false,     // Show debug info in development
-  mockData: false,       // Use real API calls instead of mock data
+  mockData: true,        // Use mock data for instant loading (set to false for production)
 } as const
 
 /**
