@@ -69,7 +69,7 @@ export const AIAssistant: React.FC = () => {
         type: 'ai',
         content: response.response || 'I apologize, but I encountered an issue generating a response.',
         timestamp: new Date(),
-        classification: {
+        classification: response.classification || {
           intent: 'general_inquiry',
           confidence: 0.85,
           suggested_action: 'provide_information',

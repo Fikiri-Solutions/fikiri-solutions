@@ -262,8 +262,79 @@ Fikiri Solutions Team"""
             "client_initialized": self.client is not None
         }
     
-    def generate_chat_response(self, user_message: str, conversation_history: List[Dict] = None) -> str:
-        """Generate AI response for chat interface."""
+    def generate_chat_response(self, user_message: str, conversation_history: List[Dict] = None) -> Dict[str, Any]:
+        """Generate AI response for chat interface with intent classification."""
+        # Import intent classifier and action router
+        try:
+            from core.intent_classifier import create_intent_classifier
+            from core.action_router import create_action_router
+            from core.minimal_crm_service import MinimalCRMService
+            
+            # Initialize components
+            intent_classifier = create_intent_classifier()
+            crm_service = MinimalCRMService()
+            action_router = create_action_router(self, crm_service, None)
+            
+            # Classify intent
+            intent_result = intent_classifier.classify_intent(user_message)
+            intent = intent_result["intent"]
+            confidence = intent_result["confidence"]
+            urgency = intent_result["urgency"]
+            
+            # Route to appropriate action
+            action_result = action_router.route_action(intent, user_message, {
+                "conversation_history": conversation_history or []
+            })
+            
+            # Generate AI response if needed for general inquiries
+            if intent == "general_inquiry" and self.is_enabled():
+                try:
+                    ai_response = self._generate_ai_response(user_message, conversation_history)
+                    action_result["response"] = ai_response
+                    action_result["ai_generated"] = True
+                except Exception as e:
+                    print(f"AI response generation failed: {e}")
+            
+            # Add classification metadata (for internal use only)
+            action_result["classification"] = {
+                "intent": intent,
+                "confidence": confidence,
+                "urgency": urgency,
+                "suggested_action": action_result["action_taken"]
+            }
+            
+            print(f"✅ Chat response generated - Intent: {intent} (confidence: {confidence})")
+            return action_result
+            
+        except ImportError as e:
+            print(f"❌ Failed to import intent classifier: {e}")
+            return {
+                "response": self._enhanced_fallback_response(user_message),
+                "action_taken": "fallback_response",
+                "success": True,
+                "classification": {
+                    "intent": "general_inquiry",
+                    "confidence": 0.6,
+                    "urgency": "normal",
+                    "suggested_action": "provide_information"
+                }
+            }
+        except Exception as e:
+            print(f"❌ Chat response generation failed: {e}")
+            return {
+                "response": self._enhanced_fallback_response(user_message),
+                "action_taken": "error_fallback",
+                "success": False,
+                "classification": {
+                    "intent": "general_inquiry",
+                    "confidence": 0.6,
+                    "urgency": "normal",
+                    "suggested_action": "provide_information"
+                }
+            }
+    
+    def _generate_ai_response(self, user_message: str, conversation_history: List[Dict] = None) -> str:
+        """Generate AI response using OpenAI API."""
         if not self.is_enabled():
             return self._enhanced_fallback_response(user_message)
         
@@ -305,11 +376,11 @@ Fikiri Solutions Team"""
             )
             
             generated_response = response.choices[0].message.content.strip()
-            print(f"✅ Chat response generated")
+            print(f"✅ AI response generated")
             return generated_response
             
         except Exception as e:
-            print(f"❌ Chat response generation failed: {e}")
+            print(f"❌ AI response generation failed: {e}")
             return self._enhanced_fallback_response(user_message)
     
     def _enhanced_fallback_response(self, user_message: str) -> str:

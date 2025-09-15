@@ -618,16 +618,29 @@ def api_ai_chat():
                 'error': 'AI service not available'
             }), 503
         
-        # Generate AI response
+        # Generate AI response with intent classification
         ai_response = services['ai_assistant'].generate_chat_response(
             user_message, 
             context.get('conversation_history', [])
         )
         
+        # Extract response and metadata
+        response_text = ai_response.get('response', 'I apologize, but I encountered an issue generating a response.')
+        classification = ai_response.get('classification', {})
+        action_taken = ai_response.get('action_taken', 'provide_information')
+        success = ai_response.get('success', True)
+        
+        # Log classification metadata (for debugging, not user-facing)
+        print(f"Intent: {classification.get('intent', 'unknown')} | "
+              f"Confidence: {classification.get('confidence', 0)} | "
+              f"Action: {action_taken}")
+        
         return jsonify({
-            'response': ai_response,
+            'response': response_text,
             'timestamp': datetime.now().isoformat(),
-            'success': True
+            'success': success,
+            'classification': classification,  # Keep for frontend debugging if needed
+            'action_taken': action_taken
         })
         
     except Exception as e:
