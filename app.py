@@ -1242,7 +1242,7 @@ def api_health():
         # Service-specific status checks
         service_status_checks = {
             'auth': lambda: {
-                'authenticated': services['auth'].check_token_file() if services['auth'] else False,
+                'authenticated': services['auth'].check_token_file(verbose=False) if services['auth'] else False,
                 'enabled': True
             },
             'ai_assistant': lambda: {

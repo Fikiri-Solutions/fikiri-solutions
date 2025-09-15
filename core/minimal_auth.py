@@ -43,14 +43,16 @@ class MinimalAuthenticator:
             print(f"❌ Error reading credentials file: {e}")
             return False
     
-    def check_token_file(self) -> bool:
+    def check_token_file(self, verbose: bool = False) -> bool:
         """Check if token file exists."""
         token_file = Path(self.token_path)
         if token_file.exists():
-            print("✅ Token file found")
+            if verbose:
+                print("✅ Token file found")
             return True
         else:
-            print("❌ Token file not found - authentication needed")
+            if verbose:
+                print("❌ Token file not found - authentication needed")
             return False
     
     def load_token(self) -> Optional[Dict[str, Any]]:
