@@ -264,8 +264,8 @@ def index():
     """Main dashboard page."""
     return render_template('dashboard.html')
 
-@app.route('/api/health')
-def api_health():
+@app.route('/api/health-old')
+def api_health_old():
     """Comprehensive health check endpoint for system monitoring."""
     try:
         health_status = {
