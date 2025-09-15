@@ -32,7 +32,7 @@ from core.enterprise_logging import log_api_request, log_service_action, log_sec
 from core.enterprise_security import security_manager, UserRole, Permission
 
 # Import monitoring and performance tracking
-from core.structured_logging import logger, monitor, error_handler, performance_monitor
+from core.structured_logging import logger, monitor, error_tracker, performance_monitor
 from core.performance_monitoring import monitor_performance, PerformanceBudget
 
 # Lightweight TensorFlow feature flag - make it optional, never a blocker
