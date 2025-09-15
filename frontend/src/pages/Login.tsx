@@ -5,10 +5,12 @@ export const Login: React.FC = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError('')
     
     try {
       // TODO: Implement actual login API call
@@ -17,10 +19,20 @@ export const Login: React.FC = () => {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000))
       
-      // Redirect to dashboard (in real app, handle auth state)
-      window.location.href = '/'
+      // Simulate validation
+      if (!email || !password) {
+        throw new Error('Please enter both email and password')
+      }
+      
+      if (email === 'test@example.com' && password === 'password') {
+        // Redirect to dashboard (in real app, handle auth state)
+        window.location.href = '/'
+      } else {
+        throw new Error('Invalid email or password')
+      }
     } catch (error) {
       console.error('Login failed:', error)
+      setError(error instanceof Error ? error.message : 'Login failed. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -39,6 +51,11 @@ export const Login: React.FC = () => {
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
           <div className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -115,8 +132,8 @@ export const Login: React.FC = () => {
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
               ) : (
                 <>
-                  Sign in
-                  <ArrowRight className="ml-2 h-4 w-4" />
+              Sign In
+              <ArrowRight className="ml-2 h-4 w-4" />
                 </>
               )}
             </button>
@@ -126,7 +143,7 @@ export const Login: React.FC = () => {
             <p className="text-sm text-gray-600">
               Don't have an account?{' '}
               <a href="#" className="font-medium text-blue-600 hover:text-blue-500">
-                Sign up for free
+                Start Free Trial
               </a>
             </p>
           </div>

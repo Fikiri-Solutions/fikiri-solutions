@@ -285,7 +285,7 @@ export const Onboarding: React.FC = () => {
               onClick={handleNext}
               className="btn-primary"
             >
-              {currentStep === 5 ? 'Get Started' : 'Next'}
+              {currentStep === 5 ? 'Get Started' : 'Continue'}
               {currentStep < 5 && <ArrowRight className="h-4 w-4 ml-2" />}
             </button>
           </div>

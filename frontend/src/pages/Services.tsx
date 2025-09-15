@@ -343,7 +343,7 @@ export const Services: React.FC = () => {
             className="btn-secondary"
           >
             <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
+            Refresh Data
           </button>
           <button
             onClick={saveConfigurations}
@@ -351,7 +351,7 @@ export const Services: React.FC = () => {
             className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="h-4 w-4 mr-2" />
-            {isLoading ? 'Saving...' : 'Save Changes'}
+            {isLoading ? 'Saving Changes...' : 'Save Configuration'}
           </button>
         </div>
       </div>
@@ -391,7 +391,7 @@ export const Services: React.FC = () => {
                   onClick={() => testService(service.id)}
                   className="btn-secondary text-sm"
                 >
-                  Test Service
+                  Test Connection
                 </button>
               </div>
             </div>
