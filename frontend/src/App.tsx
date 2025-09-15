@@ -1,5 +1,6 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { Analytics } from '@vercel/analytics/react'
 import { Dashboard } from './pages/Dashboard'
 import { Login } from './pages/Login'
 import { Onboarding } from './pages/Onboarding'
@@ -42,6 +43,7 @@ function App() {
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>
               </div>
+              <Analytics />
             </Router>
           </ToastProvider>
         </QueryProvider>
