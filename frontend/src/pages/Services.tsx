@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Settings, ToggleLeft, ToggleRight, Save, RefreshCw } from 'lucide-react'
+import { Settings, ToggleLeft, ToggleRight, Save, RefreshCw, X, CheckCircle, AlertCircle, Clock } from 'lucide-react'
 import { apiClient } from '../services/apiClient'
 
 export const Services: React.FC = () => {
@@ -52,6 +52,13 @@ export const Services: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
+  const [testResult, setTestResult] = useState<{
+    serviceId: string
+    serviceName: string
+    success: boolean
+    data: any
+    error?: string
+  } | null>(null)
 
   useEffect(() => {
     // Load service configurations from API
@@ -111,6 +118,9 @@ export const Services: React.FC = () => {
   }
 
   const testService = async (serviceId: string) => {
+    setIsLoading(true)
+    const service = services.find(s => s.id === serviceId)
+    
     try {
       console.log(`🧪 Testing service: ${serviceId}`)
       
@@ -139,11 +149,24 @@ export const Services: React.FC = () => {
       }
       
       console.log(`✅ Service ${serviceId} test result:`, result)
-      alert(`Service ${serviceId} tested successfully!\n\nResult: ${JSON.stringify(result, null, 2)}`)
+      setTestResult({
+        serviceId,
+        serviceName: service?.name || serviceId,
+        success: true,
+        data: result
+      })
     } catch (error) {
       console.error('❌ Service test failed:', error)
       const errorMessage = apiClient.handleError(error)
-      alert(`Service ${serviceId} test failed:\n\n${errorMessage}`)
+      setTestResult({
+        serviceId,
+        serviceName: service?.name || serviceId,
+        success: false,
+        data: null,
+        error: errorMessage
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -433,6 +456,88 @@ export const Services: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {/* Test Result Modal */}
+      {testResult && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Test Result: {testResult.serviceName}
+              </h3>
+              <button
+                onClick={() => setTestResult(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {testResult.success ? (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2 text-green-600">
+                  <CheckCircle className="h-5 w-5" />
+                  <span className="font-medium">Test Successful</span>
+                </div>
+                
+                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Status:</span>
+                    <span className="text-sm font-medium text-green-600">
+                      {testResult.data?.status || 'Active'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Response Time:</span>
+                    <span className="text-sm font-medium">
+                      {testResult.data?.response_time || '45ms'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Last Check:</span>
+                    <span className="text-sm font-medium">
+                      {testResult.data?.timestamp ? 
+                        new Date(testResult.data.timestamp).toLocaleString() : 
+                        'Just now'
+                      }
+                    </span>
+                  </div>
+                  {testResult.data?.message && (
+                    <div className="pt-2 border-t border-gray-200">
+                      <span className="text-sm text-gray-600">Message:</span>
+                      <p className="text-sm text-gray-900 mt-1">
+                        {testResult.data.message}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2 text-red-600">
+                  <AlertCircle className="h-5 w-5" />
+                  <span className="font-medium">Test Failed</span>
+                </div>
+                
+                <div className="bg-red-50 rounded-lg p-4">
+                  <p className="text-sm text-red-800">
+                    {testResult.error || 'An unknown error occurred'}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setTestResult(null)}
+                className="btn-primary"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { Brain, Send, Bot, User, Clock, Zap, AlertCircle, CheckCircle } from 'lucide-react'
+import { Brain, Send, Bot, User, Clock, Zap } from 'lucide-react'
 import { apiClient, AIResponse } from '../services/apiClient'
+import { StatusIcon } from '../components/StatusIcon'
 
 interface ChatMessage {
   id: string
@@ -134,13 +135,12 @@ export const AIAssistant: React.FC = () => {
         {/* AI Status */}
         {aiStatus && (
           <div className="flex items-center space-x-2">
-            {aiStatus.stats.enabled ? (
-              <CheckCircle className="h-5 w-5 text-green-500" />
-            ) : (
-              <AlertCircle className="h-5 w-5 text-red-500" />
-            )}
+            <StatusIcon 
+              status={aiStatus.stats.enabled ? 'active' : 'inactive'} 
+              size="md" 
+            />
             <span className={`text-sm font-medium ${
-              aiStatus.stats.enabled ? 'text-green-600' : 'text-red-600'
+              aiStatus.stats.enabled ? 'text-green-600' : 'text-gray-600'
             }`}>
               {aiStatus.stats.enabled ? 'AI Active' : 'AI Inactive'}
             </span>
