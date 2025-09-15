@@ -171,6 +171,10 @@ class MinimalCRMService:
             print(f"❌ Lead with ID {lead_id} not found")
             return False
         
+        # Ensure notes is a list
+        if lead.notes is None:
+            lead.notes = []
+        
         timestamp = datetime.now().isoformat()
         lead.notes.append({
             "timestamp": timestamp,
@@ -187,6 +191,10 @@ class MinimalCRMService:
         if not lead:
             print(f"❌ Lead with ID {lead_id} not found")
             return False
+        
+        # Ensure tags is a list
+        if lead.tags is None:
+            lead.tags = []
         
         if tag not in lead.tags:
             lead.tags.append(tag)
