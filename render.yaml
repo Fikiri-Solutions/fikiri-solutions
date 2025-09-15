@@ -5,7 +5,7 @@
 pip install -r requirements_minimal.txt
 
 # Start Command  
-python app.py
+gunicorn -w 2 -b 0.0.0.0:$PORT app:app
 
 # Environment Variables (set in Render dashboard)
 # OPENAI_API_KEY=your_openai_api_key_here

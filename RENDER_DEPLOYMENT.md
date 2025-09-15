@@ -33,8 +33,8 @@ git push origin main
    - **Runtime**: `Python 3`
    - **Branch**: `main`
    - **Build Command**: `pip install -r requirements_minimal.txt`
-   - **Start Command**: `python app.py`
-   - **Port**: `8081`
+   - **Start Command**: `gunicorn -w 2 -b 0.0.0.0:$PORT app:app`
+   - **Port**: `8080` (Render uses $PORT automatically)
 
 ### **Step 3: Environment Variables**
 Set these in Render dashboard → Environment:
