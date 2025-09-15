@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Mail, Users, Brain, Settings, Menu, X, Sparkles } from 'lucide-react'
+import { MobileBottomNav } from './MobileBottomNav'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -121,12 +122,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
 
         {/* Page content */}
-        <main className="py-6">
+        <main className="py-6 pb-20 lg:pb-6">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             {children}
           </div>
         </main>
       </div>
+      
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav />
     </div>
   )
 }

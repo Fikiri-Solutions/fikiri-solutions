@@ -6,6 +6,7 @@ import { ServiceCard } from '../components/ServiceCard'
 import { MetricCard } from '../components/MetricCard'
 import { DashboardCharts } from '../components/DashboardCharts'
 import { MetricCardSkeleton, ServiceCardSkeleton, ChartSkeleton, ActivitySkeleton } from '../components/Skeleton'
+import { useToast } from '../components/Toast'
 import { config, getFeatureConfig } from '../config'
 import { apiClient, ServiceData, MetricData, ActivityItem } from '../services/apiClient'
 import { mockServices, mockMetrics, mockActivity } from '../mockData'
@@ -13,6 +14,7 @@ import { mockServices, mockMetrics, mockActivity } from '../mockData'
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate()
   const features = getFeatureConfig()
+  const { addToast } = useToast()
 
   // TanStack Query hooks for smart data fetching
   const { data: services = [], isLoading: servicesLoading } = useQuery({
@@ -48,15 +50,35 @@ export const Dashboard: React.FC = () => {
     switch (metricType) {
       case 'emails':
         navigate('/crm?filter=emails')
+        addToast({
+          type: 'info',
+          title: 'Navigating to CRM',
+          message: 'Filtering by email activity'
+        })
         break
       case 'leads':
         navigate('/crm?filter=active')
+        addToast({
+          type: 'success',
+          title: 'Viewing Active Leads',
+          message: 'Showing all active lead data'
+        })
         break
       case 'responses':
         navigate('/services')
+        addToast({
+          type: 'info',
+          title: 'Checking AI Responses',
+          message: 'Viewing service performance'
+        })
         break
       case 'responseTime':
         navigate('/services')
+        addToast({
+          type: 'warning',
+          title: 'Response Time Analysis',
+          message: 'Reviewing performance metrics'
+        })
         break
       default:
         console.log(`Clicked ${metricType}`)

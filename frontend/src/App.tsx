@@ -6,8 +6,10 @@ import { Onboarding } from './pages/Onboarding'
 import { Services } from './pages/Services'
 import { CRM } from './pages/CRM'
 import { AIAssistant } from './pages/AIAssistant'
+import { NotFoundPage, ErrorPage } from './pages/ErrorPages'
 import { Layout } from './components/Layout'
 import { QueryProvider } from './providers/QueryProvider'
+import { ToastProvider } from './components/Toast'
 import { ScrollToTop } from './components/ScrollToTop'
 import { getFeatureConfig } from './config'
 
@@ -16,19 +18,23 @@ function App() {
 
   return (
     <QueryProvider>
-      <Router>
-        <ScrollToTop />
-        <div className="min-h-screen bg-gray-50">
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            {features.showOnboarding && <Route path="/onboarding" element={<Onboarding />} />}
-            <Route path="/" element={<Layout><Dashboard /></Layout>} />
-            <Route path="/services" element={<Layout><Services /></Layout>} />
-            <Route path="/crm" element={<Layout><CRM /></Layout>} />
-            <Route path="/ai" element={<Layout><AIAssistant /></Layout>} />
-          </Routes>
-        </div>
-      </Router>
+      <ToastProvider>
+        <Router>
+          <ScrollToTop />
+          <div className="min-h-screen bg-gray-50">
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              {features.showOnboarding && <Route path="/onboarding" element={<Onboarding />} />}
+              <Route path="/" element={<Layout><Dashboard /></Layout>} />
+              <Route path="/services" element={<Layout><Services /></Layout>} />
+              <Route path="/crm" element={<Layout><CRM /></Layout>} />
+              <Route path="/ai" element={<Layout><AIAssistant /></Layout>} />
+              <Route path="/error" element={<ErrorPage />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </div>
+        </Router>
+      </ToastProvider>
     </QueryProvider>
   )
 }

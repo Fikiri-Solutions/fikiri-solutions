@@ -35,6 +35,18 @@
   .min-screen-width {
     min-width: 320px;
   }
+  
+  /* Fikiri Solutions Brand Colors */
+  :root {
+    --fikiri-primary: #3B82F6;
+    --fikiri-primary-dark: #1D4ED8;
+    --fikiri-secondary: #10B981;
+    --fikiri-accent: #F59E0B;
+    --fikiri-danger: #EF4444;
+    --fikiri-success: #10B981;
+    --fikiri-warning: #F59E0B;
+    --fikiri-info: #3B82F6;
+  }
 }
 
 @layer components {
@@ -101,5 +113,24 @@
     .responsive-grid {
       @apply grid-cols-4;
     }
+  }
+  
+  /* Brand-specific components */
+  .fikiri-gradient {
+    background: linear-gradient(135deg, var(--fikiri-primary) 0%, var(--fikiri-secondary) 100%);
+  }
+  
+  .fikiri-card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-all duration-300;
+    background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+  }
+  
+  .fikiri-button {
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+    box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.3);
+  }
+  
+  .fikiri-button:hover {
+    box-shadow: 0 6px 20px 0 rgba(59, 130, 246, 0.4);
   }
 }
