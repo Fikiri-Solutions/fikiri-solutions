@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { Mail, Users, Brain, Clock, Bot, UserPlus, Zap, AlertTriangle, CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
 import { ServiceCard } from '../components/ServiceCard'
 import { MetricCard } from '../components/MetricCard'
+import { DashboardCharts } from '../components/DashboardCharts'
 import { config, getFeatureConfig } from '../config'
 import { apiClient, ServiceData, MetricData, ActivityItem } from '../services/apiClient'
 import { mockServices, mockMetrics, mockActivity } from '../mockData'
@@ -10,16 +12,36 @@ import { mockServices, mockMetrics, mockActivity } from '../mockData'
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate()
   const features = getFeatureConfig()
-  const [services, setServices] = useState<ServiceData[]>([])
-  const [metrics, setMetrics] = useState<MetricData>({
-    totalEmails: 0,
-    activeLeads: 0,
-    aiResponses: 0,
-    avgResponseTime: 0
+
+  // TanStack Query hooks for smart data fetching
+  const { data: services = [], isLoading: servicesLoading } = useQuery({
+    queryKey: ['services'],
+    queryFn: () => features.useMockData ? Promise.resolve(mockServices) : apiClient.getServices(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
   })
-  const [activity, setActivity] = useState<ActivityItem[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+
+  const { data: metrics, isLoading: metricsLoading } = useQuery({
+    queryKey: ['metrics'],
+    queryFn: () => features.useMockData ? Promise.resolve(mockMetrics) : apiClient.getMetrics(),
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  })
+
+  const { data: activity = [], isLoading: activityLoading } = useQuery({
+    queryKey: ['activity'],
+    queryFn: () => features.useMockData ? Promise.resolve(mockActivity) : apiClient.getActivity(),
+    staleTime: 1 * 60 * 1000, // 1 minute
+  })
+
+  // Chart data
+  const chartData = [
+    { name: 'Mon', emails: 45, leads: 12, responses: 38, value: 95 },
+    { name: 'Tue', emails: 52, leads: 15, responses: 42, value: 88 },
+    { name: 'Wed', emails: 38, leads: 8, responses: 35, value: 92 },
+    { name: 'Thu', emails: 61, leads: 18, responses: 48, value: 85 },
+    { name: 'Fri', emails: 47, leads: 14, responses: 41, value: 90 },
+    { name: 'Sat', emails: 23, leads: 6, responses: 22, value: 78 },
+    { name: 'Sun', emails: 19, leads: 4, responses: 18, value: 82 },
+  ]
 
   const handleMetricClick = (metricType: string) => {
     switch (metricType) {
@@ -62,50 +84,6 @@ export const Dashboard: React.FC = () => {
     }
   }
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  const fetchData = async () => {
-    setIsLoading(true)
-    setError(null)
-    
-    try {
-      if (features.useMockData) {
-        // Use mock data for local testing
-        await new Promise(resolve => setTimeout(resolve, 500)) // Simulate API delay
-        setServices(mockServices)
-        setMetrics(mockMetrics)
-        setActivity(mockActivity)
-      } else {
-        // Use real API
-        console.log('🔄 Fetching data from backend API...')
-        
-        const [servicesData, metricsData, activityData] = await Promise.all([
-          apiClient.getServices(),
-          apiClient.getMetrics(),
-          apiClient.getActivity()
-        ])
-        
-        setServices(servicesData)
-        setMetrics(metricsData)
-        setActivity(activityData)
-        
-        console.log('✅ Data fetched successfully from backend')
-      }
-    } catch (error) {
-      console.error('❌ Failed to fetch dashboard data:', error)
-      setError(apiClient.handleError(error))
-      
-      // Fallback to mock data on error
-      setServices(mockServices)
-      setMetrics(mockMetrics)
-      setActivity(mockActivity)
-      console.log('🔄 Fallback to mock data due to API error')
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   return (
     <div className="space-y-6">
@@ -115,55 +93,57 @@ export const Dashboard: React.FC = () => {
         <p className="mt-1 text-sm text-gray-600">
           Welcome back! Here's what's happening with your Fikiri Solutions.
         </p>
-        {error && (
-          <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-600">
-              <strong>API Error:</strong> {error}
+        {(servicesLoading || metricsLoading || activityLoading) && (
+          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-sm text-blue-600">
+              <strong>Loading:</strong> Fetching latest data...
             </p>
-            <button 
-              onClick={fetchData}
-              className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
-            >
-              Retry
-            </button>
           </div>
         )}
       </div>
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          title="Total Emails"
-          value={metrics.totalEmails}
-          icon={Mail}
-          change="+12%"
-          changeType="positive"
-          onClick={() => handleMetricClick('emails')}
-        />
-        <MetricCard
-          title="Active Leads"
-          value={metrics.activeLeads}
-          icon={Users}
-          change="+8%"
-          changeType="positive"
-          onClick={() => handleMetricClick('leads')}
-        />
-        <MetricCard
-          title="AI Responses"
-          value={metrics.aiResponses}
-          icon={Brain}
-          change="+23%"
-          changeType="positive"
-          onClick={() => handleMetricClick('responses')}
-        />
-        <MetricCard
-          title="Avg Response Time"
-          value={`${Math.round(metrics.avgResponseTime * 100) / 100}h`}
-          icon={Clock}
-          change="-15%"
-          changeType="positive"
-          onClick={() => handleMetricClick('responseTime')}
-        />
+        {metricsLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        ) : (
+          <>
+            <MetricCard
+              title="Total Emails"
+              value={metrics?.totalEmails?.toString() || '0'}
+              icon={Mail}
+              change="+12%"
+              changeType="positive"
+              onClick={() => handleMetricClick('emails')}
+            />
+            <MetricCard
+              title="Active Leads"
+              value={metrics?.activeLeads?.toString() || '0'}
+              icon={Users}
+              change="+8%"
+              changeType="positive"
+              onClick={() => handleMetricClick('leads')}
+            />
+            <MetricCard
+              title="AI Responses"
+              value={metrics?.aiResponses?.toString() || '0'}
+              icon={Brain}
+              change="+23%"
+              changeType="positive"
+              onClick={() => handleMetricClick('responses')}
+            />
+            <MetricCard
+              title="Avg Response Time"
+              value={`${Math.round((metrics?.avgResponseTime || 0) * 100) / 100}h`}
+              icon={Clock}
+              change="-15%"
+              changeType="positive"
+              onClick={() => handleMetricClick('responseTime')}
+            />
+          </>
+        )}
       </div>
 
       {/* Services Status */}
@@ -176,6 +156,9 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Professional Charts */}
+      <DashboardCharts data={chartData} />
+
       {/* Recent Activity */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
@@ -186,7 +169,7 @@ export const Dashboard: React.FC = () => {
             </span>
           )}
         </div>
-        {isLoading ? (
+        {activityLoading ? (
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           </div>
