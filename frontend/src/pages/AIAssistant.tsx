@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Brain, Send, Bot, User, Clock, Zap } from 'lucide-react'
+import { Brain, Send, Bot, User, Clock, Zap, Mail, Users } from 'lucide-react'
 import { apiClient, AIResponse } from '../services/apiClient'
 import { StatusIcon } from '../components/StatusIcon'
 

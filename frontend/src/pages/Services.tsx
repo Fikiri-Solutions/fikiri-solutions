@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Settings, ToggleLeft, ToggleRight, Save, RefreshCw, X, CheckCircle, AlertCircle, Clock, Play, Zap } from 'lucide-react'
+import { Settings, ToggleLeft, ToggleRight, Save, RefreshCw, X, CheckCircle, AlertCircle, Clock, Zap } from 'lucide-react'
 import { apiClient } from '../services/apiClient'
 
 export const Services: React.FC = () => {

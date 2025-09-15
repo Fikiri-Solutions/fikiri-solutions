@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { CheckCircle, ArrowRight, ArrowLeft, Mail, Users, Brain, Settings } from 'lucide-react'
 
 export const Onboarding: React.FC = () => {
+  const navigate = useNavigate()
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState({
     businessName: '',
@@ -56,7 +58,7 @@ export const Onboarding: React.FC = () => {
       setCurrentStep(currentStep + 1)
     } else {
       // Complete onboarding
-      window.location.href = '/'
+      navigate('/')
     }
   }
 

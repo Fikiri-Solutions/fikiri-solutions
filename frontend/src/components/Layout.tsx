@@ -1,7 +1,6 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Mail, Users, Brain, Settings, Menu, X, Sparkles } from 'lucide-react'
-import { useState } from 'react'
 
 interface LayoutProps {
   children: React.ReactNode

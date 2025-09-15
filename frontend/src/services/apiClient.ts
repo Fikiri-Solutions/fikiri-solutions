@@ -4,9 +4,10 @@
  */
 
 import axios, { AxiosInstance, AxiosResponse } from 'axios'
+import { config } from '../config'
 
 // API Configuration
-const API_BASE_URL = 'https://fikirisolutions.onrender.com/api'
+const API_BASE_URL = config.apiUrl
 
 // Types for API responses
 export interface ServiceStatus {
