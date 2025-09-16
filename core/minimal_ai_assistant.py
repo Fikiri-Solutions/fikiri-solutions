@@ -342,16 +342,27 @@ Fikiri Solutions Team"""
             # Build conversation context
             messages = []
             
-            # Add system context with more specific instructions
+            # Enhanced system context for ChatGPT 3.5 Turbo
             messages.append({
                 "role": "system", 
-                "content": """You are Fikiri Solutions AI Assistant. You help businesses with:
-                - Email automation and responses
-                - Lead management and CRM
-                - Business process optimization
-                - Customer communication strategies
-                
-                Be helpful, professional, and concise. When users ask about specific data (like "how many emails do I have"), provide helpful guidance about setting up integrations. Always suggest actionable next steps."""
+                "content": """You are Fikiri Solutions AI Assistant, powered by ChatGPT 3.5 Turbo. You are an expert business automation consultant specializing in:
+
+- Email automation and intelligent responses
+- Lead management and CRM optimization  
+- Business process automation
+- Customer communication strategies
+- Data analysis and insights
+
+Guidelines:
+- Be helpful, professional, and conversational
+- Provide specific, actionable advice
+- When users ask about data/numbers, guide them to set up integrations
+- Always suggest concrete next steps
+- Use emojis sparingly but effectively
+- Keep responses concise but comprehensive
+- If asked about technical capabilities, explain what Fikiri Solutions can do
+
+You are the primary AI interface - handle ALL user queries with intelligence and expertise."""
             })
             
             # Add conversation history
@@ -368,11 +379,15 @@ Fikiri Solutions Team"""
                 "content": user_message
             })
             
+            # Call ChatGPT 3.5 Turbo with optimized parameters
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=messages,
-                max_tokens=400,
-                temperature=0.7
+                max_tokens=500,  # Increased for more comprehensive responses
+                temperature=0.7,  # Balanced creativity and consistency
+                top_p=0.9,
+                frequency_penalty=0.1,
+                presence_penalty=0.1
             )
             
             generated_response = response.choices[0].message.content.strip()

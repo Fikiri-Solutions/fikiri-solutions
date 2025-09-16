@@ -195,19 +195,47 @@ class ActionRouter:
         }
     
     def _handle_help_support(self, user_message: str) -> Dict[str, Any]:
-        """Handle help and support requests."""
+        """Handle help and support requests - ALWAYS use ChatGPT 3.5 Turbo."""
+        if self.ai_assistant and self.ai_assistant.is_enabled():
+            try:
+                ai_response = self.ai_assistant._generate_ai_response(f"As the Fikiri Solutions AI Assistant, provide helpful support for this request: {user_message}. Focus on email automation, lead management, CRM, and business communication.")
+                return {
+                    "response": ai_response,
+                    "action_taken": "ai_help_support",
+                    "success": True,
+                    "ai_generated": True
+                }
+            except Exception as e:
+                print(f"AI help support failed: {e}")
+        
+        # Fallback template
         return {
             "response": "🆘 I'm here to help! I can assist with:\n\n• Email automation and responses\n• Lead management and CRM\n• Customer communication strategies\n• Business process optimization\n\nWhat specific area would you like help with? You can also check the Services section to set up integrations.",
             "action_taken": "provide_help",
-            "success": True
+            "success": True,
+            "ai_generated": False
         }
     
     def _handle_greeting(self, user_message: str) -> Dict[str, Any]:
-        """Handle greeting messages."""
+        """Handle greeting messages - ALWAYS use ChatGPT 3.5 Turbo."""
+        if self.ai_assistant and self.ai_assistant.is_enabled():
+            try:
+                ai_response = self.ai_assistant._generate_ai_response(f"Respond to this greeting in a friendly, professional way as the Fikiri Solutions AI Assistant: {user_message}")
+                return {
+                    "response": ai_response,
+                    "action_taken": "ai_greeting",
+                    "success": True,
+                    "ai_generated": True
+                }
+            except Exception as e:
+                print(f"AI greeting failed: {e}")
+        
+        # Fallback template
         return {
             "response": "👋 Hello! I'm your Fikiri Solutions AI Assistant. I can help you with email automation, lead management, and customer communication. To get started, you can set up your email integration in the Services section. How can I assist you today?",
             "action_taken": "greet_user",
-            "success": True
+            "success": True,
+            "ai_generated": False
         }
     
     def _handle_math_query(self, user_message: str) -> Dict[str, Any]:
@@ -280,20 +308,32 @@ class ActionRouter:
             }
     
     def _handle_general_inquiry(self, user_message: str) -> Dict[str, Any]:
-        """Handle general inquiries with AI assistance."""
+        """Handle general inquiries with AI assistance - ALWAYS use ChatGPT 3.5 Turbo."""
         if self.ai_assistant and self.ai_assistant.is_enabled():
             try:
-                ai_response = self.ai_assistant.generate_chat_response(user_message)
+                # Force AI generation for ALL general inquiries
+                ai_response = self.ai_assistant._generate_ai_response(user_message)
                 return {
-                    "response": ai_response.get("response", "I apologize, but I encountered an issue generating a response."),
+                    "response": ai_response,
                     "action_taken": "ai_response",
                     "success": True,
                     "ai_generated": True
                 }
             except Exception as e:
                 print(f"AI response failed: {e}")
+                # Even if AI fails, try to generate a response
+                try:
+                    fallback_ai = self.ai_assistant._generate_ai_response(f"Please respond to this user message: {user_message}")
+                    return {
+                        "response": fallback_ai,
+                        "action_taken": "ai_fallback_response",
+                        "success": True,
+                        "ai_generated": True
+                    }
+                except Exception as e2:
+                    print(f"Fallback AI also failed: {e2}")
         
-        # Fallback to enhanced response
+        # Only use template if AI is completely unavailable
         return {
             "response": "I'm Fikiri Solutions AI Assistant! I can help you with email automation, lead management, and customer communication. To provide more specific assistance, please set up your email integration in the Services section. How can I assist you today?",
             "action_taken": "provide_information",
