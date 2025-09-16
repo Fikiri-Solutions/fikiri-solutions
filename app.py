@@ -6,7 +6,7 @@ Web interface for testing and deploying Fikiri services.
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from flask_cors import CORS
-from flask_socketio import SocketIO, emit
+# from flask_socketio import SocketIO, emit  # Not currently used
 import json
 import os
 import time
@@ -49,13 +49,13 @@ CORS(app, origins=[
     'https://www.fikirisolutions.com'  # Custom domain with www
 ])
 
-# Initialize SocketIO for real-time updates
-socketio = SocketIO(app, cors_allowed_origins=[
-    'http://localhost:3000',
-    'https://fikirisolutions.vercel.app',
-    'https://fikirisolutions.com',
-    'https://www.fikirisolutions.com'
-])
+# Initialize SocketIO for real-time updates (disabled for now)
+# socketio = SocketIO(app, cors_allowed_origins=[
+#     'http://localhost:3000',
+#     'https://fikirisolutions.vercel.app',
+#     'https://fikirisolutions.com',
+#     'https://www.fikirisolutions.com'
+# ])
 app.secret_key = 'fikiri-secret-key-2024'
 
 # Global service instances
@@ -845,68 +845,15 @@ def api_toggle_feature_flag(feature_name):
         return jsonify({'error': str(e)}), 500
 
 # WebSocket Event Handlers for Real-Time Updates
-@socketio.on('connect')
-def handle_connect():
-    """Handle client connection."""
-    print(f"Client connected: {request.sid}")
-    emit('status', {'message': 'Connected to Fikiri Solutions'})
+# SocketIO functionality disabled - removed heavy dependencies
 
-@socketio.on('disconnect')
-def handle_disconnect():
-    """Handle client disconnection."""
-    print(f"Client disconnected: {request.sid}")
+# SocketIO disconnect handler removed
 
-@socketio.on('subscribe_dashboard')
-def handle_dashboard_subscription():
-    """Subscribe to dashboard updates."""
-    print(f"Client {request.sid} subscribed to dashboard updates")
-    emit('dashboard_subscribed', {'status': 'success'})
+# SocketIO dashboard subscription handler removed
 
-@socketio.on('request_metrics_update')
-def handle_metrics_update():
-    """Send real-time metrics update."""
-    try:
-        # Get current metrics
-        total_emails = 0
-        active_leads = 0
-        ai_responses = 0
-        avg_response_time = 0.0
-        
-        if services['crm']:
-            try:
-                leads = services['crm'].get_all_leads()
-                active_leads = len(leads)
-            except:
-                active_leads = 0
-        
-        if services['ai_assistant']:
-            try:
-                stats = services['ai_assistant'].get_usage_stats()
-                ai_responses = stats.get('successful_responses', 0)
-                avg_response_time = stats.get('avg_response_time', 0.0)
-            except:
-                ai_responses = 0
-                avg_response_time = 0.0
-        
-        if services['gmail'] and services['gmail'].is_authenticated():
-            total_emails = 42  # Placeholder
-        
-        metrics = {
-            'totalEmails': total_emails,
-            'activeLeads': active_leads,
-            'aiResponses': ai_responses,
-            'avgResponseTime': round(avg_response_time, 2),
-            'timestamp': datetime.now().isoformat()
-        }
-        
-        emit('metrics_update', metrics)
-        
-    except Exception as e:
-        emit('error', {'message': f'Failed to update metrics: {str(e)}'})
+# SocketIO metrics update handler removed
 
-@socketio.on('request_services_update')
-def handle_services_update():
-    """Send real-time services status update."""
+# SocketIO services update handler removed
     try:
         service_list = []
         
@@ -945,16 +892,7 @@ def handle_services_update():
     except Exception as e:
         emit('error', {'message': f'Failed to update services: {str(e)}'})
 
-def broadcast_activity_update(activity_type: str, message: str, status: str = 'success'):
-    """Broadcast activity update to all connected clients."""
-    activity = {
-        'id': int(time.time()),
-        'type': activity_type,
-        'message': message,
-        'timestamp': datetime.now().isoformat(),
-        'status': status
-    }
-    socketio.emit('activity_update', activity)
+# SocketIO broadcast function removed - real-time updates disabled
 
 if __name__ == '__main__':
     # Create templates directory if it doesn't exist
@@ -1576,5 +1514,5 @@ def api_health():
     print("📊 Dashboard: http://localhost:8081")
     print("🔧 API Endpoints: http://localhost:8081/api/")
     
-    # Run with SocketIO for real-time updates
-    socketio.run(app, debug=True, host='0.0.0.0', port=8081)
+    # Run Flask app (SocketIO disabled for now)
+    app.run(debug=True, host='0.0.0.0', port=8081)
