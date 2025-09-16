@@ -1,27 +1,32 @@
 import React from 'react';
 import { Brain, MessageSquare, Zap, BarChart3, Clock, Shield } from 'lucide-react';
+import { FeatureStatus, getFeatureStatus } from '../components/FeatureStatus';
 
 export const AIAssistantLanding: React.FC = () => {
   const capabilities = [
     {
       icon: <MessageSquare className="h-6 w-6 text-blue-500" />,
       title: "Intelligent Email Responses",
-      description: "AI that understands context and responds naturally to customer inquiries"
+      description: "AI that understands context and responds naturally to customer inquiries",
+      status: getFeatureStatus('ai-assistant')
     },
     {
       icon: <Brain className="h-6 w-6 text-purple-500" />,
       title: "Learning & Adaptation",
-      description: "Gets smarter with every interaction, learning your business tone and style"
+      description: "Gets smarter with every interaction, learning your business tone and style",
+      status: getFeatureStatus('ai-assistant')
     },
     {
       icon: <BarChart3 className="h-6 w-6 text-green-500" />,
       title: "Performance Analytics",
-      description: "Track response quality, customer satisfaction, and business impact"
+      description: "Track response quality, customer satisfaction, and business impact",
+      status: getFeatureStatus('analytics')
     },
     {
       icon: <Clock className="h-6 w-6 text-orange-500" />,
       title: "24/7 Availability",
-      description: "Never miss a customer inquiry with round-the-clock AI assistance"
+      description: "Never miss a customer inquiry with round-the-clock AI assistance",
+      status: getFeatureStatus('automation')
     }
   ];
 
@@ -78,7 +83,10 @@ export const AIAssistantLanding: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {capabilities.map((capability, index) => (
               <div key={index} className="bg-white p-6 rounded-xl shadow-lg">
-                <div className="mb-4">{capability.icon}</div>
+                <div className="flex items-center justify-between mb-4">
+                  {capability.icon}
+                  <FeatureStatus status={capability.status} />
+                </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">
                   {capability.title}
                 </h3>

@@ -1,27 +1,32 @@
 import React from 'react';
 import { CheckCircle, Star, Users, Zap, Shield, Clock } from 'lucide-react';
+import { FeatureStatus, getFeatureStatus } from '../components/FeatureStatus';
 
 export const ServicesLanding: React.FC = () => {
   const features = [
     {
       icon: <Zap className="h-6 w-6 text-blue-500" />,
       title: "AI Email Assistant",
-      description: "Automatically respond to customer inquiries with intelligent, context-aware replies"
+      description: "Automatically respond to customer inquiries with intelligent, context-aware replies",
+      status: getFeatureStatus('ai-assistant')
     },
     {
       icon: <Users className="h-6 w-6 text-green-500" />,
       title: "Smart CRM",
-      description: "Track leads, manage customer relationships, and score prospects automatically"
+      description: "Track leads, manage customer relationships, and score prospects automatically",
+      status: getFeatureStatus('crm')
     },
     {
       icon: <Shield className="h-6 w-6 text-purple-500" />,
       title: "Enterprise Security",
-      description: "Bank-level security with SOC2 compliance and data encryption"
+      description: "Bank-level security with SOC2 compliance and data encryption",
+      status: getFeatureStatus('auth')
     },
     {
       icon: <Clock className="h-6 w-6 text-orange-500" />,
       title: "24/7 Automation",
-      description: "Never miss a lead with round-the-clock email processing and follow-ups"
+      description: "Never miss a lead with round-the-clock email processing and follow-ups",
+      status: getFeatureStatus('automation')
     }
   ];
 
@@ -122,7 +127,10 @@ export const ServicesLanding: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {features.map((feature, index) => (
               <div key={index} className="bg-white p-6 rounded-xl shadow-lg">
-                <div className="mb-4">{feature.icon}</div>
+                <div className="flex items-center justify-between mb-4">
+                  {feature.icon}
+                  <FeatureStatus status={feature.status} />
+                </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">
                   {feature.title}
                 </h3>
@@ -132,7 +140,31 @@ export const ServicesLanding: React.FC = () => {
           </div>
         </div>
 
-        {/* Pricing Section */}
+        {/* Status Disclaimer */}
+        <div className="mb-16">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-blue-900 mb-3">
+              🚀 Current Platform Status
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <FeatureStatus status="live" />
+                <span className="text-blue-800">Fully operational</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <FeatureStatus status="beta" />
+                <span className="text-blue-800">In active development</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <FeatureStatus status="coming-soon" />
+                <span className="text-blue-800">Coming soon</span>
+              </div>
+            </div>
+            <p className="text-blue-700 mt-3 text-sm">
+              We're continuously improving our platform. Beta features are fully functional but may have limited configurations.
+            </p>
+          </div>
+        </div>
         <div className="mb-16">
           <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
             Simple, Transparent Pricing

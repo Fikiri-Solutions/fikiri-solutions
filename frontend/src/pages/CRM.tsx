@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react'
 import { Users, Mail, Phone, Building, Calendar, Star, Filter, Search, Plus } from 'lucide-react'
 import { apiClient, LeadData } from '../services/apiClient'
 import { EmptyState } from '../components/EmptyState'
+import { ErrorMessage, getUserFriendlyError } from '../components/ErrorMessage'
+import { FeatureStatus, getFeatureStatus } from '../components/FeatureStatus'
 
 export const CRM: React.FC = () => {
   const [leads, setLeads] = useState<LeadData[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<{ type: 'error' | 'warning' | 'info' | 'success'; title: string; message: string } | null>(null)
   const [showAddLeadModal, setShowAddLeadModal] = useState(false)
   const [newLead, setNewLead] = useState({
     name: '',
@@ -18,7 +20,11 @@ export const CRM: React.FC = () => {
 
   const handleAddLead = async () => {
     if (!newLead.name || !newLead.email) {
-      setError('Name and email are required')
+      setError({
+        type: 'warning',
+        title: 'Missing Information',
+        message: 'Name and email are required fields.'
+      })
       return
     }
 
@@ -29,10 +35,15 @@ export const CRM: React.FC = () => {
       await apiClient.addLead(newLead)
       setNewLead({ name: '', email: '', phone: '', company: '', source: 'web' })
       setShowAddLeadModal(false)
+      setError({
+        type: 'success',
+        title: 'Lead Added Successfully',
+        message: 'The new lead has been added to your CRM.'
+      })
       fetchLeads() // Refresh the leads list
     } catch (error) {
       console.error('Failed to add lead:', error)
-      setError(apiClient.handleError(error))
+      setError(getUserFriendlyError(error))
     } finally {
       setIsLoading(false)
     }
@@ -51,7 +62,7 @@ export const CRM: React.FC = () => {
       setLeads(leadsData)
     } catch (error) {
       console.error('Failed to fetch leads:', error)
-      setError(apiClient.handleError(error))
+      setError(getUserFriendlyError(error))
     } finally {
       setIsLoading(false)
     }
@@ -90,37 +101,36 @@ export const CRM: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">CRM - Lead Management</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            Track and manage your customer leads and relationships.
-          </p>
-        </div>
-        <button 
-          onClick={() => setShowAddLeadModal(true)}
-          className="btn-primary flex items-center space-x-2"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Add Lead</span>
-        </button>
-      </div>
-
-      {/* Error Display */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-sm text-red-600">
-            <strong>Error:</strong> {error}
-          </p>
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-2xl font-bold text-gray-900">CRM - Lead Management</h1>
+              <FeatureStatus status={getFeatureStatus('crm')} />
+            </div>
+            <p className="mt-1 text-sm text-gray-600">
+              Track and manage your customer leads and relationships.
+            </p>
+          </div>
           <button 
-            onClick={fetchLeads}
-            className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+            onClick={() => setShowAddLeadModal(true)}
+            className="btn-primary flex items-center space-x-2"
           >
-            Retry
+            <Plus className="h-4 w-4" />
+            <span>Add Lead</span>
           </button>
         </div>
-      )}
+
+        {/* Error Display */}
+        {error && (
+          <ErrorMessage
+            type={error.type}
+            title={error.title}
+            message={error.message}
+            onDismiss={() => setError(null)}
+          />
+        )}
+
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
