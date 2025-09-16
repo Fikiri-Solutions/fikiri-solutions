@@ -83,7 +83,7 @@ def initialize_services():
         services['gmail'] = MinimalGmailService()
         services['actions'] = MinimalEmailActions()
         services['crm'] = MinimalCRMService()
-        services['ai_assistant'] = MinimalAIEmailAssistant()
+        services['ai_assistant'] = MinimalAIEmailAssistant(api_key=os.getenv("OPENAI_API_KEY"))
         services['ml_scoring'] = MinimalMLScoring()
         services['vector_search'] = MinimalVectorSearch()
         # services['hybrid'] = StrategicHybridService()  # Removed - causing issues
