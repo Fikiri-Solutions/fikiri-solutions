@@ -111,16 +111,123 @@ export const IndustryAutomation: React.FC = () => {
   };
 
   const getIndustryIcon = (industry: string) => {
-    switch (industry) {
-      case 'landscaping':
-        return '🌱';
-      case 'restaurant':
-        return '🍽️';
-      case 'contractor':
-        return '🔨';
-      default:
-        return '🏢';
-    }
+    const icons: Record<string, string> = {
+      // Food & Beverage
+      'restaurant': '🍽️',
+      'cafe': '☕',
+      'food_truck': '🚚',
+      
+      // Real Estate
+      'real_estate': '🏠',
+      'property_management': '🏢',
+      
+      // Medical & Healthcare
+      'medical_practice': '🏥',
+      'dental_clinic': '🦷',
+      'veterinary': '🐕',
+      
+      // Labor & Trades
+      'landscaping': '🌱',
+      'painting': '🎨',
+      'carpenter': '🔨',
+      'drywall': '🔧',
+      'plumber': '🚰',
+      'roofer': '🏠',
+      
+      // Transportation & Services
+      'car_rental': '🚗',
+      'ride_share': '🚕',
+      
+      // Creative & Marketing
+      'content_creation': '📱',
+      'marketing_agency': '📊',
+      'photography': '📸',
+      
+      // Professional Services
+      'tax_services': '📋',
+      'accounting': '💰',
+      'legal_services': '⚖️',
+      
+      // Retail & E-commerce
+      'retail_store': '🛍️',
+      'ecommerce': '💻'
+    };
+    return icons[industry] || '🏢';
+  };
+
+  const getIndustryCategory = (industry: string) => {
+    const categories: Record<string, string> = {
+      // Food & Beverage
+      'restaurant': 'Food & Beverage',
+      'cafe': 'Food & Beverage',
+      'food_truck': 'Food & Beverage',
+      
+      // Real Estate
+      'real_estate': 'Real Estate',
+      'property_management': 'Real Estate',
+      
+      // Medical & Healthcare
+      'medical_practice': 'Medical & Healthcare',
+      'dental_clinic': 'Medical & Healthcare',
+      'veterinary': 'Medical & Healthcare',
+      
+      // Labor & Trades
+      'landscaping': 'Labor & Trades',
+      'painting': 'Labor & Trades',
+      'carpenter': 'Labor & Trades',
+      'drywall': 'Labor & Trades',
+      'plumber': 'Labor & Trades',
+      'roofer': 'Labor & Trades',
+      
+      // Transportation & Services
+      'car_rental': 'Transportation & Services',
+      'ride_share': 'Transportation & Services',
+      
+      // Creative & Marketing
+      'content_creation': 'Creative & Marketing',
+      'marketing_agency': 'Creative & Marketing',
+      'photography': 'Creative & Marketing',
+      
+      // Professional Services
+      'tax_services': 'Professional Services',
+      'accounting': 'Professional Services',
+      'legal_services': 'Professional Services',
+      
+      // Retail & E-commerce
+      'retail_store': 'Retail & E-commerce',
+      'ecommerce': 'Retail & E-commerce'
+    };
+    return categories[industry] || 'General';
+  };
+
+  const getIndustryDescription = (industry: string) => {
+    const descriptions: Record<string, string> = {
+      'restaurant': 'Reservation management, menu recommendations, special promotions',
+      'cafe': 'Loyalty programs, daily specials, event hosting, catering orders',
+      'food_truck': 'Location updates, daily menus, event bookings, social media',
+      'real_estate': 'Property listings, client consultations, market analysis',
+      'property_management': 'Maintenance requests, tenant communication, rent collection',
+      'medical_practice': 'Appointment scheduling, patient reminders, HIPAA compliance',
+      'dental_clinic': 'Treatment plans, insurance claims, patient education',
+      'veterinary': 'Vaccination reminders, emergency protocols, pet records',
+      'landscaping': 'Appointment scheduling, service quotes, seasonal planning',
+      'painting': 'Color consultations, project estimates, weather scheduling',
+      'carpenter': 'Custom designs, project timelines, material sourcing',
+      'drywall': 'Repair estimates, texture matching, project scheduling',
+      'plumber': 'Emergency calls, repair estimates, preventive maintenance',
+      'roofer': 'Weather scheduling, safety protocols, inspection reports',
+      'car_rental': 'Reservation management, vehicle availability, fleet maintenance',
+      'ride_share': 'Driver support, route optimization, earnings tracking',
+      'content_creation': 'Content planning, social media strategy, brand consistency',
+      'marketing_agency': 'Campaign management, client reporting, ROI tracking',
+      'photography': 'Session booking, portfolio management, client galleries',
+      'tax_services': 'Tax preparation, deadline management, IRS compliance',
+      'accounting': 'Bookkeeping, financial reporting, audit preparation',
+      'legal_services': 'Case management, client intake, document preparation',
+      'retail_store': 'Inventory management, customer service, sales tracking',
+      'ecommerce': 'Order management, customer support, inventory sync'
+    };
+    return descriptions[industry] || 'Industry-specific automation and workflows';
   };
 
   const getTierColor = (tier: string) => {
@@ -160,28 +267,49 @@ export const IndustryAutomation: React.FC = () => {
                 Select Industry & Test AI
               </h2>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                {Object.entries(prompts).map(([industry, config]) => (
-                  <button
-                    key={industry}
-                    onClick={() => setSelectedIndustry(industry)}
-                    className={`p-4 rounded-lg border-2 transition-all ${
-                      selectedIndustry === industry
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="text-2xl mb-2">{getIndustryIcon(industry)}</div>
-                    <div className="font-medium text-gray-900 dark:text-white capitalize">
-                      {industry}
+              {/* Industry Categories */}
+              <div className="space-y-6">
+                {Object.entries(prompts).reduce((acc, [industry, config]) => {
+                  const category = getIndustryCategory(industry);
+                  if (!acc[category]) {
+                    acc[category] = [];
+                  }
+                  acc[category].push({ industry, config });
+                  return acc;
+                }, {} as Record<string, Array<{industry: string, config: IndustryPrompt}>>).map(([category, industries]) => (
+                  <div key={category} className="space-y-3">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2">
+                      {category}
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {industries.map(({ industry, config }) => (
+                        <button
+                          key={industry}
+                          onClick={() => setSelectedIndustry(industry)}
+                          className={`p-4 rounded-lg border-2 transition-all text-left ${
+                            selectedIndustry === industry
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900'
+                              : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-start space-x-3">
+                            <div className="text-2xl">{getIndustryIcon(industry)}</div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-gray-900 dark:text-white capitalize">
+                                {industry.replace('_', ' ')}
+                              </div>
+                              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                {getIndustryDescription(industry)}
+                              </div>
+                              <div className={`inline-block px-2 py-1 rounded-full text-xs font-medium mt-2 ${getTierColor(config.pricing_tier)}`}>
+                                {config.pricing_tier}
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
                     </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      {config.tone}
-                    </div>
-                    <div className={`inline-block px-2 py-1 rounded-full text-xs font-medium mt-2 ${getTierColor(config.pricing_tier)}`}>
-                      {config.pricing_tier}
-                    </div>
-                  </button>
+                  </div>
                 ))}
               </div>
 
