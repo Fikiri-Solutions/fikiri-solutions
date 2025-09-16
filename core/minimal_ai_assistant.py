@@ -70,7 +70,7 @@ class MinimalAIEmailAssistant:
             )
             
             result = json.loads(response.choices[0].message.content)
-            print(f"✅ Email classified as: {result['intent']}")
+            # Debug output removed
             return result
             
         except Exception as e:
@@ -303,7 +303,7 @@ Fikiri Solutions Team"""
                 "suggested_action": action_result["action_taken"]
             }
             
-            print(f"✅ Chat response generated - Intent: {intent} (confidence: {confidence})")
+            # Debug output removed
             return action_result
             
         except ImportError as e:

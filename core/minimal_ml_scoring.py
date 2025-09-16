@@ -67,7 +67,7 @@ class MinimalMLScoring:
                 "confidence": self._calculate_confidence(scores)
             }
             
-            print(f"✅ Lead scored: {total_score} ({priority})")
+            # Debug output removed
             return result
             
         except Exception as e:
@@ -298,10 +298,7 @@ if __name__ == "__main__":
     # Test scoring
     print("Testing lead scoring...")
     score_result = scorer.calculate_lead_score(sample_email, sample_lead)
-    print(f"✅ Total score: {score_result['total_score']}")
-    print(f"✅ Priority: {score_result['priority']}")
-    print(f"✅ Action: {score_result['recommended_action']}")
-    print(f"✅ Confidence: {score_result['confidence']}")
+    # Debug output removed to prevent metadata display
     
     # Test batch scoring
     print("\nTesting batch scoring...")

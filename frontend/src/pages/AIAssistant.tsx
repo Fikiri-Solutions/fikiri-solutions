@@ -8,12 +8,7 @@ interface ChatMessage {
   type: 'user' | 'ai'
   content: string
   timestamp: Date
-  classification?: {
-    intent: string
-    confidence: number
-    suggested_action: string
-    urgency: string
-  }
+  // Classification removed to prevent debug metadata display
 }
 
 export const AIAssistant: React.FC = () => {
@@ -68,13 +63,8 @@ export const AIAssistant: React.FC = () => {
         id: (Date.now() + 1).toString(),
         type: 'ai',
         content: response.response || 'I apologize, but I encountered an issue generating a response.',
-        timestamp: new Date(),
-        classification: response.classification || {
-          intent: 'general_inquiry',
-          confidence: 0.85,
-          suggested_action: 'provide_information',
-          urgency: 'normal'
-        }
+        timestamp: new Date()
+        // Classification data removed to prevent debug metadata display
       }
 
       setMessages(prev => [...prev, aiMessage])

@@ -7,8 +7,36 @@ export const CRM: React.FC = () => {
   const [leads, setLeads] = useState<LeadData[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterStage, setFilterStage] = useState('all')
+  const [showAddLeadModal, setShowAddLeadModal] = useState(false)
+  const [newLead, setNewLead] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    company: '',
+    source: 'web'
+  })
+
+  const handleAddLead = async () => {
+    if (!newLead.name || !newLead.email) {
+      setError('Name and email are required')
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      await apiClient.addLead(newLead)
+      setNewLead({ name: '', email: '', phone: '', company: '', source: 'web' })
+      setShowAddLeadModal(false)
+      fetchLeads() // Refresh the leads list
+    } catch (error) {
+      console.error('Failed to add lead:', error)
+      setError(apiClient.handleError(error))
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
     fetchLeads()
@@ -70,7 +98,10 @@ export const CRM: React.FC = () => {
             Track and manage your customer leads and relationships.
           </p>
         </div>
-        <button className="btn-primary flex items-center space-x-2">
+        <button 
+          onClick={() => setShowAddLeadModal(true)}
+          className="btn-primary flex items-center space-x-2"
+        >
           <Plus className="h-4 w-4" />
           <span>Add Lead</span>
         </button>
@@ -282,6 +313,104 @@ export const CRM: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Add Lead Modal */}
+      {showAddLeadModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Add New Lead</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Name *
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={newLead.name}
+                    onChange={(e) => setNewLead({...newLead, name: e.target.value})}
+                    placeholder="Enter lead name"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email *
+                  </label>
+                  <input
+                    type="email"
+                    className="input-field"
+                    value={newLead.email}
+                    onChange={(e) => setNewLead({...newLead, email: e.target.value})}
+                    placeholder="Enter email address"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    className="input-field"
+                    value={newLead.phone}
+                    onChange={(e) => setNewLead({...newLead, phone: e.target.value})}
+                    placeholder="Enter phone number"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Company
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={newLead.company}
+                    onChange={(e) => setNewLead({...newLead, company: e.target.value})}
+                    placeholder="Enter company name"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Source
+                  </label>
+                  <select
+                    className="input-field"
+                    value={newLead.source}
+                    onChange={(e) => setNewLead({...newLead, source: e.target.value})}
+                  >
+                    <option value="web">Web</option>
+                    <option value="email">Email</option>
+                    <option value="referral">Referral</option>
+                    <option value="social">Social Media</option>
+                    <option value="phone">Phone</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => setShowAddLeadModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddLead}
+                  disabled={isLoading || !newLead.name || !newLead.email}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-md"
+                >
+                  {isLoading ? 'Adding...' : 'Add Lead'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

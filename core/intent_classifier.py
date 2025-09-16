@@ -235,9 +235,6 @@ if __name__ == "__main__":
         action = classifier.get_suggested_action(result["intent"])
         
         print(f"Message: '{message}'")
-        print(f"Intent: {result['intent']} (confidence: {result['confidence']})")
-        print(f"Urgency: {result['urgency']}")
-        print(f"Action: {action}")
-        print("-" * 30)
+        # Debug output removed to prevent metadata display
     
     print("🎉 Intent classification tests completed!")

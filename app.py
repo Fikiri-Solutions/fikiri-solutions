@@ -690,10 +690,7 @@ def api_ai_chat():
         action_taken = ai_response.get('action_taken', 'provide_information')
         success = ai_response.get('success', True)
         
-        # Log classification metadata (for debugging, not user-facing)
-        print(f"Intent: {classification.get('intent', 'unknown')} | "
-              f"Confidence: {classification.get('confidence', 0)} | "
-              f"Action: {action_taken}")
+        # Debug metadata removed to prevent display in logs
         
         return jsonify({
             'response': response_text,
