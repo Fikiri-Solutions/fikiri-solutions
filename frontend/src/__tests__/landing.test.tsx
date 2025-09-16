@@ -7,15 +7,42 @@ import { AnimatedWorkflow } from '../components/AnimatedWorkflow';
 // Mock Framer Motion to avoid animation issues in tests
 jest.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-    h1: ({ children, ...props }: any) => <h1 {...props}>{children}</h1>,
-    h2: ({ children, ...props }: any) => <h2 {...props}>{children}</h2>,
-    h3: ({ children, ...props }: any) => <h3 {...props}>{children}</h3>,
-    p: ({ children, ...props }: any) => <p {...props}>{children}</p>,
-    span: ({ children, ...props }: any) => <span {...props}>{children}</span>,
-    button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
-    section: ({ children, ...props }: any) => <section {...props}>{children}</section>,
-    nav: ({ children, ...props }: any) => <nav {...props}>{children}</nav>,
+    div: ({ children, ...props }: any) => {
+      const { whileHover, whileInView, animate, initial, transition, ...cleanProps } = props;
+      return <div {...cleanProps}>{children}</div>;
+    },
+    h1: ({ children, ...props }: any) => {
+      const { whileHover, whileInView, animate, initial, transition, ...cleanProps } = props;
+      return <h1 {...cleanProps}>{children}</h1>;
+    },
+    h2: ({ children, ...props }: any) => {
+      const { whileHover, whileInView, animate, initial, transition, ...cleanProps } = props;
+      return <h2 {...cleanProps}>{children}</h2>;
+    },
+    h3: ({ children, ...props }: any) => {
+      const { whileHover, whileInView, animate, initial, transition, ...cleanProps } = props;
+      return <h3 {...cleanProps}>{children}</h3>;
+    },
+    p: ({ children, ...props }: any) => {
+      const { whileHover, whileInView, animate, initial, transition, ...cleanProps } = props;
+      return <p {...cleanProps}>{children}</p>;
+    },
+    span: ({ children, ...props }: any) => {
+      const { whileHover, whileInView, animate, initial, transition, ...cleanProps } = props;
+      return <span {...cleanProps}>{children}</span>;
+    },
+    button: ({ children, ...props }: any) => {
+      const { whileHover, whileInView, animate, initial, transition, ...cleanProps } = props;
+      return <button {...cleanProps}>{children}</button>;
+    },
+    section: ({ children, ...props }: any) => {
+      const { whileHover, whileInView, animate, initial, transition, ...cleanProps } = props;
+      return <section {...cleanProps}>{children}</section>;
+    },
+    nav: ({ children, ...props }: any) => {
+      const { whileHover, whileInView, animate, initial, transition, ...cleanProps } = props;
+      return <nav {...cleanProps}>{children}</nav>;
+    },
   },
   AnimatePresence: ({ children }: any) => <>{children}</>,
 }));
@@ -67,8 +94,10 @@ describe('RenderInspiredLanding Component', () => {
   test('renders headline correctly', () => {
     renderWithRouter(<RenderInspiredLanding />);
     
-    const headline = screen.getByText(/Automate emails, leads, and workflows in minutes with AI/i);
+    // Use a more flexible text matcher for the headline with gradient span
+    const headline = screen.getByRole('heading', { level: 1 });
     expect(headline).toBeInTheDocument();
+    expect(headline).toHaveTextContent('Automate emails, leads, and workflows in minutes with AI');
   });
 
   test('renders subtext correctly', () => {
@@ -153,7 +182,8 @@ describe('RenderInspiredLanding Component', () => {
   test('applies dark mode classes correctly', () => {
     renderWithRouter(<RenderInspiredLanding />);
     
-    const mainContainer = screen.getByRole('main') || document.querySelector('.min-h-screen');
+    // Check that dark mode classes are applied to the main container
+    const mainContainer = document.querySelector('.min-h-screen');
     expect(mainContainer).toHaveClass('bg-white', 'dark:bg-gray-900');
   });
 
@@ -179,31 +209,39 @@ describe('AnimatedWorkflow Component', () => {
   test('renders all 5 workflow steps', () => {
     render(<AnimatedWorkflow />);
     
-    expect(screen.getByText('Email Received')).toBeInTheDocument();
-    expect(screen.getByText('AI Processing')).toBeInTheDocument();
-    expect(screen.getByText('CRM Update')).toBeInTheDocument();
-    expect(screen.getByText('Schedule Follow-up')).toBeInTheDocument();
-    expect(screen.getByText('Analytics Update')).toBeInTheDocument();
+    // Check that we have 5 workflow step containers
+    expect(screen.getAllByTestId('workflow-step')).toHaveLength(5);
+    
+    // Check that all step titles are present in the workflow steps (not the detailed view)
+    const workflowSteps = screen.getAllByTestId('workflow-step');
+    expect(workflowSteps[0]).toHaveTextContent('Email Received');
+    expect(workflowSteps[1]).toHaveTextContent('AI Processing');
+    expect(workflowSteps[2]).toHaveTextContent('CRM Update');
+    expect(workflowSteps[3]).toHaveTextContent('Schedule Follow-up');
+    expect(workflowSteps[4]).toHaveTextContent('Analytics Update');
   });
 
   test('renders workflow step descriptions', () => {
     render(<AnimatedWorkflow />);
     
-    expect(screen.getByText('Customer sends inquiry via email')).toBeInTheDocument();
-    expect(screen.getByText('AI analyzes intent and generates response')).toBeInTheDocument();
-    expect(screen.getByText('Lead automatically added to CRM')).toBeInTheDocument();
-    expect(screen.getByText('Appointment automatically scheduled')).toBeInTheDocument();
-    expect(screen.getByText('Performance metrics updated in real-time')).toBeInTheDocument();
+    // Check that all descriptions are present in the workflow steps
+    const workflowSteps = screen.getAllByTestId('workflow-step');
+    expect(workflowSteps[0]).toHaveTextContent('Customer sends inquiry via email');
+    expect(workflowSteps[1]).toHaveTextContent('AI analyzes intent and generates response');
+    expect(workflowSteps[2]).toHaveTextContent('Lead automatically added to CRM');
+    expect(workflowSteps[3]).toHaveTextContent('Appointment automatically scheduled');
+    expect(workflowSteps[4]).toHaveTextContent('Performance metrics updated in real-time');
   });
 
   test('renders workflow icons', () => {
     render(<AnimatedWorkflow />);
     
-    expect(screen.getByTestId('mail')).toBeInTheDocument();
-    expect(screen.getByTestId('brain')).toBeInTheDocument();
-    expect(screen.getByTestId('users')).toBeInTheDocument();
-    expect(screen.getByTestId('calendar')).toBeInTheDocument();
-    expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
+    // Use getAllByTestId since there are multiple instances of these icons
+    expect(screen.getAllByTestId('mail')).toHaveLength(2);
+    expect(screen.getAllByTestId('brain')).toHaveLength(1);
+    expect(screen.getAllByTestId('users')).toHaveLength(1);
+    expect(screen.getAllByTestId('calendar')).toHaveLength(1);
+    expect(screen.getAllByTestId('bar-chart')).toHaveLength(2);
   });
 
   test('workflow steps cycle automatically', async () => {
@@ -212,12 +250,16 @@ describe('AnimatedWorkflow Component', () => {
     // Fast-forward time to trigger step changes
     jest.advanceTimersByTime(3000);
     
-    // The component should still be rendering all steps
-    expect(screen.getByText('Email Received')).toBeInTheDocument();
-    expect(screen.getByText('AI Processing')).toBeInTheDocument();
-    expect(screen.getByText('CRM Update')).toBeInTheDocument();
-    expect(screen.getByText('Schedule Follow-up')).toBeInTheDocument();
-    expect(screen.getByText('Analytics Update')).toBeInTheDocument();
+    // Check that we still have 5 workflow step containers
+    expect(screen.getAllByTestId('workflow-step')).toHaveLength(5);
+    
+    // Check that all step titles are still present in the workflow steps
+    const workflowSteps = screen.getAllByTestId('workflow-step');
+    expect(workflowSteps[0]).toHaveTextContent('Email Received');
+    expect(workflowSteps[1]).toHaveTextContent('AI Processing');
+    expect(workflowSteps[2]).toHaveTextContent('CRM Update');
+    expect(workflowSteps[3]).toHaveTextContent('Schedule Follow-up');
+    expect(workflowSteps[4]).toHaveTextContent('Analytics Update');
   });
 
   test('renders floating elements', () => {

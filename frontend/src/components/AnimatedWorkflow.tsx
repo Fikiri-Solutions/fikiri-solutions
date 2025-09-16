@@ -71,11 +71,11 @@ export const AnimatedWorkflow: React.FC = () => {
   }, [workflowSteps.length]);
 
   return (
-    <div className="relative max-w-4xl mx-auto">
+    <div className="relative max-w-4xl mx-auto" data-testid="animated-workflow-component">
       {/* Workflow Steps */}
       <div className="flex items-center justify-between mb-8">
         {workflowSteps.map((step, index) => (
-          <div key={step.id} className="flex flex-col items-center flex-1">
+          <div key={step.id} className="flex flex-col items-center flex-1" data-testid="workflow-step">
             <motion.div
               initial={{ scale: 0.8, opacity: 0.5 }}
               animate={{
