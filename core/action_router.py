@@ -311,8 +311,10 @@ class ActionRouter:
         """Handle general inquiries with AI assistance - ALWAYS use ChatGPT 3.5 Turbo."""
         if self.ai_assistant and self.ai_assistant.is_enabled():
             try:
+                print(f"🤖 Attempting AI generation for: {user_message[:50]}...")
                 # Force AI generation for ALL general inquiries
                 ai_response = self.ai_assistant._generate_ai_response(user_message)
+                print(f"✅ AI response generated: {ai_response[:100]}...")
                 return {
                     "response": ai_response,
                     "action_taken": "ai_response",
@@ -320,10 +322,12 @@ class ActionRouter:
                     "ai_generated": True
                 }
             except Exception as e:
-                print(f"AI response failed: {e}")
+                print(f"❌ AI response failed: {e}")
                 # Even if AI fails, try to generate a response
                 try:
+                    print(f"🔄 Trying fallback AI generation...")
                     fallback_ai = self.ai_assistant._generate_ai_response(f"Please respond to this user message: {user_message}")
+                    print(f"✅ Fallback AI response: {fallback_ai[:100]}...")
                     return {
                         "response": fallback_ai,
                         "action_taken": "ai_fallback_response",
@@ -331,9 +335,10 @@ class ActionRouter:
                         "ai_generated": True
                     }
                 except Exception as e2:
-                    print(f"Fallback AI also failed: {e2}")
+                    print(f"❌ Fallback AI also failed: {e2}")
         
         # Only use template if AI is completely unavailable
+        print(f"⚠️ Using template response for: {user_message[:50]}...")
         return {
             "response": "I'm Fikiri Solutions AI Assistant! I can help you with email automation, lead management, and customer communication. To provide more specific assistance, please set up your email integration in the Services section. How can I assist you today?",
             "action_taken": "provide_information",
