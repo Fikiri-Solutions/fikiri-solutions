@@ -285,7 +285,7 @@ class ActionRouter:
             try:
                 ai_response = self.ai_assistant.generate_chat_response(user_message)
                 return {
-                    "response": ai_response,
+                    "response": ai_response.get("response", "I apologize, but I encountered an issue generating a response."),
                     "action_taken": "ai_response",
                     "success": True,
                     "ai_generated": True
