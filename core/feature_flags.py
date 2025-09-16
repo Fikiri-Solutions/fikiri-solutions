@@ -273,8 +273,16 @@ class FeatureFlags:
     
     def get_status_report(self) -> Dict[str, Any]:
         """Get comprehensive status report."""
+        # Convert FeatureLevel enums to strings for JSON serialization
+        serializable_flags = {}
+        for name, config in self.flags.items():
+            serializable_config = config.copy()
+            if 'level' in serializable_config and isinstance(serializable_config['level'], FeatureLevel):
+                serializable_config['level'] = serializable_config['level'].value
+            serializable_flags[name] = serializable_config
+        
         return {
-            "feature_flags": self.flags,
+            "feature_flags": serializable_flags,
             "dependency_status": self._heavy_deps_status,
             "strategic_recommendations": self.get_strategic_recommendations(),
             "total_features": len(self.flags),
