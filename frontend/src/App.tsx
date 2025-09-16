@@ -10,6 +10,9 @@ import { AIAssistant } from './pages/AIAssistant'
 import { NotFoundPage, ErrorPage } from './pages/ErrorPages'
 import { ServicesLanding } from './pages/ServicesLanding'
 import { AIAssistantLanding } from './pages/AIAssistantLanding'
+import { LandscapingLanding } from './pages/LandscapingLanding'
+import { RestaurantLanding } from './pages/RestaurantLanding'
+import { MedicalLanding } from './pages/MedicalLanding'
 import { Layout } from './components/Layout'
 import { IndustryAutomation } from './components/IndustryAutomation'
 import { QueryProvider } from './providers/QueryProvider'
@@ -37,6 +40,9 @@ function App() {
                   <Route path="/services" element={<Layout><Services /></Layout>} />
                   <Route path="/services-landing" element={<ServicesLanding />} />
                   <Route path="/ai-landing" element={<AIAssistantLanding />} />
+                  <Route path="/industries/landscaping" element={<LandscapingLanding />} />
+                  <Route path="/industries/restaurant" element={<RestaurantLanding />} />
+                  <Route path="/industries/medical" element={<MedicalLanding />} />
                   <Route path="/crm" element={<Layout><CRM /></Layout>} />
                   <Route path="/ai" element={<Layout><AIAssistant /></Layout>} />
                   <Route path="/assistant" element={<Layout><AIAssistant /></Layout>} />

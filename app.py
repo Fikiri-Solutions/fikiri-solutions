@@ -28,6 +28,7 @@ from core.email_service_manager import EmailServiceManager
 
 # Import Responses API migration system
 from core.responses_api_migration import responses_manager
+from core.client_analytics import analytics_engine
 
 # Import enterprise features
 from core.enterprise_logging import log_api_request, log_service_action, log_security_event
@@ -1430,6 +1431,97 @@ def get_pricing_tiers():
             'tiers': tiers,
             'success': True
         })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ============================================================================
+# CLIENT ANALYTICS & REPORTING ENDPOINTS
+# ============================================================================
+
+@app.route('/api/analytics/generate-report', methods=['POST'])
+def generate_client_report():
+    """Generate comprehensive client report with ROI analysis"""
+    try:
+        data = request.get_json()
+        client_id = data.get('client_id')
+        industry = data.get('industry')
+        usage_data = data.get('usage_data', {})
+        
+        if not client_id or not industry:
+            return jsonify({'error': 'client_id and industry are required'}), 400
+        
+        # Generate comprehensive report
+        report = analytics_engine.generate_client_report(client_id, industry, usage_data)
+        
+        # Format for client presentation
+        formatted_report = analytics_engine.format_report_for_client(report)
+        
+        return jsonify({
+            'report': formatted_report,
+            'success': True
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/analytics/roi-calculator', methods=['POST'])
+def calculate_roi():
+    """Calculate ROI for potential clients"""
+    try:
+        data = request.get_json()
+        industry = data.get('industry')
+        current_hours_wasted = data.get('hours_wasted_per_month', 0)
+        current_revenue = data.get('monthly_revenue', 0)
+        
+        if not industry:
+            return jsonify({'error': 'industry is required'}), 400
+        
+        # Calculate potential savings
+        monthly_cost = analytics_engine._get_monthly_cost(industry)
+        hours_saved = min(current_hours_wasted * 0.8, 40)  # Assume 80% reduction, max 40 hours
+        hourly_rate = current_revenue / 160 if current_revenue > 0 else 50  # Assume 160 working hours/month
+        
+        time_savings_value = hours_saved * hourly_rate
+        efficiency_gain = (hours_saved / 160) * 100
+        
+        # Calculate ROI
+        roi_percentage = (time_savings_value / monthly_cost) * 100 if monthly_cost > 0 else 0
+        payback_period = monthly_cost / (time_savings_value / 30) if time_savings_value > 0 else 0
+        
+        return jsonify({
+            'roi_analysis': {
+                'monthly_cost': monthly_cost,
+                'hours_saved': hours_saved,
+                'time_savings_value': time_savings_value,
+                'efficiency_gain': efficiency_gain,
+                'roi_percentage': roi_percentage,
+                'payback_period_days': int(payback_period)
+            },
+            'success': True
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/analytics/industry-benchmarks', methods=['GET'])
+def get_industry_benchmarks():
+    """Get industry benchmarks for comparison"""
+    try:
+        industry = request.args.get('industry')
+        
+        if industry:
+            benchmarks = analytics_engine.industry_benchmarks.get(industry, {})
+            return jsonify({
+                'industry': industry,
+                'benchmarks': benchmarks,
+                'success': True
+            })
+        else:
+            return jsonify({
+                'all_benchmarks': analytics_engine.industry_benchmarks,
+                'success': True
+            })
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
