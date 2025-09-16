@@ -243,9 +243,9 @@ class MinimalCRMService:
         """Get leads by tag."""
         return [lead for lead in self.leads if tag in lead.tags]
     
-    def get_all_leads(self) -> List[MinimalLead]:
-        """Get all leads."""
-        return self.leads.copy()
+    def get_all_leads(self) -> List[Dict[str, Any]]:
+        """Get all leads as dictionaries."""
+        return [lead.to_dict() for lead in self.leads]
     
     def get_lead_stats(self) -> Dict[str, Any]:
         """Get CRM statistics."""
