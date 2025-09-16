@@ -246,7 +246,7 @@ export const IndustryAutomation: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 transition-colors duration-300">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -286,10 +286,10 @@ export const IndustryAutomation: React.FC = () => {
                         <button
                           key={industry}
                           onClick={() => setSelectedIndustry(industry)}
-                          className={`p-4 rounded-lg border-2 transition-all text-left ${
+                          className={`p-4 rounded-lg border-2 transition-all duration-200 text-left hover:scale-105 ${
                             selectedIndustry === industry
-                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900'
-                              : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900 shadow-lg'
+                              : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-md'
                           }`}
                         >
                           <div className="flex items-start space-x-3">
@@ -323,7 +323,7 @@ export const IndustryAutomation: React.FC = () => {
                     type="text"
                     value={clientId}
                     onChange={(e) => setClientId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors duration-200"
                     placeholder="Enter client ID for analytics"
                   />
                 </div>
@@ -335,7 +335,7 @@ export const IndustryAutomation: React.FC = () => {
                   <textarea
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors duration-200"
                     rows={3}
                     placeholder={`Test ${selectedIndustry} AI assistant...`}
                   />
@@ -344,7 +344,7 @@ export const IndustryAutomation: React.FC = () => {
                 <button
                   onClick={handleIndustryChat}
                   disabled={isLoading || !message.trim()}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-md transition-colors"
+                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-md transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
                 >
                   {isLoading ? 'Processing...' : 'Send Message'}
                 </button>

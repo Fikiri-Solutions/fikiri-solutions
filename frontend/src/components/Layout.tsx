@@ -4,6 +4,7 @@ import { Mail, Users, Brain, Settings, Menu, X, Sparkles, Palette, LogOut, Build
 import { MobileBottomNav } from './MobileBottomNav'
 import { ThemeToggle } from './ThemeToggle'
 import { CustomizationPanel } from './CustomizationPanel'
+import { BackToTop } from './BackToTop'
 import { useCustomization } from '../contexts/CustomizationContext'
 import { useTheme } from '../contexts/ThemeContext'
 
@@ -61,10 +62,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-75" onClick={() => setSidebarOpen(false)} />
         <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-white dark:bg-gray-800 transition-colors duration-300">
           <div className="flex h-16 items-center justify-between px-4">
-            <div className="flex items-center space-x-2">
+            <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
               <Sparkles className="h-8 w-8 text-blue-600 dark:text-blue-400" />
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">Fikiri Solutions</h1>
-            </div>
+            </Link>
             <button onClick={() => setSidebarOpen(false)} className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
               <X className="h-6 w-6" />
             </button>
@@ -93,10 +94,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex flex-col flex-grow bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-colors duration-300">
           <div className="flex h-16 items-center px-4">
-            <div className="flex items-center space-x-2">
+            <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
               <Sparkles className="h-8 w-8 text-blue-600 dark:text-blue-400" />
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">Fikiri Solutions</h1>
-            </div>
+            </Link>
           </div>
           <nav className="flex-1 px-4 py-4">
             {navigation.map((item) => (
@@ -166,6 +167,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         isOpen={customizationOpen} 
         onClose={() => setCustomizationOpen(false)} 
       />
+      
+      {/* Back to Top Button */}
+      <BackToTop />
     </div>
   )
 }
