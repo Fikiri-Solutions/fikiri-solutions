@@ -10,6 +10,8 @@ export const CRM: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<{ type: 'error' | 'warning' | 'info' | 'success'; title: string; message: string } | null>(null)
   const [showAddLeadModal, setShowAddLeadModal] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterStage, setFilterStage] = useState('all')
   const [newLead, setNewLead] = useState({
     name: '',
     email: '',
