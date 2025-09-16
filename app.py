@@ -26,6 +26,9 @@ from core.minimal_vector_search import MinimalVectorSearch
 from core.feature_flags import get_feature_flags
 from core.email_service_manager import EmailServiceManager
 
+# Import Responses API migration system
+from core.responses_api_migration import responses_manager
+
 # Import enterprise features
 from core.enterprise_logging import log_api_request, log_service_action, log_security_event
 from core.enterprise_security import security_manager, UserRole, Permission
@@ -1299,6 +1302,135 @@ def api_send_email():
         else:
             return jsonify({'error': 'Failed to send email'}), 500
             
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ============================================================================
+# RESPONSES API MIGRATION ENDPOINTS - Industry-Specific AI Automation
+# ============================================================================
+
+@app.route('/api/industry/chat', methods=['POST'])
+def industry_chat():
+    """Industry-specific AI chat using Responses API with structured workflows"""
+    try:
+        data = request.get_json()
+        industry = data.get('industry', 'general')
+        client_id = data.get('client_id', 'default')
+        message = data.get('message', '')
+        
+        if not message:
+            return jsonify({'error': 'Message is required'}), 400
+        
+        # Process with industry-specific prompt and tools
+        result = responses_manager.process_industry_request(industry, client_id, message)
+        
+        return jsonify({
+            'response': result['response'],
+            'industry': result.get('industry', industry),
+            'conversation_id': result.get('conversation_id'),
+            'tools_used': result.get('tools_used', []),
+            'usage_metrics': result.get('usage_metrics', {}),
+            'success': result['success']
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/industry/prompts', methods=['GET'])
+def get_industry_prompts():
+    """Get available industry-specific prompts"""
+    try:
+        prompts = {}
+        for industry, config in responses_manager.industry_prompts.items():
+            prompts[industry] = {
+                'industry': config.industry,
+                'tone': config.tone,
+                'focus_areas': config.focus_areas,
+                'tools': config.tools,
+                'pricing_tier': config.pricing_tier
+            }
+        
+        return jsonify({
+            'prompts': prompts,
+            'success': True
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/industry/analytics/<client_id>', methods=['GET'])
+def get_client_analytics(client_id):
+    """Get comprehensive analytics for client reporting and pricing tiers"""
+    try:
+        analytics = responses_manager.get_client_analytics(client_id)
+        
+        return jsonify({
+            'analytics': analytics,
+            'success': True
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/industry/create-prompt', methods=['POST'])
+def create_industry_prompt():
+    """Create a new industry-specific prompt"""
+    try:
+        data = request.get_json()
+        industry = data.get('industry')
+        client_id = data.get('client_id')
+        
+        if not industry or not client_id:
+            return jsonify({'error': 'Industry and client_id are required'}), 400
+        
+        prompt_id = responses_manager.create_industry_prompt(industry, client_id)
+        
+        return jsonify({
+            'prompt_id': prompt_id,
+            'industry': industry,
+            'client_id': client_id,
+            'success': True
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/industry/pricing-tiers', methods=['GET'])
+def get_pricing_tiers():
+    """Get pricing tier information based on usage"""
+    try:
+        tiers = {
+            'starter': {
+                'name': 'Starter',
+                'price': 29.00,
+                'responses_limit': 100,
+                'features': ['Basic AI responses', 'Email automation', 'Simple CRM']
+            },
+            'professional': {
+                'name': 'Professional',
+                'price': 99.00,
+                'responses_limit': 1000,
+                'features': ['Industry-specific prompts', 'Advanced CRM', 'Calendar integration']
+            },
+            'premium': {
+                'name': 'Premium',
+                'price': 249.00,
+                'responses_limit': 5000,
+                'features': ['Custom workflows', 'Multi-industry support', 'Advanced analytics']
+            },
+            'enterprise': {
+                'name': 'Enterprise',
+                'price': 499.00,
+                'responses_limit': 'unlimited',
+                'features': ['White-label solution', 'API access', 'Priority support']
+            }
+        }
+        
+        return jsonify({
+            'tiers': tiers,
+            'success': True
+        })
+        
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

@@ -11,6 +11,7 @@ import { NotFoundPage, ErrorPage } from './pages/ErrorPages'
 import { ServicesLanding } from './pages/ServicesLanding'
 import { AIAssistantLanding } from './pages/AIAssistantLanding'
 import { Layout } from './components/Layout'
+import { IndustryAutomation } from './components/IndustryAutomation'
 import { QueryProvider } from './providers/QueryProvider'
 import { ToastProvider } from './components/Toast'
 import { ThemeProvider } from './contexts/ThemeContext'
@@ -39,6 +40,7 @@ function App() {
                   <Route path="/crm" element={<Layout><CRM /></Layout>} />
                   <Route path="/ai" element={<Layout><AIAssistant /></Layout>} />
                   <Route path="/assistant" element={<Layout><AIAssistant /></Layout>} />
+                  <Route path="/industry" element={<Layout><IndustryAutomation /></Layout>} />
                   <Route path="/error" element={<ErrorPage />} />
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>
