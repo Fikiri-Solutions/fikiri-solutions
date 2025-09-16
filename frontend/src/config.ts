@@ -32,11 +32,12 @@ export const config = {
   // API Configuration
   apiUrl: import.meta.env.VITE_API_URL || (features.mockData 
     ? 'http://localhost:3000/api'  // Mock API for local testing
-    : 'https://fikirisolutions.onrender.com/api'),  // Real backend
+    : 'https://fikirisolutions.onrender.com/api'),  // ✅ WORKING Render backend
   
   // Domain Configuration
   domain: 'fikirisolutions.com',
   productionUrl: 'https://fikirisolutions.com',
+  wwwUrl: 'https://www.fikirisolutions.com',
   
   // App Configuration
   appName: 'Fikiri Solutions',
