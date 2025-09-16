@@ -59,7 +59,7 @@ class ActionRouter:
                 "requires_setup": True
             }
         
-        # TODO: Implement actual email fetching when service is connected
+        # Mock email fetching - will be replaced with actual service integration
         return {
             "response": "📧 Your most recent email:\n\nFrom: Sarah Lee (slee@company.com)\nSubject: Project Update\nReceived: 3:57 PM\nSnippet: \"Just finished the report, attaching the draft...\"\n\nWould you like me to open it or draft a reply?",
             "action_taken": "fetch_last_email",

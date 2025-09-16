@@ -1,4 +1,11 @@
 {
+  "redirects": [
+    {
+      "source": "https://fikirisolutions.com/(.*)",
+      "destination": "https://www.fikirisolutions.com/$1",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",
