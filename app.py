@@ -889,6 +889,93 @@ def api_toggle_feature_flag(feature_name):
 
 # SocketIO broadcast function removed - real-time updates disabled
 
+@app.route('/api/health', methods=['GET'])
+def api_health():
+    """Health check endpoint for deployment monitoring."""
+    try:
+        health_status = {
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'version': '1.0.0',
+            'services': {}
+        }
+        
+        # Check each service
+        service_checks = {
+            'config': lambda: services['config'] is not None,
+            'auth': lambda: services['auth'] is not None,
+            'parser': lambda: services['parser'] is not None,
+            'gmail': lambda: services['gmail'] is not None,
+            'actions': lambda: services['actions'] is not None,
+            'crm': lambda: services['crm'] is not None,
+            'ai_assistant': lambda: services['ai_assistant'] is not None,
+            'ml_scoring': lambda: services['ml_scoring'] is not None,
+            'vector_search': lambda: services['vector_search'] is not None,
+            'feature_flags': lambda: services['feature_flags'] is not None
+        }
+        
+        # Service-specific status checks
+        service_status_checks = {
+            'auth': lambda: {
+                'authenticated': services['auth'].check_token_file(verbose=False) if services['auth'] else False,
+                'enabled': True
+            },
+            'ai_assistant': lambda: {
+                'enabled': services['ai_assistant'].is_enabled() if services['ai_assistant'] else False
+            },
+            'gmail': lambda: {
+                'authenticated': services['gmail'].is_authenticated() if services['gmail'] else False,
+                'enabled': True
+            }
+        }
+        
+        all_healthy = True
+        for service_name, check_func in service_checks.items():
+            try:
+                is_healthy = check_func()
+                
+                # Base status
+                service_status = {
+                    'status': 'healthy' if is_healthy else 'unhealthy',
+                    'available': is_healthy,
+                    'initialized': is_healthy
+                }
+                
+                # Add service-specific status if available
+                if service_name in service_status_checks:
+                    try:
+                        specific_status = service_status_checks[service_name]()
+                        service_status.update(specific_status)
+                    except Exception as e:
+                        print(f"Warning: Could not get specific status for {service_name}: {e}")
+                
+                health_status['services'][service_name] = service_status
+                
+                if not is_healthy:
+                    all_healthy = False
+            except Exception as e:
+                health_status['services'][service_name] = {
+                    'status': 'error',
+                    'error': str(e),
+                    'available': False,
+                    'initialized': False
+                }
+                all_healthy = False
+        
+        # Overall status
+        if not all_healthy:
+            health_status['status'] = 'degraded'
+        
+        status_code = 200 if all_healthy else 503
+        return jsonify(health_status), status_code
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'timestamp': datetime.now().isoformat(),
+            'error': str(e)
+        }), 500
+
 if __name__ == '__main__':
     # Create templates directory if it doesn't exist
     templates_dir = Path('templates')
