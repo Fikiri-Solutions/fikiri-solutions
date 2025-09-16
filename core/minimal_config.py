@@ -46,7 +46,10 @@ class MinimalConfig:
         self.dry_run = os.getenv("DRY_RUN", "false").lower() == "true"
         self.gmail_credentials_path = os.getenv("GMAIL_CREDENTIALS_PATH", self.gmail_credentials_path)
         self.gmail_token_path = os.getenv("GMAIL_TOKEN_PATH", self.gmail_token_path)
-        self.gmail_max_results = int(os.getenv("GMAIL_MAX_RESULTS", str(self.gmail_max_results)))
+        try:
+            self.gmail_max_results = int(os.getenv("GMAIL_MAX_RESULTS", str(self.gmail_max_results)))
+        except ValueError:
+            print(f"⚠️ Invalid GMAIL_MAX_RESULTS value, using default: {self.gmail_max_results}")
         self.auto_reply_enabled = os.getenv("AUTO_REPLY_ENABLED", "false").lower() == "true"
         self.log_level = os.getenv("LOG_LEVEL", self.log_level)
     
