@@ -122,7 +122,23 @@ class MinimalCRMService:
             return False
     
     def add_lead(self, email: str, name: str = "", source: str = "email") -> MinimalLead:
-        """Add a new lead."""
+        """Add a new lead with validation."""
+        # Validate input parameters
+        if not email or not isinstance(email, str):
+            raise ValueError("Email must be a non-empty string")
+        
+        if not isinstance(name, str):
+            name = str(name) if name is not None else ""
+        
+        if not isinstance(source, str):
+            source = str(source) if source is not None else "email"
+        
+        # Basic email validation
+        import re
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, email):
+            raise ValueError(f"Invalid email format: {email}")
+        
         # Check if lead already exists
         existing_lead = self.find_lead_by_email(email)
         if existing_lead:
@@ -130,7 +146,7 @@ class MinimalCRMService:
             return existing_lead
         
         # Create new lead
-        lead = MinimalLead(email, name, source)
+        lead = MinimalLead(email.strip().lower(), name.strip(), source.strip())
         self.leads.append(lead)
         
         print(f"✅ Added new lead: {email}")

@@ -40,6 +40,8 @@ class ActionRouter:
                 return self._handle_help_support(user_message)
             elif intent == "greeting":
                 return self._handle_greeting(user_message)
+            elif intent == "math_query":
+                return self._handle_math_query(user_message)
             else:
                 return self._handle_general_inquiry(user_message)
         
@@ -208,6 +210,75 @@ class ActionRouter:
             "success": True
         }
     
+    def _handle_math_query(self, user_message: str) -> Dict[str, Any]:
+        """Handle mathematical calculations safely."""
+        import re
+        import ast
+        
+        try:
+            # Extract mathematical expression from the message
+            # Look for patterns like "2+2", "10 * 5", "100/4", etc.
+            math_patterns = [
+                r'(\d+(?:\.\d+)?)\s*([+\-*/])\s*(\d+(?:\.\d+)?)',  # Basic operations
+                r'what.*is.*(\d+(?:\.\d+)?)\s*([+\-*/])\s*(\d+(?:\.\d+)?)',  # "What is 2+2?"
+                r'calculate.*(\d+(?:\.\d+)?)\s*([+\-*/])\s*(\d+(?:\.\d+)?)',  # "Calculate 10*5"
+            ]
+            
+            expression = None
+            for pattern in math_patterns:
+                match = re.search(pattern, user_message.lower())
+                if match:
+                    if len(match.groups()) == 3:
+                        num1, op, num2 = match.groups()
+                        expression = f"{num1} {op} {num2}"
+                    else:
+                        expression = match.group(1)
+                    break
+            
+            if not expression:
+                return {
+                    "response": "🧮 I can help with basic math! Try asking something like:\n\n• What is 2+2?\n• Calculate 10 * 5\n• What's 100 divided by 4?\n\nI can handle addition (+), subtraction (-), multiplication (*), and division (/).",
+                    "action_taken": "math_help",
+                    "success": True
+                }
+            
+            # Safe evaluation with limited operations
+            allowed_ops = ['+', '-', '*', '/']
+            if not any(op in expression for op in allowed_ops):
+                return {
+                    "response": "🧮 I can only handle basic arithmetic operations (+, -, *, /). Please ask something like 'What is 2+2?' or 'Calculate 10*5'.",
+                    "action_taken": "math_help",
+                    "success": True
+                }
+            
+            # Evaluate the expression safely
+            result = eval(expression, {"__builtins__": {}}, {})
+            
+            return {
+                "response": f"🧮 {expression} = {result}",
+                "action_taken": "calculate_math",
+                "success": True,
+                "calculation": {
+                    "expression": expression,
+                    "result": result
+                }
+            }
+            
+        except ZeroDivisionError:
+            return {
+                "response": "🧮 Error: Division by zero is not allowed.",
+                "action_taken": "math_error",
+                "success": False,
+                "error": "division_by_zero"
+            }
+        except Exception as e:
+            return {
+                "response": f"🧮 I couldn't calculate that. Please try a simpler expression like '2+2' or '10*5'.",
+                "action_taken": "math_error",
+                "success": False,
+                "error": str(e)
+            }
+    
     def _handle_general_inquiry(self, user_message: str) -> Dict[str, Any]:
         """Handle general inquiries with AI assistance."""
         if self.ai_assistant and self.ai_assistant.is_enabled():
@@ -261,22 +332,29 @@ class ActionRouter:
         # Extract email
         email_match = re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', message)
         if email_match:
-            lead_info['email'] = email_match.group()
+            lead_info['email'] = str(email_match.group()).strip()
         
         # Extract phone
         phone_match = re.search(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b', message)
         if phone_match:
-            lead_info['phone'] = phone_match.group()
+            lead_info['phone'] = str(phone_match.group()).strip()
         
         # Extract company (look for "at" or "from")
         company_match = re.search(r'(?:at|from)\s+([A-Za-z0-9\s&.,-]+)', message)
         if company_match:
-            lead_info['company'] = company_match.group(1).strip()
+            lead_info['company'] = str(company_match.group(1)).strip()
         
         # Extract name (first word after "add" or "create")
         name_match = re.search(r'(?:add|create)\s+([A-Za-z\s]+)', message)
         if name_match:
-            lead_info['name'] = name_match.group(1).strip()
+            lead_info['name'] = str(name_match.group(1)).strip()
+        
+        # Ensure all values are strings and not None
+        for key, value in lead_info.items():
+            if value is None:
+                lead_info[key] = ""
+            elif not isinstance(value, str):
+                lead_info[key] = str(value)
         
         return lead_info
 

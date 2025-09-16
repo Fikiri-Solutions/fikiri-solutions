@@ -88,6 +88,17 @@ class IntentClassifier:
                     "Can you guide me?"
                 ]
             },
+            "math_query": {
+                "keywords": ["calculate", "compute", "math", "arithmetic", "plus", "minus", "times", "divide", "add", "subtract", "multiply"],
+                "patterns": [r"\d+\s*[+\-*/]\s*\d+", r"what.*is.*\d+", r"calculate.*\d+", r"compute.*\d+"],
+                "examples": [
+                    "What is 2+2?",
+                    "Calculate 10 * 5",
+                    "What's 100 divided by 4?",
+                    "Compute 15 - 7",
+                    "Add 25 and 30"
+                ]
+            },
             "greeting": {
                 "keywords": ["hello", "hi", "hey", "good morning", "good afternoon"],
                 "patterns": [r"^(hello|hi|hey)", r"good (morning|afternoon|evening)"],
@@ -95,6 +106,24 @@ class IntentClassifier:
                     "Hello",
                     "Hi there",
                     "Good morning"
+                ]
+            },
+            "general_inquiry": {
+                "keywords": ["tell me", "what is", "explain", "describe", "about", "information", "services", "features", "capabilities", "how does", "what can", "show me"],
+                "patterns": [r"tell me about", r"what is.*", r"explain.*", r"how does.*work", r"what can.*do", r"show me.*"],
+                "examples": [
+                    "Tell me about your services",
+                    "What is Fikiri Solutions?",
+                    "Explain how this works",
+                    "What features do you offer?",
+                    "How does email automation work?",
+                    "What can you help me with?",
+                    "Show me what you can do",
+                    "Describe your capabilities",
+                    "I want to know more about this",
+                    "Can you tell me about pricing?",
+                    "What's included in the service?",
+                    "How do I get started?"
                 ]
             }
         }
