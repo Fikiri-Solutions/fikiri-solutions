@@ -13,6 +13,7 @@ import { AIAssistantLanding } from './pages/AIAssistantLanding'
 import { LandscapingLanding } from './pages/LandscapingLanding'
 import { RestaurantLanding } from './pages/RestaurantLanding'
 import { MedicalLanding } from './pages/MedicalLanding'
+import { RenderInspiredLanding } from './pages/RenderInspiredLanding'
 import { Layout } from './components/Layout'
 import { IndustryAutomation } from './components/IndustryAutomation'
 import { QueryProvider } from './providers/QueryProvider'
@@ -43,6 +44,7 @@ function App() {
                   <Route path="/industries/landscaping" element={<LandscapingLanding />} />
                   <Route path="/industries/restaurant" element={<RestaurantLanding />} />
                   <Route path="/industries/medical" element={<MedicalLanding />} />
+                  <Route path="/home" element={<RenderInspiredLanding />} />
                   <Route path="/crm" element={<Layout><CRM /></Layout>} />
                   <Route path="/ai" element={<Layout><AIAssistant /></Layout>} />
                   <Route path="/assistant" element={<Layout><AIAssistant /></Layout>} />
