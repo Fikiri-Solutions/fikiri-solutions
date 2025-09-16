@@ -569,21 +569,28 @@ def api_add_lead():
             if not data.get(field):
                 return jsonify({'error': f'Missing required field: {field}'}), 400
         
-        lead_data = {
-            'name': data['name'],
-            'email': data['email'],
-            'phone': data.get('phone', ''),
-            'company': data.get('company', ''),
-            'notes': data.get('notes', ''),
-            'status': data.get('status', 'new'),
-            'created_at': datetime.now().isoformat()
-        }
+        # Create lead using individual parameters
+        lead = services['crm'].add_lead(
+            email=data['email'],
+            name=data['name'],
+            source=data.get('source', 'web')
+        )
         
-        lead_id = services['crm'].add_lead(lead_data)
+        # Add additional fields if provided
+        if data.get('phone'):
+            lead.phone = data['phone']
+        if data.get('company'):
+            lead.company = data['company']
+        if data.get('notes'):
+            lead.notes.append(data['notes'])
+        if data.get('status'):
+            lead.stage = data['status']
+        
+        lead_data = lead.to_dict()
         
         return jsonify({
             'success': True,
-            'lead_id': lead_id,
+            'lead_id': lead.id,
             'lead': lead_data,
             'timestamp': datetime.now().isoformat()
         })
