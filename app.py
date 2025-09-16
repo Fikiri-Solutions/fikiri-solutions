@@ -658,6 +658,35 @@ def api_test_ai_assistant():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/test/openai-key', methods=['GET'])
+def test_openai_key():
+    """Test OpenAI API key status."""
+    try:
+        if not services['ai_assistant'].is_enabled():
+            return jsonify({
+                "status": "error",
+                "message": "AI Assistant not enabled",
+                "api_key_configured": False
+            })
+        
+        # Test the API key with a simple request
+        test_response = services['ai_assistant']._generate_ai_response("Test message")
+        
+        return jsonify({
+            "status": "success",
+            "message": "OpenAI API key is working",
+            "api_key_configured": True,
+            "test_response": test_response[:100] + "..." if len(test_response) > 100 else test_response
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"OpenAI API key test failed: {str(e)}",
+            "api_key_configured": False,
+            "error_details": str(e)
+        })
+
 @app.route('/api/ai/chat', methods=['POST'])
 def api_ai_chat():
     """Handle AI chat messages."""

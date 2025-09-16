@@ -395,7 +395,9 @@ You are the primary AI interface - handle ALL user queries with intelligence and
             return generated_response
             
         except Exception as e:
-            print(f"❌ AI response generation failed: {e}")
+            print(f"❌ ChatGPT 3.5 Turbo API call failed: {e}")
+            print(f"❌ API Key configured: {bool(self.api_key)}")
+            print(f"❌ API Key length: {len(self.api_key) if self.api_key else 0}")
             return self._enhanced_fallback_response(user_message)
     
     def _enhanced_fallback_response(self, user_message: str) -> str:
