@@ -14,7 +14,7 @@ class FeatureLevel(Enum):
     """Feature capability levels."""
     LIGHTWEIGHT = "lightweight"      # Pure Python, no heavy deps
     ENHANCED = "enhanced"            # Light ML (scikit-learn)
-    ADVANCED = "advanced"            # Heavy ML (TensorFlow, PyTorch)
+    ADVANCED = "advanced"            # Heavy ML (PyTorch, scikit-learn)
     FULL_AI = "full_ai"              # All AI capabilities
 
 class FeatureFlags:
@@ -82,7 +82,7 @@ class FeatureFlags:
                 "enabled": False,
                 "level": FeatureLevel.FULL_AI,
                 "fallback": False,
-                "heavy_deps": ["tensorflow", "torch", "scikit-learn"]
+                "heavy_deps": ["torch", "scikit-learn"]
             }
         }
     
@@ -114,13 +114,12 @@ class FeatureFlags:
         """Check which heavy dependencies are available."""
         heavy_deps = {
             "openai": self._check_import("openai"),
-            "scikit-learn": self._check_import("sklearn"),
+            "scikit-learn": False,  # Removed for lightweight operation
             "sentence-transformers": self._check_import("sentence_transformers"),
             "faiss-cpu": self._check_import("faiss"),
             "beautifulsoup4": self._check_import("bs4"),
             "transformers": self._check_import("transformers"),
             "torch": self._check_import("torch"),
-            "tensorflow": False,  # Disabled due to AVX compatibility issues
             "opencv-python": self._check_import("cv2"),
             "pillow": self._check_import("PIL")
         }
@@ -133,12 +132,8 @@ class FeatureFlags:
     def _check_import(self, module_name: str) -> bool:
         """Check if a module can be imported."""
         try:
-            if module_name == "tensorflow":
-                # Skip TensorFlow check entirely to avoid AVX issues
-                return False
-            else:
-                __import__(module_name)
-                return True
+            __import__(module_name)
+            return True
         except ImportError:
             return False
         except Exception as e:

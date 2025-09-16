@@ -35,10 +35,8 @@ from core.enterprise_security import security_manager, UserRole, Permission
 from core.structured_logging import logger, monitor, error_tracker, performance_monitor
 from core.performance_monitoring import monitor_performance, PerformanceBudget
 
-# Lightweight TensorFlow feature flag - make it optional, never a blocker
-# TensorFlow removed to avoid compatibility issues - using lightweight alternatives
-TENSORFLOW_ENABLED = False
-print("ℹ️  Using lightweight alternatives (TensorFlow disabled for compatibility)")
+# ML dependencies removed for lightweight operation
+# Using lightweight alternatives for optimal performance
 
 # Initialize Flask app
 app = Flask(__name__)

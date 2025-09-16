@@ -33,11 +33,9 @@ aiohttp>=3.9.0
 # Strategic Heavy Dependencies (Optional - Use Feature Flags)
 # Uncomment only what you need:
 # scikit-learn>=1.0.0                    # For enhanced ML scoring
-# sentence-transformers>=2.0.0           # For better embeddings
-# faiss-cpu>=1.7.0                       # For fast vector search
-# transformers>=4.0.0                    # For advanced NLP
-# torch>=1.0.0                           # For PyTorch models
-# tensorflow>=2.0.0                      # For TensorFlow models
+# Transformers removed for lightweight operation
+# PyTorch removed for lightweight operation
+# ML dependencies removed for lightweight operation
 # opencv-python>=4.0.0                   # For computer vision
 # pillow>=8.0.0                          # For image processing
 
