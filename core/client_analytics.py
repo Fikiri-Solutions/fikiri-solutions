@@ -59,7 +59,14 @@ class ClientAnalyticsEngine:
     """Generates comprehensive client reports and ROI analysis"""
     
     def __init__(self):
-        self.client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        # Initialize OpenAI client only if API key is available
+        api_key = os.getenv('OPENAI_API_KEY')
+        if api_key:
+            self.client = OpenAI(api_key=api_key)
+        else:
+            self.client = None
+            print("⚠️  OpenAI API key not found - Analytics features will be limited")
+        
         self.industry_benchmarks = self._load_industry_benchmarks()
         
     def _load_industry_benchmarks(self) -> Dict[str, Dict[str, float]]:
@@ -286,6 +293,14 @@ class ClientAnalyticsEngine:
     def _generate_recommendations(self, industry: str, usage_data: Dict[str, Any], metrics: List[ClientMetric]) -> List[str]:
         """Generate AI-powered recommendations"""
         try:
+            # Check if OpenAI client is available
+            if not self.client:
+                return [
+                    "Increase automation usage to save more time",
+                    "Focus on high-value customer interactions", 
+                    "Implement additional industry-specific workflows"
+                ]
+            
             prompt = f"""Based on the following {industry} business data, provide 3 specific, actionable recommendations to improve performance:
 
 Usage Data: {json.dumps(usage_data)}
@@ -320,6 +335,14 @@ Format as a JSON array of strings."""
     def _generate_next_quarter_goals(self, industry: str, usage_data: Dict[str, Any]) -> List[str]:
         """Generate next quarter goals"""
         try:
+            # Check if OpenAI client is available
+            if not self.client:
+                return [
+                    "Increase automation usage to save more time",
+                    "Focus on high-value customer interactions",
+                    "Implement additional industry-specific workflows"
+                ]
+            
             prompt = f"""Based on current {industry} business performance, suggest 3 specific goals for next quarter:
 
 Current Performance: {json.dumps(usage_data)}

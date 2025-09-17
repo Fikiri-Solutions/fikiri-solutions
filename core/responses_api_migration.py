@@ -35,7 +35,14 @@ class ResponsesAPIManager:
     """Manages Responses API with industry-specific prompts and workflows"""
     
     def __init__(self):
-        self.client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        # Initialize OpenAI client only if API key is available
+        api_key = os.getenv('OPENAI_API_KEY')
+        if api_key:
+            self.client = OpenAI(api_key=api_key)
+        else:
+            self.client = None
+            print("⚠️  OpenAI API key not found - AI features will be disabled")
+        
         self.industry_prompts = self._load_industry_prompts()
         self.usage_metrics = []
         
@@ -669,6 +676,10 @@ Available Tools: {', '.join(prompt_config.tools)}
     def process_industry_request(self, industry: str, client_id: str, user_message: str) -> Dict[str, Any]:
         """Process request using industry-specific prompt and tools"""
         try:
+            # Check if OpenAI client is available
+            if not self.client:
+                return self._fallback_response(user_message)
+            
             prompt_config = self.industry_prompts.get(industry)
             if not prompt_config:
                 return self._fallback_response(user_message)
@@ -774,6 +785,14 @@ Available Tools: {', '.join(prompt_config.tools)}
     def _fallback_response(self, user_message: str) -> Dict[str, Any]:
         """Fallback to ChatGPT 3.5 Turbo if industry prompt fails"""
         try:
+            # Check if OpenAI client is available
+            if not self.client:
+                return {
+                    'response': 'AI Assistant is currently unavailable. Please check your OpenAI API key configuration.',
+                    'success': False,
+                    'error': 'OpenAI client not initialized'
+                }
+            
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
