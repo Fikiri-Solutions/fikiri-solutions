@@ -5,12 +5,12 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 2 * 60 * 1000, // 2 minutes (reduced for faster updates)
-      gcTime: 5 * 60 * 1000, // 5 minutes (reduced memory usage)
+      staleTime: 0, // No stale time - always fetch fresh data
+      gcTime: 0, // No garbage collection time - clear immediately
       retry: 1, // Reduced retries for faster failure
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false, // Disabled for faster initial load
-      refetchOnMount: false, // Disabled for faster navigation
+      refetchOnWindowFocus: true, // Re-enable refetch on focus
+      refetchOnReconnect: true, // Re-enable refetch on reconnect
+      refetchOnMount: true, // Re-enable refetch on mount
       // Keep previous data while fetching new data
       placeholderData: (previousData) => previousData,
     },
