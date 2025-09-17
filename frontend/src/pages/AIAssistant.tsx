@@ -34,7 +34,7 @@ export const AIAssistant: React.FC = () => {
       const status = await apiClient.testAIAssistant()
       setAiStatus(status)
     } catch (error) {
-      console.error('Failed to fetch AI status:', error)
+      // Failed to fetch AI status
     }
   }
 
@@ -69,7 +69,7 @@ export const AIAssistant: React.FC = () => {
 
       setMessages(prev => [...prev, aiMessage])
     } catch (error) {
-      console.error('Failed to send message:', error)
+      // Failed to send message
       setError(apiClient.handleError(error))
     } finally {
       setIsLoading(false)

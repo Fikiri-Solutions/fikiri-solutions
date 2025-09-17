@@ -105,7 +105,7 @@ export const Dashboard: React.FC = () => {
         })
         break
       default:
-        console.log(`Clicked ${metricType}`)
+        // Metric click handled
     }
   }
 

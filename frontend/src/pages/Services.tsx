@@ -69,7 +69,7 @@ export const Services: React.FC = () => {
     try {
       // Load service configurations
     } catch (error) {
-      console.error('Failed to load configurations:', error)
+      // Failed to load configurations
     }
   }
 
@@ -108,7 +108,7 @@ export const Services: React.FC = () => {
       setHasChanges(false)
       // Show success message
     } catch (error) {
-      console.error('Failed to save configurations:', error)
+      // Failed to save configurations
       // Show error message
     } finally {
       setIsLoading(false)
@@ -120,7 +120,7 @@ export const Services: React.FC = () => {
     const service = services.find(s => s.id === serviceId)
     
     try {
-      console.log(`🧪 Testing service: ${serviceId}`)
+      // Testing service
       
       let result
       switch (serviceId) {
@@ -146,7 +146,7 @@ export const Services: React.FC = () => {
           throw new Error(`Unknown service: ${serviceId}`)
       }
       
-      console.log(`✅ Service ${serviceId} test result:`, result)
+      // Service test result
       setTestResult({
         serviceId,
         serviceName: service?.name || serviceId,
@@ -154,7 +154,7 @@ export const Services: React.FC = () => {
         data: result
       })
     } catch (error) {
-      console.error('❌ Service test failed:', error)
+      // Service test failed
       const errorMessage = apiClient.handleError(error)
       setTestResult({
         serviceId,

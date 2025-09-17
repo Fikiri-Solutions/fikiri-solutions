@@ -49,7 +49,7 @@ export const IndustryAutomation: React.FC = () => {
         setPrompts(data.prompts);
       }
     } catch (error) {
-      console.error('Failed to fetch industry prompts:', error);
+      // Failed to fetch industry prompts
     }
   };
 
@@ -61,7 +61,7 @@ export const IndustryAutomation: React.FC = () => {
         setPricingTiers(data.tiers);
       }
     } catch (error) {
-      console.error('Failed to fetch pricing tiers:', error);
+      // Failed to fetch pricing tiers
     }
   };
 
@@ -73,7 +73,7 @@ export const IndustryAutomation: React.FC = () => {
         setUsageMetrics(data.analytics.usage_metrics);
       }
     } catch (error) {
-      console.error('Failed to fetch client analytics:', error);
+      // Failed to fetch client analytics
     }
   };
 

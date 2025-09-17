@@ -43,7 +43,7 @@ export const CustomizationProvider: React.FC<CustomizationProviderProps> = ({ ch
         const parsed = JSON.parse(savedCustomization)
         setCustomization({ ...defaultCustomization, ...parsed })
       } catch (error) {
-        console.warn('Failed to parse saved customization:', error)
+        // Failed to parse saved customization
       }
     }
   }, [])

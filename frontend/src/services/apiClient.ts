@@ -91,11 +91,11 @@ class ApiClient {
     // Add request interceptor for logging
     this.client.interceptors.request.use(
       (config) => {
-        console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`)
+        // API request logged
         return config
       },
       (error) => {
-        console.error('❌ API Request Error:', error)
+        // API request error logged
         return Promise.reject(error)
       }
     )
@@ -103,11 +103,11 @@ class ApiClient {
     // Add response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => {
-        console.log(`✅ API Response: ${response.status} ${response.config.url}`)
+        // API response logged
         return response
       },
       (error) => {
-        console.error('❌ API Response Error:', error.response?.status, error.message)
+        // API response error logged
         return Promise.reject(error)
       }
     )
