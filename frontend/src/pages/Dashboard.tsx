@@ -18,41 +18,31 @@ export const Dashboard: React.FC = () => {
   const { addToast } = useToast()
   const { isConnected, data, requestMetricsUpdate, requestServicesUpdate } = useWebSocket()
 
-  // Show performance toast on first load
+  // Clear localStorage cache to force fresh data
   React.useEffect(() => {
-    const hasSeenPerformanceToast = localStorage.getItem('hasSeenPerformanceToast')
-    if (!hasSeenPerformanceToast) {
-      setTimeout(() => {
-        addToast({
-          type: 'success',
-          title: '⚡ Performance Optimized!',
-          message: 'Dashboard now loads instantly with smart caching',
-          duration: 3000
-        })
-        localStorage.setItem('hasSeenPerformanceToast', 'true')
-      }, 1000)
-    }
-  }, [addToast])
+    localStorage.removeItem('hasSeenPerformanceToast')
+    localStorage.clear() // Clear all localStorage to force fresh data
+  }, [])
 
   // TanStack Query hooks for smart data fetching with real-time updates
   const { data: servicesData = [], isLoading: servicesLoading } = useQuery({
     queryKey: ['services'],
     queryFn: () => features.useMockData ? Promise.resolve(mockServices) : apiClient.getServices(),
-    staleTime: 1 * 60 * 1000, // 1 minute (faster updates)
+    staleTime: 0, // No stale time - always fetch fresh data
     enabled: true, // Always enabled for immediate loading
   })
 
   const { data: metricsData, isLoading: metricsLoading } = useQuery({
     queryKey: ['metrics'],
     queryFn: () => features.useMockData ? Promise.resolve(mockMetrics) : apiClient.getMetrics(),
-    staleTime: 30 * 1000, // 30 seconds (very fast updates)
+    staleTime: 0, // No stale time - always fetch fresh data
     enabled: true, // Always enabled for immediate loading
   })
 
   const { data: activityData = [], isLoading: activityLoading } = useQuery({
     queryKey: ['activity'],
     queryFn: () => features.useMockData ? Promise.resolve(mockActivity) : apiClient.getActivity(),
-    staleTime: 30 * 1000, // 30 seconds (very fast updates)
+    staleTime: 0, // No stale time - always fetch fresh data
     enabled: true, // Always enabled for immediate loading
   })
 
