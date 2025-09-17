@@ -148,9 +148,9 @@ export const Dashboard: React.FC = () => {
       <div>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Welcome back! Here's what's happening with your Fikiri Solutions.
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">🚀 Dashboard - UI/UX Updated!</h1>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+              Welcome back! Here's what's happening with your Fikiri Solutions. Dark mode & new features active!
             </p>
           </div>
           
