@@ -57,7 +57,7 @@ export const Login: React.FC = () => {
         throw new Error('Invalid email or password')
       }
     } catch (error) {
-      console.error('Login failed:', error)
+      // Login failed
       setError(error instanceof Error ? error.message : 'Login failed. Please try again.')
     } finally {
       setIsLoading(false)

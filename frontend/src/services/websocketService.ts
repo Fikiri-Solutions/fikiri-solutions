@@ -30,7 +30,7 @@ class WebSocketService {
       })
 
       this.socket.on('connect', () => {
-        console.log('🔗 WebSocket connected')
+        // WebSocket connected
         this.isConnected = true
         this.reconnectAttempts = 0
         
@@ -39,42 +39,42 @@ class WebSocketService {
       })
 
       this.socket.on('disconnect', () => {
-        console.log('🔌 WebSocket disconnected')
+        // WebSocket disconnected
         this.isConnected = false
       })
 
       this.socket.on('connect_error', (error) => {
-        console.error('❌ WebSocket connection error:', error)
+        // WebSocket connection error
         this.reconnectAttempts++
         
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-          console.warn('⚠️ Max reconnection attempts reached, falling back to polling')
+          // Max reconnection attempts reached, falling back to polling
         }
       })
 
       // Dashboard update handlers
       this.socket.on('metrics_update', (data) => {
-        console.log('📊 Metrics updated:', data)
+        // Metrics updated
         // Emit custom event for React components to listen to
         window.dispatchEvent(new CustomEvent('metricsUpdate', { detail: data }))
       })
 
       this.socket.on('services_update', (data) => {
-        console.log('🔧 Services updated:', data)
+        // Services updated
         window.dispatchEvent(new CustomEvent('servicesUpdate', { detail: data }))
       })
 
       this.socket.on('activity_update', (data) => {
-        console.log('📝 Activity updated:', data)
+        // Activity updated
         window.dispatchEvent(new CustomEvent('activityUpdate', { detail: data }))
       })
 
       this.socket.on('error', (error) => {
-        console.error('❌ WebSocket error:', error)
+        // WebSocket error
       })
 
     } catch (error) {
-      console.error('❌ Failed to initialize WebSocket:', error)
+      // Failed to initialize WebSocket
     }
   }
 

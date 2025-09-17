@@ -44,7 +44,7 @@ export const CRM: React.FC = () => {
       })
       fetchLeads() // Refresh the leads list
     } catch (error) {
-      console.error('Failed to add lead:', error)
+      // Failed to add lead
       setError(getUserFriendlyError(error))
     } finally {
       setIsLoading(false)
@@ -63,7 +63,7 @@ export const CRM: React.FC = () => {
       const leadsData = await apiClient.getLeads()
       setLeads(leadsData)
     } catch (error) {
-      console.error('Failed to fetch leads:', error)
+      // Failed to fetch leads
       setError(getUserFriendlyError(error))
     } finally {
       setIsLoading(false)
@@ -318,7 +318,7 @@ export const CRM: React.FC = () => {
                 type="crm" 
                 onAction={searchTerm || filterStage !== 'all' ? undefined : () => {
                   // Add lead functionality would go here
-                  console.log('Add lead clicked')
+                  // Add lead clicked
                 }}
               />
             )}
