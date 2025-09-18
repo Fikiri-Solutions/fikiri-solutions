@@ -9,6 +9,7 @@ interface MetricCardProps {
   icon?: React.ReactNode;
   children?: React.ReactNode;
   className?: string;
+  onClick?: () => void;
 }
 
 export function MetricCard({ 
@@ -18,7 +19,8 @@ export function MetricCard({
   positive = true, 
   icon,
   children,
-  className = ""
+  className = "",
+  onClick
 }: MetricCardProps) {
   const formatValue = (val: string | number) => {
     if (typeof val === "number") {
@@ -28,7 +30,7 @@ export function MetricCard({
   };
 
   return (
-    <div className={`rounded-2xl shadow-lg p-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 flex flex-col gap-4 hover:shadow-xl transition-all duration-300 ${className}`}>
+    <div className={`rounded-2xl shadow-lg p-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 flex flex-col gap-4 hover:shadow-xl transition-all duration-300 ${className}`} onClick={onClick}>
       {/* Header */}
       <div className="flex justify-between items-start">
         <div className="flex items-center gap-3">

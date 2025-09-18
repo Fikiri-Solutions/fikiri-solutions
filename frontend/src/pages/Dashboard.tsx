@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Mail, Users, Brain, Clock, Bot, UserPlus, Zap, AlertTriangle, CheckCircle2, XCircle, AlertCircle, DollarSign, TrendingUp } from 'lucide-react'
+import { Mail, Users, Brain, Bot, UserPlus, Zap, AlertTriangle, CheckCircle2, XCircle, AlertCircle, DollarSign, TrendingUp } from 'lucide-react'
 import { ServiceCard } from '../components/ServiceCard'
 import { MetricCard } from '../components/MetricCard'
 import { MiniTrend } from '../components/MiniTrend'
@@ -19,7 +19,7 @@ export const Dashboard: React.FC = () => {
   const features = getFeatureConfig()
   const { addToast } = useToast()
   const { isConnected, data, requestMetricsUpdate, requestServicesUpdate } = useWebSocket()
-  const { data: timeseriesData, summary, loading: timeseriesLoading, error: timeseriesError } = useDashboardTimeseries()
+  const { data: timeseriesData, summary, loading: timeseriesLoading } = useDashboardTimeseries()
 
   // Clear specific cache items to force fresh data
   React.useEffect(() => {
@@ -35,7 +35,7 @@ export const Dashboard: React.FC = () => {
     enabled: true, // Always enabled for immediate loading
   })
 
-  const { data: metricsData, isLoading: metricsLoading } = useQuery({
+  const { isLoading: metricsLoading } = useQuery({
     queryKey: ['metrics'],
     queryFn: () => features.useMockData ? Promise.resolve(mockMetrics) : apiClient.getMetrics(),
     staleTime: 0, // No stale time - always fetch fresh data
@@ -51,9 +51,7 @@ export const Dashboard: React.FC = () => {
 
   // Combine API data with real-time WebSocket updates
   const services = data.services?.services || servicesData
-  const metrics = data.metrics || metricsData
   const apiActivity = data.activity ? [data.activity, ...activityData] : activityData
-  const activity = dynamicActivity.length > 0 ? dynamicActivity : apiActivity
 
   // Request real-time updates when WebSocket connects
   React.useEffect(() => {
@@ -136,6 +134,8 @@ export const Dashboard: React.FC = () => {
       clearInterval(activityInterval)
     }
   }, [])
+
+  const activity = dynamicActivity.length > 0 ? dynamicActivity : apiActivity
 
   const handleMetricClick = (metricType: string) => {
     switch (metricType) {
@@ -290,7 +290,7 @@ export const Dashboard: React.FC = () => {
             <MetricCard
               title="AI Performance"
               value="2.4h"
-              change="-15%"
+              change={-15}
               positive={true}
               icon={<Brain className="h-5 w-5" />}
               onClick={() => handleMetricClick('responseTime')}
