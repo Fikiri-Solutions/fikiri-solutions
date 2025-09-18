@@ -41,9 +41,9 @@ export const config = {
   
   // App Configuration
   appName: 'Fikiri Solutions',
-  version: '1.0.6', // Fixed all major issues
-  buildTimestamp: '2025-09-18T01:15:00Z', // Updated timestamp for fixes
-  cacheVersion: 'v1.0.6-20250918', // Fixed version with all issues resolved
+  version: '1.0.7', // Force deployment refresh
+  buildTimestamp: '2025-09-18T01:20:00Z', // Force cache refresh
+  cacheVersion: 'v1.0.7-20250918', // Force cache refresh
   
   // Development flags
   isDevelopment: typeof window !== 'undefined' && window.location.hostname === 'localhost',
