@@ -56,9 +56,18 @@ export class CacheInvalidationManager {
    * Clear all possible client-side caches
    */
   private clearAllCaches(): void {
+    // Preserve theme preference before clearing
+    const themePreference = localStorage.getItem('fikiri-theme')
+    
     // Clear localStorage
     localStorage.clear()
     console.log('  - localStorage cleared.')
+
+    // Restore theme preference
+    if (themePreference) {
+      localStorage.setItem('fikiri-theme', themePreference)
+      console.log('  - Theme preference restored.')
+    }
 
     // Clear sessionStorage
     sessionStorage.clear()

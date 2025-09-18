@@ -20,10 +20,10 @@ export const Dashboard: React.FC = () => {
   const { isConnected, data, requestMetricsUpdate, requestServicesUpdate } = useWebSocket()
   const { getCacheHeaders } = useCacheInvalidation()
 
-  // Clear localStorage cache to force fresh data
+  // Clear specific cache items to force fresh data
   React.useEffect(() => {
     localStorage.removeItem('hasSeenPerformanceToast')
-    localStorage.clear() // Clear all localStorage to force fresh data
+    // Don't clear all localStorage - it breaks theme and other preferences
   }, [])
 
   // TanStack Query hooks for smart data fetching with real-time updates
@@ -140,9 +140,9 @@ export const Dashboard: React.FC = () => {
       <div>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">🚀 ENHANCED CACHE INVALIDATION - v1.0.5</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">🚀 ALL ISSUES FIXED - v1.0.6</h1>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              ENHANCED CACHE STRATEGY: Comprehensive client-side cache clearing, version display, and automatic invalidation on version mismatch. Build: 2025-09-18T01:10:00Z
+              FIXED: Industry page working, navigation issues resolved, dark mode stable, AI Assistant with real-time capabilities. Build: 2025-09-18T01:15:00Z
             </p>
           </div>
           

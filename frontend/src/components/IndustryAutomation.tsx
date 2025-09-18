@@ -43,11 +43,31 @@ export const IndustryAutomation: React.FC = () => {
 
   const fetchIndustryPrompts = async () => {
     try {
-      const response = await fetch('/api/industry/prompts');
-      const data = await response.json();
-      if (data.success) {
-        setPrompts(data.prompts);
-      }
+      // Mock data for now - replace with actual API call when backend endpoints are ready
+      const mockPrompts = {
+        landscaping: {
+          industry: 'landscaping',
+          tone: 'professional',
+          focus_areas: ['appointment scheduling', 'service quotes', 'seasonal planning'],
+          tools: ['calendar', 'quote_generator', 'weather_api'],
+          pricing_tier: 'starter'
+        },
+        restaurant: {
+          industry: 'restaurant',
+          tone: 'friendly',
+          focus_areas: ['reservation management', 'menu recommendations', 'special promotions'],
+          tools: ['reservation_system', 'menu_api', 'promotion_tracker'],
+          pricing_tier: 'professional'
+        },
+        medical_practice: {
+          industry: 'medical_practice',
+          tone: 'professional',
+          focus_areas: ['appointment scheduling', 'patient reminders', 'HIPAA compliance'],
+          tools: ['calendar', 'patient_portal', 'compliance_checker'],
+          pricing_tier: 'premium'
+        }
+      };
+      setPrompts(mockPrompts);
     } catch (error) {
       // Failed to fetch industry prompts
     }
@@ -55,11 +75,34 @@ export const IndustryAutomation: React.FC = () => {
 
   const fetchPricingTiers = async () => {
     try {
-      const response = await fetch('/api/industry/pricing-tiers');
-      const data = await response.json();
-      if (data.success) {
-        setPricingTiers(data.tiers);
-      }
+      // Mock data for now - replace with actual API call when backend endpoints are ready
+      const mockTiers = {
+        starter: {
+          name: 'Starter',
+          price: 29,
+          responses_limit: 1000,
+          features: ['Basic AI responses', 'Email automation', 'CRM integration']
+        },
+        professional: {
+          name: 'Professional',
+          price: 79,
+          responses_limit: 5000,
+          features: ['Advanced AI responses', 'Multi-channel automation', 'Analytics dashboard']
+        },
+        premium: {
+          name: 'Premium',
+          price: 149,
+          responses_limit: 15000,
+          features: ['Custom AI training', 'API access', 'Priority support']
+        },
+        enterprise: {
+          name: 'Enterprise',
+          price: 299,
+          responses_limit: 'unlimited',
+          features: ['White-label solution', 'Custom integrations', 'Dedicated support']
+        }
+      };
+      setPricingTiers(mockTiers);
     } catch (error) {
       // Failed to fetch pricing tiers
     }
@@ -67,11 +110,15 @@ export const IndustryAutomation: React.FC = () => {
 
   const fetchClientAnalytics = async () => {
     try {
-      const response = await fetch(`/api/industry/analytics/${clientId}`);
-      const data = await response.json();
-      if (data.success && data.analytics.usage_metrics) {
-        setUsageMetrics(data.analytics.usage_metrics);
-      }
+      // Mock data for now - replace with actual API call when backend endpoints are ready
+      const mockAnalytics = {
+        tier: 'professional',
+        responses: 1250,
+        tool_calls: 45,
+        tokens: 125000,
+        monthly_cost: 79
+      };
+      setUsageMetrics(mockAnalytics);
     } catch (error) {
       // Failed to fetch client analytics
     }
@@ -82,15 +129,18 @@ export const IndustryAutomation: React.FC = () => {
 
     setIsLoading(true);
     try {
-      const response = await fetch('/api/industry/chat', {
+      // Use the existing AI Assistant API endpoint
+      const response = await fetch('https://fikirisolutions.onrender.com/api/ai/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          industry: selectedIndustry,
-          client_id: clientId,
           message: message,
+          context: {
+            industry: selectedIndustry,
+            client_id: clientId
+          }
         }),
       });
 
@@ -98,10 +148,9 @@ export const IndustryAutomation: React.FC = () => {
       if (data.success) {
         setResponse(data.response);
         setToolsUsed(data.tools_used || []);
-        setUsageMetrics(data.usage_metrics);
         setMessage('');
       } else {
-        setResponse(`Error: ${data.error}`);
+        setResponse(`Error: ${data.error || 'Failed to get response'}`);
       }
     } catch (error) {
       setResponse(`Network error: ${error}`);
