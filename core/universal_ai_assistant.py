@@ -464,96 +464,63 @@ class UniversalAIAssistant:
             return {'success': False, 'error': str(e), 'data': None}
     
     def _generate_response(self, user_message: str, query_results: List[Dict[str, Any]], intent_analysis: Dict[str, Any]) -> str:
-        """Generate natural language response based on query results"""
-        intent = intent_analysis['primary_intent']
-        
-        if intent == 'email_queries':
-            for result in query_results:
-                if result['success'] and result['data']:
-                    emails = result['data'].get('emails', [])
-                    count = result['data'].get('count', 0)
-                    
-                    if count > 0:
-                        response = f"I found {count} recent emails:\n\n"
-                        for email in emails[:5]:  # Show first 5
-                            response += f"• {email['name']} ({email['email']}) - {email['company'] or 'No company'}\n"
-                        if count > 5:
-                            response += f"\n... and {count - 5} more emails."
-                        return response
-                    else:
-                        return "I don't see any recent emails in your system. Make sure Gmail is connected and synced."
+        """Generate natural language response using ChatGPT 3.5"""
+        try:
+            import openai
+            import os
             
-            return "I couldn't retrieve your recent emails. Please check if Gmail is connected."
-        
-        elif intent == 'lead_queries':
-            for result in query_results:
-                if result['success'] and result['data']:
-                    data = result['data']
-                    total_leads = data.get('total_leads', 0)
-                    leads_by_stage = data.get('leads_by_stage', [])
-                    
-                    response = f"You have {total_leads} total leads:\n\n"
-                    for stage_data in leads_by_stage:
-                        response += f"• {stage_data['stage'].title()}: {stage_data['count']} leads\n"
-                    
-                    return response
+            # Get OpenAI API key
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                return "I'm here to help! You can ask me about your emails, leads, automations, or privacy settings. What would you like to know?"
             
-            return "I couldn't retrieve your leads information. Please check if Gmail is connected and synced."
-        
-        elif intent == 'automation_queries':
-            for result in query_results:
-                if result['success'] and result['data']:
-                    suggestions = result['data'].get('suggestions', [])
-                    
-                    response = "Here are some automation suggestions for your business:\n\n"
-                    for i, suggestion in enumerate(suggestions, 1):
-                        response += f"{i}. **{suggestion['name']}**\n"
-                        response += f"   {suggestion['description']}\n"
-                        response += f"   Trigger: {suggestion['trigger']}\n"
-                        response += f"   Action: {suggestion['action']}\n\n"
-                    
-                    return response
+            # Initialize OpenAI client
+            client = openai.OpenAI(api_key=api_key)
             
-            return "I can help you set up automations! Let me suggest some common workflows for your business."
-        
-        elif intent == 'analytics_queries':
-            for result in query_results:
-                if result['success'] and result['data']:
-                    metrics = result['data']
-                    
-                    response = "Here's your current performance:\n\n"
-                    response += f"• Total Leads: {metrics.get('leads_count', 0)}\n"
-                    response += f"• Total Activities: {metrics.get('activities_count', 0)}\n"
-                    response += f"• Gmail Connected: {'Yes' if metrics.get('gmail_connected') else 'No'}\n"
-                    
-                    if metrics.get('last_sync'):
-                        response += f"• Last Email Sync: {metrics['last_sync']}\n"
-                    
-                    return response
+            # Prepare context from query results
+            context_info = ""
+            if query_results:
+                for result in query_results:
+                    if result['success'] and result['data']:
+                        context_info += f"Service: {result.get('service', 'unknown')}\n"
+                        context_info += f"Data: {json.dumps(result['data'], indent=2)}\n\n"
             
-            return "I can provide insights about your business performance. Let me gather some metrics for you."
-        
-        elif intent == 'privacy_queries':
-            for result in query_results:
-                if result['success'] and result['data']:
-                    data = result['data']
-                    
-                    response = "Here's your privacy and data summary:\n\n"
-                    response += f"• Leads: {data.get('leads_count', 0)}\n"
-                    response += f"• Activities: {data.get('activities_count', 0)}\n"
-                    response += f"• Sync Records: {data.get('sync_records_count', 0)}\n\n"
-                    
-                    consents = data.get('consents', {})
-                    response += "Your current consents:\n"
-                    for consent_type, granted in consents.items():
-                        response += f"• {consent_type.replace('_', ' ').title()}: {'Granted' if granted else 'Not granted'}\n"
-                    
-                    return response
+            # Create prompt for ChatGPT 3.5
+            prompt = f"""You are Fikiri Solutions AI Assistant, helping with business automation, email management, CRM, and lead analysis.
+
+User Query: "{user_message}"
+
+Intent Analysis: {json.dumps(intent_analysis, indent=2)}
+
+Available Data Context:
+{context_info}
+
+Please provide a helpful, professional response that:
+1. Directly addresses the user's query
+2. Uses the available data context when relevant
+3. Suggests actionable next steps
+4. Maintains a professional, helpful tone
+5. Focuses on business automation, email management, CRM, or lead analysis
+
+Keep the response concise but comprehensive. If no specific data is available, provide general helpful guidance."""
+
+            # Call ChatGPT 3.5
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=500,
+                temperature=0.7,
+                top_p=0.9,
+                frequency_penalty=0.1,
+                presence_penalty=0.1
+            )
             
-            return "I can help you manage your privacy settings and data. Let me show you what information we have."
-        
-        # Default response
-        return "I'm here to help! You can ask me about your emails, leads, automations, or privacy settings. What would you like to know?"
+            return response.choices[0].message.content.strip()
+            
+        except Exception as e:
+            logger.error(f"Error generating ChatGPT response: {e}")
+            # Fallback to simple response
+            return "I'm here to help! You can ask me about your emails, leads, automations, or privacy settings. What would you like to know?"
     
     def _generate_suggested_actions(self, intent_analysis: Dict[str, Any], query_results: List[Dict[str, Any]]) -> List[str]:
         """Generate suggested follow-up actions"""
