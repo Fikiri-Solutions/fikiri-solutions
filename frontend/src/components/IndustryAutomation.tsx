@@ -174,8 +174,8 @@ export const IndustryAutomation: React.FC = () => {
 
       const data = await response.json();
       if (data.success) {
-        setResponse(data.response);
-        setToolsUsed(data.tools_used || []);
+        setResponse(data.data?.response || 'No response received');
+        setToolsUsed(data.data?.service_queries || []);
         setMessage('');
       } else {
         setResponse(`Error: ${data.error || 'Failed to get response'}`);
