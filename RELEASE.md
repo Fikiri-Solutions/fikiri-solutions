@@ -83,25 +83,61 @@
 
 ## Rollback Procedures
 
-### Quick Rollback (< 5 minutes)
+### Automated Rollback (< 5 minutes)
 
-1. **Enable Kill-Switch**:
+Use the emergency rollback script for automated rollback:
+
+```bash
+# Full automated rollback
+./scripts/emergency-rollback.sh
+
+# Emergency procedures only
+./scripts/emergency-rollback.sh --emergency
+
+# Kill-switch only
+./scripts/emergency-rollback.sh --kill-switch
+```
+
+### Manual Rollback Steps
+
+1. **Enable Kill-Switch** (pauses all outbound actions):
    ```bash
-   curl -X POST https://your-domain.com/api/automation/kill-switch \
+   curl -X POST https://fikirisolutions.onrender.com/api/automation/kill-switch \
      -H "Content-Type: application/json" \
      -d '{"enabled":true}'
    ```
 
-2. **Revert Code**:
+2. **Re-deploy Last Good Release**:
    ```bash
-   git checkout v0.9.0  # Previous stable version
+   git tag -l | tail -2  # List last 2 tags
+   git checkout v1.0.0-1  # Revert to previous version
    git push origin main --force
    ```
 
-3. **Restart Services**:
+3. **Database Migration Rollback** (if needed):
    ```bash
-   pm2 restart all
+   # Rollback migration
+   python scripts/migrations/001_add_user_id_to_leads.py down
+   
+   # Or restore from backup
+   cp data/fikiri_backup_$(date +%Y%m%d).db data/fikiri.db
+   ```
+
+4. **Clear Vercel Build Cache**:
+   ```bash
    vercel --prod --force
+   ```
+
+5. **Confirm Smoke Tests Pass**:
+   ```bash
+   ./scripts/smoke-tests.sh
+   ```
+
+6. **Disable Kill-Switch**:
+   ```bash
+   curl -X POST https://fikirisolutions.onrender.com/api/automation/kill-switch \
+     -H "Content-Type: application/json" \
+     -d '{"enabled":false}'
    ```
 
 ### Full Rollback (< 15 minutes)
@@ -140,7 +176,17 @@ vercel --prod --force
 
 # Or clear specific cache
 vercel --prod --clear-cache
+
+# Documented clear build cache path for releases
+# This path is referenced in RELEASE.md for rollback procedures
+vercel --prod --force
 ```
+
+### Frontend Asset Caching
+
+- **HTML**: Cache-Control: no-store (prevents caching of dynamic content)
+- **Static Assets**: Cache-Control: immutable (for hashed filenames)
+- **API Responses**: Cache-Control: no-cache (for real-time data)
 
 ### API Response Caching
 
