@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { CheckCircle, ArrowRight, ArrowLeft, Mail, Users, Brain, Settings, Loader2, AlertCircle, Zap, Database, Shield } from 'lucide-react'
 import { GmailConnection } from '../components/GmailConnection'
 import { SyncProgress } from '../components/SyncProgress'
-import { useUserActivityTracking } from '../contexts/ActivityContext'
+// import { useUserActivityTracking } from '../contexts/ActivityContext'
 
 interface OnboardingData {
   businessName: string
@@ -34,7 +34,7 @@ export const OnboardingFlow: React.FC = () => {
   const navigate = useNavigate()
   const { step } = useParams<{ step: string }>()
   const [currentStep, setCurrentStep] = useState(parseInt(step || '1'))
-  const { trackOnboardingStart, trackOnboardingComplete, trackServiceConfiguration } = useUserActivityTracking()
+  // const { trackOnboardingStart, trackOnboardingComplete, trackServiceConfiguration } = useUserActivityTracking()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [user, setUser] = useState<User | null>(null)
@@ -80,11 +80,11 @@ export const OnboardingFlow: React.FC = () => {
         setGmailConnected(data.data.gmail_connected)
         
         // Track onboarding start
-        trackOnboardingStart(data.data.user.email, `Step ${data.data.user.onboarding_step || 1}`)
+        // trackOnboardingStart(data.data.user.email, `Step ${data.data.user.onboarding_step || 1}`)
         
         // If user has completed onboarding, redirect to dashboard
         if (data.data.user.onboarding_completed) {
-          trackOnboardingComplete(data.data.user.email, data.data.user.onboarding_step)
+          // trackOnboardingComplete(data.data.user.email, data.data.user.onboarding_step)
           navigate('/')
           return
         }
