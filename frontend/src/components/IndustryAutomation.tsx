@@ -69,7 +69,17 @@ export const IndustryAutomation: React.FC = () => {
       };
       setPrompts(mockPrompts);
     } catch (error) {
-      // Failed to fetch industry prompts
+      console.error('Failed to fetch industry prompts:', error)
+      // Set fallback data
+      setPrompts({
+        landscaping: {
+          industry: 'landscaping',
+          tone: 'professional',
+          focus_areas: ['appointment scheduling', 'service quotes', 'seasonal planning'],
+          tools: ['calendar', 'quote_generator', 'weather_api'],
+          pricing_tier: 'starter'
+        }
+      })
     }
   };
 
@@ -104,7 +114,16 @@ export const IndustryAutomation: React.FC = () => {
       };
       setPricingTiers(mockTiers);
     } catch (error) {
-      // Failed to fetch pricing tiers
+      console.error('Failed to fetch pricing tiers:', error)
+      // Set fallback data
+      setPricingTiers({
+        starter: {
+          name: 'Starter',
+          price: 29,
+          responses_limit: 1000,
+          features: ['Basic AI responses', 'Email automation', 'CRM integration']
+        }
+      })
     }
   };
 
@@ -120,7 +139,15 @@ export const IndustryAutomation: React.FC = () => {
       };
       setUsageMetrics(mockAnalytics);
     } catch (error) {
-      // Failed to fetch client analytics
+      console.error('Failed to fetch client analytics:', error)
+      // Set fallback data
+      setUsageMetrics({
+        tier: 'starter',
+        responses: 0,
+        tool_calls: 0,
+        tokens: 0,
+        monthly_cost: 29
+      })
     }
   };
 

@@ -57,7 +57,7 @@ CORS(app, origins=[
 #     'https://fikirisolutions.com',
 #     'https://www.fikirisolutions.com'
 # ])
-app.secret_key = 'fikiri-secret-key-2024'
+app.secret_key = os.getenv('SECRET_KEY', 'fikiri-secret-key-2024')
 
 # Global service instances
 services = {
@@ -1043,8 +1043,9 @@ if __name__ == '__main__':
         f.write(dashboard_html)
     
     print("🚀 Starting Fikiri Flask Application...")
-    print("📊 Dashboard: http://localhost:8081")
-    print("🔧 API Endpoints: http://localhost:8081/api/")
+    base_url = os.getenv('BASE_URL', 'http://localhost:8081')
+    print(f"📊 Dashboard: {base_url}")
+    print(f"🔧 API Endpoints: {base_url}/api/")
     
     # Flask app will be started at the end of the file
 
@@ -1587,8 +1588,10 @@ if __name__ == '__main__':
         f.write(dashboard_html)
     
     print("🚀 Starting Fikiri Flask Application...")
-    print("📊 Dashboard: http://localhost:8081")
-    print("🔧 API Endpoints: http://localhost:8081/api/")
+    base_url = os.getenv('BASE_URL', 'http://localhost:8081')
+    print(f"📊 Dashboard: {base_url}")
+    print(f"🔧 API Endpoints: {base_url}/api/")
     
     # Run Flask app (SocketIO disabled for now)
-    app.run(debug=True, host='0.0.0.0', port=8081)
+    debug_mode = os.getenv('DEBUG', 'false').lower() == 'true'
+    app.run(debug=debug_mode, host='0.0.0.0', port=int(os.getenv('PORT', 8081)))
