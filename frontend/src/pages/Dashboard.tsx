@@ -138,9 +138,9 @@ export const Dashboard: React.FC = () => {
       <div>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">🚀 CACHE INVALIDATION DEPLOYMENT - v1.0.2</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">🚨 VERCEL CDN CACHE ISSUE - v1.0.3</h1>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              CACHE INVALIDATION STRATEGY: Comprehensive cache-busting headers, version-based invalidation, and deployment timestamps implemented. Build: 2025-09-17T18:45:00Z
+              VERCEL CDN IGNORING CACHE HEADERS: Despite no-cache headers, Vercel CDN still serving cached version. Need to force CDN purge and rebuild.
             </p>
           </div>
           
