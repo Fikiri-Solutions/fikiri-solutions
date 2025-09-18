@@ -567,7 +567,8 @@ export const IndustryAutomation: React.FC = () => {
                       ))}
                     </ul>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
