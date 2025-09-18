@@ -231,6 +231,9 @@ from core.enhanced_crm_service import enhanced_crm_service
 from core.email_parser_service import email_parser_service
 from core.automation_engine import automation_engine
 from core.onboarding_orchestrator import onboarding_orchestrator
+from core.automation_safety import automation_safety_manager
+from core.rate_limiter import rate_limiter
+from core.oauth_token_manager import oauth_token_manager
 
 # User registration endpoint
 @app.route('/api/auth/signup', methods=['POST'])
@@ -1083,6 +1086,168 @@ def api_get_onboarding_summary():
     
     if result['success']:
         return create_success_response(result['data'], "Onboarding summary retrieved")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+# Automation Safety Control endpoints
+@app.route('/api/automation/kill-switch', methods=['POST'])
+@handle_api_errors
+def api_toggle_kill_switch():
+    """Toggle global automation kill-switch."""
+    data = request.get_json()
+    enabled = data.get('enabled', False)
+    
+    result = automation_safety_manager.toggle_global_kill_switch(enabled)
+    
+    if result['success']:
+        return create_success_response({
+            'kill_switch_enabled': result['kill_switch_enabled']
+        }, result['message'])
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/automation/safety-status', methods=['GET'])
+@handle_api_errors
+def api_get_safety_status():
+    """Get automation safety status."""
+    user_id = request.args.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    result = automation_safety_manager.get_safety_status(int(user_id))
+    
+    if result['success']:
+        return create_success_response(result['data'], "Safety status retrieved")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/automation/check-limits', methods=['POST'])
+@handle_api_errors
+def api_check_automation_limits():
+    """Check if automation action is within rate limits."""
+    data = request.get_json()
+    user_id = data.get('user_id')
+    contact_email = data.get('contact_email')
+    action_type = data.get('action_type')
+    
+    if not all([user_id, contact_email, action_type]):
+        return create_error_response("user_id, contact_email, and action_type are required", 400, "MISSING_PARAMETERS")
+    
+    # Check automation safety limits
+    safety_result = automation_safety_manager.check_rate_limits(int(user_id), action_type, contact_email)
+    
+    # Check general rate limits
+    rate_result = rate_limiter.check_automation_rate_limit(int(user_id), contact_email, action_type)
+    
+    # Combine results
+    if not safety_result['allowed'] or not rate_result['allowed']:
+        return create_success_response({
+            'allowed': False,
+            'reason': safety_result.get('reason') if not safety_result['allowed'] else rate_result.get('reason'),
+            'message': safety_result.get('message') if not safety_result['allowed'] else rate_result.get('message'),
+            'retry_after': rate_result.get('retry_after')
+        }, "Action blocked by rate limits")
+    
+    return create_success_response({
+        'allowed': True,
+        'reason': 'within_limits',
+        'message': 'Action is within rate limits'
+    }, "Action allowed")
+
+# Rate Limiting endpoints
+@app.route('/api/rate-limits/check', methods=['POST'])
+@handle_api_errors
+def api_check_rate_limits():
+    """Check API rate limits."""
+    data = request.get_json()
+    user_id = data.get('user_id')
+    endpoint = data.get('endpoint', 'unknown')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    result = rate_limiter.check_api_rate_limit(int(user_id), endpoint)
+    
+    if result['allowed']:
+        return create_success_response(result, "Request allowed")
+    else:
+        return create_error_response(
+            result.get('message', 'Rate limit exceeded'), 
+            429, 
+            result.get('reason', 'RATE_LIMIT_EXCEEDED'),
+            headers={'Retry-After': str(result.get('retry_after', 60))}
+        )
+
+@app.route('/api/rate-limits/status', methods=['GET'])
+@handle_api_errors
+def api_get_rate_limit_status():
+    """Get rate limit status for user."""
+    user_id = request.args.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    result = rate_limiter.get_rate_limit_status(int(user_id))
+    
+    if result['success']:
+        return create_success_response(result['data'], "Rate limit status retrieved")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+# OAuth Token Management endpoints
+@app.route('/api/oauth/token-status', methods=['GET'])
+@handle_api_errors
+def api_get_token_status():
+    """Get OAuth token status."""
+    user_id = request.args.get('user_id')
+    service = request.args.get('service', 'gmail')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    result = oauth_token_manager.get_token_status(int(user_id), service)
+    
+    if result['success']:
+        return create_success_response(result['data'], "Token status retrieved")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/oauth/refresh-token', methods=['POST'])
+@handle_api_errors
+def api_refresh_token():
+    """Refresh OAuth token."""
+    data = request.get_json()
+    user_id = data.get('user_id')
+    service = data.get('service', 'gmail')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    result = oauth_token_manager.refresh_token(int(user_id), service)
+    
+    if result['success']:
+        return create_success_response({
+            'expires_in': result.get('expires_in')
+        }, result['message'])
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/oauth/revoke-tokens', methods=['POST'])
+@handle_api_errors
+def api_revoke_tokens():
+    """Revoke OAuth tokens."""
+    data = request.get_json()
+    user_id = data.get('user_id')
+    service = data.get('service', 'gmail')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    result = oauth_token_manager.revoke_tokens(int(user_id), service)
+    
+    if result['success']:
+        return create_success_response({}, result['message'])
     else:
         return create_error_response(result['error'], 400, result['error_code'])
 
