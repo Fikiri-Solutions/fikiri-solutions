@@ -235,7 +235,7 @@ export const EnhancedDashboard: React.FC = () => {
                 icon={<DollarSign className="h-5 w-5" />}
                 onClick={() => handleMetricClick('revenue')}
               >
-                <MiniTrend data={timeseriesData || []} dataKey="revenue" color="#eab308" />
+                <MiniTrend data={timeseriesData || []} dataKey="revenue" color="#f97316" />
               </EnhancedMetricCard>
 
               <EnhancedMetricCard
@@ -247,7 +247,7 @@ export const EnhancedDashboard: React.FC = () => {
                 onClick={() => handleMetricClick('responseTime')}
               >
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <TrendingUp className="h-4 w-4 text-green-500" />
+                  <TrendingUp className="h-4 w-4 text-brand-secondary" />
                   <span>Optimized</span>
                 </div>
               </EnhancedMetricCard>
