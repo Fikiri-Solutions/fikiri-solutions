@@ -648,6 +648,47 @@ def api_delete_user_data(validated_data):
     else:
         return create_error_response(result['error'], 400, result['error_code'])
 
+# Test endpoint to debug AI assistant
+@app.route('/api/ai/test', methods=['POST'])
+def api_ai_test():
+    """Test endpoint to debug AI assistant issues."""
+    try:
+        print("🔍 AI Test Debug: Starting test")
+        
+        # Test 1: Check if universal_ai_assistant is imported
+        print(f"🔍 AI Test Debug: universal_ai_assistant type: {type(universal_ai_assistant)}")
+        
+        # Test 2: Check if it has process_query method
+        print(f"🔍 AI Test Debug: Has process_query: {hasattr(universal_ai_assistant, 'process_query')}")
+        
+        # Test 3: Try to call process_query
+        print("🔍 AI Test Debug: Calling process_query...")
+        result = universal_ai_assistant.process_query(
+            user_message="test message",
+            user_id=1,
+            context={}
+        )
+        
+        print(f"🔍 AI Test Debug: Result success: {result.success}")
+        print(f"🔍 AI Test Debug: Response: {result.response[:100] if result.response else 'No response'}...")
+        
+        return jsonify({
+            'success': True,
+            'message': 'AI test completed',
+            'result_success': result.success,
+            'response_preview': result.response[:100] if result.response else 'No response'
+        })
+        
+    except Exception as e:
+        print(f"❌ AI Test Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
 # Universal AI Assistant endpoints
 @app.route('/api/ai/chat', methods=['POST'])
 @handle_api_errors
