@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Mail, Lock, ArrowRight, Zap, Sparkles, Shield, Rocket } from 'lucide-react'
+import { useUserActivityTracking } from '../contexts/ActivityContext'
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('')
@@ -9,6 +10,7 @@ export const Login: React.FC = () => {
   const [emailError, setEmailError] = useState('')
   const [passwordError, setPasswordError] = useState('')
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+  const { trackLogin } = useUserActivityTracking()
 
   // Track mouse position for interactive background
   useEffect(() => {
@@ -58,6 +60,16 @@ export const Login: React.FC = () => {
       // Simulate validation
       if (!email || !password) {
         throw new Error('Please enter both email and password')
+      }
+      
+      // For demo purposes, allow any valid email/password combination
+      if (validateEmail(email) && password.length >= 6) {
+        // Track successful login
+        trackLogin(email, 'email')
+        
+        // Redirect to dashboard
+        window.location.href = '/'
+        return
       }
       
       // TODO: Implement real authentication API
