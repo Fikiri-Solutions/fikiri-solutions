@@ -60,9 +60,24 @@ function App() {
                 <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
                   <Suspense fallback={<PageLoader />}>
                     <Routes>
-                      <Route path="/" element={<Layout><Dashboard /></Layout>} />
                       <Route path="/login" element={<Login />} />
-                      <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+                      {features.showOnboarding && <Route path="/onboarding" element={<Onboarding />} />}
+                      <Route path="/onboarding-flow" element={<OnboardingFlow />} />
+                      <Route path="/onboarding-flow/:step" element={<OnboardingFlow />} />
+                      <Route path="/" element={<Layout><Dashboard /></Layout>} />
+                      <Route path="/services" element={<Layout><Services /></Layout>} />
+                      <Route path="/services-landing" element={<ServicesLanding />} />
+                      <Route path="/ai-landing" element={<AIAssistantLanding />} />
+                      <Route path="/industries/landscaping" element={<LandscapingLanding />} />
+                      <Route path="/industries/restaurant" element={<RestaurantLanding />} />
+                      <Route path="/industries/medical" element={<MedicalLanding />} />
+                      <Route path="/home" element={<RenderInspiredLanding />} />
+                      <Route path="/crm" element={<Layout><CRM /></Layout>} />
+                      <Route path="/ai" element={<Layout><AIAssistant /></Layout>} />
+                      <Route path="/assistant" element={<Layout><AIAssistant /></Layout>} />
+                      <Route path="/industry" element={<Layout><IndustryAutomation /></Layout>} />
+                      <Route path="/privacy" element={<Layout><PrivacySettings /></Layout>} />
+                      <Route path="/error" element={<ErrorPage />} />
                       <Route path="*" element={<NotFoundPage />} />
                     </Routes>
                   </Suspense>
