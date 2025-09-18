@@ -20,20 +20,51 @@ export const Dashboard: React.FC = () => {
   const navigate = useNavigate()
   const features = getFeatureConfig()
   const { addToast } = useToast()
-  const { isConnected, data, requestMetricsUpdate, requestServicesUpdate } = useWebSocket()
-  const { data: timeseriesData, summary, loading: timeseriesLoading } = useDashboardTimeseries()
   
-  // Dashboard view options
-  const [dashboardView, setDashboardView] = useState<'enhanced' | 'compact' | 'original'>('enhanced')
-  
-  // Render different dashboard views
-  if (dashboardView === 'enhanced') {
-    return <EnhancedDashboard />
-  }
-  
-  if (dashboardView === 'compact') {
-    return <CompactDashboard />
-  }
+  // Simple dashboard for testing
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+            Dashboard - Test Mode
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-8">
+            This is a simplified dashboard to test functionality.
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                Total Leads
+              </h3>
+              <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                1,234
+              </p>
+            </div>
+            
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                Emails Processed
+              </h3>
+              <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                5,678
+              </p>
+            </div>
+            
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                Revenue
+              </h3>
+              <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                $12,345
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 
   // Clear specific cache items to force fresh data
   React.useEffect(() => {
