@@ -4,7 +4,6 @@ Comprehensive performance tracking for Fikiri Solutions
 """
 
 import time
-import psutil
 import threading
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
@@ -12,6 +11,14 @@ from collections import defaultdict, deque
 import logging
 from dataclasses import dataclass, asdict
 import json
+
+# Gracefully handle missing psutil
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    print("psutil not available for system monitoring")
 
 logger = logging.getLogger(__name__)
 
@@ -84,8 +91,12 @@ class PerformanceMonitor:
         """Record a request performance metric"""
         try:
             # Get current system metrics
-            memory_usage = psutil.virtual_memory().percent
-            cpu_usage = psutil.cpu_percent()
+            if PSUTIL_AVAILABLE:
+                memory_usage = psutil.virtual_memory().percent
+                cpu_usage = psutil.cpu_percent()
+            else:
+                memory_usage = 0.0
+                cpu_usage = 0.0
             
             # Create metric
             metric = PerformanceMetric(
@@ -202,13 +213,18 @@ class PerformanceMonitor:
             while True:
                 try:
                     # Collect system metrics
-                    cpu_percent = psutil.cpu_percent(interval=1)
-                    memory_percent = psutil.virtual_memory().percent
-                    disk_percent = psutil.disk_usage('/').percent
-                    load_avg = psutil.getloadavg() if hasattr(psutil, 'getloadavg') else (0, 0, 0)
-                    
-                    # Get active connections (simplified)
-                    active_connections = len(psutil.net_connections())
+                    if PSUTIL_AVAILABLE:
+                        cpu_percent = psutil.cpu_percent(interval=1)
+                        memory_percent = psutil.virtual_memory().percent
+                        disk_percent = psutil.disk_usage('/').percent
+                        load_avg = psutil.getloadavg() if hasattr(psutil, 'getloadavg') else (0, 0, 0)
+                        active_connections = len(psutil.net_connections())
+                    else:
+                        cpu_percent = 0.0
+                        memory_percent = 0.0
+                        disk_percent = 0.0
+                        load_avg = (0, 0, 0)
+                        active_connections = 0
                     
                     # Create system metric
                     system_metric = SystemMetrics(
