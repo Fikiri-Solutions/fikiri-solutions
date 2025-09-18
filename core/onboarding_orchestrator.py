@@ -418,7 +418,16 @@ class OnboardingOrchestrator:
             user_data = db_optimizer.execute_query(
                 "SELECT * FROM users WHERE id = ?",
                 (user_id,)
-            )[0]
+            )
+            
+            if not user_data:
+                return {
+                    'success': False,
+                    'error': 'User not found',
+                    'error_code': 'USER_NOT_FOUND'
+                }
+            
+            user_data = user_data[0]
             
             # Get Gmail connection status
             gmail_connected = gmail_oauth_manager.is_gmail_connected(user_id)
