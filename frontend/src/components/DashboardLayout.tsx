@@ -11,7 +11,7 @@ interface DashboardCardProps {
   className?: string;
   badge?: {
     text: string;
-    variant?: "default" | "secondary" | "destructive" | "outline";
+    variant?: "default" | "secondary" | "destructive" | "outline" | "success";
   };
 }
 

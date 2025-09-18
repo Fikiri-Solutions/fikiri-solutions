@@ -271,7 +271,7 @@ export const EnhancedDashboard: React.FC = () => {
         <DashboardCard
           title="Active Services"
           description="Your automation services status"
-          badge={{ text: `${services.length} Active`, variant: "default" }}
+          badge={{ text: `${services.length} Active`, variant: "success" }}
         >
           {servicesLoading ? (
             <div className="space-y-3">
