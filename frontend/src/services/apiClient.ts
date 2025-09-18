@@ -238,7 +238,19 @@ class ApiClient {
   // CRM endpoints
   async getLeads(): Promise<LeadData[]> {
     const response = await this.client.get('/crm/leads')
-    return response.data.leads || []
+    const backendLeads = response.data.leads || []
+    
+    // Map backend data to frontend interface
+    return backendLeads.map((lead: any) => ({
+      id: lead.id,
+      name: lead.name,
+      email: lead.email,
+      company: lead.company || '', // Backend might not have company field
+      stage: lead.stage,
+      score: lead.score || 0, // Default score if not provided
+      lastContact: lead.last_contact || lead.created_at, // Map last_contact to lastContact
+      source: lead.source
+    }))
   }
 
   // Utility methods

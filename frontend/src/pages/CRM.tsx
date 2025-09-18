@@ -121,10 +121,10 @@ export const CRM: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-2xl font-bold text-gray-900">CRM - Lead Management</h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">CRM - Lead Management</h1>
               <FeatureStatus status={getFeatureStatus('crm')} />
             </div>
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
               Track and manage your customer leads and relationships.
             </p>
           </div>
@@ -157,8 +157,8 @@ export const CRM: React.FC = () => {
             </div>
             <div className="ml-4 w-0 flex-1">
               <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">Total Leads</dt>
-                <dd className="text-2xl font-semibold text-gray-900">{leads.length}</dd>
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Leads</dt>
+                <dd className="text-2xl font-semibold text-gray-900 dark:text-white">{leads.length}</dd>
               </dl>
             </div>
           </div>
@@ -171,8 +171,8 @@ export const CRM: React.FC = () => {
             </div>
             <div className="ml-4 w-0 flex-1">
               <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">Qualified Leads</dt>
-                <dd className="text-2xl font-semibold text-gray-900">
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Qualified Leads</dt>
+                <dd className="text-2xl font-semibold text-gray-900 dark:text-white">
                   {leads.filter(lead => lead.stage === 'qualified').length}
                 </dd>
               </dl>
@@ -187,8 +187,8 @@ export const CRM: React.FC = () => {
             </div>
             <div className="ml-4 w-0 flex-1">
               <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">Contacted</dt>
-                <dd className="text-2xl font-semibold text-gray-900">
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Contacted</dt>
+                <dd className="text-2xl font-semibold text-gray-900 dark:text-white">
                   {leads.filter(lead => lead.stage === 'contacted').length}
                 </dd>
               </dl>
@@ -203,8 +203,8 @@ export const CRM: React.FC = () => {
             </div>
             <div className="ml-4 w-0 flex-1">
               <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">Companies</dt>
-                <dd className="text-2xl font-semibold text-gray-900">
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Companies</dt>
+                <dd className="text-2xl font-semibold text-gray-900 dark:text-white">
                   {new Set(leads.map(lead => lead.company)).size}
                 </dd>
               </dl>
@@ -253,7 +253,7 @@ export const CRM: React.FC = () => {
       {/* Leads Table */}
       <div className="card">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Leads ({filteredLeads.length})</h3>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Leads ({filteredLeads.length})</h3>
         </div>
         
         {isLoading ? (
@@ -265,22 +265,22 @@ export const CRM: React.FC = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Lead
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Company
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Stage
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Score
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Last Contact
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Source
                   </th>
                 </tr>
@@ -298,13 +298,13 @@ export const CRM: React.FC = () => {
                           </div>
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{lead.name}</div>
-                          <div className="text-sm text-gray-500">{lead.email}</div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">{lead.name}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">{lead.email}</div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{lead.company}</div>
+                      <div className="text-sm text-gray-900 dark:text-white">{lead.company}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStageColor(lead.stage)}`}>
@@ -316,10 +316,10 @@ export const CRM: React.FC = () => {
                         {lead.score}/10
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {lead.lastContact}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {lead.source}
                     </td>
                   </tr>
@@ -345,11 +345,11 @@ export const CRM: React.FC = () => {
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
           <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
             <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Add New Lead</h3>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Add New Lead</h3>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Name *
                   </label>
                   <input
@@ -362,7 +362,7 @@ export const CRM: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Email *
                   </label>
                   <input
@@ -375,7 +375,7 @@ export const CRM: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Phone
                   </label>
                   <input
@@ -388,7 +388,7 @@ export const CRM: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Company
                   </label>
                   <input
@@ -401,7 +401,7 @@ export const CRM: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Source
                   </label>
                   <select
