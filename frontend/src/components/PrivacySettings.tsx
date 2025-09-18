@@ -239,37 +239,37 @@ export const PrivacySettings: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Privacy & Data Management</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Privacy & Data Management</h1>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
             Control your data privacy settings and manage your information.
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <Shield className="h-6 w-6 text-blue-600" />
-          <span className="text-sm font-medium text-blue-600">GDPR Compliant</span>
+          <Shield className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+          <span className="text-sm font-medium text-blue-600 dark:text-blue-400">GDPR Compliant</span>
         </div>
       </div>
 
       {/* Success/Error Messages */}
       {success && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
           <div className="flex items-start">
             <CheckCircle className="h-5 w-5 text-green-400 mt-0.5 mr-3" />
             <div>
-              <h3 className="text-sm font-medium text-green-800">Success</h3>
-              <p className="mt-1 text-sm text-green-700">{success}</p>
+              <h3 className="text-sm font-medium text-green-800 dark:text-green-200">Success</h3>
+              <p className="mt-1 text-sm text-green-700 dark:text-green-300">{success}</p>
             </div>
           </div>
         </div>
       )}
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
           <div className="flex items-start">
             <AlertTriangle className="h-5 w-5 text-red-400 mt-0.5 mr-3" />
             <div>
-              <h3 className="text-sm font-medium text-red-800">Error</h3>
-              <p className="mt-1 text-sm text-red-700">{error}</p>
+              <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Error</h3>
+              <p className="mt-1 text-sm text-red-700 dark:text-red-300">{error}</p>
             </div>
           </div>
         </div>
@@ -279,21 +279,21 @@ export const PrivacySettings: React.FC = () => {
       {dataSummary && (
         <div className="card">
           <div className="flex items-center space-x-3 mb-4">
-            <Database className="h-5 w-5 text-blue-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Your Data Summary</h2>
+            <Database className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Your Data Summary</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-blue-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-blue-600">{dataSummary.leads_count}</div>
-              <div className="text-sm text-blue-700">Leads</div>
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{dataSummary.leads_count}</div>
+              <div className="text-sm text-blue-700 dark:text-blue-300">Leads</div>
             </div>
-            <div className="bg-green-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-green-600">{dataSummary.activities_count}</div>
-              <div className="text-sm text-green-700">Activities</div>
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">{dataSummary.activities_count}</div>
+              <div className="text-sm text-green-700 dark:text-green-300">Activities</div>
             </div>
-            <div className="bg-purple-50 rounded-lg p-4">
-              <div className="text-2xl font-bold text-purple-600">{dataSummary.sync_records_count}</div>
-              <div className="text-sm text-purple-700">Sync Records</div>
+            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
+              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{dataSummary.sync_records_count}</div>
+              <div className="text-sm text-purple-700 dark:text-purple-300">Sync Records</div>
             </div>
           </div>
         </div>
@@ -303,8 +303,8 @@ export const PrivacySettings: React.FC = () => {
       {settings && (
         <div className="card">
           <div className="flex items-center space-x-3 mb-6">
-            <Settings className="h-5 w-5 text-blue-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Privacy Settings</h2>
+            <Settings className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Privacy Settings</h2>
           </div>
 
           <div className="space-y-6">

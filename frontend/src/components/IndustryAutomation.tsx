@@ -520,15 +520,28 @@ export const IndustryAutomation: React.FC = () => {
               </h3>
               
               <div className="space-y-4">
-                {Object.entries(pricingTiers).map(([tier, config]) => (
-                  <div
-                    key={tier}
-                    className={`p-4 rounded-lg border ${
-                      usageMetrics?.tier === tier
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900'
-                        : 'border-gray-200 dark:border-gray-700'
-                    }`}
-                  >
+                {Object.entries(pricingTiers).map(([tier, config]) => {
+                  // Check if this tier matches the selected industry's pricing tier
+                  const isSelectedTier = selectedIndustry && prompts[selectedIndustry]?.pricing_tier === tier;
+                  
+                  return (
+                    <div
+                      key={tier}
+                      className={`p-4 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-md ${
+                        isSelectedTier
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900 shadow-lg'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      }`}
+                      onClick={() => {
+                        // Find an industry that uses this tier and select it
+                        const industryForTier = Object.keys(prompts).find(
+                          industry => prompts[industry]?.pricing_tier === tier
+                        );
+                        if (industryForTier) {
+                          setSelectedIndustry(industryForTier);
+                        }
+                      }}
+                    >
                     <div className="flex justify-between items-start mb-2">
                       <h4 className="font-medium text-gray-900 dark:text-white">
                         {config.name}
