@@ -5,6 +5,7 @@
 
 import axios, { AxiosInstance, AxiosResponse } from 'axios'
 import { config } from '../config'
+import { CacheInvalidationManager } from '../utils/cacheInvalidation'
 
 // API Configuration
 const API_BASE_URL = config.apiUrl
@@ -80,11 +81,14 @@ class ApiClient {
   private client: AxiosInstance
 
   constructor() {
+    const cacheManager = CacheInvalidationManager.getInstance()
+    
     this.client = axios.create({
       baseURL: API_BASE_URL,
       timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
+        ...cacheManager.getCacheHeaders() // Add cache invalidation headers
       },
     })
 

@@ -42,6 +42,8 @@ export const config = {
   // App Configuration
   appName: 'Fikiri Solutions',
   version: '1.0.2', // Updated for Vercel deployment
+  buildTimestamp: '2025-09-17T18:45:00Z', // Cache invalidation timestamp
+  cacheVersion: 'v1.0.2-20250917', // Unique cache version for invalidation
   
   // Development flags
   isDevelopment: typeof window !== 'undefined' && window.location.hostname === 'localhost',
