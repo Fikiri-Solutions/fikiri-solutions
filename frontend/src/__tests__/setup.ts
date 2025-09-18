@@ -40,4 +40,11 @@ global.ResizeObserver = vi.fn().mockImplementation(() => ({
 }))
 
 // Mock scrollTo
-global.scrollTo = vi.fn()
+global.scrollTo = vi.fn().mockImplementation((options?: ScrollToOptions | number, y?: number) => {
+  if (typeof options === 'number' && typeof y === 'number') {
+    // Called with x, y coordinates
+    return;
+  }
+  // Called with options object
+  return;
+})

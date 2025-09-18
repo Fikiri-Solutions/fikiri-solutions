@@ -9,16 +9,14 @@ import { MetricCardSkeleton, ServiceCardSkeleton, ChartSkeleton, ActivitySkeleto
 import { useToast } from '../components/Toast'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { config, getFeatureConfig } from '../config'
-import { apiClient, ServiceData, MetricData, ActivityItem } from '../services/apiClient'
+import { apiClient } from '../services/apiClient'
 import { mockServices, mockMetrics, mockActivity } from '../mockData'
-import { useCacheInvalidation } from '../utils/cacheInvalidation'
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate()
   const features = getFeatureConfig()
   const { addToast } = useToast()
   const { isConnected, data, requestMetricsUpdate, requestServicesUpdate } = useWebSocket()
-  const { getCacheHeaders } = useCacheInvalidation()
 
   // Clear specific cache items to force fresh data
   React.useEffect(() => {
@@ -237,7 +235,7 @@ export const Dashboard: React.FC = () => {
               <ServiceCardSkeleton />
             </>
           ) : (
-            services.map((service) => (
+            services.map((service: any) => (
               <ServiceCard key={service.id} service={service} />
             ))
           )}

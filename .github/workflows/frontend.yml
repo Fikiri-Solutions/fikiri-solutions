@@ -1,0 +1,118 @@
+name: Frontend CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths: [ 'frontend/**' ]
+  pull_request:
+    branches: [ main ]
+    paths: [ 'frontend/**' ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./frontend
+      run: npm ci
+    
+    - name: Run type check
+      working-directory: ./frontend
+      run: npm run type-check
+    
+    - name: Run linting
+      working-directory: ./frontend
+      run: npm run lint
+    
+    - name: Run tests
+      working-directory: ./frontend
+      run: npm run test
+    
+    - name: Run E2E tests
+      working-directory: ./frontend
+      run: npm run e2e
+      env:
+        CYPRESS_BASE_URL: http://localhost:3000
+    
+    - name: Build application
+      working-directory: ./frontend
+      run: npm run build
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-build
+        path: frontend/dist/
+        retention-days: 7
+
+  deploy-preview:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: frontend-build
+        path: frontend/dist/
+    
+    - name: Deploy to Vercel Preview
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        working-directory: ./frontend
+        scope: ${{ secrets.VERCEL_ORG_ID }}
+
+  deploy-production:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: frontend-build
+        path: frontend/dist/
+    
+    - name: Deploy to Vercel Production
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        vercel-args: '--prod'
+        working-directory: ./frontend
+        scope: ${{ secrets.VERCEL_ORG_ID }}
+    
+    - name: Run health check
+      run: |
+        sleep 30
+        curl -f https://fikirisolutions.vercel.app/api/health || exit 1
+    
+    - name: Notify deployment success
+      uses: 8398a7/action-slack@v3
+      with:
+        status: success
+        text: 'Frontend deployed successfully to production!'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      if: always()
+

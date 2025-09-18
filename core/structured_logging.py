@@ -337,43 +337,9 @@ class ErrorTracker:
 # Global error tracker
 error_tracker = ErrorTracker(logger)
 
-# Performance monitoring
-class PerformanceMonitor:
-    """Monitor system performance metrics."""
-    
-    def __init__(self, logger: StructuredLogger):
-        self.logger = logger
-        self.metrics = {}
-    
-    def track_metric(self, name: str, value: float, tags: Optional[Dict[str, str]] = None):
-        """Track a performance metric."""
-        self.metrics[name] = {
-            'value': value,
-            'timestamp': datetime.utcnow().isoformat(),
-            'tags': tags or {}
-        }
-        
-        self.logger.info(
-            f"Performance Metric: {name}",
-            metric_name=name,
-            value=value,
-            tags=tags or {}
-        )
-    
-    def track_latency(self, operation: str, latency_ms: float):
-        """Track operation latency."""
-        self.track_metric(f"latency.{operation}", latency_ms, {'unit': 'ms'})
-    
-    def track_throughput(self, operation: str, requests_per_second: float):
-        """Track operation throughput."""
-        self.track_metric(f"throughput.{operation}", requests_per_second, {'unit': 'req/s'})
-    
-    def track_memory_usage(self, memory_mb: float):
-        """Track memory usage."""
-        self.track_metric("memory.usage", memory_mb, {'unit': 'MB'})
-
-# Global performance monitor
-performance_monitor = PerformanceMonitor(logger)
+# Global performance monitor (using the main performance_monitor from performance_monitor.py)
+# Import the main performance monitor to avoid duplication
+from core.performance_monitor import performance_monitor
 
 if __name__ == "__main__":
     # Test the logging system

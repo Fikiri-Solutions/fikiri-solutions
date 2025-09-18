@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Mail, Users, Brain, Settings, Menu, X, Sparkles, Palette, LogOut, Building2 } from 'lucide-react'
+import { Mail, Users, Brain, Settings, Menu, X, Sparkles, Palette, LogOut, Building2, Shield } from 'lucide-react'
 import { MobileBottomNav } from './MobileBottomNav'
 import { ThemeToggle } from './ThemeToggle'
 import { CustomizationPanel } from './CustomizationPanel'
@@ -53,6 +53,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'CRM', href: '/crm', icon: Users },
     { name: 'AI Assistant', href: '/ai', icon: Brain },
     { name: 'Industry AI', href: '/industry', icon: Building2 },
+    { name: 'Privacy', href: '/privacy', icon: Shield },
   ]
 
   return (
