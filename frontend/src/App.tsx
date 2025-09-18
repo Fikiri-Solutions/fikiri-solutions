@@ -62,7 +62,7 @@ function App() {
                     <Routes>
                       <Route path="/" element={<Layout><TestComponent /></Layout>} />
                       <Route path="/login" element={<Login />} />
-                      <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+                      <Route path="/dashboard" element={<Layout><TestComponent /></Layout>} />
                       <Route path="*" element={<NotFoundPage />} />
                     </Routes>
                   </Suspense>
