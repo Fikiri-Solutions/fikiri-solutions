@@ -1,22 +1,30 @@
 /**
  * Cache Invalidation Utilities
  * Comprehensive cache invalidation strategy for production deployments
+ * 
+ * This utility ensures that users always get the latest version of the app
+ * by implementing multiple cache invalidation strategies:
+ * 
+ * 1. Version-based cache invalidation
+ * 2. Timestamp-based cache busting
+ * 3. Browser cache clearing
+ * 4. Service Worker cache invalidation
+ * 5. API request cache headers
  */
 
 import { config } from '../config'
 
+const CURRENT_APP_VERSION = config.version
+const CURRENT_BUILD_TIMESTAMP = config.buildTimestamp
+const CURRENT_CACHE_VERSION = config.cacheVersion
+
 /**
- * Cache invalidation strategies
+ * Comprehensive Cache Invalidation Manager
+ * Handles all aspects of cache invalidation for production deployments
  */
 export class CacheInvalidationManager {
   private static instance: CacheInvalidationManager
-  private cacheVersion: string
-  private buildTimestamp: string
-
-  constructor() {
-    this.cacheVersion = config.cacheVersion
-    this.buildTimestamp = config.buildTimestamp
-  }
+  private constructor() {}
 
   public static getInstance(): CacheInvalidationManager {
     if (!CacheInvalidationManager.instance) {
@@ -26,76 +34,60 @@ export class CacheInvalidationManager {
   }
 
   /**
-   * Force cache invalidation by adding version parameters to requests
+   * Initialize cache invalidation on app start
+   * Checks version and clears caches if needed
    */
-  public addCacheBuster(url: string): string {
-    const separator = url.includes('?') ? '&' : '?'
-    return `${url}${separator}_v=${this.cacheVersion}&_t=${Date.now()}`
-  }
+  public initialize(): void {
+    const storedCacheVersion = localStorage.getItem('appCacheVersion')
+    const storedBuildTimestamp = localStorage.getItem('appBuildTimestamp')
 
-  /**
-   * Clear all browser caches
-   */
-  public clearBrowserCache(): void {
-    try {
-      // Clear localStorage
-      localStorage.clear()
-      
-      // Clear sessionStorage
-      sessionStorage.clear()
-      
-      // Clear IndexedDB (if available)
-      if ('indexedDB' in window) {
-        indexedDB.databases?.().then(databases => {
-          databases.forEach(db => {
-            if (db.name) {
-              indexedDB.deleteDatabase(db.name)
-            }
-          })
-        })
-      }
-      
-      // Clear service worker cache (if available)
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(registrations => {
-          registrations.forEach(registration => {
-            registration.unregister()
-          })
-        })
-      }
-    } catch (error) {
-      // Cache clearing failed - log silently
+    if (storedCacheVersion !== CURRENT_CACHE_VERSION || storedBuildTimestamp !== CURRENT_BUILD_TIMESTAMP) {
+      console.log('🚨 Cache mismatch detected! Clearing all client-side caches.')
+      this.clearAllCaches()
+      localStorage.setItem('appCacheVersion', CURRENT_CACHE_VERSION)
+      localStorage.setItem('appBuildTimestamp', CURRENT_BUILD_TIMESTAMP)
+      console.log(`✅ New cache version stored: ${CURRENT_CACHE_VERSION} (${CURRENT_BUILD_TIMESTAMP})`)
+    } else {
+      console.log('✅ Client-side cache is up to date.')
     }
   }
 
   /**
-   * Force reload with cache invalidation
+   * Clear all possible client-side caches
    */
-  public forceReload(): void {
-    // Clear caches first
-    this.clearBrowserCache()
-    
-    // Force reload with cache bypass
-    window.location.reload()
-  }
+  private clearAllCaches(): void {
+    // Clear localStorage
+    localStorage.clear()
+    console.log('  - localStorage cleared.')
 
-  /**
-   * Check if cache needs invalidation based on version
-   */
-  public needsCacheInvalidation(): boolean {
-    const storedVersion = localStorage.getItem('app_version')
-    return storedVersion !== this.cacheVersion
-  }
+    // Clear sessionStorage
+    sessionStorage.clear()
+    console.log('  - sessionStorage cleared.')
 
-  /**
-   * Update stored version and clear caches if needed
-   */
-  public invalidateIfNeeded(): void {
-    if (this.needsCacheInvalidation()) {
-      this.clearBrowserCache()
-      localStorage.setItem('app_version', this.cacheVersion)
-      localStorage.setItem('build_timestamp', this.buildTimestamp)
+    // Clear IndexedDB (if used)
+    if (window.indexedDB) {
+      indexedDB.databases().then(dbs => {
+        dbs.forEach(db => {
+          if (db.name) {
+            indexedDB.deleteDatabase(db.name)
+            console.log(`  - IndexedDB database '${db.name}' deleted.`)
+          }
+        })
+      }).catch(error => console.error('Error clearing IndexedDB:', error))
     }
+
+    // Clear Service Worker caches
+    if ('caches' in window) {
+      caches.keys().then(cacheNames => {
+        cacheNames.forEach(cacheName => {
+          caches.delete(cacheName)
+          console.log(`  - Service Worker cache '${cacheName}' deleted.`)
+        })
+      }).catch(error => console.error('Error clearing Service Worker caches:', error))
+    }
+
+    // Force browser to refetch all resources
+    window.location.reload(true)
   }
 
   /**
@@ -103,21 +95,37 @@ export class CacheInvalidationManager {
    */
   public getCacheHeaders(): Record<string, string> {
     return {
+      'X-Deployment-Timestamp': CURRENT_BUILD_TIMESTAMP,
+      'X-Cache-Version': CURRENT_CACHE_VERSION,
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Pragma': 'no-cache',
       'Expires': '0',
-      'X-Cache-Version': this.cacheVersion,
-      'X-Build-Timestamp': this.buildTimestamp
     }
+  }
+
+  /**
+   * Add cache buster parameters to URLs
+   */
+  public addCacheBuster(url: string): string {
+    const separator = url.includes('?') ? '&' : '?'
+    return `${url}${separator}v=${CURRENT_CACHE_VERSION}&t=${Date.now()}`
+  }
+
+  /**
+   * Force reload with cache bypass
+   */
+  public forceReload(): void {
+    window.location.reload(true)
   }
 }
 
 /**
  * Initialize cache invalidation on app start
+ * This should be called before the app renders
  */
 export const initializeCacheInvalidation = (): void => {
   const cacheManager = CacheInvalidationManager.getInstance()
-  cacheManager.invalidateIfNeeded()
+  cacheManager.initialize()
 }
 
 /**
@@ -128,9 +136,7 @@ export const useCacheInvalidation = () => {
   
   return {
     addCacheBuster: cacheManager.addCacheBuster.bind(cacheManager),
-    clearBrowserCache: cacheManager.clearBrowserCache.bind(cacheManager),
     forceReload: cacheManager.forceReload.bind(cacheManager),
-    needsCacheInvalidation: cacheManager.needsCacheInvalidation.bind(cacheManager),
     getCacheHeaders: cacheManager.getCacheHeaders.bind(cacheManager)
   }
 }

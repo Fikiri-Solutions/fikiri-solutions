@@ -11,12 +11,14 @@ import { useWebSocket } from '../hooks/useWebSocket'
 import { config, getFeatureConfig } from '../config'
 import { apiClient, ServiceData, MetricData, ActivityItem } from '../services/apiClient'
 import { mockServices, mockMetrics, mockActivity } from '../mockData'
+import { useCacheInvalidation } from '../utils/cacheInvalidation'
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate()
   const features = getFeatureConfig()
   const { addToast } = useToast()
   const { isConnected, data, requestMetricsUpdate, requestServicesUpdate } = useWebSocket()
+  const { getCacheHeaders } = useCacheInvalidation()
 
   // Clear localStorage cache to force fresh data
   React.useEffect(() => {
@@ -138,18 +140,29 @@ export const Dashboard: React.FC = () => {
       <div>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">🚀 FORCE VERCEL CDN PURGE - v1.0.4</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">🚀 ENHANCED CACHE INVALIDATION - v1.0.5</h1>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              FORCING CDN PURGE: Updated timestamp and version to force Vercel CDN to purge cache and serve fresh content. Build: 2025-09-18T01:00:00Z
+              ENHANCED CACHE STRATEGY: Comprehensive client-side cache clearing, version display, and automatic invalidation on version mismatch. Build: 2025-09-18T01:10:00Z
             </p>
           </div>
           
-          {/* WebSocket Connection Status */}
-          <div className="flex items-center space-x-2">
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-            <span className="text-xs text-gray-500">
-              {isConnected ? 'Live Updates' : 'Offline'}
-            </span>
+          {/* Version and Connection Status */}
+          <div className="flex items-center space-x-4">
+            {/* Cache Version Display */}
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                Cache: {config.cacheVersion}
+              </span>
+            </div>
+            
+            {/* WebSocket Connection Status */}
+            <div className="flex items-center space-x-2">
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {isConnected ? 'Live Updates' : 'Offline'}
+              </span>
+            </div>
           </div>
         </div>
         
