@@ -13,6 +13,7 @@ import { useDashboardTimeseries } from '../hooks/useDashboardTimeseries'
 import { config, getFeatureConfig } from '../config'
 import { apiClient } from '../services/apiClient'
 import { mockServices, mockMetrics, mockActivity } from '../mockData'
+import { EnhancedDashboard } from './EnhancedDashboard'
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate()
@@ -20,6 +21,14 @@ export const Dashboard: React.FC = () => {
   const { addToast } = useToast()
   const { isConnected, data, requestMetricsUpdate, requestServicesUpdate } = useWebSocket()
   const { data: timeseriesData, summary, loading: timeseriesLoading } = useDashboardTimeseries()
+  
+  // Toggle between old and new dashboard
+  const [useEnhancedDashboard, setUseEnhancedDashboard] = useState(true)
+  
+  // Use enhanced dashboard by default
+  if (useEnhancedDashboard) {
+    return <EnhancedDashboard />
+  }
 
   // Clear specific cache items to force fresh data
   React.useEffect(() => {
