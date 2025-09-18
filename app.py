@@ -34,9 +34,38 @@ from core.client_analytics import analytics_engine
 from core.enterprise_logging import log_api_request, log_service_action, log_security_event
 from core.enterprise_security import security_manager, UserRole, Permission
 
+# Import API validation
+from core.api_validation import (
+    validate_api_request, handle_api_errors, create_success_response, create_error_response,
+    LOGIN_SCHEMA, LEAD_SCHEMA, CHAT_SCHEMA, ValidationError, APIError
+)
+
+# Import backend excellence features
+from core.backend_excellence import (
+    APIVersion, api_version, async_manager, async_operation,
+    db_pool, cache_manager, cached, background_tasks,
+    rate_limit, create_api_blueprint
+)
+
+# Import database optimization
+from core.database_optimization import (
+    db_optimizer, migration_manager, QueryMetrics, IndexInfo
+)
+
+# Import business operations
+from core.business_operations import (
+    business_analytics, business_intelligence, legal_compliance,
+    create_business_blueprint
+)
+
+# Import monitoring and backup systems
+from core.monitoring_backup import (
+    monitoring_system, backup_manager, Alert
+)
+
 # Import monitoring and performance tracking
-from core.structured_logging import logger, monitor, error_tracker, performance_monitor
-from core.performance_monitoring import monitor_performance, PerformanceBudget
+from core.structured_logging import logger, monitor, error_tracker
+from core.performance_monitor import performance_monitor
 
 # ML dependencies removed for lightweight operation
 # Using lightweight alternatives for optimal performance
@@ -49,6 +78,13 @@ CORS(app, origins=[
     'https://fikirisolutions.com',  # Custom domain
     'https://www.fikirisolutions.com'  # Custom domain with www
 ])
+
+# Register versioned API blueprints
+app.register_blueprint(create_api_blueprint('v1'))
+app.register_blueprint(create_api_blueprint('v2'))
+
+# Register business operations blueprint
+app.register_blueprint(create_business_blueprint())
 
 # Initialize SocketIO for real-time updates (disabled for now)
 # socketio = SocketIO(app, cors_allowed_origins=[
@@ -110,9 +146,11 @@ def log_request():
 
 @app.after_request
 def log_response(response):
-    """Log all outgoing responses."""
+    """Log all outgoing responses with performance monitoring."""
     if hasattr(request, 'start_time'):
         response_time = time.time() - request.start_time
+        
+        # Log to enterprise logging
         log_api_request(
             endpoint=request.endpoint or request.path,
             method=request.method,
@@ -120,61 +158,933 @@ def log_response(response):
             response_time=response_time,
             user_agent=request.headers.get('User-Agent')
         )
+        
+        # Record performance metrics
+        performance_monitor.record_request(
+            endpoint=request.endpoint or request.path,
+            method=request.method,
+            response_time=response_time,
+            status_code=response.status_code,
+            user_agent=request.headers.get('User-Agent', ''),
+            ip_address=request.remote_addr or ''
+        )
     return response
 
 # Add security endpoints
 @app.route('/api/auth/login', methods=['POST'])
-def api_login():
-    """User login endpoint."""
-    try:
-        data = request.get_json()
-        email = data.get('email')
-        password = data.get('password')  # In production, use proper password hashing
-        
-        # For demo purposes, accept any password
-        user = security_manager.authenticate_user(email, password)
-        
-        if user:
-            session_obj = security_manager.create_session(
-                user, 
-                request.remote_addr, 
-                request.headers.get('User-Agent', '')
-            )
-            
-            session['session_id'] = session_obj.session_id
-            session['user_id'] = user.id
-            
-            log_security_event(
-                event_type="user_login",
-                severity="info",
-                details={"user_id": user.id, "email": user.email}
-            )
-            
-            return jsonify({
-                'success': True,
-                'user': {
-                    'id': user.id,
-                    'email': user.email,
-                    'name': user.name,
-                    'role': user.role.value
-                },
-                'session_id': session_obj.session_id
-            })
-        else:
-            log_security_event(
-                event_type="failed_login",
-                severity="warning",
-                details={"email": email, "ip": request.remote_addr}
-            )
-            return jsonify({'success': False, 'error': 'Invalid credentials'}), 401
-            
-    except Exception as e:
-        log_security_event(
-            event_type="login_error",
-            severity="error",
-            details={"error": str(e)}
+@validate_api_request(**LOGIN_SCHEMA)
+@handle_api_errors
+def api_login(validated_data):
+    """User login endpoint with comprehensive validation."""
+    email = validated_data['email']
+    password = validated_data['password']
+    
+    # For demo purposes, accept any password
+    user = security_manager.authenticate_user(email, password)
+    
+    if user:
+        session_obj = security_manager.create_session(
+            user, 
+            request.remote_addr, 
+            request.headers.get('User-Agent', '')
         )
-        return jsonify({'error': str(e)}), 500
+        
+        session['session_id'] = session_obj.session_id
+        session['user_id'] = user.id
+        
+        log_security_event(
+            event_type="user_login",
+            severity="info",
+            details={"user_id": user.id, "email": user.email}
+        )
+        
+        # Track business analytics
+        business_analytics.track_event('user_login', {
+            'user_id': user.id,
+            'email': user.email,
+            'login_method': 'email_password'
+        })
+        
+        return create_success_response({
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'name': user.name,
+                'role': user.role.value
+            },
+            'session_id': session_obj.session_id
+        }, "Login successful")
+    else:
+        log_security_event(
+            event_type="failed_login",
+            severity="warning",
+            details={"email": email, "ip": request.remote_addr}
+        )
+        return create_error_response("Invalid credentials", 401, "INVALID_CREDENTIALS")
+
+# Import new authentication modules
+from core.user_auth import user_auth_manager
+from core.gmail_oauth import gmail_oauth_manager, gmail_sync_manager
+from core.privacy_manager import privacy_manager
+from core.universal_ai_assistant import universal_ai_assistant
+from core.enhanced_crm_service import enhanced_crm_service
+from core.email_parser_service import email_parser_service
+from core.automation_engine import automation_engine
+from core.onboarding_orchestrator import onboarding_orchestrator
+
+# User registration endpoint
+@app.route('/api/auth/signup', methods=['POST'])
+@validate_api_request(**{
+    'email': {'type': 'string', 'required': True, 'minlength': 5, 'maxlength': 255},
+    'password': {'type': 'string', 'required': True, 'minlength': 6, 'maxlength': 128},
+    'name': {'type': 'string', 'required': True, 'minlength': 2, 'maxlength': 100},
+    'business_name': {'type': 'string', 'required': False, 'maxlength': 200},
+    'business_email': {'type': 'string', 'required': False, 'maxlength': 255},
+    'industry': {'type': 'string', 'required': False, 'maxlength': 100},
+    'team_size': {'type': 'string', 'required': False, 'maxlength': 50}
+})
+@handle_api_errors
+def api_signup(validated_data):
+    """User registration endpoint with comprehensive validation."""
+    result = user_auth_manager.create_user(
+        email=validated_data['email'],
+        password=validated_data['password'],
+        name=validated_data['name'],
+        business_name=validated_data.get('business_name'),
+        business_email=validated_data.get('business_email'),
+        industry=validated_data.get('industry'),
+        team_size=validated_data.get('team_size')
+    )
+    
+    if result['success']:
+        log_security_event(
+            event_type="user_registration",
+            severity="info",
+            details={"user_id": result['user'].id, "email": result['user'].email}
+        )
+        
+        # Track business analytics
+        business_analytics.track_event('user_signup', {
+            'user_id': result['user'].id,
+            'email': result['user'].email,
+            'industry': validated_data.get('industry'),
+            'team_size': validated_data.get('team_size')
+        })
+        
+        return create_success_response({
+            'user': {
+                'id': result['user'].id,
+                'email': result['user'].email,
+                'name': result['user'].name,
+                'role': result['user'].role,
+                'onboarding_completed': result['user'].onboarding_completed,
+                'onboarding_step': result['user'].onboarding_step
+            }
+        }, "Account created successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+# Gmail OAuth endpoints
+@app.route('/api/auth/gmail/connect', methods=['POST'])
+@handle_api_errors
+def api_gmail_connect():
+    """Generate Gmail OAuth authorization URL."""
+    data = request.get_json()
+    user_id = data.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    result = gmail_oauth_manager.generate_auth_url(user_id)
+    
+    if result['success']:
+        return create_success_response({
+            'auth_url': result['auth_url'],
+            'state': result['state']
+        }, "Gmail authorization URL generated")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/auth/gmail/callback', methods=['GET'])
+@handle_api_errors
+def api_gmail_callback():
+    """Handle Gmail OAuth callback."""
+    code = request.args.get('code')
+    state = request.args.get('state')
+    error = request.args.get('error')
+    
+    if error:
+        return create_error_response(f"OAuth error: {error}", 400, "OAUTH_ERROR")
+    
+    if not code or not state:
+        return create_error_response("Missing code or state parameter", 400, "MISSING_PARAMETERS")
+    
+    result = gmail_oauth_manager.handle_oauth_callback(code, state)
+    
+    if result['success']:
+        return create_success_response({
+            'user_id': result['user_id']
+        }, "Gmail account connected successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/auth/gmail/status', methods=['GET'])
+@handle_api_errors
+def api_gmail_status():
+    """Check Gmail connection status."""
+    user_id = request.args.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    is_connected = gmail_oauth_manager.is_gmail_connected(int(user_id))
+    
+    return create_success_response({
+        'connected': is_connected,
+        'user_id': user_id
+    }, "Gmail status retrieved")
+
+@app.route('/api/auth/gmail/disconnect', methods=['POST'])
+@handle_api_errors
+def api_gmail_disconnect():
+    """Disconnect Gmail account."""
+    data = request.get_json()
+    user_id = data.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    result = gmail_oauth_manager.revoke_gmail_access(int(user_id))
+    
+    if result['success']:
+        return create_success_response({
+            'user_id': user_id
+        }, "Gmail account disconnected")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+# Email sync endpoints
+@app.route('/api/email/sync/start', methods=['POST'])
+@handle_api_errors
+def api_start_email_sync():
+    """Start initial email synchronization."""
+    data = request.get_json()
+    user_id = data.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    result = gmail_sync_manager.start_initial_sync(int(user_id))
+    
+    if result['success']:
+        return create_success_response({
+            'sync_id': result['sync_id']
+        }, "Email sync started")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/email/sync/status', methods=['GET'])
+@handle_api_errors
+def api_email_sync_status():
+    """Get email sync status."""
+    user_id = request.args.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    sync_status = gmail_sync_manager.get_sync_status(int(user_id))
+    
+    if sync_status:
+        return create_success_response({
+            'sync_id': sync_status.id,
+            'status': sync_status.status,
+            'emails_processed': sync_status.emails_processed,
+            'emails_total': sync_status.emails_total,
+            'started_at': sync_status.started_at.isoformat(),
+            'completed_at': sync_status.completed_at.isoformat() if sync_status.completed_at else None,
+            'error_message': sync_status.error_message
+        }, "Sync status retrieved")
+    else:
+        return create_success_response({
+            'status': 'no_sync'
+        }, "No sync found")
+
+# Onboarding endpoints
+@app.route('/api/onboarding/update', methods=['POST'])
+@validate_api_request(**{
+    'user_id': {'type': 'integer', 'required': True},
+    'step': {'type': 'integer', 'required': True, 'min': 1, 'max': 5},
+    'completed': {'type': 'boolean', 'required': False}
+})
+@handle_api_errors
+def api_update_onboarding(validated_data):
+    """Update user onboarding progress."""
+    user_id = validated_data['user_id']
+    step = validated_data['step']
+    completed = validated_data.get('completed', False)
+    
+    result = user_auth_manager.update_user_profile(
+        user_id,
+        onboarding_step=step,
+        onboarding_completed=completed
+    )
+    
+    if result['success']:
+        return create_success_response({
+            'user': {
+                'id': result['user'].id,
+                'onboarding_step': result['user'].onboarding_step,
+                'onboarding_completed': result['user'].onboarding_completed
+            }
+        }, "Onboarding progress updated")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/onboarding/status', methods=['GET'])
+@handle_api_errors
+def api_onboarding_status():
+    """Get user onboarding status."""
+    user_id = request.args.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    user = user_auth_manager.get_user_by_id(int(user_id))
+    
+    if not user:
+        return create_error_response("User not found", 404, "USER_NOT_FOUND")
+    
+    return create_success_response({
+        'user_id': user.id,
+        'onboarding_step': user.onboarding_step,
+        'onboarding_completed': user.onboarding_completed,
+        'gmail_connected': gmail_oauth_manager.is_gmail_connected(user.id)
+    }, "Onboarding status retrieved")
+
+# Privacy and Data Management endpoints
+@app.route('/api/privacy/settings', methods=['GET'])
+@handle_api_errors
+def api_get_privacy_settings():
+    """Get user privacy settings."""
+    user_id = request.args.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    settings = privacy_manager.get_privacy_settings(int(user_id))
+    
+    if settings:
+        return create_success_response({
+            'data_retention_days': settings.data_retention_days,
+            'email_scanning_enabled': settings.email_scanning_enabled,
+            'personal_email_exclusion': settings.personal_email_exclusion,
+            'auto_labeling_enabled': settings.auto_labeling_enabled,
+            'lead_detection_enabled': settings.lead_detection_enabled,
+            'analytics_tracking_enabled': settings.analytics_tracking_enabled,
+            'updated_at': settings.updated_at.isoformat()
+        }, "Privacy settings retrieved")
+    else:
+        # Create default settings if none exist
+        result = privacy_manager.create_default_privacy_settings(int(user_id))
+        if result['success']:
+            settings = privacy_manager.get_privacy_settings(int(user_id))
+            return create_success_response({
+                'data_retention_days': settings.data_retention_days,
+                'email_scanning_enabled': settings.email_scanning_enabled,
+                'personal_email_exclusion': settings.personal_email_exclusion,
+                'auto_labeling_enabled': settings.auto_labeling_enabled,
+                'lead_detection_enabled': settings.lead_detection_enabled,
+                'analytics_tracking_enabled': settings.analytics_tracking_enabled,
+                'updated_at': settings.updated_at.isoformat()
+            }, "Default privacy settings created")
+        else:
+            return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/privacy/settings', methods=['PUT'])
+@validate_api_request(**{
+    'user_id': {'type': 'integer', 'required': True},
+    'data_retention_days': {'type': 'integer', 'required': False, 'min': 30, 'max': 365},
+    'email_scanning_enabled': {'type': 'boolean', 'required': False},
+    'personal_email_exclusion': {'type': 'boolean', 'required': False},
+    'auto_labeling_enabled': {'type': 'boolean', 'required': False},
+    'lead_detection_enabled': {'type': 'boolean', 'required': False},
+    'analytics_tracking_enabled': {'type': 'boolean', 'required': False}
+})
+@handle_api_errors
+def api_update_privacy_settings(validated_data):
+    """Update user privacy settings."""
+    user_id = validated_data['user_id']
+    
+    # Remove user_id from updates
+    updates = {k: v for k, v in validated_data.items() if k != 'user_id'}
+    
+    result = privacy_manager.update_privacy_settings(user_id, **updates)
+    
+    if result['success']:
+        return create_success_response({
+            'settings': {
+                'data_retention_days': result['settings'].data_retention_days,
+                'email_scanning_enabled': result['settings'].email_scanning_enabled,
+                'personal_email_exclusion': result['settings'].personal_email_exclusion,
+                'auto_labeling_enabled': result['settings'].auto_labeling_enabled,
+                'lead_detection_enabled': result['settings'].lead_detection_enabled,
+                'analytics_tracking_enabled': result['settings'].analytics_tracking_enabled,
+                'updated_at': result['settings'].updated_at.isoformat()
+            }
+        }, "Privacy settings updated successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/privacy/consent', methods=['POST'])
+@validate_api_request(**{
+    'user_id': {'type': 'integer', 'required': True},
+    'consent_type': {'type': 'string', 'required': True, 'enum': ['gmail_access', 'data_processing', 'analytics']},
+    'granted': {'type': 'boolean', 'required': True},
+    'consent_text': {'type': 'string', 'required': True, 'maxlength': 1000}
+})
+@handle_api_errors
+def api_record_privacy_consent(validated_data):
+    """Record user privacy consent."""
+    result = privacy_manager.record_privacy_consent(
+        user_id=validated_data['user_id'],
+        consent_type=validated_data['consent_type'],
+        granted=validated_data['granted'],
+        consent_text=validated_data['consent_text'],
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent')
+    )
+    
+    if result['success']:
+        return create_success_response({
+            'consent_type': validated_data['consent_type'],
+            'granted': validated_data['granted']
+        }, "Privacy consent recorded successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/privacy/consents', methods=['GET'])
+@handle_api_errors
+def api_get_privacy_consents():
+    """Get user privacy consents."""
+    user_id = request.args.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    consents = privacy_manager.get_privacy_consents(int(user_id))
+    
+    return create_success_response({
+        'consents': [
+            {
+                'id': consent.id,
+                'consent_type': consent.consent_type,
+                'granted': consent.granted,
+                'consent_text': consent.consent_text,
+                'granted_at': consent.granted_at.isoformat(),
+                'revoked_at': consent.revoked_at.isoformat() if consent.revoked_at else None
+            }
+            for consent in consents
+        ]
+    }, "Privacy consents retrieved")
+
+@app.route('/api/privacy/data-summary', methods=['GET'])
+@handle_api_errors
+def api_get_data_summary():
+    """Get user data summary for privacy dashboard."""
+    user_id = request.args.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    result = privacy_manager.get_data_summary(int(user_id))
+    
+    if result['success']:
+        return create_success_response(result['data_summary'], "Data summary retrieved")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/privacy/cleanup', methods=['POST'])
+@handle_api_errors
+def api_cleanup_expired_data():
+    """Clean up expired data based on retention settings."""
+    data = request.get_json()
+    user_id = data.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    result = privacy_manager.cleanup_expired_data(int(user_id))
+    
+    if result['success']:
+        return create_success_response({
+            'cleanup_results': result['cleanup_results'],
+            'total_deleted': result['total_deleted']
+        }, "Data cleanup completed successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/privacy/export', methods=['GET'])
+@handle_api_errors
+def api_export_user_data():
+    """Export all user data for GDPR compliance."""
+    user_id = request.args.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    result = privacy_manager.export_user_data(int(user_id))
+    
+    if result['success']:
+        return create_success_response(result['export_data'], "User data exported successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/privacy/delete', methods=['POST'])
+@validate_api_request(**{
+    'user_id': {'type': 'integer', 'required': True},
+    'confirmation': {'type': 'string', 'required': True, 'enum': ['DELETE_ALL_MY_DATA']}
+})
+@handle_api_errors
+def api_delete_user_data(validated_data):
+    """Delete all user data for GDPR compliance."""
+    if validated_data['confirmation'] != 'DELETE_ALL_MY_DATA':
+        return create_error_response("Invalid confirmation", 400, "INVALID_CONFIRMATION")
+    
+    result = privacy_manager.delete_user_data(validated_data['user_id'])
+    
+    if result['success']:
+        return create_success_response({
+            'deleted_records': result['deleted_records']
+        }, "User data deleted successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+# Universal AI Assistant endpoints
+@app.route('/api/ai/chat', methods=['POST'])
+@validate_api_request(**{
+    'user_id': {'type': 'integer', 'required': True},
+    'message': {'type': 'string', 'required': True, 'minlength': 1, 'maxlength': 1000},
+    'context': {'type': 'object', 'required': False}
+})
+@handle_api_errors
+def api_ai_chat(validated_data):
+    """Universal AI Assistant chat endpoint."""
+    result = universal_ai_assistant.process_query(
+        user_message=validated_data['message'],
+        user_id=validated_data['user_id'],
+        context=validated_data.get('context', {})
+    )
+    
+    if result.success:
+        return create_success_response({
+            'response': result.response,
+            'suggested_actions': result.suggested_actions,
+            'confidence': result.confidence,
+            'service_queries': [
+                {
+                    'service': query.service,
+                    'action': query.action,
+                    'parameters': query.parameters
+                }
+                for query in result.service_queries
+            ]
+        }, "AI response generated")
+    else:
+        return create_error_response("Failed to process AI query", 500, "AI_PROCESSING_ERROR")
+
+# Enhanced CRM Service endpoints
+@app.route('/api/crm/leads', methods=['GET'])
+@handle_api_errors
+def api_get_leads():
+    """Get leads with filtering and analytics."""
+    user_id = request.args.get('user_id')
+    stage = request.args.get('stage')
+    time_period = request.args.get('time_period')
+    company = request.args.get('company')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    filters = {}
+    if stage:
+        filters['stage'] = stage
+    if time_period:
+        filters['time_period'] = time_period
+    if company:
+        filters['company'] = company
+    
+    result = enhanced_crm_service.get_leads_summary(int(user_id), filters)
+    
+    if result['success']:
+        return create_success_response(result['data'], "Leads retrieved successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/crm/leads', methods=['POST'])
+@validate_api_request(**{
+    'user_id': {'type': 'integer', 'required': True},
+    'email': {'type': 'string', 'required': True, 'minlength': 5, 'maxlength': 255},
+    'name': {'type': 'string', 'required': True, 'minlength': 2, 'maxlength': 100},
+    'phone': {'type': 'string', 'required': False, 'maxlength': 20},
+    'company': {'type': 'string', 'required': False, 'maxlength': 200},
+    'source': {'type': 'string', 'required': False, 'maxlength': 50},
+    'stage': {'type': 'string', 'required': False, 'maxlength': 50},
+    'notes': {'type': 'string', 'required': False, 'maxlength': 1000},
+    'tags': {'type': 'array', 'required': False},
+    'metadata': {'type': 'object', 'required': False}
+})
+@handle_api_errors
+def api_create_lead(validated_data):
+    """Create a new lead."""
+    user_id = validated_data.pop('user_id')
+    result = enhanced_crm_service.create_lead(user_id, validated_data)
+    
+    if result['success']:
+        return create_success_response(result['data'], "Lead created successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/crm/leads/<int:lead_id>', methods=['PUT'])
+@validate_api_request(**{
+    'user_id': {'type': 'integer', 'required': True},
+    'name': {'type': 'string', 'required': False, 'minlength': 2, 'maxlength': 100},
+    'phone': {'type': 'string', 'required': False, 'maxlength': 20},
+    'company': {'type': 'string', 'required': False, 'maxlength': 200},
+    'stage': {'type': 'string', 'required': False, 'maxlength': 50},
+    'notes': {'type': 'string', 'required': False, 'maxlength': 1000},
+    'tags': {'type': 'array', 'required': False},
+    'metadata': {'type': 'object', 'required': False}
+})
+@handle_api_errors
+def api_update_lead(validated_data, lead_id):
+    """Update lead information."""
+    user_id = validated_data.pop('user_id')
+    result = enhanced_crm_service.update_lead(lead_id, user_id, validated_data)
+    
+    if result['success']:
+        return create_success_response(result['data'], "Lead updated successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/crm/leads/<int:lead_id>/activities', methods=['POST'])
+@validate_api_request(**{
+    'user_id': {'type': 'integer', 'required': True},
+    'activity_type': {'type': 'string', 'required': True, 'maxlength': 50},
+    'description': {'type': 'string', 'required': True, 'maxlength': 500},
+    'metadata': {'type': 'object', 'required': False}
+})
+@handle_api_errors
+def api_add_lead_activity(validated_data, lead_id):
+    """Add activity to a lead."""
+    user_id = validated_data.pop('user_id')
+    result = enhanced_crm_service.add_lead_activity(
+        lead_id, user_id, 
+        validated_data['activity_type'], 
+        validated_data['description'],
+        validated_data.get('metadata', {})
+    )
+    
+    if result['success']:
+        return create_success_response(result['data'], "Activity added successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/crm/leads/<int:lead_id>/activities', methods=['GET'])
+@handle_api_errors
+def api_get_lead_activities(lead_id):
+    """Get activities for a specific lead."""
+    user_id = request.args.get('user_id')
+    limit = int(request.args.get('limit', 50))
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    result = enhanced_crm_service.get_lead_activities(lead_id, int(user_id), limit)
+    
+    if result['success']:
+        return create_success_response(result['data'], "Activities retrieved successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/crm/pipeline', methods=['GET'])
+@handle_api_errors
+def api_get_lead_pipeline():
+    """Get lead pipeline with stage distribution."""
+    user_id = request.args.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    result = enhanced_crm_service.get_lead_pipeline(int(user_id))
+    
+    if result['success']:
+        return create_success_response(result['data'], "Pipeline retrieved successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/crm/sync-gmail', methods=['POST'])
+@handle_api_errors
+def api_sync_gmail_leads():
+    """Sync leads from Gmail emails."""
+    data = request.get_json()
+    user_id = data.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    result = enhanced_crm_service.sync_gmail_leads(int(user_id))
+    
+    if result['success']:
+        return create_success_response(result['data'], "Gmail leads synced successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+# Email Parser Service endpoints
+@app.route('/api/email/parse', methods=['POST'])
+@validate_api_request(**{
+    'user_id': {'type': 'integer', 'required': True},
+    'email_data': {'type': 'object', 'required': True}
+})
+@handle_api_errors
+def api_parse_email(validated_data):
+    """Parse email and extract structured data."""
+    try:
+        parsed_email = email_parser_service.parse_email(
+            validated_data['email_data'], 
+            validated_data['user_id']
+        )
+        
+        return create_success_response({
+            'parsed_email': {
+                'id': parsed_email.id,
+                'sender_email': parsed_email.sender_email,
+                'sender_name': parsed_email.sender_name,
+                'subject': parsed_email.subject,
+                'extracted_data': parsed_email.extracted_data,
+                'lead_potential': parsed_email.lead_potential,
+                'action_required': parsed_email.action_required
+            }
+        }, "Email parsed successfully")
+        
+    except Exception as e:
+        return create_error_response(str(e), 500, "EMAIL_PARSING_ERROR")
+
+@app.route('/api/email/insights', methods=['GET'])
+@handle_api_errors
+def api_get_email_insights():
+    """Get email insights and analytics."""
+    user_id = request.args.get('user_id')
+    time_period = request.args.get('time_period', 'today')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    insights = email_parser_service.get_email_insights(int(user_id), time_period)
+    
+    return create_success_response({
+        'insights': [
+            {
+                'email_id': insight.email_id,
+                'insight_type': insight.insight_type,
+                'confidence': insight.confidence,
+                'data': insight.data,
+                'suggested_action': insight.suggested_action
+            }
+            for insight in insights
+        ]
+    }, "Email insights retrieved successfully")
+
+@app.route('/api/email/classify-intent', methods=['POST'])
+@validate_api_request(**{
+    'email_data': {'type': 'object', 'required': True}
+})
+@handle_api_errors
+def api_classify_email_intent(validated_data):
+    """Classify email intent and suggest actions."""
+    intent = email_parser_service.classify_email_intent(validated_data['email_data'])
+    
+    return create_success_response(intent, "Email intent classified successfully")
+
+@app.route('/api/email/extract-contacts', methods=['POST'])
+@validate_api_request(**{
+    'email_data': {'type': 'object', 'required': True}
+})
+@handle_api_errors
+def api_extract_contacts(validated_data):
+    """Extract contact information from email."""
+    contacts = email_parser_service.extract_contacts_from_email(validated_data['email_data'])
+    
+    return create_success_response({
+        'contacts': contacts
+    }, "Contacts extracted successfully")
+
+# Automation Engine endpoints
+@app.route('/api/automation/rules', methods=['GET'])
+@handle_api_errors
+def api_get_automation_rules():
+    """Get automation rules for user."""
+    user_id = request.args.get('user_id')
+    status = request.args.get('status')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    result = automation_engine.get_automation_rules(int(user_id), status)
+    
+    if result['success']:
+        return create_success_response(result['data'], "Automation rules retrieved successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/automation/rules', methods=['POST'])
+@validate_api_request(**{
+    'user_id': {'type': 'integer', 'required': True},
+    'name': {'type': 'string', 'required': True, 'minlength': 3, 'maxlength': 100},
+    'description': {'type': 'string', 'required': False, 'maxlength': 500},
+    'trigger_type': {'type': 'string', 'required': True},
+    'trigger_conditions': {'type': 'object', 'required': True},
+    'action_type': {'type': 'string', 'required': True},
+    'action_parameters': {'type': 'object', 'required': True}
+})
+@handle_api_errors
+def api_create_automation_rule(validated_data):
+    """Create a new automation rule."""
+    user_id = validated_data.pop('user_id')
+    result = automation_engine.create_automation_rule(user_id, validated_data)
+    
+    if result['success']:
+        return create_success_response(result['data'], "Automation rule created successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/automation/rules/<int:rule_id>', methods=['PUT'])
+@validate_api_request(**{
+    'user_id': {'type': 'integer', 'required': True},
+    'name': {'type': 'string', 'required': False, 'minlength': 3, 'maxlength': 100},
+    'description': {'type': 'string', 'required': False, 'maxlength': 500},
+    'trigger_conditions': {'type': 'object', 'required': False},
+    'action_parameters': {'type': 'object', 'required': False},
+    'status': {'type': 'string', 'required': False}
+})
+@handle_api_errors
+def api_update_automation_rule(validated_data, rule_id):
+    """Update automation rule."""
+    user_id = validated_data.pop('user_id')
+    result = automation_engine.update_automation_rule(rule_id, user_id, validated_data)
+    
+    if result['success']:
+        return create_success_response(result['data'], "Automation rule updated successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/automation/suggestions', methods=['GET'])
+@handle_api_errors
+def api_get_automation_suggestions():
+    """Get automation suggestions based on user patterns."""
+    user_id = request.args.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    result = automation_engine.get_automation_suggestions(int(user_id))
+    
+    if result['success']:
+        return create_success_response(result['data'], "Automation suggestions retrieved successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/automation/execute', methods=['POST'])
+@validate_api_request(**{
+    'user_id': {'type': 'integer', 'required': True},
+    'trigger_type': {'type': 'string', 'required': True},
+    'trigger_data': {'type': 'object', 'required': True}
+})
+@handle_api_errors
+def api_execute_automation(validated_data):
+    """Execute automation rules based on trigger."""
+    from core.automation_engine import TriggerType
+    
+    try:
+        trigger_type = TriggerType(validated_data['trigger_type'])
+        result = automation_engine.execute_automation_rules(
+            trigger_type, 
+            validated_data['trigger_data'], 
+            validated_data['user_id']
+        )
+        
+        if result['success']:
+            return create_success_response(result['data'], "Automation executed successfully")
+        else:
+            return create_error_response(result['error'], 400, result['error_code'])
+            
+    except ValueError:
+        return create_error_response("Invalid trigger type", 400, "INVALID_TRIGGER_TYPE")
+
+# Onboarding Orchestration endpoints
+@app.route('/api/onboarding/start', methods=['POST'])
+@handle_api_errors
+def api_start_onboarding():
+    """Start the complete onboarding process."""
+    data = request.get_json()
+    user_id = data.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    result = onboarding_orchestrator.start_onboarding_job(int(user_id))
+    
+    if result['success']:
+        return create_success_response({
+            'job_id': result['job_id']
+        }, "Onboarding job started successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/onboarding/status', methods=['GET'])
+@handle_api_errors
+def api_get_onboarding_status():
+    """Get onboarding job status."""
+    user_id = request.args.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    job = onboarding_orchestrator.get_job_status(int(user_id))
+    
+    if job:
+        return create_success_response({
+            'status': job.status,
+            'current_step': job.current_step,
+            'progress': job.progress,
+            'started_at': job.started_at.isoformat(),
+            'completed_at': job.completed_at.isoformat() if job.completed_at else None,
+            'error_message': job.error_message
+        }, "Onboarding status retrieved")
+    else:
+        return create_success_response({
+            'status': 'not_started',
+            'current_step': None,
+            'progress': 0,
+            'started_at': None,
+            'completed_at': None,
+            'error_message': None
+        }, "No onboarding job found")
+
+@app.route('/api/onboarding/summary', methods=['GET'])
+@handle_api_errors
+def api_get_onboarding_summary():
+    """Get complete onboarding summary."""
+    user_id = request.args.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
+    
+    result = onboarding_orchestrator.get_onboarding_summary(int(user_id))
+    
+    if result['success']:
+        return create_success_response(result['data'], "Onboarding summary retrieved")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
 
 @app.route('/api/auth/logout', methods=['POST'])
 def api_logout():
@@ -538,66 +1448,64 @@ def api_test_email_actions():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/crm/leads', methods=['GET'])
+@rate_limit(max_requests=50, window=3600)
+@cached(ttl=300, key_prefix="crm_leads")  # Cache for 5 minutes
 def api_get_leads():
-    """Get all leads from CRM."""
+    """Get all leads from CRM with caching and rate limiting."""
     try:
         if not services['crm']:
-            return jsonify({'error': 'CRM service not available'}), 503
+            return create_error_response("CRM service not available", 503, "SERVICE_UNAVAILABLE")
         
         leads = services['crm'].get_all_leads()
         
-        return jsonify({
-            'success': True,
+        return create_success_response({
             'leads': leads,
-            'count': len(leads),
-            'timestamp': datetime.now().isoformat()
-        })
+            'count': len(leads)
+        }, "Leads retrieved successfully")
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error getting leads: {e}")
+        return create_error_response("Failed to retrieve leads", 500, "CRM_ERROR")
 
 @app.route('/api/crm/leads', methods=['POST'])
-def api_add_lead():
-    """Add a new lead to CRM."""
-    try:
-        data = request.get_json()
-        
-        if not services['crm']:
-            return jsonify({'error': 'CRM service not available'}), 503
-        
-        required_fields = ['name', 'email']
-        for field in required_fields:
-            if not data.get(field):
-                return jsonify({'error': f'Missing required field: {field}'}), 400
-        
-        # Create lead using individual parameters
-        lead = services['crm'].add_lead(
-            email=data['email'],
-            name=data['name'],
-            source=data.get('source', 'web')
-        )
-        
-        # Add additional fields if provided
-        if data.get('phone'):
-            lead.phone = data['phone']
-        if data.get('company'):
-            lead.company = data['company']
-        if data.get('notes'):
-            lead.notes.append(data['notes'])
-        if data.get('status'):
-            lead.stage = data['status']
-        
-        lead_data = lead.to_dict()
-        
-        return jsonify({
-            'success': True,
-            'lead_id': lead.id,
-            'lead': lead_data,
-            'timestamp': datetime.now().isoformat()
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+@validate_api_request(**LEAD_SCHEMA)
+@handle_api_errors
+def api_add_lead(validated_data):
+    """Add a new lead to CRM with comprehensive validation."""
+    if not services['crm']:
+        return create_error_response("CRM service not available", 503, "SERVICE_UNAVAILABLE")
+    
+    # Create lead using validated data
+    lead = services['crm'].add_lead(
+        email=validated_data['email'],
+        name=validated_data['name'],
+        source=validated_data.get('source', 'web')
+    )
+    
+    # Add additional fields if provided
+    if validated_data.get('phone'):
+        lead.phone = validated_data['phone']
+    if validated_data.get('company'):
+        lead.company = validated_data['company']
+    if validated_data.get('notes'):
+        lead.notes.append(validated_data['notes'])
+    if validated_data.get('status'):
+        lead.stage = validated_data['status']
+    
+    lead_data = lead.to_dict()
+    
+    # Track business analytics
+    business_analytics.track_event('lead_created', {
+        'lead_id': lead.id,
+        'source': validated_data.get('source', 'web'),
+        'company': validated_data.get('company'),
+        'stage': validated_data.get('status', 'new')
+    })
+    
+    return create_success_response({
+        'lead_id': lead.id,
+        'lead': lead_data
+    }, "Lead added successfully")
 
 @app.route('/api/test/crm', methods=['POST'])
 def api_test_crm():
@@ -692,24 +1600,21 @@ def test_openai_key():
         })
 
 @app.route('/api/ai/chat', methods=['POST'])
-def api_ai_chat():
-    """Handle AI chat messages."""
+@validate_api_request(**CHAT_SCHEMA)
+@handle_api_errors
+def api_ai_chat(validated_data):
+    """Handle AI chat messages with comprehensive validation."""
+    user_message = validated_data['message']
+    context = validated_data.get('context', {})
+    
+    # Check if AI assistant is available
+    if not services['ai_assistant'] or not services['ai_assistant'].is_enabled():
+        return create_error_response(
+            'AI Assistant is currently unavailable. Please check your OpenAI API key configuration.',
+            503, 'AI_SERVICE_UNAVAILABLE'
+        )
+    
     try:
-        data = request.get_json()
-        
-        user_message = data.get('message', '')
-        context = data.get('context', {})
-        
-        if not user_message.strip():
-            return jsonify({'error': 'Message cannot be empty'}), 400
-        
-        # Check if AI assistant is available
-        if not services['ai_assistant'] or not services['ai_assistant'].is_enabled():
-            return jsonify({
-                'response': 'AI Assistant is currently unavailable. Please check your OpenAI API key configuration.',
-                'error': 'AI service not available'
-            }), 503
-        
         # Generate AI response with intent classification
         ai_response = services['ai_assistant'].generate_chat_response(
             user_message, 
@@ -722,18 +1627,19 @@ def api_ai_chat():
         action_taken = ai_response.get('action_taken', 'provide_information')
         success = ai_response.get('success', True)
         
-        # Debug metadata removed to prevent display in logs
-        
-        return jsonify({
+        return create_success_response({
             'response': response_text,
-            'timestamp': datetime.now().isoformat(),
-            'success': success,
-            'classification': classification,  # Keep for frontend debugging if needed
-            'action_taken': action_taken
-        })
+            'classification': classification,
+            'action_taken': action_taken,
+            'success': success
+        }, "AI response generated successfully")
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"AI chat error: {str(e)}")
+        return create_error_response(
+            "Failed to generate AI response. Please try again.",
+            500, 'AI_RESPONSE_ERROR'
+        )
 
 @app.route('/api/test/ml-scoring', methods=['POST'])
 def api_test_ml_scoring():
@@ -894,6 +1800,245 @@ def api_toggle_feature_flag(feature_name):
         emit('error', {'message': f'Failed to update services: {str(e)}'})
 
 # SocketIO broadcast function removed - real-time updates disabled
+
+@app.route('/api/performance/summary', methods=['GET'])
+def api_performance_summary():
+    """Get comprehensive performance summary."""
+    try:
+        summary = performance_monitor.get_performance_summary()
+        return create_success_response(summary, "Performance summary retrieved successfully")
+    except Exception as e:
+        logger.error(f"Error getting performance summary: {e}")
+        return create_error_response("Failed to retrieve performance summary", 500, "PERFORMANCE_ERROR")
+
+@app.route('/api/performance/endpoint/<endpoint>', methods=['GET'])
+def api_endpoint_performance(endpoint):
+    """Get performance metrics for a specific endpoint."""
+    try:
+        metrics = performance_monitor.get_endpoint_performance(endpoint)
+        return create_success_response(metrics, f"Performance metrics for {endpoint}")
+    except Exception as e:
+        logger.error(f"Error getting endpoint performance: {e}")
+        return create_error_response("Failed to retrieve endpoint performance", 500, "PERFORMANCE_ERROR")
+
+@app.route('/api/performance/system-health', methods=['GET'])
+def api_system_health():
+    """Get current system health status."""
+    try:
+        health = performance_monitor.get_system_health()
+        return create_success_response(health, "System health retrieved successfully")
+    except Exception as e:
+        logger.error(f"Error getting system health: {e}")
+        return create_error_response("Failed to retrieve system health", 500, "PERFORMANCE_ERROR")
+
+@app.route('/api/performance/export', methods=['GET'])
+def api_export_metrics():
+    """Export performance metrics for analysis."""
+    try:
+        hours = request.args.get('hours', 24, type=int)
+        metrics = performance_monitor.export_metrics(hours)
+        return create_success_response(metrics, f"Performance metrics exported for last {hours} hours")
+    except Exception as e:
+        logger.error(f"Error exporting metrics: {e}")
+        return create_error_response("Failed to export metrics", 500, "PERFORMANCE_ERROR")
+
+@app.route('/api/async/bulk-process', methods=['POST'])
+@async_operation("bulk_process")
+def api_bulk_process():
+    """Start bulk processing operation asynchronously."""
+    def bulk_process_task():
+        """Simulate bulk processing task"""
+        time.sleep(5)  # Simulate processing time
+        return {
+            'processed_items': 1000,
+            'success_count': 950,
+            'error_count': 50,
+            'processing_time': 5.0
+        }
+    
+    # This will return immediately with a task ID
+    # The actual processing happens in the background
+    return bulk_process_task()
+
+@app.route('/api/tasks/<task_id>', methods=['GET'])
+def api_get_task_status(task_id: str):
+    """Get the status of an async task."""
+    try:
+        status = async_manager.get_task_status(task_id)
+        return create_success_response(status, f"Task {task_id} status")
+    except Exception as e:
+        logger.error(f"Error getting task status: {e}")
+        return create_error_response("Failed to get task status", 500, "TASK_ERROR")
+
+@app.route('/api/cache/clear', methods=['POST'])
+def api_clear_cache():
+    """Clear application cache."""
+    try:
+        success = cache_manager.clear()
+        return create_success_response(
+            {'cleared': success}, 
+            "Cache cleared successfully" if success else "Failed to clear cache"
+        )
+    except Exception as e:
+        logger.error(f"Error clearing cache: {e}")
+        return create_error_response("Failed to clear cache", 500, "CACHE_ERROR")
+
+@app.route('/api/database/optimize', methods=['POST'])
+def api_optimize_database():
+    """Run database optimization tasks."""
+    try:
+        results = db_optimizer.optimize_database()
+        return create_success_response(results, "Database optimization completed")
+    except Exception as e:
+        logger.error(f"Error optimizing database: {e}")
+        return create_error_response("Failed to optimize database", 500, "DATABASE_ERROR")
+
+@app.route('/api/database/stats', methods=['GET'])
+def api_database_stats():
+    """Get database statistics."""
+    try:
+        stats = db_optimizer.get_database_stats()
+        return create_success_response(stats, "Database statistics retrieved")
+    except Exception as e:
+        logger.error(f"Error getting database stats: {e}")
+        return create_error_response("Failed to get database stats", 500, "DATABASE_ERROR")
+
+@app.route('/api/database/query-performance', methods=['GET'])
+def api_query_performance():
+    """Get query performance analysis."""
+    try:
+        hours = request.args.get('hours', 24, type=int)
+        performance = db_optimizer.get_query_performance(hours)
+        return create_success_response(performance, f"Query performance for last {hours} hours")
+    except Exception as e:
+        logger.error(f"Error getting query performance: {e}")
+        return create_error_response("Failed to get query performance", 500, "DATABASE_ERROR")
+
+@app.route('/api/database/migrations', methods=['GET'])
+def api_migration_status():
+    """Get migration status."""
+    try:
+        status = migration_manager.get_migration_status()
+        return create_success_response(status, "Migration status retrieved")
+    except Exception as e:
+        logger.error(f"Error getting migration status: {e}")
+        return create_error_response("Failed to get migration status", 500, "DATABASE_ERROR")
+
+@app.route('/api/database/migrations/run', methods=['POST'])
+def api_run_migrations():
+    """Run all pending migrations."""
+    try:
+        applied_migrations = migration_manager.run_all_pending_migrations()
+        return create_success_response(
+            {'applied_migrations': applied_migrations},
+            f"Applied {len(applied_migrations)} migrations"
+        )
+    except Exception as e:
+        logger.error(f"Error running migrations: {e}")
+        return create_error_response("Failed to run migrations", 500, "DATABASE_ERROR")
+
+@app.route('/api/monitoring/alerts', methods=['GET'])
+def api_get_alerts():
+    """Get monitoring alerts."""
+    try:
+        severity = request.args.get('severity')
+        resolved = request.args.get('resolved', type=bool)
+        
+        alerts = monitoring_system.get_alerts(severity, resolved)
+        
+        return create_success_response({
+            'alerts': [
+                {
+                    'id': alert.id,
+                    'severity': alert.severity,
+                    'title': alert.title,
+                    'message': alert.message,
+                    'timestamp': alert.timestamp.isoformat(),
+                    'source': alert.source,
+                    'resolved': alert.resolved,
+                    'resolved_at': alert.resolved_at.isoformat() if alert.resolved_at else None
+                }
+                for alert in alerts
+            ],
+            'total_count': len(alerts)
+        }, "Alerts retrieved successfully")
+        
+    except Exception as e:
+        logger.error(f"Error getting alerts: {e}")
+        return create_error_response("Failed to get alerts", 500, "MONITORING_ERROR")
+
+@app.route('/api/monitoring/alerts/<alert_id>/resolve', methods=['POST'])
+def api_resolve_alert(alert_id: str):
+    """Resolve a monitoring alert."""
+    try:
+        monitoring_system.resolve_alert(alert_id)
+        return create_success_response(
+            {'alert_id': alert_id},
+            "Alert resolved successfully"
+        )
+    except Exception as e:
+        logger.error(f"Error resolving alert: {e}")
+        return create_error_response("Failed to resolve alert", 500, "MONITORING_ERROR")
+
+@app.route('/api/monitoring/metrics', methods=['GET'])
+def api_get_metrics():
+    """Get monitoring metrics summary."""
+    try:
+        hours = request.args.get('hours', 24, type=int)
+        metrics = monitoring_system.get_metrics_summary(hours)
+        
+        return create_success_response(metrics, f"Metrics for last {hours} hours")
+    except Exception as e:
+        logger.error(f"Error getting metrics: {e}")
+        return create_error_response("Failed to get metrics", 500, "MONITORING_ERROR")
+
+@app.route('/api/backup/status', methods=['GET'])
+def api_backup_status():
+    """Get backup status and history."""
+    try:
+        status = backup_manager.get_backup_status()
+        return create_success_response(status, "Backup status retrieved")
+    except Exception as e:
+        logger.error(f"Error getting backup status: {e}")
+        return create_error_response("Failed to get backup status", 500, "BACKUP_ERROR")
+
+@app.route('/api/backup/create', methods=['POST'])
+def api_create_backup():
+    """Create a backup."""
+    try:
+        data = request.get_json()
+        backup_type = data.get('type', 'database')
+        
+        result = backup_manager.create_backup(backup_type)
+        
+        if 'error' in result:
+            return create_error_response(result['error'], 400, "BACKUP_ERROR")
+        
+        return create_success_response(result, "Backup created successfully")
+    except Exception as e:
+        logger.error(f"Error creating backup: {e}")
+        return create_error_response("Failed to create backup", 500, "BACKUP_ERROR")
+
+@app.route('/api/backup/restore', methods=['POST'])
+def api_restore_backup():
+    """Restore from a backup."""
+    try:
+        data = request.get_json()
+        backup_name = data.get('backup_name')
+        destination = data.get('destination')
+        
+        if not backup_name or not destination:
+            return create_error_response("Backup name and destination required", 400, "BACKUP_ERROR")
+        
+        result = backup_manager.restore_backup(backup_name, destination)
+        
+        if 'error' in result:
+            return create_error_response(result['error'], 400, "BACKUP_ERROR")
+        
+        return create_success_response(result, "Backup restored successfully")
+    except Exception as e:
+        logger.error(f"Error restoring backup: {e}")
+        return create_error_response("Failed to restore backup", 500, "BACKUP_ERROR")
 
 @app.route('/api/health', methods=['GET'])
 def api_health():
@@ -1115,7 +2260,7 @@ def api_get_services():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/metrics', methods=['GET'])
-def api_get_metrics():
+def api_get_dashboard_metrics():
     """Get dashboard metrics."""
     try:
         # Get real data from services

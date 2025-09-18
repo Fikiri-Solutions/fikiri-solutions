@@ -65,6 +65,14 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     root.classList.remove('light', 'dark')
     root.classList.add(resolvedTheme)
     root.setAttribute('data-theme', resolvedTheme)
+    
+    // Force a re-render by updating CSS custom properties
+    root.style.setProperty('--current-theme', resolvedTheme)
+    
+    // Trigger a custom event for components that need to know about theme changes
+    window.dispatchEvent(new CustomEvent('theme-change', { 
+      detail: { theme: resolvedTheme } 
+    }))
   }, [resolvedTheme])
 
   // Save theme to localStorage
