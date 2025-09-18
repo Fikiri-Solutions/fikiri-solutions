@@ -10,11 +10,18 @@ import hashlib
 import base64
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, Tuple
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import requests
 from core.database_optimization import db_optimizer
+
+# Gracefully handle missing cryptography
+try:
+    from cryptography.fernet import Fernet
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    CRYPTOGRAPHY_AVAILABLE = True
+except ImportError:
+    CRYPTOGRAPHY_AVAILABLE = False
+    print("cryptography not available for token encryption")
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +30,12 @@ class OAuthTokenManager:
     
     def __init__(self, db_optimizer):
         self.db_optimizer = db_optimizer
-        self.encryption_key = self._get_or_create_encryption_key()
-        self.cipher_suite = Fernet(self.encryption_key)
+        if CRYPTOGRAPHY_AVAILABLE:
+            self.encryption_key = self._get_or_create_encryption_key()
+            self.cipher_suite = Fernet(self.encryption_key)
+        else:
+            self.encryption_key = None
+            self.cipher_suite = None
         self._initialize_token_tables()
     
     def _get_or_create_encryption_key(self) -> bytes:
@@ -118,6 +129,10 @@ class OAuthTokenManager:
     
     def encrypt_token(self, token: str) -> str:
         """Encrypt token for secure storage"""
+        if not CRYPTOGRAPHY_AVAILABLE or not self.cipher_suite:
+            # Fallback to base64 encoding without encryption
+            return base64.urlsafe_b64encode(token.encode()).decode()
+        
         try:
             encrypted_bytes = self.cipher_suite.encrypt(token.encode())
             return base64.urlsafe_b64encode(encrypted_bytes).decode()
@@ -127,6 +142,10 @@ class OAuthTokenManager:
     
     def decrypt_token(self, encrypted_token: str) -> str:
         """Decrypt token from storage"""
+        if not CRYPTOGRAPHY_AVAILABLE or not self.cipher_suite:
+            # Fallback to base64 decoding without decryption
+            return base64.urlsafe_b64decode(encrypted_token.encode()).decode()
+        
         try:
             encrypted_bytes = base64.urlsafe_b64decode(encrypted_token.encode())
             decrypted_bytes = self.cipher_suite.decrypt(encrypted_bytes)
