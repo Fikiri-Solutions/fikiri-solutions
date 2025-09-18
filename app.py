@@ -651,17 +651,27 @@ def api_delete_user_data(validated_data):
 # Universal AI Assistant endpoints
 @app.route('/api/ai/chat', methods=['POST'])
 @handle_api_errors
-def api_ai_chat(validated_data):
+def api_ai_chat():
     """Universal AI Assistant chat endpoint."""
     try:
-        print(f"🔍 AI Chat Debug: Processing message: {validated_data.get('message', 'No message')}")
-        print(f"🔍 AI Chat Debug: User ID: {validated_data.get('user_id', 'No user_id')}")
-        print(f"🔍 AI Chat Debug: Context: {validated_data.get('context', {})}")
+        data = request.get_json()
+        if not data:
+            return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
+        
+        # Basic validation
+        required_fields = ['message', 'user_id']
+        for field in required_fields:
+            if field not in data or not data[field]:
+                return create_error_response(f"{field} is required", 400, f'MISSING_{field.upper()}')
+        
+        print(f"🔍 AI Chat Debug: Processing message: {data.get('message', 'No message')}")
+        print(f"🔍 AI Chat Debug: User ID: {data.get('user_id', 'No user_id')}")
+        print(f"🔍 AI Chat Debug: Context: {data.get('context', {})}")
         
         result = universal_ai_assistant.process_query(
-            user_message=validated_data['message'],
-            user_id=validated_data['user_id'],
-            context=validated_data.get('context', {})
+            user_message=data['message'],
+            user_id=data['user_id'],
+            context=data.get('context', {})
         )
         
         print(f"🔍 AI Chat Debug: Result success: {result.success}")
