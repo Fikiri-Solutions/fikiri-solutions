@@ -14,6 +14,7 @@ import { config, getFeatureConfig } from '../config'
 import { apiClient } from '../services/apiClient'
 import { mockServices, mockMetrics, mockActivity } from '../mockData'
 import { EnhancedDashboard } from './EnhancedDashboard'
+import { CompactDashboard } from './CompactDashboard'
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate()
@@ -22,12 +23,16 @@ export const Dashboard: React.FC = () => {
   const { isConnected, data, requestMetricsUpdate, requestServicesUpdate } = useWebSocket()
   const { data: timeseriesData, summary, loading: timeseriesLoading } = useDashboardTimeseries()
   
-  // Toggle between old and new dashboard
-  const [useEnhancedDashboard, setUseEnhancedDashboard] = useState(true)
+  // Dashboard view options
+  const [dashboardView, setDashboardView] = useState<'enhanced' | 'compact' | 'original'>('enhanced')
   
-  // Use enhanced dashboard by default
-  if (useEnhancedDashboard) {
+  // Render different dashboard views
+  if (dashboardView === 'enhanced') {
     return <EnhancedDashboard />
+  }
+  
+  if (dashboardView === 'compact') {
+    return <CompactDashboard />
   }
 
   // Clear specific cache items to force fresh data

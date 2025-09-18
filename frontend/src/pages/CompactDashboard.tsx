@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Mail, Users, Brain, Clock, Bot, UserPlus, Zap, AlertTriangle, CheckCircle2, XCircle, AlertCircle, DollarSign, TrendingUp } from 'lucide-react'
+import { Mail, Users, Brain, Clock, Bot, UserPlus, Zap, AlertTriangle, CheckCircle2, XCircle, AlertCircle, DollarSign, TrendingUp, BarChart3, PieChart as PieChartIcon, Grid, Layout } from 'lucide-react'
 import { ServiceCard } from '../components/ServiceCard'
 import { EnhancedMetricCard } from '../components/EnhancedMetricCard'
 import { MiniTrend } from '../components/MiniTrend'
-import { EnhancedDashboardCharts } from '../components/EnhancedDashboardCharts'
+import { ChartWidget, CompactChartGrid } from '../components/ChartWidget'
 import { MetricCardSkeleton, ServiceCardSkeleton, ChartSkeleton, ActivitySkeleton } from '../components/Skeleton'
 import { useToast } from '../components/Toast'
 import { useWebSocket } from '../hooks/useWebSocket'
@@ -14,13 +14,16 @@ import { config, getFeatureConfig } from '../config'
 import { apiClient } from '../services/apiClient'
 import { mockServices, mockMetrics, mockActivity } from '../mockData'
 import { DashboardSection, StatsGrid, DashboardCard } from '../components/DashboardLayout'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
-export const EnhancedDashboard: React.FC = () => {
+export const CompactDashboard: React.FC = () => {
   const navigate = useNavigate()
   const features = getFeatureConfig()
   const { addToast } = useToast()
   const { isConnected, data, requestMetricsUpdate, requestServicesUpdate } = useWebSocket()
   const { data: timeseriesData, summary, loading: timeseriesLoading, error: timeseriesError } = useDashboardTimeseries()
+  const [viewMode, setViewMode] = useState<'grid' | 'compact'>('grid')
 
   // Clear specific cache items to force fresh data
   React.useEffect(() => {
@@ -162,32 +165,86 @@ export const EnhancedDashboard: React.FC = () => {
     }
   }
 
+  // Prepare compact chart data
+  const compactCharts = [
+    {
+      title: "Email Trends",
+      data: chartData,
+      type: "line" as const,
+      dataKey: "emails",
+      color: "#3B82F6"
+    },
+    {
+      title: "Lead Generation",
+      data: chartData,
+      type: "bar" as const,
+      dataKey: "leads",
+      color: "#22C55E"
+    },
+    {
+      title: "Response Rate",
+      data: chartData,
+      type: "area" as const,
+      dataKey: "responses",
+      color: "#F59E0B"
+    },
+    {
+      title: "Service Distribution",
+      data: chartData,
+      type: "pie" as const,
+      dataKey: "value",
+      color: "#8B5CF6"
+    }
+  ]
+
   return (
-    <div className="space-y-8 p-6">
+    <div className="space-y-6 p-6">
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Compact Dashboard</h1>
             <p className="text-muted-foreground">
-              Welcome back! Here's what's happening with your business automation.
+              Streamlined view with interactive chart widgets
             </p>
           </div>
           
-          {/* Version and Connection Status */}
+          {/* View Mode Toggle */}
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-              <span className="text-xs text-muted-foreground">
-                Cache: {config.cacheVersion}
-              </span>
+              <Button
+                variant={viewMode === 'grid' ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+              >
+                <Grid className="h-4 w-4 mr-1" />
+                Grid
+              </Button>
+              <Button
+                variant={viewMode === 'compact' ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode('compact')}
+              >
+                <Layout className="h-4 w-4 mr-1" />
+                Compact
+              </Button>
             </div>
             
-            <div className="flex items-center space-x-2">
-              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className="text-xs text-muted-foreground">
-                {isConnected ? 'Connected' : 'Disconnected'}
-              </span>
+            {/* Version and Connection Status */}
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                <span className="text-xs text-muted-foreground">
+                  Cache: {config.cacheVersion}
+                </span>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <span className="text-xs text-muted-foreground">
+                  {isConnected ? 'Connected' : 'Disconnected'}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -256,12 +313,21 @@ export const EnhancedDashboard: React.FC = () => {
         </StatsGrid>
       </DashboardSection>
 
-      {/* Charts Section */}
-      <DashboardSection title="Analytics" description="Interactive data visualization with real-time insights">
-        {chartData.length === 0 ? (
-          <ChartSkeleton />
+      {/* Interactive Charts Section */}
+      <DashboardSection title="Analytics" description="Interactive data visualization">
+        {viewMode === 'compact' ? (
+          <CompactChartGrid charts={compactCharts} />
         ) : (
-          <EnhancedDashboardCharts data={chartData} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {compactCharts.map((chart, index) => (
+              <ChartWidget
+                key={index}
+                {...chart}
+                compact={false}
+                showControls={true}
+              />
+            ))}
+          </div>
         )}
       </DashboardSection>
 
