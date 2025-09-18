@@ -164,6 +164,7 @@ export const IndustryAutomation: React.FC = () => {
         },
         body: JSON.stringify({
           message: message,
+          user_id: 1, // Add user_id parameter
           context: {
             industry: selectedIndustry,
             client_id: clientId

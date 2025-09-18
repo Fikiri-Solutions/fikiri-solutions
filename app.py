@@ -654,9 +654,9 @@ def api_delete_user_data(validated_data):
 def api_ai_chat(validated_data):
     """Universal AI Assistant chat endpoint."""
     result = universal_ai_assistant.process_query(
-        user_message=data['message'],
-        user_id=data['user_id'],
-        context=data.get('context', {})
+        user_message=validated_data['message'],
+        user_id=validated_data['user_id'],
+        context=validated_data.get('context', {})
     )
     
     if result.success:
