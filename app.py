@@ -653,28 +653,42 @@ def api_delete_user_data(validated_data):
 @handle_api_errors
 def api_ai_chat(validated_data):
     """Universal AI Assistant chat endpoint."""
-    result = universal_ai_assistant.process_query(
-        user_message=validated_data['message'],
-        user_id=validated_data['user_id'],
-        context=validated_data.get('context', {})
-    )
-    
-    if result.success:
-        return create_success_response({
-            'response': result.response,
-            'suggested_actions': result.suggested_actions,
-            'confidence': result.confidence,
-            'service_queries': [
-                {
-                    'service': query.service,
-                    'action': query.action,
-                    'parameters': query.parameters
-                }
-                for query in result.service_queries
-            ]
-        }, "AI response generated")
-    else:
-        return create_error_response("Failed to process AI query", 500, "AI_PROCESSING_ERROR")
+    try:
+        print(f"🔍 AI Chat Debug: Processing message: {validated_data.get('message', 'No message')}")
+        print(f"🔍 AI Chat Debug: User ID: {validated_data.get('user_id', 'No user_id')}")
+        print(f"🔍 AI Chat Debug: Context: {validated_data.get('context', {})}")
+        
+        result = universal_ai_assistant.process_query(
+            user_message=validated_data['message'],
+            user_id=validated_data['user_id'],
+            context=validated_data.get('context', {})
+        )
+        
+        print(f"🔍 AI Chat Debug: Result success: {result.success}")
+        print(f"🔍 AI Chat Debug: Response: {result.response[:100] if result.response else 'No response'}...")
+        
+        if result.success:
+            return create_success_response({
+                'response': result.response,
+                'suggested_actions': result.suggested_actions,
+                'confidence': result.confidence,
+                'service_queries': [
+                    {
+                        'service': query.service,
+                        'action': query.action,
+                        'parameters': query.parameters
+                    }
+                    for query in result.service_queries
+                ]
+            }, "AI response generated")
+        else:
+            return create_error_response("Failed to process AI query", 500, "AI_PROCESSING_ERROR")
+            
+    except Exception as e:
+        print(f"❌ AI Chat Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return create_error_response(f"AI processing error: {str(e)}", 500, "AI_PROCESSING_ERROR")
 
 # Enhanced CRM Service endpoints
 @app.route('/api/crm/leads', methods=['GET'])
