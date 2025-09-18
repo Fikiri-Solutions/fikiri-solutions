@@ -289,7 +289,7 @@ export const Dashboard: React.FC = () => {
 
             <MetricCard
               title="AI Performance"
-              value={`${Math.round((metrics?.avgResponseTime || 0) * 100) / 100}h`}
+              value="2.4h"
               change="-15%"
               positive={true}
               icon={<Brain className="h-5 w-5" />}
