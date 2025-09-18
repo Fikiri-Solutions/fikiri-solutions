@@ -540,6 +540,28 @@ export const IndustryAutomation: React.FC = () => {
                         if (industryForTier) {
                           setSelectedIndustry(industryForTier);
                         }
+                        
+                        // Update usage metrics based on selected tier
+                        const tierConfig = pricingTiers[tier];
+                        if (tierConfig && usageMetrics) {
+                          const responsesLimit = typeof tierConfig.responses_limit === 'number' 
+                            ? tierConfig.responses_limit 
+                            : 50000; // Default for unlimited
+                          
+                          // Calculate usage based on tier (simulate realistic usage)
+                          const usagePercentage = Math.min(0.8, Math.random() * 0.6 + 0.2); // 20-80% usage
+                          const responses = Math.floor(responsesLimit * usagePercentage);
+                          const toolCalls = Math.floor(responses * 0.1); // ~10% of responses use tools
+                          const tokens = responses * 150; // Average 150 tokens per response
+                          
+                          setUsageMetrics({
+                            tier: tier,
+                            responses: responses,
+                            tool_calls: toolCalls,
+                            tokens: tokens,
+                            monthly_cost: tierConfig.price
+                          });
+                        }
                       }}
                     >
                     <div className="flex justify-between items-start mb-2">

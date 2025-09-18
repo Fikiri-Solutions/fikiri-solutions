@@ -443,16 +443,16 @@ export const PrivacySettings: React.FC = () => {
       {/* Data Management Actions */}
       <div className="card">
         <div className="flex items-center space-x-3 mb-6">
-          <Database className="h-5 w-5 text-blue-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Data Management</h2>
+          <Database className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Data Management</h2>
         </div>
 
         <div className="space-y-4">
           {/* Cleanup Expired Data */}
-          <div className="flex items-center justify-between p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center justify-between p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
             <div>
-              <h3 className="text-sm font-medium text-yellow-800">Cleanup Expired Data</h3>
-              <p className="text-xs text-yellow-700">
+              <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Cleanup Expired Data</h3>
+              <p className="text-xs text-yellow-700 dark:text-yellow-300">
                 Delete data older than your retention period
               </p>
             </div>
@@ -467,10 +467,10 @@ export const PrivacySettings: React.FC = () => {
           </div>
 
           {/* Export Data */}
-          <div className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
             <div>
-              <h3 className="text-sm font-medium text-blue-800">Export Your Data</h3>
-              <p className="text-xs text-blue-700">
+              <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">Export Your Data</h3>
+              <p className="text-xs text-blue-700 dark:text-blue-300">
                 Download all your data in JSON format
               </p>
             </div>
@@ -485,10 +485,10 @@ export const PrivacySettings: React.FC = () => {
           </div>
 
           {/* Delete All Data */}
-          <div className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
             <div>
-              <h3 className="text-sm font-medium text-red-800">Delete All Data</h3>
-              <p className="text-xs text-red-700">
+              <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Delete All Data</h3>
+              <p className="text-xs text-red-700 dark:text-red-300">
                 Permanently delete all your data and account
               </p>
             </div>
@@ -508,23 +508,25 @@ export const PrivacySettings: React.FC = () => {
       {consents.length > 0 && (
         <div className="card">
           <div className="flex items-center space-x-3 mb-6">
-            <Shield className="h-5 w-5 text-blue-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Consent History</h2>
+            <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Consent History</h2>
           </div>
 
           <div className="space-y-3">
             {consents.map((consent) => (
-              <div key={consent.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div key={consent.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-900 capitalize">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 capitalize">
                     {consent.consent_type.replace('_', ' ')}
                   </h3>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
                     {consent.granted ? 'Granted' : 'Denied'} on {new Date(consent.granted_at).toLocaleDateString()}
                   </p>
                 </div>
                 <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  consent.granted ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  consent.granted 
+                    ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200' 
+                    : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200'
                 }`}>
                   {consent.granted ? 'Granted' : 'Denied'}
                 </div>
