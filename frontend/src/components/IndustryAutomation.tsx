@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, Building2, Users, TrendingUp, Settings, CheckCircle } from 'lucide-react';
+import { Building2, TrendingUp, Settings, CheckCircle } from 'lucide-react';
 
 interface IndustryPrompt {
   industry: string;
@@ -345,20 +345,22 @@ export const IndustryAutomation: React.FC = () => {
               
               {/* Industry Categories */}
               <div className="space-y-6">
-                {Object.entries(prompts).reduce((acc, [industry, config]) => {
-                  const category = getIndustryCategory(industry);
-                  if (!acc[category]) {
-                    acc[category] = [];
-                  }
-                  acc[category].push({ industry, config });
-                  return acc;
-                }, {} as Record<string, Array<{industry: string, config: IndustryPrompt}>>).map(([category, industries]) => (
+                {Object.entries(
+                  Object.entries(prompts).reduce((acc, [industry, config]) => {
+                    const category = getIndustryCategory(industry);
+                    if (!acc[category]) {
+                      acc[category] = [];
+                    }
+                    acc[category].push({ industry, config });
+                    return acc;
+                  }, {} as Record<string, Array<{industry: string, config: IndustryPrompt}>>)
+                ).map(([category, industries]: [string, Array<{industry: string, config: IndustryPrompt}>]) => (
                   <div key={category} className="space-y-3">
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2">
                       {category}
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {industries.map(({ industry, config }) => (
+                      {industries.map(({ industry, config }: {industry: string, config: IndustryPrompt}) => (
                         <button
                           key={industry}
                           onClick={() => setSelectedIndustry(industry)}

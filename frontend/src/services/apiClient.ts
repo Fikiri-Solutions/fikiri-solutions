@@ -275,6 +275,11 @@ class ApiClient {
   }
 
   // Error handling
+  async addLead(leadData: LeadData): Promise<LeadData> {
+    const response = await this.client.post('/crm/leads', leadData)
+    return response.data
+  }
+
   handleError(error: any): string {
     if (error.response) {
       // Server responded with error status

@@ -96,7 +96,7 @@ export class CacheInvalidationManager {
     }
 
     // Force browser to refetch all resources
-    window.location.reload(true)
+    window.location.reload()
   }
 
   /**
@@ -124,7 +124,7 @@ export class CacheInvalidationManager {
    * Force reload with cache bypass
    */
   public forceReload(): void {
-    window.location.reload(true)
+    window.location.reload()
   }
 }
 
