@@ -541,18 +541,42 @@ export const IndustryAutomation: React.FC = () => {
                           setSelectedIndustry(industryForTier);
                         }
                         
-                        // Update usage metrics based on selected tier
+                        // Update usage metrics based on selected tier with consistent data
                         const tierConfig = pricingTiers[tier];
-                        if (tierConfig && usageMetrics) {
+                        if (tierConfig) {
+                          // Define tier-specific usage patterns
+                          const tierUsagePatterns = {
+                            starter: {
+                              usagePercentage: 0.75, // 75% usage
+                              toolCallRatio: 0.05,   // 5% of responses use tools
+                              avgTokensPerResponse: 120
+                            },
+                            professional: {
+                              usagePercentage: 0.65, // 65% usage
+                              toolCallRatio: 0.08,   // 8% of responses use tools
+                              avgTokensPerResponse: 150
+                            },
+                            premium: {
+                              usagePercentage: 0.55, // 55% usage
+                              toolCallRatio: 0.12,   // 12% of responses use tools
+                              avgTokensPerResponse: 180
+                            },
+                            enterprise: {
+                              usagePercentage: 0.45, // 45% usage (enterprise users are more selective)
+                              toolCallRatio: 0.15,   // 15% of responses use tools
+                              avgTokensPerResponse: 200
+                            }
+                          };
+                          
+                          const pattern = tierUsagePatterns[tier as keyof typeof tierUsagePatterns] || tierUsagePatterns.starter;
                           const responsesLimit = typeof tierConfig.responses_limit === 'number' 
                             ? tierConfig.responses_limit 
-                            : 50000; // Default for unlimited
+                            : 100000; // Default for unlimited (enterprise)
                           
-                          // Calculate usage based on tier (simulate realistic usage)
-                          const usagePercentage = Math.min(0.8, Math.random() * 0.6 + 0.2); // 20-80% usage
-                          const responses = Math.floor(responsesLimit * usagePercentage);
-                          const toolCalls = Math.floor(responses * 0.1); // ~10% of responses use tools
-                          const tokens = responses * 150; // Average 150 tokens per response
+                          // Calculate usage based on tier-specific patterns
+                          const responses = Math.floor(responsesLimit * pattern.usagePercentage);
+                          const toolCalls = Math.floor(responses * pattern.toolCallRatio);
+                          const tokens = responses * pattern.avgTokensPerResponse;
                           
                           setUsageMetrics({
                             tier: tier,
