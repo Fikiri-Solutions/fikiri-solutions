@@ -138,9 +138,9 @@ export const Dashboard: React.FC = () => {
       <div>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">🚨 VERCEL CDN CACHE ISSUE - v1.0.3</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">🚀 FORCE VERCEL CDN PURGE - v1.0.4</h1>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              VERCEL CDN IGNORING CACHE HEADERS: Despite no-cache headers, Vercel CDN still serving cached version. Need to force CDN purge and rebuild.
+              FORCING CDN PURGE: Updated timestamp and version to force Vercel CDN to purge cache and serve fresh content. Build: 2025-09-18T01:00:00Z
             </p>
           </div>
           

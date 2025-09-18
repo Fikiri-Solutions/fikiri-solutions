@@ -41,9 +41,9 @@ export const config = {
   
   // App Configuration
   appName: 'Fikiri Solutions',
-  version: '1.0.3', // Updated for Vercel CDN cache issue
-  buildTimestamp: '2025-09-18T00:50:00Z', // Updated timestamp for CDN cache purge
-  cacheVersion: 'v1.0.3-20250918', // Updated cache version for CDN invalidation
+  version: '1.0.4', // Force Vercel CDN purge
+  buildTimestamp: '2025-09-18T01:00:00Z', // New timestamp to force CDN purge
+  cacheVersion: 'v1.0.4-20250918', // New cache version to force invalidation
   
   // Development flags
   isDevelopment: typeof window !== 'undefined' && window.location.hostname === 'localhost',
