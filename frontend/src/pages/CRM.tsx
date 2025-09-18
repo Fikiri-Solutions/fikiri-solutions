@@ -13,10 +13,14 @@ export const CRM: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStage, setFilterStage] = useState('all')
   const [newLead, setNewLead] = useState({
+    id: '',
     name: '',
     email: '',
     phone: '',
     company: '',
+    stage: 'new',
+    score: 0,
+    lastContact: new Date().toISOString(),
     source: 'web'
   })
 
@@ -35,7 +39,17 @@ export const CRM: React.FC = () => {
 
     try {
       await apiClient.addLead(newLead)
-      setNewLead({ name: '', email: '', phone: '', company: '', source: 'web' })
+      setNewLead({ 
+        id: '', 
+        name: '', 
+        email: '', 
+        phone: '', 
+        company: '', 
+        stage: 'new', 
+        score: 0, 
+        lastContact: new Date().toISOString(), 
+        source: 'web' 
+      })
       setShowAddLeadModal(false)
       setError({
         type: 'success',
