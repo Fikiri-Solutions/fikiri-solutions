@@ -172,12 +172,21 @@ def log_response(response):
 
 # Add security endpoints
 @app.route('/api/auth/login', methods=['POST'])
-@validate_api_request(**LOGIN_SCHEMA)
 @handle_api_errors
-def api_login(validated_data):
+def api_login():
     """User login endpoint with comprehensive validation."""
-    email = validated_data['email']
-    password = validated_data['password']
+    data = request.get_json()
+    if not data:
+        return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
+    
+    # Basic validation
+    required_fields = ['email', 'password']
+    for field in required_fields:
+        if field not in data or not data[field]:
+            return create_error_response(f"{field} is required", 400, 'MISSING_FIELD')
+    
+    email = data['email']
+    password = data['password']
     
     # For demo purposes, accept any password
     user = security_manager.authenticate_user(email, password)
@@ -237,26 +246,27 @@ from core.oauth_token_manager import oauth_token_manager
 
 # User registration endpoint
 @app.route('/api/auth/signup', methods=['POST'])
-@validate_api_request(**{
-    'email': {'type': 'string', 'required': True, 'minlength': 5, 'maxlength': 255},
-    'password': {'type': 'string', 'required': True, 'minlength': 6, 'maxlength': 128},
-    'name': {'type': 'string', 'required': True, 'minlength': 2, 'maxlength': 100},
-    'business_name': {'type': 'string', 'required': False, 'maxlength': 200},
-    'business_email': {'type': 'string', 'required': False, 'maxlength': 255},
-    'industry': {'type': 'string', 'required': False, 'maxlength': 100},
-    'team_size': {'type': 'string', 'required': False, 'maxlength': 50}
-})
 @handle_api_errors
-def api_signup(validated_data):
+def api_signup():
     """User registration endpoint with comprehensive validation."""
+    data = request.get_json()
+    if not data:
+        return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
+    
+    # Basic validation
+    required_fields = ['email', 'password', 'name']
+    for field in required_fields:
+        if field not in data or not data[field]:
+            return create_error_response(f"{field} is required", 400, 'MISSING_FIELD')
+    
     result = user_auth_manager.create_user(
-        email=validated_data['email'],
-        password=validated_data['password'],
-        name=validated_data['name'],
-        business_name=validated_data.get('business_name'),
-        business_email=validated_data.get('business_email'),
-        industry=validated_data.get('industry'),
-        team_size=validated_data.get('team_size')
+        email=data['email'],
+        password=data['password'],
+        name=data['name'],
+        business_name=data.get('business_name'),
+        business_email=data.get('business_email'),
+        industry=data.get('industry'),
+        team_size=data.get('team_size')
     )
     
     if result['success']:
@@ -270,8 +280,8 @@ def api_signup(validated_data):
         business_analytics.track_event('user_signup', {
             'user_id': result['user'].id,
             'email': result['user'].email,
-            'industry': validated_data.get('industry'),
-            'team_size': validated_data.get('team_size')
+            'industry': data.get('industry'),
+            'team_size': data.get('team_size')
         })
         
         return create_success_response({
@@ -414,17 +424,12 @@ def api_email_sync_status():
 
 # Onboarding endpoints
 @app.route('/api/onboarding/update', methods=['POST'])
-@validate_api_request(**{
-    'user_id': {'type': 'integer', 'required': True},
-    'step': {'type': 'integer', 'required': True, 'min': 1, 'max': 5},
-    'completed': {'type': 'boolean', 'required': False}
-})
 @handle_api_errors
 def api_update_onboarding(validated_data):
     """Update user onboarding progress."""
-    user_id = validated_data['user_id']
-    step = validated_data['step']
-    completed = validated_data.get('completed', False)
+    user_id = data['user_id']
+    step = data['step']
+    completed = data.get('completed', False)
     
     result = user_auth_manager.update_user_profile(
         user_id,
@@ -504,19 +509,10 @@ def api_get_privacy_settings():
             return create_error_response(result['error'], 400, result['error_code'])
 
 @app.route('/api/privacy/settings', methods=['PUT'])
-@validate_api_request(**{
-    'user_id': {'type': 'integer', 'required': True},
-    'data_retention_days': {'type': 'integer', 'required': False, 'min': 30, 'max': 365},
-    'email_scanning_enabled': {'type': 'boolean', 'required': False},
-    'personal_email_exclusion': {'type': 'boolean', 'required': False},
-    'auto_labeling_enabled': {'type': 'boolean', 'required': False},
-    'lead_detection_enabled': {'type': 'boolean', 'required': False},
-    'analytics_tracking_enabled': {'type': 'boolean', 'required': False}
-})
 @handle_api_errors
 def api_update_privacy_settings(validated_data):
     """Update user privacy settings."""
-    user_id = validated_data['user_id']
+    user_id = data['user_id']
     
     # Remove user_id from updates
     updates = {k: v for k, v in validated_data.items() if k != 'user_id'}
@@ -539,28 +535,22 @@ def api_update_privacy_settings(validated_data):
         return create_error_response(result['error'], 400, result['error_code'])
 
 @app.route('/api/privacy/consent', methods=['POST'])
-@validate_api_request(**{
-    'user_id': {'type': 'integer', 'required': True},
-    'consent_type': {'type': 'string', 'required': True, 'enum': ['gmail_access', 'data_processing', 'analytics']},
-    'granted': {'type': 'boolean', 'required': True},
-    'consent_text': {'type': 'string', 'required': True, 'maxlength': 1000}
-})
 @handle_api_errors
 def api_record_privacy_consent(validated_data):
     """Record user privacy consent."""
     result = privacy_manager.record_privacy_consent(
-        user_id=validated_data['user_id'],
-        consent_type=validated_data['consent_type'],
-        granted=validated_data['granted'],
-        consent_text=validated_data['consent_text'],
+        user_id=data['user_id'],
+        consent_type=data['consent_type'],
+        granted=data['granted'],
+        consent_text=data['consent_text'],
         ip_address=request.remote_addr,
         user_agent=request.headers.get('User-Agent')
     )
     
     if result['success']:
         return create_success_response({
-            'consent_type': validated_data['consent_type'],
-            'granted': validated_data['granted']
+            'consent_type': data['consent_type'],
+            'granted': data['granted']
         }, "Privacy consent recorded successfully")
     else:
         return create_error_response(result['error'], 400, result['error_code'])
@@ -643,17 +633,13 @@ def api_export_user_data():
         return create_error_response(result['error'], 400, result['error_code'])
 
 @app.route('/api/privacy/delete', methods=['POST'])
-@validate_api_request(**{
-    'user_id': {'type': 'integer', 'required': True},
-    'confirmation': {'type': 'string', 'required': True, 'enum': ['DELETE_ALL_MY_DATA']}
-})
 @handle_api_errors
 def api_delete_user_data(validated_data):
     """Delete all user data for GDPR compliance."""
-    if validated_data['confirmation'] != 'DELETE_ALL_MY_DATA':
+    if data['confirmation'] != 'DELETE_ALL_MY_DATA':
         return create_error_response("Invalid confirmation", 400, "INVALID_CONFIRMATION")
     
-    result = privacy_manager.delete_user_data(validated_data['user_id'])
+    result = privacy_manager.delete_user_data(data['user_id'])
     
     if result['success']:
         return create_success_response({
@@ -664,18 +650,13 @@ def api_delete_user_data(validated_data):
 
 # Universal AI Assistant endpoints
 @app.route('/api/ai/chat', methods=['POST'])
-@validate_api_request(**{
-    'user_id': {'type': 'integer', 'required': True},
-    'message': {'type': 'string', 'required': True, 'minlength': 1, 'maxlength': 1000},
-    'context': {'type': 'object', 'required': False}
-})
 @handle_api_errors
 def api_ai_chat(validated_data):
     """Universal AI Assistant chat endpoint."""
     result = universal_ai_assistant.process_query(
-        user_message=validated_data['message'],
-        user_id=validated_data['user_id'],
-        context=validated_data.get('context', {})
+        user_message=data['message'],
+        user_id=data['user_id'],
+        context=data.get('context', {})
     )
     
     if result.success:
@@ -724,23 +705,15 @@ def api_get_leads():
         return create_error_response(result['error'], 400, result['error_code'])
 
 @app.route('/api/crm/leads', methods=['POST'])
-@validate_api_request(**{
-    'user_id': {'type': 'integer', 'required': True},
-    'email': {'type': 'string', 'required': True, 'minlength': 5, 'maxlength': 255},
-    'name': {'type': 'string', 'required': True, 'minlength': 2, 'maxlength': 100},
-    'phone': {'type': 'string', 'required': False, 'maxlength': 20},
-    'company': {'type': 'string', 'required': False, 'maxlength': 200},
-    'source': {'type': 'string', 'required': False, 'maxlength': 50},
-    'stage': {'type': 'string', 'required': False, 'maxlength': 50},
-    'notes': {'type': 'string', 'required': False, 'maxlength': 1000},
-    'tags': {'type': 'array', 'required': False},
-    'metadata': {'type': 'object', 'required': False}
-})
 @handle_api_errors
-def api_create_lead(validated_data):
+def api_create_lead():
     """Create a new lead."""
-    user_id = validated_data.pop('user_id')
-    result = enhanced_crm_service.create_lead(user_id, validated_data)
+    data = request.get_json()
+    if not data:
+        return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
+    
+    user_id = data.pop('user_id')
+    result = enhanced_crm_service.create_lead(user_id, data)
     
     if result['success']:
         return create_success_response(result['data'], "Lead created successfully")
@@ -748,16 +721,6 @@ def api_create_lead(validated_data):
         return create_error_response(result['error'], 400, result['error_code'])
 
 @app.route('/api/crm/leads/<int:lead_id>', methods=['PUT'])
-@validate_api_request(**{
-    'user_id': {'type': 'integer', 'required': True},
-    'name': {'type': 'string', 'required': False, 'minlength': 2, 'maxlength': 100},
-    'phone': {'type': 'string', 'required': False, 'maxlength': 20},
-    'company': {'type': 'string', 'required': False, 'maxlength': 200},
-    'stage': {'type': 'string', 'required': False, 'maxlength': 50},
-    'notes': {'type': 'string', 'required': False, 'maxlength': 1000},
-    'tags': {'type': 'array', 'required': False},
-    'metadata': {'type': 'object', 'required': False}
-})
 @handle_api_errors
 def api_update_lead(validated_data, lead_id):
     """Update lead information."""
@@ -770,21 +733,15 @@ def api_update_lead(validated_data, lead_id):
         return create_error_response(result['error'], 400, result['error_code'])
 
 @app.route('/api/crm/leads/<int:lead_id>/activities', methods=['POST'])
-@validate_api_request(**{
-    'user_id': {'type': 'integer', 'required': True},
-    'activity_type': {'type': 'string', 'required': True, 'maxlength': 50},
-    'description': {'type': 'string', 'required': True, 'maxlength': 500},
-    'metadata': {'type': 'object', 'required': False}
-})
 @handle_api_errors
 def api_add_lead_activity(validated_data, lead_id):
     """Add activity to a lead."""
     user_id = validated_data.pop('user_id')
     result = enhanced_crm_service.add_lead_activity(
         lead_id, user_id, 
-        validated_data['activity_type'], 
-        validated_data['description'],
-        validated_data.get('metadata', {})
+        data['activity_type'], 
+        data['description'],
+        data.get('metadata', {})
     )
     
     if result['success']:
@@ -844,17 +801,13 @@ def api_sync_gmail_leads():
 
 # Email Parser Service endpoints
 @app.route('/api/email/parse', methods=['POST'])
-@validate_api_request(**{
-    'user_id': {'type': 'integer', 'required': True},
-    'email_data': {'type': 'object', 'required': True}
-})
 @handle_api_errors
 def api_parse_email(validated_data):
     """Parse email and extract structured data."""
     try:
         parsed_email = email_parser_service.parse_email(
-            validated_data['email_data'], 
-            validated_data['user_id']
+            data['email_data'], 
+            data['user_id']
         )
         
         return create_success_response({
@@ -898,24 +851,18 @@ def api_get_email_insights():
     }, "Email insights retrieved successfully")
 
 @app.route('/api/email/classify-intent', methods=['POST'])
-@validate_api_request(**{
-    'email_data': {'type': 'object', 'required': True}
-})
 @handle_api_errors
 def api_classify_email_intent(validated_data):
     """Classify email intent and suggest actions."""
-    intent = email_parser_service.classify_email_intent(validated_data['email_data'])
+    intent = email_parser_service.classify_email_intent(data['email_data'])
     
     return create_success_response(intent, "Email intent classified successfully")
 
 @app.route('/api/email/extract-contacts', methods=['POST'])
-@validate_api_request(**{
-    'email_data': {'type': 'object', 'required': True}
-})
 @handle_api_errors
 def api_extract_contacts(validated_data):
     """Extract contact information from email."""
-    contacts = email_parser_service.extract_contacts_from_email(validated_data['email_data'])
+    contacts = email_parser_service.extract_contacts_from_email(data['email_data'])
     
     return create_success_response({
         'contacts': contacts
@@ -940,15 +887,6 @@ def api_get_automation_rules():
         return create_error_response(result['error'], 400, result['error_code'])
 
 @app.route('/api/automation/rules', methods=['POST'])
-@validate_api_request(**{
-    'user_id': {'type': 'integer', 'required': True},
-    'name': {'type': 'string', 'required': True, 'minlength': 3, 'maxlength': 100},
-    'description': {'type': 'string', 'required': False, 'maxlength': 500},
-    'trigger_type': {'type': 'string', 'required': True},
-    'trigger_conditions': {'type': 'object', 'required': True},
-    'action_type': {'type': 'string', 'required': True},
-    'action_parameters': {'type': 'object', 'required': True}
-})
 @handle_api_errors
 def api_create_automation_rule(validated_data):
     """Create a new automation rule."""
@@ -961,14 +899,6 @@ def api_create_automation_rule(validated_data):
         return create_error_response(result['error'], 400, result['error_code'])
 
 @app.route('/api/automation/rules/<int:rule_id>', methods=['PUT'])
-@validate_api_request(**{
-    'user_id': {'type': 'integer', 'required': True},
-    'name': {'type': 'string', 'required': False, 'minlength': 3, 'maxlength': 100},
-    'description': {'type': 'string', 'required': False, 'maxlength': 500},
-    'trigger_conditions': {'type': 'object', 'required': False},
-    'action_parameters': {'type': 'object', 'required': False},
-    'status': {'type': 'string', 'required': False}
-})
 @handle_api_errors
 def api_update_automation_rule(validated_data, rule_id):
     """Update automation rule."""
@@ -997,22 +927,17 @@ def api_get_automation_suggestions():
         return create_error_response(result['error'], 400, result['error_code'])
 
 @app.route('/api/automation/execute', methods=['POST'])
-@validate_api_request(**{
-    'user_id': {'type': 'integer', 'required': True},
-    'trigger_type': {'type': 'string', 'required': True},
-    'trigger_data': {'type': 'object', 'required': True}
-})
 @handle_api_errors
 def api_execute_automation(validated_data):
     """Execute automation rules based on trigger."""
     from core.automation_engine import TriggerType
     
     try:
-        trigger_type = TriggerType(validated_data['trigger_type'])
+        trigger_type = TriggerType(data['trigger_type'])
         result = automation_engine.execute_automation_rules(
             trigger_type, 
-            validated_data['trigger_data'], 
-            validated_data['user_id']
+            data['trigger_data'], 
+            data['user_id']
         )
         
         if result['success']:
@@ -1612,59 +1537,48 @@ def api_test_email_actions():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/crm/leads', methods=['GET'])
-@rate_limit(max_requests=50, window=3600)
-@cached(ttl=300, key_prefix="crm_leads")  # Cache for 5 minutes
-def api_get_leads():
-    """Get all leads from CRM with caching and rate limiting."""
-    try:
-        if not services['crm']:
-            return create_error_response("CRM service not available", 503, "SERVICE_UNAVAILABLE")
-        
-        leads = services['crm'].get_all_leads()
-        
-        return create_success_response({
-            'leads': leads,
-            'count': len(leads)
-        }, "Leads retrieved successfully")
-        
-    except Exception as e:
-        logger.error(f"Error getting leads: {e}")
-        return create_error_response("Failed to retrieve leads", 500, "CRM_ERROR")
-
 @app.route('/api/crm/leads', methods=['POST'])
-@validate_api_request(**LEAD_SCHEMA)
 @handle_api_errors
-def api_add_lead(validated_data):
+def api_add_lead():
     """Add a new lead to CRM with comprehensive validation."""
+    data = request.get_json()
+    if not data:
+        return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
+    
+    # Basic validation
+    required_fields = ['user_id', 'email', 'name']
+    for field in required_fields:
+        if field not in data or not data[field]:
+            return create_error_response(f"{field} is required", 400, 'MISSING_FIELD')
+    
     if not services['crm']:
         return create_error_response("CRM service not available", 503, "SERVICE_UNAVAILABLE")
     
     # Create lead using validated data
     lead = services['crm'].add_lead(
-        email=validated_data['email'],
-        name=validated_data['name'],
-        source=validated_data.get('source', 'web')
+        email=data['email'],
+        name=data['name'],
+        source=data.get('source', 'web')
     )
     
     # Add additional fields if provided
-    if validated_data.get('phone'):
-        lead.phone = validated_data['phone']
-    if validated_data.get('company'):
-        lead.company = validated_data['company']
-    if validated_data.get('notes'):
-        lead.notes.append(validated_data['notes'])
-    if validated_data.get('status'):
-        lead.stage = validated_data['status']
+    if data.get('phone'):
+        lead.phone = data['phone']
+    if data.get('company'):
+        lead.company = data['company']
+    if data.get('notes'):
+        lead.notes.append(data['notes'])
+    if data.get('status'):
+        lead.stage = data['status']
     
     lead_data = lead.to_dict()
     
     # Track business analytics
     business_analytics.track_event('lead_created', {
         'lead_id': lead.id,
-        'source': validated_data.get('source', 'web'),
-        'company': validated_data.get('company'),
-        'stage': validated_data.get('status', 'new')
+        'source': data.get('source', 'web'),
+        'company': data.get('company'),
+        'stage': data.get('status', 'new')
     })
     
     return create_success_response({
@@ -1763,48 +1677,6 @@ def test_openai_key():
             "api_key_configured": False,
             "error_details": str(e)
         })
-
-@app.route('/api/ai/chat', methods=['POST'])
-@validate_api_request(**CHAT_SCHEMA)
-@handle_api_errors
-def api_ai_chat(validated_data):
-    """Handle AI chat messages with comprehensive validation."""
-    user_message = validated_data['message']
-    context = validated_data.get('context', {})
-    
-    # Check if AI assistant is available
-    if not services['ai_assistant'] or not services['ai_assistant'].is_enabled():
-        return create_error_response(
-            'AI Assistant is currently unavailable. Please check your OpenAI API key configuration.',
-            503, 'AI_SERVICE_UNAVAILABLE'
-        )
-    
-    try:
-        # Generate AI response with intent classification
-        ai_response = services['ai_assistant'].generate_chat_response(
-            user_message, 
-            context.get('conversation_history', [])
-        )
-        
-        # Extract response and metadata
-        response_text = ai_response.get('response', 'I apologize, but I encountered an issue generating a response.')
-        classification = ai_response.get('classification', {})
-        action_taken = ai_response.get('action_taken', 'provide_information')
-        success = ai_response.get('success', True)
-        
-        return create_success_response({
-            'response': response_text,
-            'classification': classification,
-            'action_taken': action_taken,
-            'success': success
-        }, "AI response generated successfully")
-        
-    except Exception as e:
-        logger.error(f"AI chat error: {str(e)}")
-        return create_error_response(
-            "Failed to generate AI response. Please try again.",
-            500, 'AI_RESPONSE_ERROR'
-        )
 
 @app.route('/api/test/ml-scoring', methods=['POST'])
 def api_test_ml_scoring():
