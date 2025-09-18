@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react'
-import { Brain, Send, Bot, User, Clock, Zap, Mail, Users } from 'lucide-react'
+import React, { useState, useEffect, useRef } from 'react'
+import { Brain, Send, Bot, User, Clock, Zap, Mail, Users, Wifi, WifiOff } from 'lucide-react'
 import { apiClient, AIResponse } from '../services/apiClient'
 import { StatusIcon } from '../components/StatusIcon'
+import { useWebSocket } from '../hooks/useWebSocket'
 
 interface ChatMessage {
   id: string
@@ -17,6 +18,9 @@ export const AIAssistant: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [aiStatus, setAiStatus] = useState<AIResponse | null>(null)
+  const [isTyping, setIsTyping] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const { isConnected } = useWebSocket()
 
   useEffect(() => {
     fetchAIStatus()
@@ -28,6 +32,11 @@ export const AIAssistant: React.FC = () => {
       timestamp: new Date()
     }])
   }, [])
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   const fetchAIStatus = async () => {
     try {
@@ -87,20 +96,37 @@ export const AIAssistant: React.FC = () => {
           </p>
         </div>
         
-        {/* AI Status */}
-        {aiStatus && (
+        {/* AI Status & Connection */}
+        <div className="flex items-center space-x-4">
+          {/* Real-time Connection Status */}
           <div className="flex items-center space-x-2">
-            <StatusIcon 
-              status={aiStatus.stats.enabled ? 'active' : 'inactive'} 
-              size="md" 
-            />
+            {isConnected ? (
+              <Wifi className="h-4 w-4 text-green-500" />
+            ) : (
+              <WifiOff className="h-4 w-4 text-red-500" />
+            )}
             <span className={`text-sm font-medium ${
-              aiStatus.stats.enabled ? 'text-green-600' : 'text-gray-600'
+              isConnected ? 'text-green-600' : 'text-red-600'
             }`}>
-              {aiStatus.stats.enabled ? 'AI Active' : 'AI Inactive'}
+              {isConnected ? 'Real-time Connected' : 'Offline Mode'}
             </span>
           </div>
-        )}
+          
+          {/* AI Status */}
+          {aiStatus && (
+            <div className="flex items-center space-x-2">
+              <StatusIcon 
+                status={aiStatus.stats.enabled ? 'active' : 'inactive'} 
+                size="md" 
+              />
+              <span className={`text-sm font-medium ${
+                aiStatus.stats.enabled ? 'text-green-600' : 'text-gray-600'
+              }`}>
+                {aiStatus.stats.enabled ? 'AI Active' : 'AI Inactive'}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Error Display */}
@@ -147,6 +173,30 @@ export const AIAssistant: React.FC = () => {
               </div>
             </div>
           ))}
+          
+          {/* Typing Indicator */}
+          {isTyping && (
+            <div className="flex justify-start">
+              <div className="bg-gray-100 text-gray-900 max-w-xs lg:max-w-md px-4 py-2 rounded-lg">
+                <div className="flex items-start space-x-2">
+                  <Bot className="h-4 w-4 mt-1 flex-shrink-0" />
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-1">
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      </div>
+                      <span className="text-sm text-gray-500 ml-2">AI is typing...</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Auto-scroll anchor */}
+          <div ref={messagesEndRef} />
           
           {/* Loading Indicator */}
           {isLoading && (

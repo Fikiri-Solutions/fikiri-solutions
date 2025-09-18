@@ -41,9 +41,9 @@ export const config = {
   
   // App Configuration
   appName: 'Fikiri Solutions',
-  version: '1.0.5', // Enhanced cache invalidation implementation
-  buildTimestamp: '2025-09-18T01:10:00Z', // Updated timestamp for enhanced cache strategy
-  cacheVersion: 'v1.0.5-20250918', // Enhanced cache version with comprehensive invalidation
+  version: '1.0.6', // Fixed all major issues
+  buildTimestamp: '2025-09-18T01:15:00Z', // Updated timestamp for fixes
+  cacheVersion: 'v1.0.6-20250918', // Fixed version with all issues resolved
   
   // Development flags
   isDevelopment: typeof window !== 'undefined' && window.location.hostname === 'localhost',
