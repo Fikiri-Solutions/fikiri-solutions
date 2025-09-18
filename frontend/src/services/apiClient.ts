@@ -217,6 +217,21 @@ class ApiClient {
     return response.data
   }
 
+  // Dashboard endpoints
+  async getDashboardTimeseries(userId: number = 1): Promise<any> {
+    const response = await this.client.get('/dashboard/timeseries', {
+      params: { user_id: userId }
+    })
+    return response.data
+  }
+
+  async getDashboardMetrics(userId: number = 1): Promise<any> {
+    const response = await this.client.get('/dashboard/metrics', {
+      params: { user_id: userId }
+    })
+    return response.data
+  }
+
   async testAIAssistant(): Promise<AIResponse> {
     const response = await this.client.post('/test/ai-assistant', {
       content: 'Hi, I need help with your services.',

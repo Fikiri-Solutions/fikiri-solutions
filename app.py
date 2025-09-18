@@ -30,6 +30,8 @@ from core.email_service_manager import EmailServiceManager
 from core.responses_api_migration import responses_manager
 from core.client_analytics import analytics_engine
 
+# Dashboard routes will be added directly to Flask app
+
 # Import enterprise features
 from core.enterprise_logging import log_api_request, log_service_action, log_security_event
 from core.enterprise_security import security_manager, UserRole, Permission
@@ -724,6 +726,76 @@ def api_ai_simple():
         import traceback
         traceback.print_exc()
         return create_error_response(f"Simple AI error: {str(e)}", 500, "SIMPLE_AI_ERROR")
+
+# Dashboard API endpoints
+@app.route('/api/dashboard/timeseries', methods=['GET'])
+@handle_api_errors
+def api_dashboard_timeseries():
+    """Get dashboard timeseries data for the last 14 days with change calculations"""
+    try:
+        user_id = request.args.get('user_id', 1, type=int)
+        
+        # Mock data for now - replace with actual database queries
+        import random
+        from datetime import datetime, timedelta
+        
+        # Generate mock timeseries data for the last 14 days
+        timeseries = []
+        base_date = datetime.now() - timedelta(days=13)
+        
+        for i in range(14):
+            day = base_date + timedelta(days=i)
+            timeseries.append({
+                "day": day.strftime("%Y-%m-%d"),
+                "leads": random.randint(3, 15),
+                "emails": random.randint(8, 25),
+                "revenue": random.randint(500, 2000)
+            })
+        
+        # Split into current vs previous 7 days
+        current = timeseries[-7:]
+        previous = timeseries[:7]
+        
+        def calc_change(key):
+            cur = sum(d[key] for d in current)
+            prev = sum(d[key] for d in previous) if previous else 0
+            if prev == 0: 
+                return {"change_pct": None, "positive": True}
+            change = ((cur - prev) / prev) * 100
+            return {"change_pct": round(change, 1), "positive": change >= 0}
+        
+        return create_success_response({
+            "timeseries": timeseries,
+            "summary": {
+                "leads": calc_change("leads"),
+                "emails": calc_change("emails"),
+                "revenue": calc_change("revenue")
+            }
+        })
+    except Exception as e:
+        logger.error(f"Dashboard timeseries error: {e}")
+        return create_error_response(f"Failed to fetch dashboard data: {str(e)}", 500, 'DASHBOARD_TIMESERIES_ERROR')
+
+@app.route('/api/dashboard/metrics', methods=['GET'])
+@handle_api_errors
+def api_dashboard_metrics():
+    """Get current dashboard metrics summary"""
+    try:
+        user_id = request.args.get('user_id', 1, type=int)
+        
+        # Mock data for now - replace with actual database queries
+        import random
+        
+        return create_success_response({
+            "total_leads": random.randint(50, 200),
+            "total_emails": random.randint(200, 500),
+            "total_revenue": random.randint(10000, 50000),
+            "today_leads": random.randint(2, 8),
+            "today_emails": random.randint(5, 15)
+        })
+    except Exception as e:
+        logger.error(f"Dashboard metrics error: {e}")
+        return create_error_response(f"Failed to fetch dashboard metrics: {str(e)}", 500, 'DASHBOARD_METRICS_ERROR')
 
 # Universal AI Assistant endpoints
 @app.route('/api/ai/chat', methods=['POST'])
