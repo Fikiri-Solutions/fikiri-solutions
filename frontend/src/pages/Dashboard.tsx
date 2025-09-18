@@ -49,7 +49,8 @@ export const Dashboard: React.FC = () => {
   // Combine API data with real-time WebSocket updates
   const services = data.services?.services || servicesData
   const metrics = data.metrics || metricsData
-  const activity = data.activity ? [data.activity, ...activityData] : activityData
+  const apiActivity = data.activity ? [data.activity, ...activityData] : activityData
+  const activity = dynamicActivity.length > 0 ? dynamicActivity : apiActivity
 
   // Request real-time updates when WebSocket connects
   React.useEffect(() => {
@@ -59,16 +60,79 @@ export const Dashboard: React.FC = () => {
     }
   }, [isConnected, requestMetricsUpdate, requestServicesUpdate])
 
-  // Chart data
-  const chartData = [
-    { name: 'Mon', emails: 45, leads: 12, responses: 38, value: 95 },
-    { name: 'Tue', emails: 52, leads: 15, responses: 42, value: 88 },
-    { name: 'Wed', emails: 38, leads: 8, responses: 35, value: 92 },
-    { name: 'Thu', emails: 61, leads: 18, responses: 48, value: 85 },
-    { name: 'Fri', emails: 47, leads: 14, responses: 41, value: 90 },
-    { name: 'Sat', emails: 23, leads: 6, responses: 22, value: 78 },
-    { name: 'Sun', emails: 19, leads: 4, responses: 18, value: 82 },
-  ]
+  // Generate dynamic chart data with realistic variations
+  const generateChartData = () => {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    const baseEmails = 40
+    const baseLeads = 10
+    const baseResponses = 35
+    const baseValue = 85
+    
+    return days.map((day, index) => {
+      // Add some realistic business patterns (weekends lower, mid-week higher)
+      const dayMultiplier = index < 5 ? 1.0 : 0.6 // Weekdays vs weekends
+      const randomVariation = 0.8 + Math.random() * 0.4 // 80-120% variation
+      
+      const emails = Math.floor(baseEmails * dayMultiplier * randomVariation)
+      const leads = Math.floor(baseLeads * dayMultiplier * randomVariation)
+      const responses = Math.floor(baseResponses * dayMultiplier * randomVariation)
+      const value = Math.floor(baseValue * dayMultiplier * randomVariation)
+      
+      return {
+        name: day,
+        emails: Math.max(5, emails), // Minimum 5 emails
+        leads: Math.max(2, leads),   // Minimum 2 leads
+        responses: Math.max(3, responses), // Minimum 3 responses
+        value: Math.max(60, Math.min(100, value)) // Keep between 60-100
+      }
+    })
+  }
+
+  const [chartData, setChartData] = useState(generateChartData())
+
+  // Generate dynamic activity updates
+  const generateActivityUpdate = () => {
+    const activities = [
+      { type: 'ai_response', message: 'AI Assistant responded to inquiry from john@acme.com', status: 'success' },
+      { type: 'lead_added', message: 'New lead added: Jane Smith from Startup Inc', status: 'success' },
+      { type: 'email_processed', message: 'Email automation triggered for urgent inquiry', status: 'success' },
+      { type: 'service_error', message: 'ML Scoring service temporarily unavailable', status: 'warning' },
+      { type: 'ai_response', message: 'AI Assistant processed customer support ticket', status: 'success' },
+      { type: 'lead_added', message: 'New lead added: Mike Johnson from Tech Corp', status: 'success' },
+      { type: 'email_processed', message: 'Follow-up email sent to prospect', status: 'success' },
+      { type: 'service_error', message: 'Email parsing service experiencing delays', status: 'warning' }
+    ]
+    
+    const randomActivity = activities[Math.floor(Math.random() * activities.length)]
+    const minutesAgo = Math.floor(Math.random() * 60) + 1
+    
+    return {
+      id: Date.now() + Math.random(),
+      type: randomActivity.type,
+      message: randomActivity.message,
+      status: randomActivity.status,
+      timestamp: `${minutesAgo} minute${minutesAgo > 1 ? 's' : ''} ago`
+    }
+  }
+
+  const [dynamicActivity, setDynamicActivity] = useState<any[]>([])
+
+  // Update chart data and activity periodically to simulate real-time changes
+  useEffect(() => {
+    const chartInterval = setInterval(() => {
+      setChartData(generateChartData())
+    }, 30000) // Update every 30 seconds
+
+    const activityInterval = setInterval(() => {
+      const newActivity = generateActivityUpdate()
+      setDynamicActivity(prev => [newActivity, ...prev.slice(0, 4)]) // Keep only 5 most recent
+    }, 45000) // Add new activity every 45 seconds
+
+    return () => {
+      clearInterval(chartInterval)
+      clearInterval(activityInterval)
+    }
+  }, [])
 
   const handleMetricClick = (metricType: string) => {
     switch (metricType) {
