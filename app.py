@@ -689,6 +689,42 @@ def api_ai_test():
             'traceback': traceback.format_exc()
         }), 500
 
+# Simple AI endpoint as fallback
+@app.route('/api/ai/simple', methods=['POST'])
+@handle_api_errors
+def api_ai_simple():
+    """Simple AI endpoint that works without complex dependencies."""
+    try:
+        data = request.get_json()
+        if not data:
+            return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
+        
+        message = data.get('message', '')
+        user_id = data.get('user_id', 1)
+        
+        if not message:
+            return create_error_response("Message is required", 400, 'MISSING_MESSAGE')
+        
+        # Use the minimal AI assistant directly
+        from core.minimal_ai_assistant import MinimalAIEmailAssistant
+        ai_assistant = MinimalAIEmailAssistant()
+        
+        # Generate a simple response
+        response = ai_assistant.generate_chat_response(message)
+        
+        return create_success_response({
+            'response': response.get('response', 'I received your message but had trouble generating a response.'),
+            'suggested_actions': ['Try rephrasing your question'],
+            'confidence': 0.8,
+            'service_queries': []
+        }, "Simple AI response generated")
+        
+    except Exception as e:
+        print(f"❌ Simple AI Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return create_error_response(f"Simple AI error: {str(e)}", 500, "SIMPLE_AI_ERROR")
+
 # Universal AI Assistant endpoints
 @app.route('/api/ai/chat', methods=['POST'])
 @handle_api_errors
