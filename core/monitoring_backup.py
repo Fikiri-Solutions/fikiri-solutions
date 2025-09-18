@@ -28,6 +28,7 @@ class Alert:
     source: str
     resolved: bool = False
     resolved_at: Optional[datetime] = None
+    tags: Optional[Dict[str, str]] = None
 
 class MonitoringSystem:
     """Comprehensive monitoring and alerting system"""
