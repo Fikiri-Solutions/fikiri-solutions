@@ -156,8 +156,8 @@ export const IndustryAutomation: React.FC = () => {
 
     setIsLoading(true);
     try {
-      // Use the existing AI Assistant API endpoint
-      const response = await fetch('https://fikirisolutions.onrender.com/api/ai/chat', {
+      // Use the simple AI API endpoint
+      const response = await fetch('https://fikirisolutions.onrender.com/api/ai/simple', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

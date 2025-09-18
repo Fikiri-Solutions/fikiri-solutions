@@ -209,7 +209,7 @@ class ApiClient {
   }
 
   async sendChatMessage(message: string, context?: any): Promise<any> {
-    const response = await this.client.post('/ai/chat', {
+    const response = await this.client.post('/ai/simple', {
       message,
       user_id: 1, // Add user_id parameter
       context: context || {}
