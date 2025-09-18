@@ -6,7 +6,7 @@ import {
 } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/Button"
 import { 
   TrendingUp, TrendingDown, BarChart3, PieChart as PieChartIcon, 
   Calendar, Filter, Download, Maximize2, RefreshCw, Eye, EyeOff
