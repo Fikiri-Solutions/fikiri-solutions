@@ -250,8 +250,8 @@ export const AIAssistant: React.FC = () => {
           <div className="flex items-center space-x-3">
             <Mail className="h-6 w-6 text-blue-600" />
             <div>
-              <h3 className="text-sm font-medium text-gray-900">Email Response</h3>
-              <p className="text-xs text-gray-500">Generate professional email replies</p>
+              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Email Response</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Generate professional email replies</p>
             </div>
           </div>
         </button>
@@ -263,8 +263,8 @@ export const AIAssistant: React.FC = () => {
           <div className="flex items-center space-x-3">
             <Users className="h-6 w-6 text-green-600" />
             <div>
-              <h3 className="text-sm font-medium text-gray-900">Lead Analysis</h3>
-              <p className="text-xs text-gray-500">Get insights on your leads</p>
+              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Lead Analysis</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Get insights on your leads</p>
             </div>
           </div>
         </button>
@@ -276,8 +276,8 @@ export const AIAssistant: React.FC = () => {
           <div className="flex items-center space-x-3">
             <Zap className="h-6 w-6 text-yellow-600" />
             <div>
-              <h3 className="text-sm font-medium text-gray-900">Automation</h3>
-              <p className="text-xs text-gray-500">Configure business workflows</p>
+              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Automation</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Configure business workflows</p>
             </div>
           </div>
         </button>

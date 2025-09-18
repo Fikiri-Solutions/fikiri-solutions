@@ -408,24 +408,24 @@ export const Services: React.FC = () => {
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center">
-                  <h3 className="text-lg font-medium text-gray-900">{service.name}</h3>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">{service.name}</h3>
                   <button
                     onClick={() => toggleService(service.id)}
                     className="ml-4"
                   >
                     {service.enabled ? (
-                      <ToggleRight className="h-6 w-6 text-blue-600" />
+                      <ToggleRight className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                     ) : (
-                      <ToggleLeft className="h-6 w-6 text-gray-400" />
+                      <ToggleLeft className="h-6 w-6 text-gray-400 dark:text-gray-500" />
                     )}
                   </button>
                 </div>
-                <p className="mt-1 text-sm text-gray-600">{service.description}</p>
+                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{service.description}</p>
                 <div className="mt-2">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                     service.enabled 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-gray-100 text-gray-800'
+                      ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300' 
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300'
                   }`}>
                     {service.enabled ? 'Enabled' : 'Disabled'}
                   </span>
