@@ -60,9 +60,9 @@ function App() {
                 <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
                   <Suspense fallback={<PageLoader />}>
                     <Routes>
-                      <Route path="/" element={<TestComponent />} />
+                      <Route path="/" element={<Layout><TestComponent /></Layout>} />
                       <Route path="/login" element={<Login />} />
-                      <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
                       <Route path="*" element={<NotFoundPage />} />
                     </Routes>
                   </Suspense>
