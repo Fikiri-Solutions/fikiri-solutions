@@ -23,11 +23,6 @@ interface SummaryData {
   };
 }
 
-interface DashboardTimeseriesResponse {
-  timeseries: TimeseriesData[];
-  summary: SummaryData;
-}
-
 export function useDashboardTimeseries() {
   const [data, setData] = useState<TimeseriesData[]>([]);
   const [summary, setSummary] = useState<SummaryData>({

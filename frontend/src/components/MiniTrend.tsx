@@ -1,5 +1,3 @@
-import React from "react";
-
 interface MiniTrendProps {
   data: Array<{
     day: string;
