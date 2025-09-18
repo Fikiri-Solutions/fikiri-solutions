@@ -1,13 +1,15 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Mail, Users, Brain, Clock, Bot, UserPlus, Zap, AlertTriangle, CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
+import { Mail, Users, Brain, Clock, Bot, UserPlus, Zap, AlertTriangle, CheckCircle2, XCircle, AlertCircle, DollarSign, TrendingUp } from 'lucide-react'
 import { ServiceCard } from '../components/ServiceCard'
 import { MetricCard } from '../components/MetricCard'
+import { MiniTrend } from '../components/MiniTrend'
 import { DashboardCharts } from '../components/DashboardCharts'
 import { MetricCardSkeleton, ServiceCardSkeleton, ChartSkeleton, ActivitySkeleton } from '../components/Skeleton'
 import { useToast } from '../components/Toast'
 import { useWebSocket } from '../hooks/useWebSocket'
+import { useDashboardTimeseries } from '../hooks/useDashboardTimeseries'
 import { config, getFeatureConfig } from '../config'
 import { apiClient } from '../services/apiClient'
 import { mockServices, mockMetrics, mockActivity } from '../mockData'
@@ -17,6 +19,7 @@ export const Dashboard: React.FC = () => {
   const features = getFeatureConfig()
   const { addToast } = useToast()
   const { isConnected, data, requestMetricsUpdate, requestServicesUpdate } = useWebSocket()
+  const { data: timeseriesData, summary, loading: timeseriesLoading, error: timeseriesError } = useDashboardTimeseries()
 
   // Clear specific cache items to force fresh data
   React.useEffect(() => {
@@ -240,9 +243,9 @@ export const Dashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Metrics Grid */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {metricsLoading ? (
+      {/* Enhanced Metrics Grid with Timeseries */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {timeseriesLoading ? (
           <>
             <MetricCardSkeleton />
             <MetricCardSkeleton />
@@ -252,37 +255,51 @@ export const Dashboard: React.FC = () => {
         ) : (
           <>
             <MetricCard
-              title="Total Emails"
-              value={metrics?.totalEmails?.toString() || '0'}
-              icon={Mail}
-              change="+12%"
-              changeType="positive"
-              onClick={() => handleMetricClick('emails')}
-            />
-            <MetricCard
-              title="Active Leads"
-              value={metrics?.activeLeads?.toString() || '0'}
-              icon={Users}
-              change="+8%"
-              changeType="positive"
+              title="New Leads"
+              value={timeseriesData?.reduce((sum, day) => sum + (day.leads || 0), 0) || 0}
+              change={summary?.leads?.change_pct}
+              positive={summary?.leads?.positive}
+              icon={<Users className="h-5 w-5" />}
               onClick={() => handleMetricClick('leads')}
-            />
+            >
+              <MiniTrend data={timeseriesData || []} dataKey="leads" color="#22c55e" />
+            </MetricCard>
+
             <MetricCard
-              title="AI Responses"
-              value={metrics?.aiResponses?.toString() || '0'}
-              icon={Brain}
-              change="+23%"
-              changeType="positive"
-              onClick={() => handleMetricClick('responses')}
-            />
+              title="Emails Sent"
+              value={timeseriesData?.reduce((sum, day) => sum + (day.emails || 0), 0) || 0}
+              change={summary?.emails?.change_pct}
+              positive={summary?.emails?.positive}
+              icon={<Mail className="h-5 w-5" />}
+              onClick={() => handleMetricClick('emails')}
+            >
+              <MiniTrend data={timeseriesData || []} dataKey="emails" color="#3b82f6" />
+            </MetricCard>
+
             <MetricCard
-              title="Avg Response Time"
+              title="Revenue Impact"
+              value={`$${((timeseriesData?.reduce((sum, day) => sum + (day.revenue || 0), 0) || 0) / 1000).toFixed(1)}k`}
+              change={summary?.revenue?.change_pct}
+              positive={summary?.revenue?.positive}
+              icon={<DollarSign className="h-5 w-5" />}
+              onClick={() => handleMetricClick('revenue')}
+            >
+              <MiniTrend data={timeseriesData || []} dataKey="revenue" color="#eab308" />
+            </MetricCard>
+
+            <MetricCard
+              title="AI Performance"
               value={`${Math.round((metrics?.avgResponseTime || 0) * 100) / 100}h`}
-              icon={Clock}
               change="-15%"
-              changeType="positive"
+              positive={true}
+              icon={<Brain className="h-5 w-5" />}
               onClick={() => handleMetricClick('responseTime')}
-            />
+            >
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                <TrendingUp className="h-4 w-4 text-green-500" />
+                <span>Optimized</span>
+              </div>
+            </MetricCard>
           </>
         )}
       </div>
