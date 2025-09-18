@@ -211,6 +211,7 @@ class ApiClient {
   async sendChatMessage(message: string, context?: any): Promise<any> {
     const response = await this.client.post('/ai/chat', {
       message,
+      user_id: 1, // Add user_id parameter
       context: context || {}
     })
     return response.data
@@ -237,7 +238,9 @@ class ApiClient {
 
   // CRM endpoints
   async getLeads(): Promise<LeadData[]> {
-    const response = await this.client.get('/crm/leads')
+    const response = await this.client.get('/crm/leads', {
+      params: { user_id: 1 } // Add user_id parameter
+    })
     const backendLeads = response.data.leads || []
     
     // Map backend data to frontend interface
