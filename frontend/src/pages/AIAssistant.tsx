@@ -71,7 +71,7 @@ export const AIAssistant: React.FC = () => {
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
-        content: response.response || 'I apologize, but I encountered an issue generating a response.',
+        content: response.data?.response || 'I apologize, but I encountered an issue generating a response.',
         timestamp: new Date()
         // Classification data removed to prevent debug metadata display
       }
