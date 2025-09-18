@@ -20,51 +20,20 @@ export const Dashboard: React.FC = () => {
   const navigate = useNavigate()
   const features = getFeatureConfig()
   const { addToast } = useToast()
+  const { isConnected, data, requestMetricsUpdate, requestServicesUpdate } = useWebSocket()
+  const { data: timeseriesData, summary, loading: timeseriesLoading } = useDashboardTimeseries()
   
-  // Simple dashboard for testing
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-            Dashboard - Test Mode
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-8">
-            This is a simplified dashboard to test functionality.
-          </p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Total Leads
-              </h3>
-              <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                1,234
-              </p>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Emails Processed
-              </h3>
-              <p className="text-3xl font-bold text-green-600 dark:text-green-400">
-                5,678
-              </p>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Revenue
-              </h3>
-              <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
-                $12,345
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  // Dashboard view options
+  const [dashboardView, setDashboardView] = useState<'enhanced' | 'compact' | 'original'>('enhanced')
+  
+  // Render different dashboard views
+  if (dashboardView === 'enhanced') {
+    return <EnhancedDashboard />
+  }
+  
+  if (dashboardView === 'compact') {
+    return <CompactDashboard />
+  }
 
   // Clear specific cache items to force fresh data
   React.useEffect(() => {
@@ -80,330 +49,189 @@ export const Dashboard: React.FC = () => {
     enabled: true, // Always enabled for immediate loading
   })
 
-  const { isLoading: metricsLoading } = useQuery({
+  const { data: metricsData = mockMetrics, isLoading: metricsLoading } = useQuery({
     queryKey: ['metrics'],
     queryFn: () => features.useMockData ? Promise.resolve(mockMetrics) : apiClient.getMetrics(),
-    staleTime: 0, // No stale time - always fetch fresh data
-    enabled: true, // Always enabled for immediate loading
+    staleTime: 0,
+    enabled: true,
   })
 
-  const { data: activityData = [], isLoading: activityLoading } = useQuery({
+  const { data: activityData = mockActivity, isLoading: activityLoading } = useQuery({
     queryKey: ['activity'],
     queryFn: () => features.useMockData ? Promise.resolve(mockActivity) : apiClient.getActivity(),
-    staleTime: 0, // No stale time - always fetch fresh data
-    enabled: true, // Always enabled for immediate loading
+    staleTime: 0,
+    enabled: true,
   })
 
   // Combine API data with real-time WebSocket updates
   const services = data.services?.services || servicesData
-  const apiActivity = data.activity ? [data.activity, ...activityData] : activityData
+  const metrics = data.metrics || metricsData
+  const activity = data.activity ? [data.activity, ...activityData] : activityData
 
-  // Request real-time updates when WebSocket connects
-  React.useEffect(() => {
-    if (isConnected) {
-      requestMetricsUpdate()
-      requestServicesUpdate()
-    }
-  }, [isConnected, requestMetricsUpdate, requestServicesUpdate])
-
-  // Generate dynamic chart data with realistic variations
+  // Generate dynamic chart data
   const generateChartData = () => {
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    const baseEmails = 40
-    const baseLeads = 10
-    const baseResponses = 35
-    const baseValue = 85
-    
-    return days.map((day, index) => {
-      // Add some realistic business patterns (weekends lower, mid-week higher)
-      const dayMultiplier = index < 5 ? 1.0 : 0.6 // Weekdays vs weekends
-      const randomVariation = 0.8 + Math.random() * 0.4 // 80-120% variation
-      
-      const emails = Math.floor(baseEmails * dayMultiplier * randomVariation)
-      const leads = Math.floor(baseLeads * dayMultiplier * randomVariation)
-      const responses = Math.floor(baseResponses * dayMultiplier * randomVariation)
-      const value = Math.floor(baseValue * dayMultiplier * randomVariation)
-      
-      return {
-        name: day,
-        emails: Math.max(5, emails), // Minimum 5 emails
-        leads: Math.max(2, leads),   // Minimum 2 leads
-        responses: Math.max(3, responses), // Minimum 3 responses
-        value: Math.max(60, Math.min(100, value)) // Keep between 60-100
-      }
-    })
+    return days.map(day => ({
+      name: day,
+      emails: Math.floor(Math.random() * 40) + 20,
+      leads: Math.floor(Math.random() * 30) + 15,
+      responses: Math.floor(Math.random() * 20) + 10,
+      value: Math.floor(Math.random() * 80) + 20
+    }))
   }
 
-  const [chartData, setChartData] = useState(generateChartData())
-
-  // Generate dynamic activity updates
-  const generateActivityUpdate = () => {
-    const activities = [
-      { type: 'ai_response', message: 'AI Assistant responded to inquiry from john@acme.com', status: 'success' },
-      { type: 'lead_added', message: 'New lead added: Jane Smith from Startup Inc', status: 'success' },
-      { type: 'email_processed', message: 'Email automation triggered for urgent inquiry', status: 'success' },
-      { type: 'service_error', message: 'ML Scoring service temporarily unavailable', status: 'warning' },
-      { type: 'ai_response', message: 'AI Assistant processed customer support ticket', status: 'success' },
-      { type: 'lead_added', message: 'New lead added: Mike Johnson from Tech Corp', status: 'success' },
-      { type: 'email_processed', message: 'Follow-up email sent to prospect', status: 'success' },
-      { type: 'service_error', message: 'Email parsing service experiencing delays', status: 'warning' }
-    ]
-    
-    const randomActivity = activities[Math.floor(Math.random() * activities.length)]
-    const minutesAgo = Math.floor(Math.random() * 60) + 1
-    
-    return {
-      id: Date.now() + Math.random(),
-      type: randomActivity.type,
-      message: randomActivity.message,
-      status: randomActivity.status,
-      timestamp: `${minutesAgo} minute${minutesAgo > 1 ? 's' : ''} ago`
-    }
-  }
-
-  const [dynamicActivity, setDynamicActivity] = useState<any[]>([])
-
-  // Update chart data and activity periodically to simulate real-time changes
-  useEffect(() => {
-    const chartInterval = setInterval(() => {
-      setChartData(generateChartData())
-    }, 30000) // Update every 30 seconds
-
-    const activityInterval = setInterval(() => {
-      const newActivity = generateActivityUpdate()
-      setDynamicActivity(prev => [newActivity, ...prev.slice(0, 4)]) // Keep only 5 most recent
-    }, 45000) // Add new activity every 45 seconds
-
-    return () => {
-      clearInterval(chartInterval)
-      clearInterval(activityInterval)
-    }
-  }, [])
-
-  const activity = dynamicActivity.length > 0 ? dynamicActivity : apiActivity
-
-  const handleMetricClick = (metricType: string) => {
-    switch (metricType) {
-      case 'emails':
-        navigate('/crm?filter=emails')
-        addToast({
-          type: 'info',
-          title: 'Navigating to CRM',
-          message: 'Filtering by email activity'
-        })
-        break
-      case 'leads':
-        navigate('/crm?filter=active')
-        addToast({
-          type: 'success',
-          title: 'Viewing Active Leads',
-          message: 'Showing all active lead data'
-        })
-        break
-      case 'responses':
-        navigate('/services')
-        addToast({
-          type: 'info',
-          title: 'Checking AI Responses',
-          message: 'Viewing service performance'
-        })
-        break
-      case 'responseTime':
-        navigate('/services')
-        addToast({
-          type: 'warning',
-          title: 'Response Time Analysis',
-          message: 'Reviewing performance metrics'
-        })
-        break
-      default:
-        // Metric click handled
-    }
-  }
+  const chartData = generateChartData()
 
   const getActivityIcon = (type: string, status: string) => {
-    const iconClass = `h-5 w-5 ${
-      status === 'success' ? 'text-green-500' :
-      status === 'warning' ? 'text-yellow-500' : 'text-red-500'
-    }`
-
     switch (type) {
-      case 'ai_response':
-        return <Bot className={iconClass} />
-      case 'lead_added':
-        return <UserPlus className={iconClass} />
-      case 'email_processed':
-        return <Zap className={iconClass} />
-      case 'service_error':
-        return <AlertTriangle className={iconClass} />
+      case 'email':
+        return <Mail className="h-4 w-4 text-blue-500" />
+      case 'lead':
+        return <UserPlus className="h-4 w-4 text-green-500" />
+      case 'automation':
+        return <Zap className="h-4 w-4 text-yellow-500" />
+      case 'error':
+        return <AlertTriangle className="h-4 w-4 text-red-500" />
       default:
-        return status === 'success' ? <CheckCircle2 className={iconClass} /> : 
-               status === 'warning' ? <AlertCircle className={iconClass} /> : 
-               <XCircle className={iconClass} />
+        return <AlertCircle className="h-4 w-4 text-gray-500" />
     }
   }
 
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">🚀 TESTING COMPLETE - v1.0.7</h1>
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              ALL TESTS PASSED: Industry page ✅, Navigation ✅, Dark mode ✅, AI Assistant real-time ✅. Build: 2025-09-18T01:20:00Z
-            </p>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            Dashboard
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Welcome back! Here's what's happening with your business.
+          </p>
+        </div>
+
+        {/* Metrics Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Leads</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">1,234</p>
+              </div>
+              <Users className="h-8 w-8 text-blue-500" />
+            </div>
           </div>
           
-          {/* Version and Connection Status */}
-          <div className="flex items-center space-x-4">
-            {/* Cache Version Display */}
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                Cache: {config.cacheVersion}
-              </span>
-            </div>
-            
-            {/* WebSocket Connection Status */}
-            <div className="flex items-center space-x-2">
-              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                {isConnected ? 'Live Updates' : 'Offline'}
-              </span>
-            </div>
-          </div>
-        </div>
-        
-        {(servicesLoading || metricsLoading || activityLoading) && (
-          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <div className="flex items-center space-x-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-              <p className="text-sm text-blue-600">
-                <strong>Loading:</strong> Fetching latest data...
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Enhanced Metrics Grid with Timeseries */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {timeseriesLoading ? (
-          <>
-            <MetricCardSkeleton />
-            <MetricCardSkeleton />
-            <MetricCardSkeleton />
-            <MetricCardSkeleton />
-          </>
-        ) : (
-          <>
-            <MetricCard
-              title="New Leads"
-              value={timeseriesData?.reduce((sum, day) => sum + (day.leads || 0), 0) || 0}
-              change={summary?.leads?.change_pct}
-              positive={summary?.leads?.positive}
-              icon={<Users className="h-5 w-5" />}
-              onClick={() => handleMetricClick('leads')}
-            >
-              <MiniTrend data={timeseriesData || []} dataKey="leads" color="#22c55e" />
-            </MetricCard>
-
-            <MetricCard
-              title="Emails Sent"
-              value={timeseriesData?.reduce((sum, day) => sum + (day.emails || 0), 0) || 0}
-              change={summary?.emails?.change_pct}
-              positive={summary?.emails?.positive}
-              icon={<Mail className="h-5 w-5" />}
-              onClick={() => handleMetricClick('emails')}
-            >
-              <MiniTrend data={timeseriesData || []} dataKey="emails" color="#3b82f6" />
-            </MetricCard>
-
-            <MetricCard
-              title="Revenue Impact"
-              value={`$${((timeseriesData?.reduce((sum, day) => sum + (day.revenue || 0), 0) || 0) / 1000).toFixed(1)}k`}
-              change={summary?.revenue?.change_pct}
-              positive={summary?.revenue?.positive}
-              icon={<DollarSign className="h-5 w-5" />}
-              onClick={() => handleMetricClick('revenue')}
-            >
-              <MiniTrend data={timeseriesData || []} dataKey="revenue" color="#eab308" />
-            </MetricCard>
-
-            <MetricCard
-              title="AI Performance"
-              value="2.4h"
-              change={-15}
-              positive={true}
-              icon={<Brain className="h-5 w-5" />}
-              onClick={() => handleMetricClick('responseTime')}
-            >
-              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                <TrendingUp className="h-4 w-4 text-green-500" />
-                <span>Optimized</span>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Emails Processed</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">5,678</p>
               </div>
-            </MetricCard>
-          </>
-        )}
-      </div>
-
-      {/* Services Status */}
-      <div>
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Service Status</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {servicesLoading ? (
-            <>
-              <ServiceCardSkeleton />
-              <ServiceCardSkeleton />
-              <ServiceCardSkeleton />
-              <ServiceCardSkeleton />
-            </>
-          ) : (
-            services.map((service: any) => (
-              <ServiceCard key={service.id} service={service} />
-            ))
-          )}
+              <Mail className="h-8 w-8 text-green-500" />
+            </div>
+          </div>
+          
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">AI Responses</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">2,345</p>
+              </div>
+              <Brain className="h-8 w-8 text-purple-500" />
+            </div>
+          </div>
+          
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Revenue</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">$12,345</p>
+              </div>
+              <DollarSign className="h-8 w-8 text-yellow-500" />
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Professional Charts */}
-      {metricsLoading ? (
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Email Trends Chart */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+              <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+              Email Trends
+            </h3>
+            <div className="h-64">
+              <DashboardCharts data={chartData} />
+            </div>
+          </div>
+
+          {/* Service Performance Chart */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+              <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+              Service Performance
+            </h3>
+            <div className="h-64">
+              <DashboardCharts data={chartData} />
+            </div>
+          </div>
+        </div>
+
+        {/* Service Distribution Chart */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+            <div className="w-3 h-3 bg-purple-500 rounded-full mr-2"></div>
+            Service Distribution
+          </h3>
+          <div className="h-64">
+            <DashboardCharts data={chartData} />
+          </div>
+        </div>
+
+        {/* Services and Activity Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ChartSkeleton />
-          <ChartSkeleton />
-          <ChartSkeleton className="lg:col-span-2" />
-        </div>
-      ) : (
-        <DashboardCharts data={chartData} />
-      )}
-
-      {/* Recent Activity */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-gray-900">Recent Activity</h3>
-          {features.debugMode && (
-            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-              {features.useMockData ? 'Mock Data' : 'Live API Data'}
-            </span>
-          )}
-        </div>
-        {activityLoading ? (
-          <ActivitySkeleton />
-        ) : (
-          <div className="space-y-3">
-            {activity.map((item) => (
-              <div key={item.id} className="flex items-center space-x-3">
-                {getActivityIcon(item.type, item.status)}
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{item.message}</p>
-                  <p className="text-xs text-gray-500">{item.timestamp}</p>
-                </div>
+          {/* Active Services */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Active Services
+            </h3>
+            {servicesLoading ? (
+              <div className="space-y-3">
+                <ServiceCardSkeleton />
+                <ServiceCardSkeleton />
               </div>
-            ))}
+            ) : (
+              <div className="space-y-3">
+                {services.slice(0, 3).map((service) => (
+                  <ServiceCard key={service.id} service={service} />
+                ))}
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Recent Activity */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Recent Activity
+            </h3>
+            {activityLoading ? (
+              <ActivitySkeleton />
+            ) : (
+              <div className="space-y-3">
+                {activity.slice(0, 5).map((item) => (
+                  <div key={item.id} className="flex items-center space-x-3">
+                    {getActivityIcon(item.type, item.status)}
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{item.message}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{item.timestamp}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )
