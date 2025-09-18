@@ -50,12 +50,8 @@ export const Login: React.FC = () => {
         throw new Error('Please enter both email and password')
       }
       
-      if (email === 'test@example.com' && password === 'password') {
-        // Redirect to dashboard (in real app, handle auth state)
-        window.location.href = '/'
-      } else {
-        throw new Error('Invalid email or password')
-      }
+      // TODO: Implement real authentication API
+      throw new Error('Authentication service not yet implemented')
     } catch (error) {
       // Login failed
       setError(error instanceof Error ? error.message : 'Login failed. Please try again.')

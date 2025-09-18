@@ -22,45 +22,48 @@ import { ToastProvider } from './components/Toast'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { CustomizationProvider } from './contexts/CustomizationContext'
 import { ScrollToTop } from './components/ScrollToTop'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { getFeatureConfig } from './config'
 
 function App() {
   const features = getFeatureConfig()
 
   return (
-    <ThemeProvider>
-      <CustomizationProvider>
-        <QueryProvider>
-          <ToastProvider>
-            <Router>
-              <ScrollToTop />
-              <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                <Routes>
-                  <Route path="/login" element={<Login />} />
-                  {features.showOnboarding && <Route path="/onboarding" element={<Onboarding />} />}
-                  <Route path="/" element={<Layout><Dashboard /></Layout>} />
-                  <Route path="/services" element={<Layout><Services /></Layout>} />
-                  <Route path="/services-landing" element={<ServicesLanding />} />
-                  <Route path="/ai-landing" element={<AIAssistantLanding />} />
-                  <Route path="/industries/landscaping" element={<LandscapingLanding />} />
-                  <Route path="/industries/restaurant" element={<RestaurantLanding />} />
-                  <Route path="/industries/medical" element={<MedicalLanding />} />
-                  <Route path="/home" element={<RenderInspiredLanding />} />
-                  <Route path="/crm" element={<Layout><CRM /></Layout>} />
-                  <Route path="/ai" element={<Layout><AIAssistant /></Layout>} />
-                  <Route path="/assistant" element={<Layout><AIAssistant /></Layout>} />
-                  <Route path="/industry" element={<Layout><IndustryAutomation /></Layout>} />
-                  <Route path="/error" element={<ErrorPage />} />
-                  <Route path="*" element={<NotFoundPage />} />
-                </Routes>
-              </div>
-              <Analytics />
-              <SpeedInsights />
-            </Router>
-          </ToastProvider>
-        </QueryProvider>
-      </CustomizationProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <CustomizationProvider>
+          <QueryProvider>
+            <ToastProvider>
+              <Router>
+                <ScrollToTop />
+                <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                  <Routes>
+                    <Route path="/login" element={<Login />} />
+                    {features.showOnboarding && <Route path="/onboarding" element={<Onboarding />} />}
+                    <Route path="/" element={<Layout><Dashboard /></Layout>} />
+                    <Route path="/services" element={<Layout><Services /></Layout>} />
+                    <Route path="/services-landing" element={<ServicesLanding />} />
+                    <Route path="/ai-landing" element={<AIAssistantLanding />} />
+                    <Route path="/industries/landscaping" element={<LandscapingLanding />} />
+                    <Route path="/industries/restaurant" element={<RestaurantLanding />} />
+                    <Route path="/industries/medical" element={<MedicalLanding />} />
+                    <Route path="/home" element={<RenderInspiredLanding />} />
+                    <Route path="/crm" element={<Layout><CRM /></Layout>} />
+                    <Route path="/ai" element={<Layout><AIAssistant /></Layout>} />
+                    <Route path="/assistant" element={<Layout><AIAssistant /></Layout>} />
+                    <Route path="/industry" element={<Layout><IndustryAutomation /></Layout>} />
+                    <Route path="/error" element={<ErrorPage />} />
+                    <Route path="*" element={<NotFoundPage />} />
+                  </Routes>
+                </div>
+                <Analytics />
+                <SpeedInsights />
+              </Router>
+            </ToastProvider>
+          </QueryProvider>
+        </CustomizationProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   )
 }
 
