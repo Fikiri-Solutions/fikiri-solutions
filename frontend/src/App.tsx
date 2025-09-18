@@ -29,6 +29,22 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { PageLoader } from './components/PageLoader'
 import { getFeatureConfig } from './config'
 
+// Simple test component to isolate the issue
+const TestComponent = () => {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="text-center">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+          Fikiri Solutions - Test Mode
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">
+          This is a minimal test to isolate the error.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const features = getFeatureConfig()
 
@@ -44,24 +60,9 @@ function App() {
                 <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
                   <Suspense fallback={<PageLoader />}>
                     <Routes>
+                      <Route path="/" element={<TestComponent />} />
                       <Route path="/login" element={<Login />} />
-                      {features.showOnboarding && <Route path="/onboarding" element={<Onboarding />} />}
-                      <Route path="/onboarding-flow" element={<OnboardingFlow />} />
-                      <Route path="/onboarding-flow/:step" element={<OnboardingFlow />} />
-                      <Route path="/" element={<Layout><Dashboard /></Layout>} />
-                      <Route path="/services" element={<Layout><Services /></Layout>} />
-                      <Route path="/services-landing" element={<ServicesLanding />} />
-                      <Route path="/ai-landing" element={<AIAssistantLanding />} />
-                      <Route path="/industries/landscaping" element={<LandscapingLanding />} />
-                      <Route path="/industries/restaurant" element={<RestaurantLanding />} />
-                      <Route path="/industries/medical" element={<MedicalLanding />} />
-                      <Route path="/home" element={<RenderInspiredLanding />} />
-                      <Route path="/crm" element={<Layout><CRM /></Layout>} />
-                      <Route path="/ai" element={<Layout><AIAssistant /></Layout>} />
-                      <Route path="/assistant" element={<Layout><AIAssistant /></Layout>} />
-                      <Route path="/industry" element={<Layout><IndustryAutomation /></Layout>} />
-                      <Route path="/privacy" element={<Layout><PrivacySettings /></Layout>} />
-                      <Route path="/error" element={<ErrorPage />} />
+                      <Route path="/dashboard" element={<Dashboard />} />
                       <Route path="*" element={<NotFoundPage />} />
                     </Routes>
                   </Suspense>
