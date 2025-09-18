@@ -23,6 +23,7 @@ import { QueryProvider } from './providers/QueryProvider'
 import { ToastProvider } from './components/Toast'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { CustomizationProvider } from './contexts/CustomizationContext'
+import { ActivityProvider } from './contexts/ActivityContext'
 import { ScrollToTop } from './components/ScrollToTop'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { PageLoader } from './components/PageLoader'
@@ -35,8 +36,9 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <CustomizationProvider>
-          <QueryProvider>
-            <ToastProvider>
+          <ActivityProvider>
+            <QueryProvider>
+              <ToastProvider>
               <Router>
                 <ScrollToTop />
                 <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
@@ -69,6 +71,7 @@ function App() {
               </Router>
             </ToastProvider>
           </QueryProvider>
+          </ActivityProvider>
         </CustomizationProvider>
       </ThemeProvider>
     </ErrorBoundary>

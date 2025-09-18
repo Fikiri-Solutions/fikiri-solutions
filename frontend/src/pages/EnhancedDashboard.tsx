@@ -13,7 +13,7 @@ import { useDashboardTimeseries } from '../hooks/useDashboardTimeseries'
 import { config, getFeatureConfig } from '../config'
 import { apiClient } from '../services/apiClient'
 import { mockServices, mockMetrics, mockActivity } from '../mockData'
-import { DashboardSection, StatsGrid, DashboardCard } from '../components/DashboardLayout'
+import { useActivity } from '../contexts/ActivityContext'
 
 export const EnhancedDashboard: React.FC = () => {
   const navigate = useNavigate()
@@ -21,6 +21,7 @@ export const EnhancedDashboard: React.FC = () => {
   const { addToast } = useToast()
   const { isConnected, data, requestMetricsUpdate, requestServicesUpdate } = useWebSocket()
   const { data: timeseriesData, summary, loading: timeseriesLoading, error: timeseriesError } = useDashboardTimeseries()
+  const { getRecentActivities } = useActivity()
 
   // Clear specific cache items to force fresh data
   React.useEffect(() => {
@@ -49,11 +50,12 @@ export const EnhancedDashboard: React.FC = () => {
     enabled: true,
   })
 
-  // Combine API data with real-time WebSocket updates
+  // Combine API data with real-time WebSocket updates and user activities
   const services = data.services?.services || servicesData
   const metrics = data.metrics || metricsData
   const apiActivity = data.activity ? [data.activity, ...activityData] : activityData
-  const activity = apiActivity
+  const userActivities = getRecentActivities(5)
+  const activity = userActivities.length > 0 ? userActivities : apiActivity
 
   // Request real-time updates when WebSocket connects
   React.useEffect(() => {
