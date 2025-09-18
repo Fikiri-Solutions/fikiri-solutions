@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 
 // Simple unit test for data mapping logic
 describe('CRM Data Mapping - Unit Tests', () => {
@@ -55,7 +55,7 @@ describe('CRM Data Mapping - Unit Tests', () => {
         last_contact: null,
         source: 'manual',
         created_at: '2025-09-18T08:00:00Z'
-      }
+      } as any
 
       const mappedLead = {
         id: incompleteBackendLead.id,
