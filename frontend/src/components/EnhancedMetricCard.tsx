@@ -43,7 +43,7 @@ export function EnhancedMetricCard({
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div className="flex items-center gap-3">
           {icon && (
-            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+            <div className="p-2 rounded-lg bg-brand-primary/10 text-brand-primary">
               {icon}
             </div>
           )}
