@@ -1,384 +1,131 @@
-import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { Mail, Users, Brain, Clock, Bot, UserPlus, Zap, AlertTriangle, CheckCircle2, XCircle, AlertCircle, DollarSign, TrendingUp, BarChart3, PieChart as PieChartIcon, Grid, Layout } from 'lucide-react'
-import { ServiceCard } from '../components/ServiceCard'
-import { EnhancedMetricCard } from '../components/EnhancedMetricCard'
-import { MiniTrend } from '../components/MiniTrend'
-import { ChartWidget, CompactChartGrid } from '../components/ChartWidget'
-import { MetricCardSkeleton, ServiceCardSkeleton, ChartSkeleton, ActivitySkeleton } from '../components/Skeleton'
-import { useToast } from '../components/Toast'
-import { useWebSocket } from '../hooks/useWebSocket'
-import { useDashboardTimeseries } from '../hooks/useDashboardTimeseries'
-import { config, getFeatureConfig } from '../config'
-import { apiClient } from '../services/apiClient'
-import { mockServices, mockMetrics, mockActivity } from '../mockData'
-import { useActivity } from '../contexts/ActivityContext'
-import { DashboardSection, StatsGrid, DashboardCard } from '../components/DashboardLayout'
-import { Button } from '@/components/ui/Button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import React from 'react';
+import { Users, Mail, Brain, DollarSign, TrendingUp, Zap, CheckCircle2 } from 'lucide-react';
 
 export const CompactDashboard: React.FC = () => {
-  const navigate = useNavigate()
-  const features = getFeatureConfig()
-  const { addToast } = useToast()
-  const { isConnected, data, requestMetricsUpdate, requestServicesUpdate } = useWebSocket()
-  const { data: timeseriesData, summary, loading: timeseriesLoading, error: timeseriesError } = useDashboardTimeseries()
-  const { getRecentActivities } = useActivity()
-  const [viewMode, setViewMode] = useState<'grid' | 'compact'>('grid')
 
-  // Clear specific cache items to force fresh data
-  React.useEffect(() => {
-    localStorage.removeItem('hasSeenPerformanceToast')
-  }, [])
+  // Compact metrics
+  const compactMetrics = {
+    totalLeads: 1247,
+    emailsProcessed: 5678,
+    aiResponses: 2345,
+    revenue: 12345
+  };
 
-  // TanStack Query hooks for smart data fetching with real-time updates
-  const { data: servicesData = [], isLoading: servicesLoading } = useQuery({
-    queryKey: ['services'],
-    queryFn: () => features.useMockData ? Promise.resolve(mockServices) : apiClient.getServices(),
-    staleTime: 0,
-    enabled: true,
-  })
-
-  const { data: metricsData, isLoading: metricsLoading } = useQuery({
-    queryKey: ['metrics'],
-    queryFn: () => features.useMockData ? Promise.resolve(mockMetrics) : apiClient.getMetrics(),
-    staleTime: 0,
-    enabled: true,
-  })
-
-  const { data: activityData = [], isLoading: activityLoading } = useQuery({
-    queryKey: ['activity'],
-    queryFn: () => features.useMockData ? Promise.resolve(mockActivity) : apiClient.getActivity(),
-    staleTime: 0,
-    enabled: true,
-  })
-
-  // Combine API data with real-time WebSocket updates and user activities
-  const services = data.services?.services || servicesData
-  const metrics = data.metrics || metricsData
-  const apiActivity = data.activity ? [data.activity, ...activityData] : activityData
-  const userActivities = getRecentActivities(5)
-  const activity = userActivities.length > 0 ? userActivities : apiActivity
-
-  // Request real-time updates when WebSocket connects
-  React.useEffect(() => {
-    if (isConnected) {
-      requestMetricsUpdate()
-      requestServicesUpdate()
-    }
-  }, [isConnected, requestMetricsUpdate, requestServicesUpdate])
-
-  // Generate dynamic chart data with realistic variations
-  const generateChartData = () => {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    const baseEmails = 40
-    const baseLeads = 10
-    const baseResponses = 35
-    const baseValue = 85
-    
-    return days.map((day, index) => {
-      const dayMultiplier = index < 5 ? 1.0 : 0.6
-      const randomVariation = 0.8 + Math.random() * 0.4
-      
-      const emails = Math.floor(baseEmails * dayMultiplier * randomVariation)
-      const leads = Math.floor(baseLeads * dayMultiplier * randomVariation)
-      const responses = Math.floor(baseResponses * dayMultiplier * randomVariation)
-      const value = Math.floor(baseValue * dayMultiplier * randomVariation)
-      
-      return {
-        name: day,
-        emails: Math.max(5, emails),
-        leads: Math.max(2, leads),
-        responses: Math.max(3, responses),
-        value: Math.max(60, Math.min(100, value))
-      }
-    })
-  }
-
-  const [chartData, setChartData] = useState(generateChartData())
-
-  // Update chart data periodically to simulate real-time changes
-  useEffect(() => {
-    const chartInterval = setInterval(() => {
-      setChartData(generateChartData())
-    }, 30000)
-
-    return () => clearInterval(chartInterval)
-  }, [])
-
-  const handleMetricClick = (metricType: string) => {
-    switch (metricType) {
-      case 'emails':
-        navigate('/crm?filter=emails')
-        addToast({
-          type: 'info',
-          title: 'Navigating to CRM',
-          message: 'Filtering by email activity'
-        })
-        break
-      case 'leads':
-        navigate('/crm?filter=active')
-        addToast({
-          type: 'success',
-          title: 'Viewing Active Leads',
-          message: 'Showing all active lead data'
-        })
-        break
-      case 'responses':
-        navigate('/services')
-        addToast({
-          type: 'info',
-          title: 'Checking AI Responses',
-          message: 'Viewing service performance'
-        })
-        break
-      case 'responseTime':
-        navigate('/services')
-        addToast({
-          type: 'warning',
-          title: 'Response Time Analysis',
-          message: 'Reviewing performance metrics'
-        })
-        break
-      default:
-        break
-    }
-  }
-
-  const getActivityIcon = (type: string, status: string) => {
-    const iconClass = `h-5 w-5 ${
-      status === 'success' ? 'text-green-500' :
-      status === 'warning' ? 'text-yellow-500' : 'text-red-500'
-    }`
-
-    switch (type) {
-      case 'ai_response':
-        return <Bot className={iconClass} />
-      case 'lead_added':
-        return <UserPlus className={iconClass} />
-      case 'email_processed':
-        return <Zap className={iconClass} />
-      case 'service_error':
-        return <AlertTriangle className={iconClass} />
-      default:
-        return status === 'success' ? <CheckCircle2 className={iconClass} /> : 
-               status === 'warning' ? <AlertCircle className={iconClass} /> : 
-               <XCircle className={iconClass} />
-    }
-  }
-
-  // Prepare compact chart data
-  const compactCharts = [
-    {
-      title: "Email Trends",
-      data: chartData,
-      type: "line" as const,
-      dataKey: "emails",
-      color: "#3B82F6"
-    },
-    {
-      title: "Lead Generation",
-      data: chartData,
-      type: "bar" as const,
-      dataKey: "leads",
-      color: "#22C55E"
-    },
-    {
-      title: "Response Rate",
-      data: chartData,
-      type: "area" as const,
-      dataKey: "responses",
-      color: "#F59E0B"
-    },
-    {
-      title: "Service Distribution",
-      data: chartData,
-      type: "pie" as const,
-      dataKey: "value",
-      color: "#8B5CF6"
-    }
-  ]
+  const compactActivity = [
+    { id: 1, type: 'ai_response', message: 'AI processed customer inquiry', status: 'success', timestamp: '2m ago' },
+    { id: 2, type: 'lead_added', message: 'New lead: TechCorp Solutions', status: 'success', timestamp: '5m ago' },
+    { id: 3, type: 'automation', message: 'Email sequence triggered', status: 'success', timestamp: '8m ago' },
+    { id: 4, type: 'ai_response', message: 'AI generated follow-up', status: 'success', timestamp: '12m ago' }
+  ];
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Compact Dashboard</h1>
-            <p className="text-muted-foreground">
-              Streamlined view with interactive chart widgets
-            </p>
-          </div>
-          
-          {/* View Mode Toggle */}
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Button
-                variant={viewMode === 'grid' ? "default" : "outline"}
-                size="sm"
-                onClick={() => setViewMode('grid')}
-              >
-                <Grid className="h-4 w-4 mr-1" />
-                Grid
-              </Button>
-              <Button
-                variant={viewMode === 'compact' ? "default" : "outline"}
-                size="sm"
-                onClick={() => setViewMode('compact')}
-              >
-                <Layout className="h-4 w-4 mr-1" />
-                Compact
-              </Button>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="container mx-auto px-4 py-6">
+        {/* Compact Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+            Compact Dashboard
+          </h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Essential metrics at a glance
+          </p>
+        </div>
+
+        {/* Compact Metrics Grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Leads</p>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">{compactMetrics.totalLeads.toLocaleString()}</p>
+              </div>
+              <Users className="h-5 w-5 text-blue-500" />
             </div>
-            
-            {/* Version and Connection Status */}
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                <span className="text-xs text-muted-foreground">
-                  Cache: {config.cacheVersion}
-                </span>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Emails</p>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">{compactMetrics.emailsProcessed.toLocaleString()}</p>
               </div>
-              
-              <div className="flex items-center space-x-2">
-                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                <span className="text-xs text-muted-foreground">
-                  {isConnected ? 'Connected' : 'Disconnected'}
-                </span>
+              <Mail className="h-5 w-5 text-green-500" />
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">AI Responses</p>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">{compactMetrics.aiResponses.toLocaleString()}</p>
               </div>
+              <Brain className="h-5 w-5 text-purple-500" />
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Revenue</p>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">${compactMetrics.revenue.toLocaleString()}</p>
+              </div>
+              <DollarSign className="h-5 w-5 text-yellow-500" />
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Enhanced Metrics Grid */}
-      <DashboardSection title="Key Metrics" description="Real-time performance indicators">
-        <StatsGrid>
-          {timeseriesLoading ? (
-            <>
-              <MetricCardSkeleton />
-              <MetricCardSkeleton />
-              <MetricCardSkeleton />
-              <MetricCardSkeleton />
-            </>
-          ) : (
-            <>
-              <EnhancedMetricCard
-                title="New Leads"
-                value={timeseriesData?.reduce((sum, day) => sum + (day.leads || 0), 0) || 0}
-                change={summary?.leads?.change_pct}
-                positive={summary?.leads?.positive}
-                icon={<Users className="h-5 w-5" />}
-                onClick={() => handleMetricClick('leads')}
-              >
-                <MiniTrend data={timeseriesData || []} dataKey="leads" color="#22c55e" />
-              </EnhancedMetricCard>
-
-              <EnhancedMetricCard
-                title="Emails Sent"
-                value={timeseriesData?.reduce((sum, day) => sum + (day.emails || 0), 0) || 0}
-                change={summary?.emails?.change_pct}
-                positive={summary?.emails?.positive}
-                icon={<Mail className="h-5 w-5" />}
-                onClick={() => handleMetricClick('emails')}
-              >
-                <MiniTrend data={timeseriesData || []} dataKey="emails" color="#3b82f6" />
-              </EnhancedMetricCard>
-
-              <EnhancedMetricCard
-                title="Revenue Impact"
-                value={`$${((timeseriesData?.reduce((sum, day) => sum + (day.revenue || 0), 0) || 0) / 1000).toFixed(1)}k`}
-                change={summary?.revenue?.change_pct}
-                positive={summary?.revenue?.positive}
-                icon={<DollarSign className="h-5 w-5" />}
-                onClick={() => handleMetricClick('revenue')}
-              >
-                <MiniTrend data={timeseriesData || []} dataKey="revenue" color="#f97316" />
-              </EnhancedMetricCard>
-
-              <EnhancedMetricCard
-                title="AI Performance"
-                value={`${Math.round((metrics?.avgResponseTime || 0) * 100) / 100}h`}
-                change={-15}
-                positive={true}
-                icon={<Brain className="h-5 w-5" />}
-                onClick={() => handleMetricClick('responseTime')}
-              >
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <TrendingUp className="h-4 w-4 text-brand-secondary" />
-                  <span>Optimized</span>
+        {/* Compact Activity Feed */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+            <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+            Recent Activity
+          </h3>
+          <div className="space-y-3">
+            {compactActivity.map((item) => (
+              <div key={item.id} className="flex items-center space-x-3 py-2">
+                <div className={`p-1.5 rounded-full ${
+                  item.status === 'success' ? 'bg-green-100 dark:bg-green-900/20' : 'bg-red-100 dark:bg-red-900/20'
+                }`}>
+                  {item.type === 'ai_response' && <Brain className="h-3 w-3 text-green-600 dark:text-green-400" />}
+                  {item.type === 'lead_added' && <Users className="h-3 w-3 text-blue-600 dark:text-blue-400" />}
+                  {item.type === 'automation' && <Zap className="h-3 w-3 text-yellow-600 dark:text-yellow-400" />}
                 </div>
-              </EnhancedMetricCard>
-            </>
-          )}
-        </StatsGrid>
-      </DashboardSection>
-
-      {/* Interactive Charts Section */}
-      <DashboardSection title="Analytics" description="Interactive data visualization">
-        {viewMode === 'compact' ? (
-          <CompactChartGrid charts={compactCharts} />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {compactCharts.map((chart, index) => (
-              <ChartWidget
-                key={index}
-                {...chart}
-                compact={false}
-                showControls={true}
-              />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{item.message}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{item.timestamp}</p>
+                </div>
+              </div>
             ))}
           </div>
-        )}
-      </DashboardSection>
+        </div>
 
-      {/* Services and Activity Grid */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Services */}
-        <DashboardCard
-          title="Active Services"
-          description="Your automation services status"
-          badge={{ text: `${services.length} Active`, variant: "success" }}
-        >
-          {servicesLoading ? (
-            <div className="space-y-3">
-              <ServiceCardSkeleton />
-              <ServiceCardSkeleton />
+        {/* Compact Performance Indicators */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Conversion Rate</span>
+              <TrendingUp className="h-4 w-4 text-green-500" />
             </div>
-          ) : (
-            <div className="space-y-3">
-              {services.slice(0, 3).map((service) => (
-                <ServiceCard key={service.id} service={service} />
-              ))}
-            </div>
-          )}
-        </DashboardCard>
+            <div className="text-2xl font-bold text-green-600">12.5%</div>
+          </div>
 
-        {/* Recent Activity */}
-        <DashboardCard
-          title="Recent Activity"
-          description="Latest system events and updates"
-          badge={{ text: "Live", variant: "secondary" }}
-        >
-          {activityLoading ? (
-            <ActivitySkeleton />
-          ) : (
-            <div className="space-y-3">
-              {activity.slice(0, 5).map((item) => (
-                <div key={item.id} className="flex items-center space-x-3">
-                  {getActivityIcon(item.type, item.status)}
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{item.message}</p>
-                    <p className="text-xs text-muted-foreground">{item.timestamp}</p>
-                  </div>
-                </div>
-              ))}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Response Time</span>
+              <Zap className="h-4 w-4 text-blue-500" />
             </div>
-          )}
-        </DashboardCard>
+            <div className="text-2xl font-bold text-blue-600">2.4h</div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Satisfaction</span>
+              <CheckCircle2 className="h-4 w-4 text-purple-500" />
+            </div>
+            <div className="text-2xl font-bold text-purple-600">4.8/5</div>
+          </div>
+        </div>
       </div>
     </div>
-  )
-}
+  );
+};
