@@ -44,15 +44,16 @@
     <link rel="canonical" href="https://fikirisolutions.com/" />
     
     <!-- Preconnect for performance -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://fikirisolutions.onrender.com">
     
-    <!-- Fonts with optimization -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <!-- Resource hints for performance -->
+    <link rel="prefetch" href="/assets/EnhancedDashboard-*.js" as="script">
+    <link rel="prefetch" href="/assets/DashboardCharts-*.js" as="script">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"></noscript>
+    
+    <!-- Local font preloading for better performance -->
+    <link rel="preload" href="/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
     
     <!-- Font preloading will be handled by the CSS with font-display: swap -->
     

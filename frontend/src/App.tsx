@@ -28,9 +28,11 @@ import { ScrollToTop } from './components/ScrollToTop'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { PageLoader } from './components/PageLoader'
 import { getFeatureConfig } from './config'
+import { useWarmRoutes } from './hooks/useWarmRoutes'
 
 function App() {
   const features = getFeatureConfig()
+  useWarmRoutes() // Warm up routes after first paint
 
   return (
     <ErrorBoundary>

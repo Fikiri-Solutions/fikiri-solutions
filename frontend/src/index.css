@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Font optimization */
+html { 
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; 
+}
+
+@font-face { 
+  font-family: 'Inter';
+  src: url('/fonts/inter.woff2') format('woff2');
+  font-display: swap; 
+  font-weight: 600;
+}
+
 @layer base {
   :root {
     /* Custom Radix Colors for Fikiri Solutions */
