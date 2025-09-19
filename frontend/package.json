@@ -43,6 +43,7 @@
     "husky": "^9.1.7",
     "jest-axe": "^10.0.0",
     "jsdom": "^23.0.0",
+    "lighthouse": "^12.8.2",
     "lint-staged": "^16.1.6",
     "postcss": "^8.4.21",
     "prettier": "^2.8.7",

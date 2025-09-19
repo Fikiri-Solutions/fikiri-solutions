@@ -17,3 +17,4 @@ export const LazyDashboardCharts: React.FC<LazyDashboardChartsProps> = ({ data }
 }
 
 export default LazyDashboardCharts
+

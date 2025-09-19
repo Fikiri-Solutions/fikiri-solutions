@@ -20,3 +20,4 @@ export const LazyDashboard: React.FC<LazyDashboardProps> = ({ view }) => {
 }
 
 export default LazyDashboard
+
