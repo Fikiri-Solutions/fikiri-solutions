@@ -30,13 +30,24 @@ export function MiniTrend({
   const min = Math.min(...values);
   const range = max - min || 1;
 
+  // Safety check for single data point
+  if (values.length === 1) {
+    return (
+      <div className="w-full" style={{ height: `${height}px` }}>
+        <svg width="100%" height={height} viewBox="0 0 100 100" className="overflow-visible">
+          <circle cx="50" cy="50" r="3" fill={color} />
+        </svg>
+      </div>
+    );
+  }
+
   const points = values.map((value, index) => {
     const x = (index / (values.length - 1)) * 100;
     const y = 100 - ((value - min) / range) * 100;
     return `${x},${y}`;
-  }).join(" ");
+  });
 
-  const pathData = `M ${points}`;
+  const pathData = points.length > 0 ? `M ${points[0]} L ${points.slice(1).join(' L ')}` : '';
 
   return (
     <div className="w-full" style={{ height: `${height}px` }}>
@@ -56,21 +67,25 @@ export function MiniTrend({
         <rect width="100" height="100" fill="url(#grid)" />
         
         {/* Area fill */}
-        <path
-          d={`M 0,100 L ${pathData} L 100,100 Z`}
-          fill={color}
-          fillOpacity="0.1"
-        />
+        {pathData && (
+          <path
+            d={`M 0,100 L ${pathData} L 100,100 Z`}
+            fill={color}
+            fillOpacity="0.1"
+          />
+        )}
         
         {/* Line */}
-        <path
-          d={pathData}
-          fill="none"
-          stroke={color}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        {pathData && (
+          <path
+            d={pathData}
+            fill="none"
+            stroke={color}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        )}
         
         {/* Data points */}
         {values.map((value, index) => {
