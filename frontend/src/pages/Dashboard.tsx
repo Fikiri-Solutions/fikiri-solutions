@@ -1,11 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Mail, Users, Brain, Bot, UserPlus, Zap, AlertTriangle, CheckCircle2, XCircle, AlertCircle, DollarSign, TrendingUp } from 'lucide-react'
 import { ServiceCard } from '../components/ServiceCard'
 import { MetricCard } from '../components/MetricCard'
 import { MiniTrend } from '../components/MiniTrend'
-import { DashboardCharts } from '../components/DashboardCharts'
 import { MetricCardSkeleton, ServiceCardSkeleton, ChartSkeleton, ActivitySkeleton } from '../components/Skeleton'
 import { useToast } from '../components/Toast'
 import { useWebSocket } from '../hooks/useWebSocket'
@@ -14,8 +13,11 @@ import { useDashboardView } from '../hooks/useDashboardView'
 import { config, getFeatureConfig } from '../config'
 import { apiClient } from '../services/apiClient'
 import { mockServices, mockMetrics, mockActivity } from '../mockData'
-import { EnhancedDashboard } from './EnhancedDashboard'
-import { CompactDashboard } from './CompactDashboard'
+
+// Lazy load heavy dashboard components
+const EnhancedDashboard = React.lazy(() => import('./EnhancedDashboard').then(module => ({ default: module.EnhancedDashboard })))
+const CompactDashboard = React.lazy(() => import('./CompactDashboard').then(module => ({ default: module.CompactDashboard })))
+const DashboardCharts = React.lazy(() => import('../components/DashboardCharts').then(module => ({ default: module.DashboardCharts })))
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate()
@@ -27,20 +29,23 @@ export const Dashboard: React.FC = () => {
   // Use dashboard view hook for persistence
   const { dashboardView, setDashboardView, isEnhanced, isCompact, isOriginal } = useDashboardView()
   
-  // Render different dashboard views
+  // Render different dashboard views with Suspense
   if (dashboardView === 'enhanced') {
     console.log('Rendering EnhancedDashboard')
-    try {
-      return <EnhancedDashboard />
-    } catch (error) {
-      console.error('EnhancedDashboard failed:', error)
-      // Fall through to original dashboard
-    }
+    return (
+      <Suspense fallback={<ChartSkeleton />}>
+        <EnhancedDashboard />
+      </Suspense>
+    )
   }
   
   if (dashboardView === 'compact') {
     console.log('Rendering CompactDashboard')
-    return <CompactDashboard />
+    return (
+      <Suspense fallback={<ChartSkeleton />}>
+        <CompactDashboard />
+      </Suspense>
+    )
   }
   
   console.log('Rendering original dashboard')
@@ -172,7 +177,9 @@ export const Dashboard: React.FC = () => {
               Email Trends
             </h3>
             <div className="h-64">
-              <DashboardCharts data={chartData} />
+                    <Suspense fallback={<ChartSkeleton />}>
+                      <DashboardCharts data={chartData} />
+                    </Suspense>
             </div>
           </div>
 
@@ -183,7 +190,9 @@ export const Dashboard: React.FC = () => {
               Service Performance
             </h3>
             <div className="h-64">
-              <DashboardCharts data={chartData} />
+                    <Suspense fallback={<ChartSkeleton />}>
+                      <DashboardCharts data={chartData} />
+                    </Suspense>
             </div>
           </div>
         </div>
@@ -195,7 +204,9 @@ export const Dashboard: React.FC = () => {
             Service Distribution
           </h3>
           <div className="h-64">
-            <DashboardCharts data={chartData} />
+                    <Suspense fallback={<ChartSkeleton />}>
+                      <DashboardCharts data={chartData} />
+                    </Suspense>
           </div>
         </div>
 
