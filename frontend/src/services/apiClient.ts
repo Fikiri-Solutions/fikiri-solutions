@@ -218,9 +218,9 @@ class ApiClient {
   }
 
   // Dashboard endpoints
-  async getDashboardTimeseries(userId: number = 1): Promise<any> {
+  async getDashboardTimeseries(userId: number = 1, period: 'week' | 'month' | 'quarter' = 'week'): Promise<any> {
     const response = await this.client.get('/dashboard/timeseries', {
-      params: { user_id: userId }
+      params: { user_id: userId, period }
     })
     return response.data
   }
@@ -229,6 +229,47 @@ class ApiClient {
     const response = await this.client.get('/dashboard/metrics', {
       params: { user_id: userId }
     })
+    return response.data
+  }
+
+  // Enhanced dashboard endpoints
+
+  async getLeads(filters?: {
+    dateRange?: { start: string; end: string };
+    status?: string;
+    source?: string;
+  }): Promise<any> {
+    const response = await this.client.get('/dashboard/leads', {
+      params: filters
+    })
+    return response.data
+  }
+
+  async getEmailMetrics(period: 'day' | 'week' | 'month' = 'week'): Promise<any> {
+    const response = await this.client.get('/dashboard/emails', {
+      params: { period }
+    })
+    return response.data
+  }
+
+  async getAIMetrics(): Promise<any> {
+    const response = await this.client.get('/dashboard/ai')
+    return response.data
+  }
+
+  async getRevenueAnalytics(period: 'week' | 'month' | 'quarter' = 'month'): Promise<any> {
+    const response = await this.client.get('/dashboard/revenue', {
+      params: { period }
+    })
+    return response.data
+  }
+
+  async updateDashboardPreferences(preferences: {
+    defaultView?: string;
+    refreshInterval?: number;
+    notifications?: boolean;
+  }): Promise<any> {
+    const response = await this.client.post('/dashboard/preferences', preferences)
     return response.data
   }
 

@@ -20,3 +20,4 @@ Sitemap: https://fikirisolutions.com/sitemap.xml
 
 # Crawl delay (optional)
 Crawl-delay: 1
+

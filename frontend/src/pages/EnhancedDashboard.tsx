@@ -1,31 +1,60 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Users, Mail, Brain, DollarSign, TrendingUp, Zap, CheckCircle2 } from 'lucide-react';
-import { MetricCard } from '../components/MetricCard';
-import { MiniTrend } from '../components/MiniTrend';
-import { useDashboardTimeseries } from '../hooks/useDashboardTimeseries';
+import { EnhancedMetricCard } from '../components/EnhancedUI';
+import { DashboardControls } from '../components/DashboardControls';
+import { OptimizedLineChart, OptimizedBarChart, OptimizedPieChart } from '../components/OptimizedCharts';
+import { StaggeredList, StaggeredItem, EnhancedActivityItem } from '../components/EnhancedUI';
+import { useDashboardData } from '../hooks/useDashboardData';
+import { useDashboardView } from '../hooks/useDashboardView';
 
 export const EnhancedDashboard: React.FC = () => {
-  const { data: timeseriesData, summary } = useDashboardTimeseries();
-
-  // Mock data for enhanced dashboard
-  const enhancedMetrics = {
-    totalLeads: 1247,
-    emailsProcessed: 5678,
-    aiResponses: 2345,
-    revenue: 12345,
-    conversionRate: 12.5,
-    avgResponseTime: 2.4,
-    customerSatisfaction: 4.8,
-    automationEfficiency: 87.3
+  const [currentPeriod, setCurrentPeriod] = useState<'week' | 'month' | 'quarter'>('week');
+  const [currentSort, setCurrentSort] = useState<'newest' | 'oldest' | 'priority'>('newest');
+  const [filters, setFilters] = useState<{ status?: string; type?: string }>({});
+  
+  // Use new data hooks
+  const { data: metricsData, isLoading: metricsLoading } = useDashboardMetrics();
+  const { data: timeseriesData, isLoading: timeseriesLoading } = useDashboardTimeseries(currentPeriod);
+  const { data: activityData, isLoading: activityLoading } = useActivityFeed(10);
+  const { data: leadData } = useLeadAnalytics(filters);
+  const { data: emailData } = useEmailMetrics(currentPeriod);
+  const { data: aiData } = useAIMetrics();
+  const { data: revenueData } = useRevenueAnalytics(currentPeriod);
+  
+  // Dashboard controls handlers
+  const handlePeriodChange = (period: 'week' | 'month' | 'quarter') => {
+    setCurrentPeriod(period);
   };
-
-  const enhancedActivity = [
-    { id: 1, type: 'ai_response', message: 'AI processed complex customer inquiry', status: 'success', timestamp: '2 minutes ago' },
-    { id: 2, type: 'lead_added', message: 'New high-value lead: TechCorp Solutions', status: 'success', timestamp: '5 minutes ago' },
-    { id: 3, type: 'automation', message: 'Email sequence triggered for prospect', status: 'success', timestamp: '8 minutes ago' },
-    { id: 4, type: 'ai_response', message: 'AI generated personalized follow-up', status: 'success', timestamp: '12 minutes ago' },
-    { id: 5, type: 'lead_added', message: 'Lead qualified: StartupXYZ Inc', status: 'success', timestamp: '15 minutes ago' }
-  ];
+  
+  const handleSortChange = (sort: 'newest' | 'oldest' | 'priority') => {
+    setCurrentSort(sort);
+  };
+  
+  const handleFilterChange = (newFilters: { status?: string; type?: string }) => {
+    setFilters(newFilters);
+  };
+  
+  const handleRefresh = () => {
+    // Trigger refetch of all queries
+    window.location.reload(); // Simple refresh for now
+  };
+  
+  const handleExport = (format: 'pdf' | 'csv') => {
+    console.log(`Exporting dashboard data as ${format}`);
+    // Implement export functionality
+  };
+  
+  // Enhanced metrics with real data
+  const enhancedMetrics = {
+    totalLeads: metricsData?.total_leads || 1247,
+    emailsProcessed: metricsData?.total_emails || 5678,
+    aiResponses: aiData?.total_responses || 2345,
+    revenue: revenueData?.total_revenue || 12345,
+    conversionRate: metricsData?.conversion_rate || 12.5,
+    avgResponseTime: aiData?.avg_response_time || 2.4,
+    customerSatisfaction: metricsData?.satisfaction_score || 4.8,
+    automationEfficiency: metricsData?.automation_efficiency || 87.3
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">

@@ -10,6 +10,7 @@ import { MetricCardSkeleton, ServiceCardSkeleton, ChartSkeleton, ActivitySkeleto
 import { useToast } from '../components/Toast'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useDashboardTimeseries } from '../hooks/useDashboardTimeseries'
+import { useDashboardView } from '../hooks/useDashboardView'
 import { config, getFeatureConfig } from '../config'
 import { apiClient } from '../services/apiClient'
 import { mockServices, mockMetrics, mockActivity } from '../mockData'
@@ -23,8 +24,8 @@ export const Dashboard: React.FC = () => {
   const { isConnected, data, requestMetricsUpdate, requestServicesUpdate } = useWebSocket()
   const { data: timeseriesData, summary, loading: timeseriesLoading } = useDashboardTimeseries()
   
-  // Dashboard view options
-  const [dashboardView, setDashboardView] = useState<'enhanced' | 'compact' | 'original'>('enhanced')
+  // Use dashboard view hook for persistence
+  const { dashboardView, setDashboardView, isEnhanced, isCompact, isOriginal } = useDashboardView()
   
   // Render different dashboard views
   if (dashboardView === 'enhanced') {
