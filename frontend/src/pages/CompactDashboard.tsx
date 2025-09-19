@@ -57,6 +57,20 @@ export const CompactDashboard: React.FC = () => {
   const userActivities = getRecentActivities(5)
   const activity = userActivities.length > 0 ? userActivities : apiActivity
 
+  // Transform timeseries data for charts
+  const transformTimeseriesData = (data: any[]) => {
+    if (!data || data.length === 0) return []
+    
+    return data.map(item => ({
+      name: item.day ? new Date(item.day).toLocaleDateString('en-US', { weekday: 'short' }) : item.name,
+      day: item.day,
+      leads: item.leads || 0,
+      emails: item.emails || 0,
+      revenue: item.revenue || 0,
+      value: (item.leads || 0) + (item.emails || 0) + (item.revenue || 0) / 100 // Combined value for pie charts
+    }))
+  }
+
   // Transform timeseries data for pie charts
   const transformForPieChart = (data: any[]) => {
     if (!data || data.length === 0) return []
@@ -74,7 +88,8 @@ export const CompactDashboard: React.FC = () => {
     ].filter(item => item.value > 0)
   }
 
-  const pieChartData = transformForPieChart(timeseriesData)
+  const transformedTimeseriesData = transformTimeseriesData(timeseriesData || [])
+  const pieChartData = transformForPieChart(timeseriesData || [])
 
   return (
     <div className="space-y-6 p-4">
@@ -109,7 +124,7 @@ export const CompactDashboard: React.FC = () => {
           compact
         >
           <MiniTrend 
-            data={timeseriesData || []} 
+            data={transformedTimeseriesData} 
             dataKey="leads" 
             color="#3b82f6" 
             height={30}
@@ -127,7 +142,7 @@ export const CompactDashboard: React.FC = () => {
           compact
         >
           <MiniTrend 
-            data={timeseriesData || []} 
+            data={transformedTimeseriesData} 
             dataKey="emails" 
             color="#22c55e" 
             height={30}
@@ -145,7 +160,7 @@ export const CompactDashboard: React.FC = () => {
           compact
         >
           <MiniTrend 
-            data={timeseriesData || []} 
+            data={transformedTimeseriesData} 
             dataKey="revenue" 
             color="#8b5cf6" 
             height={30}
@@ -163,7 +178,7 @@ export const CompactDashboard: React.FC = () => {
           compact
         >
           <MiniTrend 
-            data={timeseriesData || []} 
+            data={transformedTimeseriesData} 
             dataKey="revenue" 
             color="#f97316" 
             height={30}
@@ -199,27 +214,27 @@ export const CompactDashboard: React.FC = () => {
       {/* Charts */}
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <ChartWidget
-            title="Email Trends"
-            data={timeseriesData || []}
-            type="line"
-            dataKey="emails"
-            color="#3b82f6"
-          />
-          <ChartWidget
-            title="Lead Growth"
-            data={timeseriesData || []}
-            type="bar"
-            dataKey="leads"
-            color="#22c55e"
-          />
-          <ChartWidget
-            title="Revenue"
-            data={timeseriesData || []}
-            type="area"
-            dataKey="revenue"
-            color="#f97316"
-          />
+                  <ChartWidget
+                    title="Email Trends"
+                    data={transformedTimeseriesData}
+                    type="line"
+                    dataKey="emails"
+                    color="#3b82f6"
+                  />
+                  <ChartWidget
+                    title="Lead Growth"
+                    data={transformedTimeseriesData}
+                    type="bar"
+                    dataKey="leads"
+                    color="#22c55e"
+                  />
+                  <ChartWidget
+                    title="Revenue"
+                    data={transformedTimeseriesData}
+                    type="area"
+                    dataKey="revenue"
+                    color="#f97316"
+                  />
         </div>
       ) : (
         <div className="space-y-4">

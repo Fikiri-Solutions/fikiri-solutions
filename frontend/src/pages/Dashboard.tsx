@@ -95,6 +95,20 @@ export const Dashboard: React.FC = () => {
     }))
   }
 
+  // Transform timeseries data for charts
+  const transformTimeseriesData = (data: any[]) => {
+    if (!data || data.length === 0) return []
+    
+    return data.map(item => ({
+      name: item.day ? new Date(item.day).toLocaleDateString('en-US', { weekday: 'short' }) : item.name,
+      day: item.day,
+      leads: item.leads || 0,
+      emails: item.emails || 0,
+      revenue: item.revenue || 0,
+      value: (item.leads || 0) + (item.emails || 0) + (item.revenue || 0) / 100 // Combined value for pie charts
+    }))
+  }
+
   // Transform timeseries data for pie charts
   const transformForPieChart = (data: any[]) => {
     if (!data || data.length === 0) return []
@@ -113,6 +127,7 @@ export const Dashboard: React.FC = () => {
   }
 
   const chartData = generateChartData()
+  const transformedTimeseriesData = transformTimeseriesData(timeseriesData || [])
   const pieChartData = transformForPieChart(timeseriesData || [])
 
   const getActivityIcon = (type: string, status: string) => {
@@ -223,7 +238,7 @@ export const Dashboard: React.FC = () => {
           </h3>
           <div className="h-64">
                     <Suspense fallback={<ChartSkeleton />}>
-                      <DashboardCharts data={chartData} pieData={pieChartData} />
+                      <DashboardCharts data={transformedTimeseriesData} pieData={pieChartData} />
                     </Suspense>
           </div>
         </div>

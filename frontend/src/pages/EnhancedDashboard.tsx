@@ -53,6 +53,20 @@ export const EnhancedDashboard: React.FC = () => {
   const userActivities = getRecentActivities(5)
   const activity = userActivities.length > 0 ? userActivities : apiActivity
 
+  // Transform timeseries data for charts
+  const transformTimeseriesData = (data: any[]) => {
+    if (!data || data.length === 0) return []
+    
+    return data.map(item => ({
+      name: item.day ? new Date(item.day).toLocaleDateString('en-US', { weekday: 'short' }) : item.name,
+      day: item.day,
+      leads: item.leads || 0,
+      emails: item.emails || 0,
+      revenue: item.revenue || 0,
+      value: (item.leads || 0) + (item.emails || 0) + (item.revenue || 0) / 100 // Combined value for pie charts
+    }))
+  }
+
   // Transform timeseries data for pie charts
   const transformForPieChart = (data: any[]) => {
     if (!data || data.length === 0) return []
@@ -70,7 +84,8 @@ export const EnhancedDashboard: React.FC = () => {
     ].filter(item => item.value > 0)
   }
 
-  const pieChartData = transformForPieChart(timeseriesData)
+  const transformedTimeseriesData = transformTimeseriesData(timeseriesData || [])
+  const pieChartData = transformForPieChart(timeseriesData || [])
 
   return (
     <div className="space-y-8 p-6">
@@ -104,7 +119,7 @@ export const EnhancedDashboard: React.FC = () => {
           color="blue"
         >
           <MiniTrend 
-            data={timeseriesData || []} 
+            data={transformedTimeseriesData} 
             dataKey="leads" 
             color="#3b82f6" 
           />
@@ -120,7 +135,7 @@ export const EnhancedDashboard: React.FC = () => {
           color="green"
         >
           <MiniTrend 
-            data={timeseriesData || []} 
+            data={transformedTimeseriesData} 
             dataKey="emails" 
             color="#22c55e" 
           />
@@ -136,7 +151,7 @@ export const EnhancedDashboard: React.FC = () => {
           color="purple"
         >
           <MiniTrend 
-            data={timeseriesData || []} 
+            data={transformedTimeseriesData} 
             dataKey="revenue" 
             color="#8b5cf6" 
           />
@@ -152,7 +167,7 @@ export const EnhancedDashboard: React.FC = () => {
           color="orange"
         >
           <MiniTrend 
-            data={timeseriesData || []} 
+            data={transformedTimeseriesData} 
             dataKey="revenue" 
             color="#f97316" 
           />
@@ -161,7 +176,7 @@ export const EnhancedDashboard: React.FC = () => {
 
       {/* Enhanced Charts */}
       <DashboardSection title="Analytics Overview">
-        <EnhancedDashboardCharts data={timeseriesData || []} pieData={pieChartData} />
+        <EnhancedDashboardCharts data={transformedTimeseriesData} pieData={pieChartData} />
       </DashboardSection>
 
       {/* Services and Activity */}
