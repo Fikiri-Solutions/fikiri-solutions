@@ -14,6 +14,7 @@ import { config, getFeatureConfig } from '../config'
 import { apiClient } from '../services/apiClient'
 import { mockServices, mockMetrics, mockActivity } from '../mockData'
 import { useActivity } from '../contexts/ActivityContext'
+import { DashboardSection, StatsGrid, DashboardCard } from '../components/DashboardLayout'
 
 export const EnhancedDashboard: React.FC = () => {
   const navigate = useNavigate()
