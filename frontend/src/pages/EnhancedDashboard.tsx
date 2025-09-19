@@ -53,6 +53,25 @@ export const EnhancedDashboard: React.FC = () => {
   const userActivities = getRecentActivities(5)
   const activity = userActivities.length > 0 ? userActivities : apiActivity
 
+  // Transform timeseries data for pie charts
+  const transformForPieChart = (data: any[]) => {
+    if (!data || data.length === 0) return []
+    
+    const totals = data.reduce((acc, item) => ({
+      leads: acc.leads + (item.leads || 0),
+      emails: acc.emails + (item.emails || 0),
+      revenue: acc.revenue + (item.revenue || 0)
+    }), { leads: 0, emails: 0, revenue: 0 })
+
+    return [
+      { name: 'Leads', value: totals.leads, color: '#3b82f6' },
+      { name: 'Emails', value: totals.emails, color: '#22c55e' },
+      { name: 'Revenue', value: totals.revenue, color: '#f97316' }
+    ].filter(item => item.value > 0)
+  }
+
+  const pieChartData = transformForPieChart(timeseriesData)
+
   return (
     <div className="space-y-8 p-6">
       {/* Header */}
@@ -142,7 +161,7 @@ export const EnhancedDashboard: React.FC = () => {
 
       {/* Enhanced Charts */}
       <DashboardSection title="Analytics Overview">
-        <EnhancedDashboardCharts data={timeseriesData || []} />
+        <EnhancedDashboardCharts data={timeseriesData || []} pieData={pieChartData} />
       </DashboardSection>
 
       {/* Services and Activity */}

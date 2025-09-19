@@ -25,6 +25,11 @@ interface ChartData {
 
 interface DashboardChartsProps {
   data: ChartData[]
+  pieData?: Array<{
+    name: string;
+    value: number;
+    color: string;
+  }>;
 }
 
 const COLORS = {
@@ -44,7 +49,7 @@ const GRADIENT_COLORS = [
   { start: '#8B5CF6', end: '#7C3AED' }
 ]
 
-export const EnhancedDashboardCharts: React.FC<DashboardChartsProps> = ({ data }) => {
+export const EnhancedDashboardCharts: React.FC<DashboardChartsProps> = ({ data, pieData = [] }) => {
   const [activeChart, setActiveChart] = useState<'line' | 'bar' | 'area'>('line')
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('7d')
   const [showLegend, setShowLegend] = useState(true)
@@ -426,7 +431,7 @@ export const EnhancedDashboardCharts: React.FC<DashboardChartsProps> = ({ data }
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={data}
+                    data={pieData.length > 0 ? pieData : data}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
@@ -438,10 +443,10 @@ export const EnhancedDashboardCharts: React.FC<DashboardChartsProps> = ({ data }
                     animationDuration={500}
                     animationBegin={0}
                   >
-                    {data.map((entry, index) => (
+                    {(pieData.length > 0 ? pieData : data).map((entry, index) => (
                       <Cell 
                         key={`cell-${index}`} 
-                        fill={GRADIENT_COLORS[index % GRADIENT_COLORS.length].start}
+                        fill={pieData.length > 0 ? entry.color : GRADIENT_COLORS[index % GRADIENT_COLORS.length].start}
                         stroke="#fff"
                         strokeWidth={2}
                       />

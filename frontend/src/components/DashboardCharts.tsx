@@ -11,11 +11,16 @@ interface ChartData {
 
 interface DashboardChartsProps {
   data: ChartData[]
+  pieData?: Array<{
+    name: string;
+    value: number;
+    color: string;
+  }>;
 }
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
 
-export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data }) => {
+export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, pieData = [] }) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Email Trends Chart */}
@@ -127,7 +132,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data }) => {
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
-                data={data}
+                data={pieData.length > 0 ? pieData : data}
                 cx="50%"
                 cy="50%"
                 labelLine={false}
@@ -137,8 +142,11 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data }) => {
                 dataKey="value"
                 animationDuration={300}
               >
-                {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                {(pieData.length > 0 ? pieData : data).map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={pieData.length > 0 ? entry.color : COLORS[index % COLORS.length]} 
+                  />
                 ))}
               </Pie>
               <Tooltip 
