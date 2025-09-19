@@ -12,6 +12,29 @@ interface ChatMessage {
   // Classification removed to prevent debug metadata display
 }
 
+// Fallback responses for when backend is not available
+const getFallbackResponse = (message: string): string => {
+  const lowerMessage = message.toLowerCase()
+  
+  if (lowerMessage.includes('contact') || lowerMessage.includes('email') || lowerMessage.includes('phone')) {
+    return 'You can contact Fikiri Solutions at:\n\n📧 Email: info@fikirisolutions.com\n🌐 Website: https://fikirisolutions.com\n📞 Phone: Available through our contact form\n\nWe specialize in AI-powered business automation for landscaping, restaurants, and medical practices.'
+  }
+  
+  if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('pricing')) {
+    return 'Our pricing varies based on your specific needs:\n\n• **Starter Plan**: Basic email automation\n• **Professional Plan**: Advanced CRM + automation\n• **Enterprise Plan**: Custom solutions\n\nContact us for a personalized quote based on your industry and requirements.'
+  }
+  
+  if (lowerMessage.includes('service') || lowerMessage.includes('what do you do')) {
+    return 'Fikiri Solutions provides AI-powered business automation:\n\n🏢 **Email Automation**: Smart email responses and workflows\n📊 **CRM Management**: Lead tracking and analysis\n🤖 **AI Assistant**: Intelligent business support\n🏭 **Industry Solutions**: Specialized for landscaping, restaurants, and medical practices\n\nWe help businesses streamline operations and increase efficiency.'
+  }
+  
+  if (lowerMessage.includes('help') || lowerMessage.includes('assist')) {
+    return 'I can help you with:\n\n• Email automation setup\n• Lead analysis and prioritization\n• CRM configuration\n• Business process optimization\n• Industry-specific solutions\n\nWhat specific area would you like assistance with?'
+  }
+  
+  return 'I\'m here to help with Fikiri Solutions\' services including email automation, CRM management, and business process optimization. Could you please provide more details about what you\'d like assistance with?'
+}
+
 export const AIAssistant: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputMessage, setInputMessage] = useState('')
@@ -28,7 +51,7 @@ export const AIAssistant: React.FC = () => {
     setMessages([{
       id: '1',
       type: 'ai',
-      content: 'Hello! I\'m your AI Assistant. I can help you with email responses, lead analysis, and business automation. How can I assist you today?',
+      content: 'Hello! I\'m your Fikiri Solutions AI Assistant. I can help you with email automation, lead analysis, CRM management, and business process optimization. I have knowledge about our services including industry-specific automation for landscaping, restaurants, and medical practices. How can I assist you today?',
       timestamp: new Date()
     }])
   }, [])
@@ -78,8 +101,16 @@ export const AIAssistant: React.FC = () => {
 
       setMessages(prev => [...prev, aiMessage])
     } catch (error) {
-      // Failed to send message
-      setError(apiClient.handleError(error))
+      // Failed to send message - provide helpful fallback response
+      const fallbackResponse = getFallbackResponse(inputMessage.trim())
+      const aiMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        type: 'ai',
+        content: fallbackResponse,
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, aiMessage])
+      setError(null) // Clear error since we provided a fallback
     } finally {
       setIsLoading(false)
     }
