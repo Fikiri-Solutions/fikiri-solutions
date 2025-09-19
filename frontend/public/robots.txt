@@ -1,0 +1,22 @@
+User-agent: *
+Allow: /
+
+# Disallow admin and private routes
+Disallow: /admin/
+Disallow: /api/
+Disallow: /_next/
+Disallow: /static/
+
+# Allow important pages
+Allow: /
+Allow: /services
+Allow: /ai
+Allow: /crm
+Allow: /privacy
+Allow: /industries/
+
+# Sitemap location
+Sitemap: https://fikirisolutions.com/sitemap.xml
+
+# Crawl delay (optional)
+Crawl-delay: 1
