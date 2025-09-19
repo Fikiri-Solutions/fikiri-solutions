@@ -44,7 +44,7 @@ export function useLeadAnalytics(filters?: {
 }) {
   return useQuery({
     queryKey: ['dashboard', 'leads', filters],
-    queryFn: () => apiClient.getLeads(filters),
+    queryFn: () => apiClient.getDashboardLeads(filters),
     staleTime: 60000,
     retry: 3,
   });

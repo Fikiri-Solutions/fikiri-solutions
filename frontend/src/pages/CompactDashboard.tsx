@@ -1,131 +1,269 @@
-import React from 'react';
-import { Users, Mail, Brain, DollarSign, TrendingUp, Zap, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { Mail, Users, Brain, Clock, Bot, UserPlus, Zap, AlertTriangle, CheckCircle2, XCircle, AlertCircle, DollarSign, TrendingUp, BarChart3, PieChart as PieChartIcon, Grid, Layout } from 'lucide-react'
+import { ServiceCard } from '../components/ServiceCard'
+import { EnhancedMetricCard } from '../components/EnhancedMetricCard'
+import { MiniTrend } from '../components/MiniTrend'
+import { ChartWidget, CompactChartGrid } from '../components/ChartWidget'
+import { MetricCardSkeleton, ServiceCardSkeleton, ChartSkeleton, ActivitySkeleton } from '../components/Skeleton'
+import { useToast } from '../components/Toast'
+import { useWebSocket } from '../hooks/useWebSocket'
+import { useDashboardTimeseries } from '../hooks/useDashboardTimeseries'
+import { config, getFeatureConfig } from '../config'
+import { apiClient } from '../services/apiClient'
+import { mockServices, mockMetrics, mockActivity } from '../mockData'
+import { DashboardSection, StatsGrid, DashboardCard } from '../components/DashboardLayout'
+import { Button } from '@/components/ui/Button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useActivity } from '../contexts/ActivityContext'
 
 export const CompactDashboard: React.FC = () => {
+  const navigate = useNavigate()
+  const features = getFeatureConfig()
+  const { addToast } = useToast()
+  const { isConnected, data, requestMetricsUpdate, requestServicesUpdate } = useWebSocket()
+  const { data: timeseriesData, summary, loading: timeseriesLoading, error: timeseriesError } = useDashboardTimeseries()
+  const { getRecentActivities } = useActivity()
 
-  // Compact metrics
-  const compactMetrics = {
-    totalLeads: 1247,
-    emailsProcessed: 5678,
-    aiResponses: 2345,
-    revenue: 12345
-  };
+  const [viewMode, setViewMode] = useState<'grid' | 'compact'>('grid') // State for chart view mode
 
-  const compactActivity = [
-    { id: 1, type: 'ai_response', message: 'AI processed customer inquiry', status: 'success', timestamp: '2m ago' },
-    { id: 2, type: 'lead_added', message: 'New lead: TechCorp Solutions', status: 'success', timestamp: '5m ago' },
-    { id: 3, type: 'automation', message: 'Email sequence triggered', status: 'success', timestamp: '8m ago' },
-    { id: 4, type: 'ai_response', message: 'AI generated follow-up', status: 'success', timestamp: '12m ago' }
-  ];
+  // TanStack Query hooks for smart data fetching with real-time updates
+  const { data: servicesData = [], isLoading: servicesLoading } = useQuery({
+    queryKey: ['services'],
+    queryFn: () => features.useMockData ? Promise.resolve(mockServices) : apiClient.getServices(),
+    staleTime: 0,
+    enabled: true,
+  })
+
+  const { data: metricsData = mockMetrics, isLoading: metricsLoading } = useQuery({
+    queryKey: ['metrics'],
+    queryFn: () => features.useMockData ? Promise.resolve(mockMetrics) : apiClient.getMetrics(),
+    staleTime: 0,
+    enabled: true,
+  })
+
+  const { data: activityData = mockActivity, isLoading: activityLoading } = useQuery({
+    queryKey: ['activity'],
+    queryFn: () => features.useMockData ? Promise.resolve(mockActivity) : apiClient.getActivity(),
+    staleTime: 0,
+    enabled: true,
+  })
+
+  // Combine API data with real-time WebSocket updates and user activities
+  const services = data.services?.services || servicesData
+  const metrics = data.metrics || metricsData
+  const apiActivity = data.activity ? [data.activity, ...activityData] : activityData
+  const userActivities = getRecentActivities(5)
+  const activity = userActivities.length > 0 ? userActivities : apiActivity
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="container mx-auto px-4 py-6">
-        {/* Compact Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+    <div className="space-y-6 p-4">
+      {/* Compact Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             Compact Dashboard
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Essential metrics at a glance
+            Streamlined view for quick insights
           </p>
         </div>
-
-        {/* Compact Metrics Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Leads</p>
-                <p className="text-xl font-bold text-gray-900 dark:text-white">{compactMetrics.totalLeads.toLocaleString()}</p>
-              </div>
-              <Users className="h-5 w-5 text-blue-500" />
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Emails</p>
-                <p className="text-xl font-bold text-gray-900 dark:text-white">{compactMetrics.emailsProcessed.toLocaleString()}</p>
-              </div>
-              <Mail className="h-5 w-5 text-green-500" />
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">AI Responses</p>
-                <p className="text-xl font-bold text-gray-900 dark:text-white">{compactMetrics.aiResponses.toLocaleString()}</p>
-              </div>
-              <Brain className="h-5 w-5 text-purple-500" />
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Revenue</p>
-                <p className="text-xl font-bold text-gray-900 dark:text-white">${compactMetrics.revenue.toLocaleString()}</p>
-              </div>
-              <DollarSign className="h-5 w-5 text-yellow-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* Compact Activity Feed */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-            <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-            Recent Activity
-          </h3>
-          <div className="space-y-3">
-            {compactActivity.map((item) => (
-              <div key={item.id} className="flex items-center space-x-3 py-2">
-                <div className={`p-1.5 rounded-full ${
-                  item.status === 'success' ? 'bg-green-100 dark:bg-green-900/20' : 'bg-red-100 dark:bg-red-900/20'
-                }`}>
-                  {item.type === 'ai_response' && <Brain className="h-3 w-3 text-green-600 dark:text-green-400" />}
-                  {item.type === 'lead_added' && <Users className="h-3 w-3 text-blue-600 dark:text-blue-400" />}
-                  {item.type === 'automation' && <Zap className="h-3 w-3 text-yellow-600 dark:text-yellow-400" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{item.message}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{item.timestamp}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Compact Performance Indicators */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Conversion Rate</span>
-              <TrendingUp className="h-4 w-4 text-green-500" />
-            </div>
-            <div className="text-2xl font-bold text-green-600">12.5%</div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Response Time</span>
-              <Zap className="h-4 w-4 text-blue-500" />
-            </div>
-            <div className="text-2xl font-bold text-blue-600">2.4h</div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Satisfaction</span>
-              <CheckCircle2 className="h-4 w-4 text-purple-500" />
-            </div>
-            <div className="text-2xl font-bold text-purple-600">4.8/5</div>
-          </div>
+        <div className="flex items-center space-x-2">
+          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+          <span className="text-xs text-gray-600 dark:text-gray-400">
+            {isConnected ? 'Live' : 'Offline'}
+          </span>
         </div>
       </div>
+
+      {/* Compact Metrics */}
+      <StatsGrid className="grid-cols-2 lg:grid-cols-4 gap-4">
+        <EnhancedMetricCard
+          title="Leads"
+          value={summary?.leads?.total || 1247}
+          change={summary?.leads?.change || 12.5}
+          trend="up"
+          icon={<Users className="h-4 w-4" />}
+          color="blue"
+          compact
+        >
+          <MiniTrend 
+            data={timeseriesData || []} 
+            dataKey="leads" 
+            color="#3b82f6" 
+            height={30}
+          />
+        </EnhancedMetricCard>
+
+        <EnhancedMetricCard
+          title="Emails"
+          value={summary?.emails?.total || 5689}
+          change={summary?.emails?.change || 8.2}
+          trend="up"
+          icon={<Mail className="h-4 w-4" />}
+          color="green"
+          compact
+        >
+          <MiniTrend 
+            data={timeseriesData || []} 
+            dataKey="emails" 
+            color="#22c55e" 
+            height={30}
+          />
+        </EnhancedMetricCard>
+
+        <EnhancedMetricCard
+          title="AI Score"
+          value="94.2%"
+          change={2.1}
+          trend="up"
+          icon={<Brain className="h-4 w-4" />}
+          color="purple"
+          compact
+        >
+          <MiniTrend 
+            data={timeseriesData || []} 
+            dataKey="revenue" 
+            color="#8b5cf6" 
+            height={30}
+          />
+        </EnhancedMetricCard>
+
+        <EnhancedMetricCard
+          title="Revenue"
+          value={`$${summary?.revenue?.total || 12450}`}
+          change={summary?.revenue?.change || 15.3}
+          trend="up"
+          icon={<DollarSign className="h-4 w-4" />}
+          color="orange"
+          compact
+        >
+          <MiniTrend 
+            data={timeseriesData || []} 
+            dataKey="revenue" 
+            color="#f97316" 
+            height={30}
+          />
+        </EnhancedMetricCard>
+      </StatsGrid>
+
+      {/* Chart View Toggle */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          Analytics
+        </h2>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant={viewMode === 'grid' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('grid')}
+          >
+            <Grid className="h-4 w-4 mr-1" />
+            Grid
+          </Button>
+          <Button
+            variant={viewMode === 'compact' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('compact')}
+          >
+            <Layout className="h-4 w-4 mr-1" />
+            Compact
+          </Button>
+        </div>
+      </div>
+
+      {/* Charts */}
+      {viewMode === 'grid' ? (
+        <CompactChartGrid>
+          <ChartWidget
+            title="Email Trends"
+            data={timeseriesData || []}
+            type="line"
+            dataKey="emails"
+            color="#3b82f6"
+          />
+          <ChartWidget
+            title="Lead Growth"
+            data={timeseriesData || []}
+            type="bar"
+            dataKey="leads"
+            color="#22c55e"
+          />
+          <ChartWidget
+            title="Revenue"
+            data={timeseriesData || []}
+            type="area"
+            dataKey="revenue"
+            color="#f97316"
+          />
+        </CompactChartGrid>
+      ) : (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Quick Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-48">
+                <ChartWidget
+                  title=""
+                  data={timeseriesData || []}
+                  type="line"
+                  dataKey="emails"
+                  color="#3b82f6"
+                  compact
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Compact Services and Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <DashboardCard title="Services" variant="success" compact>
+          {servicesLoading ? (
+            <div className="space-y-2">
+              <ServiceCardSkeleton />
+              <ServiceCardSkeleton />
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {services.slice(0, 2).map((service) => (
+                <ServiceCard key={service.id} service={service} compact />
+              ))}
+            </div>
+          )}
+        </DashboardCard>
+
+        <DashboardCard title="Activity" compact>
+          {activityLoading ? (
+            <ActivitySkeleton />
+          ) : (
+            <div className="space-y-2">
+              {activity.slice(0, 3).map((item) => (
+                <div key={item.id} className="flex items-center space-x-2">
+                  <div className="flex-shrink-0">
+                    {item.type === 'email' && <Mail className="h-3 w-3 text-blue-500" />}
+                    {item.type === 'lead' && <UserPlus className="h-3 w-3 text-green-500" />}
+                    {item.type === 'automation' && <Zap className="h-3 w-3 text-yellow-500" />}
+                    {item.type === 'error' && <AlertTriangle className="h-3 w-3 text-red-500" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-900 dark:text-white truncate">
+                      {item.message}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {item.timestamp}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </DashboardCard>
+      </div>
     </div>
-  );
-};
+  )
+}

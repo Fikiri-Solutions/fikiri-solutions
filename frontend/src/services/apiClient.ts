@@ -234,7 +234,7 @@ class ApiClient {
 
   // Enhanced dashboard endpoints
 
-  async getLeads(filters?: {
+  async getDashboardLeads(filters?: {
     dateRange?: { start: string; end: string };
     status?: string;
     source?: string;
