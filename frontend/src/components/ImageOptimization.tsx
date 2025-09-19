@@ -121,34 +121,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
   )
 }
 
-// Responsive image component
-export const ResponsiveImage: React.FC<{
-  src: string
-  alt: string
-  className?: string
-  breakpoints?: { [key: string]: string }
-}> = ({ src, alt, className = '', breakpoints = {} }) => {
-  const defaultBreakpoints = {
-    mobile: '480w',
-    tablet: '768w',
-    desktop: '1024w',
-    large: '1920w'
-  }
-
-  const mergedBreakpoints = { ...defaultBreakpoints, ...breakpoints }
-  const srcSet = Object.entries(mergedBreakpoints)
-    .map(([size, width]) => `${src}?w=${width} ${width}`)
-    .join(', ')
-
-  return (
-    <OptimizedImage
-      src={src}
-      alt={alt}
-      className={className}
-      sizes="(max-width: 480px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
-    />
-  )
-}
+// Responsive image component - moved to separate file to avoid conflicts
 
 // Hero image with parallax effect
 export const HeroImage: React.FC<{
