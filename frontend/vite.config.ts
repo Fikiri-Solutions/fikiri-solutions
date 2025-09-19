@@ -24,12 +24,16 @@ export default defineConfig({
           // Vendor chunks for better caching
           vendor: ['react', 'react-dom'],
           router: ['react-router-dom'],
-          ui: ['@headlessui/react', '@heroicons/react'],
+          ui: ['@headlessui/react', '@heroicons/react', 'lucide-react'],
           animations: ['framer-motion'],
           charts: ['recharts'],
           query: ['@tanstack/react-query'],
           analytics: ['@vercel/analytics/react', '@vercel/speed-insights/react'],
         },
+        // Optimize chunk names for better caching
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
       },
     },
     // Optimize bundle size
@@ -39,10 +43,18 @@ export default defineConfig({
       compress: {
         drop_console: true,
         drop_debugger: true,
+        pure_funcs: ['console.log', 'console.info'],
+      },
+      mangle: {
+        safari10: true,
       },
     },
-    // Enable source maps for production debugging
-    sourcemap: true,
+    // Enable source maps for production debugging (only for errors)
+    sourcemap: 'hidden',
+    // Target modern browsers for better performance
+    target: 'esnext',
+    // Optimize CSS
+    cssCodeSplit: true,
   },
   // Image optimization
   assetsInclude: ['**/*.webp', '**/*.avif'],
