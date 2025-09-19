@@ -17,6 +17,7 @@ import { MedicalLanding } from './pages/MedicalLanding'
 import { RenderInspiredLanding } from './pages/RenderInspiredLanding'
 import { Layout } from './components/Layout'
 import { IndustryAutomation } from './components/IndustryAutomation'
+import { About } from './pages/About'
 import { PrivacySettings } from './components/PrivacySettings'
 import { OnboardingFlow } from './pages/OnboardingFlow'
 import { QueryProvider } from './providers/QueryProvider'
@@ -62,7 +63,8 @@ function App() {
                       <Route path="/ai" element={<Layout><AIAssistant /></Layout>} />
                       <Route path="/assistant" element={<Layout><AIAssistant /></Layout>} />
                       <Route path="/industry" element={<Layout><IndustryAutomation /></Layout>} />
-                      <Route path="/privacy" element={<Layout><PrivacySettings /></Layout>} />
+                              <Route path="/about" element={<Layout><About /></Layout>} />
+                              <Route path="/privacy" element={<Layout><PrivacySettings /></Layout>} />
                       <Route path="/error" element={<ErrorPage />} />
                       <Route path="*" element={<NotFoundPage />} />
                     </Routes>
