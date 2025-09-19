@@ -55,6 +55,7 @@ export default defineConfig({
     target: 'esnext',
     // Optimize CSS
     cssCodeSplit: true,
+    cssMinify: true,
   },
   // Image optimization
   assetsInclude: ['**/*.webp', '**/*.avif'],
