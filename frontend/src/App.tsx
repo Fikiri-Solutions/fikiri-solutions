@@ -23,7 +23,7 @@ import { QueryProvider } from './providers/QueryProvider'
 import { ToastProvider } from './components/Toast'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { CustomizationProvider } from './contexts/CustomizationContext'
-// import { ActivityProvider } from './contexts/ActivityContext'
+import { ActivityProvider } from './contexts/ActivityContext'
 import { ScrollToTop } from './components/ScrollToTop'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { PageLoader } from './components/PageLoader'
@@ -50,10 +50,10 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <ThemeProvider>
-        <CustomizationProvider>
-          {/* <ActivityProvider> */}
-            <QueryProvider>
+            <ThemeProvider>
+              <CustomizationProvider>
+                <ActivityProvider>
+                  <QueryProvider>
               <ToastProvider>
               <Router>
                 <ScrollToTop />
@@ -86,9 +86,9 @@ function App() {
                 <SpeedInsights />
               </Router>
             </ToastProvider>
-          </QueryProvider>
-          {/* </ActivityProvider> */}
-        </CustomizationProvider>
+                  </QueryProvider>
+                </ActivityProvider>
+              </CustomizationProvider>
       </ThemeProvider>
     </ErrorBoundary>
   )
