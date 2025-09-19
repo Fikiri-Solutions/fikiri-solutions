@@ -47,7 +47,13 @@ export function MiniTrend({
     return `${x},${y}`;
   });
 
-  const pathData = points.length > 0 ? `M ${points[0]} L ${points.slice(1).join(' L ')}` : '';
+  // Ensure all coordinates are valid numbers
+  const validPoints = points.filter(point => {
+    const [x, y] = point.split(',').map(Number);
+    return !isNaN(x) && !isNaN(y) && isFinite(x) && isFinite(y);
+  });
+
+  const pathData = validPoints.length > 0 ? `M ${validPoints[0]} L ${validPoints.slice(1).join(' L ')}` : '';
 
   return (
     <div className="w-full" style={{ height: `${height}px` }}>
@@ -69,7 +75,7 @@ export function MiniTrend({
         {/* Area fill */}
         {pathData && (
           <path
-            d={`M 0,100 L ${pathData} L 100,100 Z`}
+            d={`M 0,100 L ${pathData.replace('M ', '')} L 100,100 Z`}
             fill={color}
             fillOpacity="0.1"
           />
@@ -88,9 +94,8 @@ export function MiniTrend({
         )}
         
         {/* Data points */}
-        {values.map((value, index) => {
-          const x = (index / (values.length - 1)) * 100;
-          const y = 100 - ((value - min) / range) * 100;
+        {validPoints.map((point, index) => {
+          const [x, y] = point.split(',').map(Number);
           return (
             <circle
               key={index}
