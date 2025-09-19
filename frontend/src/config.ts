@@ -41,9 +41,9 @@ export const config = {
   
   // App Configuration
   appName: 'Fikiri Solutions',
-  version: '1.0.8', // Force deployment refresh
-  buildTimestamp: '2025-09-18T22:57:00Z', // Force cache refresh
-  cacheVersion: 'v1.0.8-20250918', // Force cache refresh
+  version: '1.0.9', // Force deployment refresh
+  buildTimestamp: '2025-09-19T01:10:00Z', // Force cache refresh
+  cacheVersion: 'v1.0.9-20250919', // Force cache refresh
   
   // Development flags
   isDevelopment: typeof window !== 'undefined' && window.location.hostname === 'localhost',
@@ -69,4 +69,4 @@ export const getFeatureConfig = () => ({
   debugMode: isFeatureEnabled('debugMode'),
 })
 
-// Deployment timestamp: Thu Sep 18 22:57:00 EDT 2025 - Force Vercel deployment
+// Deployment timestamp: Fri Sep 19 01:10:00 EDT 2025 - Force Vercel deployment with fixes
