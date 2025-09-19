@@ -28,12 +28,21 @@ export const Dashboard: React.FC = () => {
   
   // Render different dashboard views
   if (dashboardView === 'enhanced') {
-    return <EnhancedDashboard />
+    console.log('Rendering EnhancedDashboard')
+    try {
+      return <EnhancedDashboard />
+    } catch (error) {
+      console.error('EnhancedDashboard failed:', error)
+      // Fall through to original dashboard
+    }
   }
   
   if (dashboardView === 'compact') {
+    console.log('Rendering CompactDashboard')
     return <CompactDashboard />
   }
+  
+  console.log('Rendering original dashboard')
 
   // Clear specific cache items to force fresh data
   React.useEffect(() => {
