@@ -81,8 +81,9 @@ export const CompactDashboard: React.FC = () => {
       <StatsGrid className="grid-cols-2 lg:grid-cols-4 gap-4">
         <EnhancedMetricCard
           title="Leads"
-          value={summary?.leads?.total || 1247}
-          change={summary?.leads?.change || 12.5}
+          value={1247}
+          change={summary?.leads?.change_pct || 12.5}
+          positive={summary?.leads?.positive || true}
           trend="up"
           icon={<Users className="h-4 w-4" />}
           color="blue"
@@ -98,8 +99,9 @@ export const CompactDashboard: React.FC = () => {
 
         <EnhancedMetricCard
           title="Emails"
-          value={summary?.emails?.total || 5689}
-          change={summary?.emails?.change || 8.2}
+          value={5689}
+          change={summary?.emails?.change_pct || 8.2}
+          positive={summary?.emails?.positive || true}
           trend="up"
           icon={<Mail className="h-4 w-4" />}
           color="green"
@@ -117,6 +119,7 @@ export const CompactDashboard: React.FC = () => {
           title="AI Score"
           value="94.2%"
           change={2.1}
+          positive={true}
           trend="up"
           icon={<Brain className="h-4 w-4" />}
           color="purple"
@@ -132,8 +135,9 @@ export const CompactDashboard: React.FC = () => {
 
         <EnhancedMetricCard
           title="Revenue"
-          value={`$${summary?.revenue?.total || 12450}`}
-          change={summary?.revenue?.change || 15.3}
+          value={`$${12450}`}
+          change={summary?.revenue?.change_pct || 15.3}
+          positive={summary?.revenue?.positive || true}
           trend="up"
           icon={<DollarSign className="h-4 w-4" />}
           color="orange"
@@ -175,7 +179,7 @@ export const CompactDashboard: React.FC = () => {
 
       {/* Charts */}
       {viewMode === 'grid' ? (
-        <CompactChartGrid>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <ChartWidget
             title="Email Trends"
             data={timeseriesData || []}
@@ -197,7 +201,7 @@ export const CompactDashboard: React.FC = () => {
             dataKey="revenue"
             color="#f97316"
           />
-        </CompactChartGrid>
+        </div>
       ) : (
         <div className="space-y-4">
           <Card>
@@ -222,7 +226,7 @@ export const CompactDashboard: React.FC = () => {
 
       {/* Compact Services and Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <DashboardCard title="Services" variant="success" compact>
+        <DashboardCard title="Services" compact>
           {servicesLoading ? (
             <div className="space-y-2">
               <ServiceCardSkeleton />

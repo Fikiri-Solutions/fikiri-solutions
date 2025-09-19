@@ -77,8 +77,9 @@ export const EnhancedDashboard: React.FC = () => {
       <StatsGrid>
         <EnhancedMetricCard
           title="Total Leads"
-          value={summary?.leads?.total || 1247}
-          change={summary?.leads?.change || 12.5}
+          value={1247}
+          change={summary?.leads?.change_pct || 12.5}
+          positive={summary?.leads?.positive || true}
           trend="up"
           icon={<Users className="h-5 w-5" />}
           color="blue"
@@ -92,8 +93,9 @@ export const EnhancedDashboard: React.FC = () => {
 
         <EnhancedMetricCard
           title="Emails Processed"
-          value={summary?.emails?.total || 5689}
-          change={summary?.emails?.change || 8.2}
+          value={5689}
+          change={summary?.emails?.change_pct || 8.2}
+          positive={summary?.emails?.positive || true}
           trend="up"
           icon={<Mail className="h-5 w-5" />}
           color="green"
@@ -109,6 +111,7 @@ export const EnhancedDashboard: React.FC = () => {
           title="AI Performance"
           value="94.2%"
           change={2.1}
+          positive={true}
           trend="up"
           icon={<TrendingUp className="h-5 w-5" />}
           color="purple"
@@ -122,8 +125,9 @@ export const EnhancedDashboard: React.FC = () => {
 
         <EnhancedMetricCard
           title="Revenue"
-          value={`$${summary?.revenue?.total || 12450}`}
-          change={summary?.revenue?.change || 15.3}
+          value={`$${12450}`}
+          change={summary?.revenue?.change_pct || 15.3}
+          positive={summary?.revenue?.positive || true}
           trend="up"
           icon={<DollarSign className="h-5 w-5" />}
           color="orange"
@@ -143,7 +147,7 @@ export const EnhancedDashboard: React.FC = () => {
 
       {/* Services and Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <DashboardCard title="Active Services" variant="success">
+        <DashboardCard title="Active Services">
           {servicesLoading ? (
             <div className="space-y-3">
               <ServiceCardSkeleton />

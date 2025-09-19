@@ -9,6 +9,8 @@ interface DashboardCardProps {
   description?: string;
   children: React.ReactNode;
   className?: string;
+  compact?: boolean;
+  variant?: string;
   badge?: {
     text: string;
     variant?: "default" | "secondary" | "destructive" | "outline" | "success";
@@ -20,27 +22,29 @@ export function DashboardCard({
   description, 
   children, 
   className,
+  compact = false,
+  variant,
   badge 
 }: DashboardCardProps) {
   return (
-    <Card className={cn("transition-all duration-300 hover:shadow-md", className)}>
-      <CardHeader className="space-y-1">
+    <Card className={cn("transition-all duration-300 hover:shadow-md", compact && "p-3", className)}>
+      <CardHeader className={cn("space-y-1", compact && "pb-2")}>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold">{title}</CardTitle>
+          <CardTitle className={cn("font-semibold", compact ? "text-base" : "text-lg")}>{title}</CardTitle>
           {badge && (
             <Badge variant={badge.variant || "secondary"}>
               {badge.text}
             </Badge>
           )}
         </div>
-        {description && (
+        {description && !compact && (
           <CardDescription className="text-sm text-muted-foreground">
             {description}
           </CardDescription>
         )}
       </CardHeader>
-      <Separator />
-      <CardContent className="pt-6">
+      {!compact && <Separator />}
+      <CardContent className={cn("", compact ? "pt-0" : "pt-6")}>
         {children}
       </CardContent>
     </Card>
