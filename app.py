@@ -63,6 +63,7 @@ from core.redis_cache import get_cache, cache_result
 from core.redis_sessions import init_flask_sessions, create_user_session, get_current_user, logout_user, require_login
 from core.redis_rate_limiting import init_rate_limiting, rate_limit, get_rate_limiter
 from core.redis_queues import get_email_queue, get_ai_queue, get_crm_queue, get_webhook_queue
+from core.webhook_sentry import capture_webhook_error, capture_webhook_performance
 
 # Dashboard routes will be added directly to Flask app
 
@@ -3024,6 +3025,69 @@ def sentry_performance_test():
             'message': 'Sentry performance test completed',
             'status': 'success',
             'redis_connected': cache.is_connected()
+        }), 200
+
+# Webhook Sentry Test Routes
+@app.route('/api/webhook-sentry-test', methods=['GET'])
+def webhook_sentry_test():
+    """Test webhook Sentry integration by triggering an error."""
+    try:
+        # This will trigger a webhook Sentry error for testing
+        webhook_data = {
+            'type': 'test_webhook',
+            'source': 'sentry_test',
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Simulate webhook processing error
+        raise Exception('This is a webhook Sentry test error!')
+        
+    except Exception as e:
+        # Capture the error in webhook Sentry
+        capture_webhook_error(e, webhook_data, 'test_user')
+        return jsonify({
+            'message': 'Webhook Sentry test error triggered',
+            'error': str(e),
+            'webhook_data': webhook_data,
+            'status': 'error_sent_to_webhook_sentry'
+        }), 500
+
+@app.route('/api/webhook-sentry-performance-test', methods=['GET'])
+def webhook_sentry_performance_test():
+    """Test webhook Sentry performance monitoring."""
+    webhook_data = {
+        'type': 'performance_test',
+        'source': 'sentry_test',
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    with capture_webhook_performance('webhook_performance_test', webhook_data) as transaction:
+        # Simulate webhook processing work
+        time.sleep(0.1)
+        
+        # Test Redis operations
+        cache = get_cache()
+        if cache.is_connected():
+            cache.cache_ai_response("webhook_test", "webhook_response", "test_user")
+        
+        # Test webhook queue
+        webhook_queue = get_webhook_queue()
+        if webhook_queue.is_connected():
+            job_id = webhook_queue.enqueue_job(
+                "process_webhook",
+                {
+                    "webhook_data": webhook_data,
+                    "test": True
+                }
+            )
+            transaction.set_data("job_id", job_id)
+        
+        return jsonify({
+            'message': 'Webhook Sentry performance test completed',
+            'status': 'success',
+            'redis_connected': cache.is_connected(),
+            'webhook_queue_connected': webhook_queue.is_connected(),
+            'webhook_data': webhook_data
         }), 200
 
 if __name__ == '__main__':
