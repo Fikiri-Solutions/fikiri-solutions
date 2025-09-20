@@ -51,17 +51,17 @@ export const RenderInspiredLanding: React.FC = () => {
     {
       title: "Industry-Specific AI",
       description: "Tailored automation for landscaping, restaurants, medical practices, and more",
-      icon: <Brain className="h-8 w-8 text-blue-600" />
+      icon: <Brain className="h-8 w-8 text-brand-primary" />
     },
     {
       title: "Real-Time Analytics",
       description: "Track performance with detailed reports and ROI insights",
-      icon: <BarChart3 className="h-8 w-8 text-green-600" />
+      icon: <BarChart3 className="h-8 w-8 text-brand-secondary" />
     },
     {
       title: "Seamless Integration",
       description: "Connect with your existing tools and workflows effortlessly",
-      icon: <Zap className="h-8 w-8 text-purple-600" />
+      icon: <Zap className="h-8 w-8 text-brand-accent" />
     }
   ];
 
@@ -73,27 +73,27 @@ export const RenderInspiredLanding: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300" data-testid="render-landing-page">
+    <div className="min-h-screen bg-brand-background dark:bg-gray-900 transition-colors duration-300" data-testid="render-landing-page">
       {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-700">
+      <nav className="fixed top-0 w-full z-50 bg-brand-background/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-brand-text/10 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
-              <Sparkles className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-              <span className="text-xl font-bold text-gray-900 dark:text-white">Fikiri Solutions</span>
+              <Sparkles className="h-8 w-8 text-brand-primary dark:text-brand-accent" />
+              <span className="text-xl font-bold text-brand-text dark:text-white">Fikiri Solutions</span>
             </Link>
             
             <div className="hidden md:flex items-center space-x-8">
-              <Link to="/services" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors duration-200">
+              <Link to="/services" className="text-brand-text/70 dark:text-gray-300 hover:text-brand-primary dark:hover:text-white transition-colors duration-200">
                 Services
               </Link>
-              <Link to="/industry" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors duration-200">
+              <Link to="/industry" className="text-brand-text/70 dark:text-gray-300 hover:text-brand-primary dark:hover:text-white transition-colors duration-200">
                 Industries
               </Link>
-              <Link to="/pricing" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors duration-200">
+              <Link to="/pricing" className="text-brand-text/70 dark:text-gray-300 hover:text-brand-primary dark:hover:text-white transition-colors duration-200">
                 Pricing
               </Link>
-              <Link to="/docs" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors duration-200">
+              <Link to="/docs" className="text-brand-text/70 dark:text-gray-300 hover:text-brand-primary dark:hover:text-white transition-colors duration-200">
                 Docs
               </Link>
             </div>
@@ -101,13 +101,13 @@ export const RenderInspiredLanding: React.FC = () => {
             <div className="flex items-center space-x-4">
               <Link
                 to="/login"
-                className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors duration-200"
+                className="text-brand-text/70 dark:text-gray-300 hover:text-brand-primary dark:hover:text-white transition-colors duration-200"
               >
                 Sign In
               </Link>
               <Link
                 to="/signup"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+                className="bg-brand-primary hover:bg-brand-secondary text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2 dark:focus:ring-offset-gray-900"
               >
                 Get Started
               </Link>
@@ -126,14 +126,14 @@ export const RenderInspiredLanding: React.FC = () => {
               transition={{ duration: 0.6 }}
               className="mb-8"
             >
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-gray-900 dark:text-white mb-6 leading-tight">
+              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-brand-text dark:text-white mb-6 leading-tight">
                 Automate emails, leads, and{' '}
-                <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                <span className="fikiri-gradient bg-clip-text text-transparent">
                   workflows
                 </span>{' '}
                 in minutes with AI
               </h1>
-              <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-400 mb-8 max-w-3xl mx-auto">
+              <p className="text-xl md:text-2xl text-brand-text/70 dark:text-gray-400 mb-8 max-w-3xl mx-auto">
                 Industry-specific AI automation that handles your business processes while you focus on growth
               </p>
             </motion.div>
@@ -146,14 +146,14 @@ export const RenderInspiredLanding: React.FC = () => {
             >
               <Link
                 to="/signup"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 inline-flex items-center justify-center shadow-lg"
+                className="bg-brand-primary hover:bg-brand-secondary text-white px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2 dark:focus:ring-offset-gray-900 inline-flex items-center justify-center shadow-lg"
               >
                 Try for Free
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
               <Link
                 to="/contact"
-                className="border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500 px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 inline-flex items-center justify-center"
+                className="border-2 border-brand-text/20 dark:border-gray-600 text-brand-text dark:text-gray-300 hover:border-brand-accent dark:hover:border-gray-500 px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2 dark:focus:ring-offset-gray-900 inline-flex items-center justify-center"
               >
                 <Play className="mr-2 h-5 w-5" />
                 Watch Demo
@@ -198,7 +198,7 @@ export const RenderInspiredLanding: React.FC = () => {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.5 }}
-                className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-8 border border-gray-200 dark:border-gray-700"
+                className="bg-brand-background dark:bg-gray-800 rounded-2xl p-8 border border-brand-text/10 dark:border-gray-700"
               >
                 <AnimatedWorkflow />
               </motion.div>
@@ -208,7 +208,7 @@ export const RenderInspiredLanding: React.FC = () => {
       </section>
 
       {/* Stats Section */}
-      <section className="py-16 bg-gray-50 dark:bg-gray-800" data-testid="stats-section">
+      <section className="py-16 bg-brand-background/50 dark:bg-gray-800" data-testid="stats-section">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {stats.map((stat, index) => (
@@ -225,11 +225,11 @@ export const RenderInspiredLanding: React.FC = () => {
                   whileInView={{ scale: 1 }}
                   transition={{ duration: 0.5, delay: index * 0.1 + 0.3 }}
                   viewport={{ once: true }}
-                  className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2"
+                  className="text-3xl md:text-4xl font-bold text-brand-text dark:text-white mb-2"
                 >
                   {stat.number}
                 </motion.div>
-                <p className="text-gray-600 dark:text-gray-400">{stat.label}</p>
+                <p className="text-brand-text/70 dark:text-gray-400">{stat.label}</p>
               </motion.div>
             ))}
           </div>
@@ -246,10 +246,10 @@ export const RenderInspiredLanding: React.FC = () => {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-brand-text dark:text-white mb-4">
               Why Choose Fikiri Solutions?
             </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+            <p className="text-xl text-brand-text/70 dark:text-gray-400 max-w-2xl mx-auto">
               Built for modern businesses that need intelligent automation without the complexity
             </p>
           </motion.div>
@@ -263,13 +263,13 @@ export const RenderInspiredLanding: React.FC = () => {
                 transition={{ duration: 0.6, delay: index * 0.1 }}
                 viewport={{ once: true }}
                 whileHover={{ y: -5 }}
-                className="bg-white dark:bg-gray-800 p-8 rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-all duration-300"
+                className="bg-brand-background dark:bg-gray-800 p-8 rounded-xl border border-brand-text/10 dark:border-gray-700 hover:shadow-lg transition-all duration-300"
               >
                 <div className="mb-4">{feature.icon}</div>
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+                <h3 className="text-xl font-semibold text-brand-text dark:text-white mb-3">
                   {feature.title}
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-brand-text/70 dark:text-gray-400">
                   {feature.description}
                 </p>
               </motion.div>
@@ -279,7 +279,7 @@ export const RenderInspiredLanding: React.FC = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-blue-600 to-purple-600 text-white" data-testid="cta-section">
+      <section className="py-20 fikiri-gradient text-white" data-testid="cta-section">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -296,14 +296,14 @@ export const RenderInspiredLanding: React.FC = () => {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 to="/signup"
-                className="bg-white text-blue-600 px-8 py-4 rounded-lg font-semibold text-lg hover:bg-gray-100 transition-all duration-200 hover:scale-105 inline-flex items-center justify-center shadow-lg"
+                className="bg-white text-brand-primary px-8 py-4 rounded-lg font-semibold text-lg hover:bg-gray-100 transition-all duration-200 hover:scale-105 inline-flex items-center justify-center shadow-lg"
               >
                 Start Free Trial
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
               <Link
                 to="/contact"
-                className="border-2 border-white text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-white hover:text-blue-600 transition-all duration-200 hover:scale-105 inline-flex items-center justify-center"
+                className="border-2 border-white text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-white hover:text-brand-primary transition-all duration-200 hover:scale-105 inline-flex items-center justify-center"
               >
                 Contact Sales
               </Link>
