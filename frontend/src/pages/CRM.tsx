@@ -121,16 +121,16 @@ export const CRM: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">CRM - Lead Management</h1>
+              <h1 className="text-2xl font-bold text-brand-text dark:text-white">CRM - Lead Management</h1>
               <FeatureStatus status={getFeatureStatus('crm')} />
             </div>
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            <p className="mt-1 text-sm text-brand-text/70 dark:text-gray-400">
               Track and manage your customer leads and relationships.
             </p>
           </div>
           <button 
             onClick={() => setShowAddLeadModal(true)}
-            className="btn-primary flex items-center space-x-2"
+            className="bg-brand-primary hover:bg-brand-secondary text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center space-x-2"
           >
             <Plus className="h-4 w-4" />
             <span>Add Lead</span>
@@ -150,29 +150,29 @@ export const CRM: React.FC = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="card">
+        <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <Users className="h-6 w-6 text-gray-400" />
+              <Users className="h-6 w-6 text-brand-primary" />
             </div>
             <div className="ml-4 w-0 flex-1">
               <dl>
-                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Leads</dt>
-                <dd className="text-2xl font-semibold text-gray-900 dark:text-white">{leads.length}</dd>
+                <dt className="text-sm font-medium text-brand-text/70 dark:text-gray-400 truncate">Total Leads</dt>
+                <dd className="text-2xl font-semibold text-brand-text dark:text-white">{leads.length}</dd>
               </dl>
             </div>
           </div>
         </div>
 
-        <div className="card">
+        <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <Star className="h-6 w-6 text-gray-400" />
+              <Star className="h-6 w-6 text-brand-secondary" />
             </div>
             <div className="ml-4 w-0 flex-1">
               <dl>
-                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Qualified Leads</dt>
-                <dd className="text-2xl font-semibold text-gray-900 dark:text-white">
+                <dt className="text-sm font-medium text-brand-text/70 dark:text-gray-400 truncate">Qualified Leads</dt>
+                <dd className="text-2xl font-semibold text-brand-text dark:text-white">
                   {leads.filter(lead => lead.stage === 'qualified').length}
                 </dd>
               </dl>
@@ -180,15 +180,15 @@ export const CRM: React.FC = () => {
           </div>
         </div>
 
-        <div className="card">
+        <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <Mail className="h-6 w-6 text-gray-400" />
+              <Mail className="h-6 w-6 text-brand-accent" />
             </div>
             <div className="ml-4 w-0 flex-1">
               <dl>
-                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Contacted</dt>
-                <dd className="text-2xl font-semibold text-gray-900 dark:text-white">
+                <dt className="text-sm font-medium text-brand-text/70 dark:text-gray-400 truncate">Contacted</dt>
+                <dd className="text-2xl font-semibold text-brand-text dark:text-white">
                   {leads.filter(lead => lead.stage === 'contacted').length}
                 </dd>
               </dl>
@@ -196,15 +196,15 @@ export const CRM: React.FC = () => {
           </div>
         </div>
 
-        <div className="card">
+        <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <Building className="h-6 w-6 text-gray-400" />
+              <Building className="h-6 w-6 text-brand-warning" />
             </div>
             <div className="ml-4 w-0 flex-1">
               <dl>
-                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Companies</dt>
-                <dd className="text-2xl font-semibold text-gray-900 dark:text-white">
+                <dt className="text-sm font-medium text-brand-text/70 dark:text-gray-400 truncate">Companies</dt>
+                <dd className="text-2xl font-semibold text-brand-text dark:text-white">
                   {new Set(leads.map(lead => lead.company)).size}
                 </dd>
               </dl>
@@ -214,16 +214,16 @@ export const CRM: React.FC = () => {
       </div>
 
       {/* Filters and Search */}
-      <div className="card">
+      <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
           <div className="flex-1 max-w-lg">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-gray-400" />
+                <Search className="h-5 w-5 text-brand-text/60" />
               </div>
               <input
                 type="text"
-                className="input-field pl-10"
+                className="bg-white text-brand-text placeholder-brand-text/60 border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 pl-10 w-full"
                 placeholder="Search leads by name, email, or company..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -233,9 +233,9 @@ export const CRM: React.FC = () => {
           
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <Filter className="h-4 w-4 text-gray-400" />
+              <Filter className="h-4 w-4 text-brand-text/60" />
               <select
-                className="input-field"
+                className="bg-white text-brand-text border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2"
                 value={filterStage}
                 onChange={(e) => setFilterStage(e.target.value)}
               >
@@ -251,60 +251,60 @@ export const CRM: React.FC = () => {
       </div>
 
       {/* Leads Table */}
-      <div className="card">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Leads ({filteredLeads.length})</h3>
+      <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md border border-brand-text/10">
+        <div className="px-6 py-4 border-b border-brand-text/10">
+          <h3 className="text-lg font-medium text-brand-text dark:text-white">Leads ({filteredLeads.length})</h3>
         </div>
         
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-800">
+            <table className="min-w-full divide-y divide-brand-text/10 dark:divide-gray-700">
+              <thead className="bg-brand-background/50 dark:bg-gray-800">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider">
                     Lead
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider">
                     Company
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider">
                     Stage
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider">
                     Score
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider">
                     Last Contact
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider">
                     Source
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-brand-text/10 dark:divide-gray-700">
                 {filteredLeads.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-gray-50">
+                  <tr key={lead.id} className="hover:bg-brand-background/30 dark:hover:bg-gray-800">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                            <span className="text-sm font-medium text-blue-600">
+                          <div className="h-10 w-10 rounded-full bg-brand-accent/20 flex items-center justify-center">
+                            <span className="text-sm font-medium text-brand-primary">
                               {lead.name.split(' ').map(n => n[0]).join('')}
                             </span>
                           </div>
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{lead.name}</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">{lead.email}</div>
+                          <div className="text-sm font-medium text-brand-text dark:text-white">{lead.name}</div>
+                          <div className="text-sm text-brand-text/70 dark:text-gray-400">{lead.email}</div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-white">{lead.company}</div>
+                      <div className="text-sm text-brand-text dark:text-white">{lead.company}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStageColor(lead.stage)}`}>
@@ -316,10 +316,10 @@ export const CRM: React.FC = () => {
                         {lead.score}/10
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-brand-text/70 dark:text-gray-400">
                       {lead.lastContact}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-brand-text/70 dark:text-gray-400">
                       {lead.source}
                     </td>
                   </tr>
@@ -343,18 +343,18 @@ export const CRM: React.FC = () => {
       {/* Add Lead Modal */}
       {showAddLeadModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+          <div className="relative top-20 mx-auto p-5 border border-brand-text/10 w-96 shadow-lg rounded-md bg-brand-background dark:bg-gray-800">
             <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Add New Lead</h3>
+              <h3 className="text-lg font-medium text-brand-text dark:text-white mb-4">Add New Lead</h3>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-1">
                     Name *
                   </label>
                   <input
                     type="text"
-                    className="input-field"
+                    className="bg-white text-brand-text placeholder-brand-text/60 border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                     value={newLead.name}
                     onChange={(e) => setNewLead({...newLead, name: e.target.value})}
                     placeholder="Enter lead name"
@@ -362,12 +362,12 @@ export const CRM: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-1">
                     Email *
                   </label>
                   <input
                     type="email"
-                    className="input-field"
+                    className="bg-white text-brand-text placeholder-brand-text/60 border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                     value={newLead.email}
                     onChange={(e) => setNewLead({...newLead, email: e.target.value})}
                     placeholder="Enter email address"
@@ -375,12 +375,12 @@ export const CRM: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-1">
                     Phone
                   </label>
                   <input
                     type="tel"
-                    className="input-field"
+                    className="bg-white text-brand-text placeholder-brand-text/60 border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                     value={newLead.phone}
                     onChange={(e) => setNewLead({...newLead, phone: e.target.value})}
                     placeholder="Enter phone number"
@@ -388,12 +388,12 @@ export const CRM: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-1">
                     Company
                   </label>
                   <input
                     type="text"
-                    className="input-field"
+                    className="bg-white text-brand-text placeholder-brand-text/60 border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                     value={newLead.company}
                     onChange={(e) => setNewLead({...newLead, company: e.target.value})}
                     placeholder="Enter company name"
@@ -401,11 +401,11 @@ export const CRM: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-1">
                     Source
                   </label>
                   <select
-                    className="input-field"
+                    className="bg-white text-brand-text border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                     value={newLead.source}
                     onChange={(e) => setNewLead({...newLead, source: e.target.value})}
                   >
@@ -421,14 +421,14 @@ export const CRM: React.FC = () => {
               <div className="flex justify-end space-x-3 mt-6">
                 <button
                   onClick={() => setShowAddLeadModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+                  className="px-4 py-2 text-sm font-medium text-brand-text bg-brand-background/50 hover:bg-brand-background/80 border border-brand-text/20 rounded-lg"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAddLead}
                   disabled={isLoading || !newLead.name || !newLead.email}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-md"
+                  className="px-4 py-2 text-sm font-medium text-white bg-brand-primary hover:bg-brand-secondary disabled:opacity-50 disabled:cursor-not-allowed rounded-lg"
                 >
                   {isLoading ? 'Adding...' : 'Add Lead'}
                 </button>
