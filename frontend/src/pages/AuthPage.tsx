@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Eye, EyeOff, AlertCircle, CheckCircle, Loader2, Mail, Lock, User } from 'lucide-react'
+import { FikiriLogo } from '../components/FikiriLogo'
 
 interface SignupFormData {
   name: string
@@ -195,49 +196,49 @@ export const AuthPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-brand-background flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         {/* Logo and Header */}
         <div className="text-center mb-8">
-          <div className="mx-auto w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center mb-4">
-            <Mail className="h-8 w-8 text-white" />
+          <div className="flex items-center justify-center mb-4">
+            <FikiriLogo size="lg" variant="full" className="mx-auto" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Fikiri Solutions</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-3xl font-bold text-brand-text">Fikiri Solutions</h1>
+          <p className="text-brand-text/70 mt-2">
             AI-powered email automation for your business
           </p>
         </div>
 
         {/* Auth Form */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="bg-brand-background border border-brand-text/10 rounded-2xl shadow-xl p-8">
           {/* Success Message */}
           {success && (
-            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="mb-6 bg-brand-accent/10 border border-brand-accent/20 rounded-lg p-4">
               <div className="flex items-center">
-                <CheckCircle className="h-5 w-5 text-green-400 mr-3" />
-                <p className="text-sm text-green-800">{success}</p>
+                <CheckCircle className="h-5 w-5 text-brand-accent mr-3" />
+                <p className="text-sm text-brand-text">{success}</p>
               </div>
             </div>
           )}
 
           {/* General Error */}
           {errors.general && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="mb-6 bg-brand-error/10 border border-brand-error/20 rounded-lg p-4">
               <div className="flex items-center">
-                <AlertCircle className="h-5 w-5 text-red-400 mr-3" />
-                <p className="text-sm text-red-800">{errors.general}</p>
+                <AlertCircle className="h-5 w-5 text-brand-error mr-3" />
+                <p className="text-sm text-brand-text">{errors.general}</p>
               </div>
             </div>
           )}
 
           {/* Tab Toggle */}
-          <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
+          <div className="flex mb-6 bg-brand-text/5 rounded-lg p-1">
             <button
               onClick={() => setIsSignup(false)}
               className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                 !isSignup
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-brand-background text-brand-text shadow-sm'
+                  : 'text-brand-text/60 hover:text-brand-text'
               }`}
             >
               Sign In
@@ -246,8 +247,8 @@ export const AuthPage: React.FC = () => {
               onClick={() => setIsSignup(true)}
               className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                 isSignup
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-brand-background text-brand-text shadow-sm'
+                  : 'text-brand-text/60 hover:text-brand-text'
               }`}
             >
               Create Account
@@ -258,7 +259,7 @@ export const AuthPage: React.FC = () => {
           <button
             onClick={handleGoogleAuth}
             disabled={isLoading}
-            className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+            className="w-full flex items-center justify-center px-4 py-3 border border-brand-text/20 rounded-lg shadow-sm bg-brand-background text-sm font-medium text-brand-text hover:bg-brand-text/5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent disabled:opacity-50 disabled:cursor-not-allowed mb-4"
           >
             <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -274,7 +275,7 @@ export const AuthPage: React.FC = () => {
               <div className="w-full border-t border-gray-300" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">Or continue with email</span>
+              <span className="px-2 bg-brand-background text-brand-text/60">Or continue with email</span>
             </div>
           </div>
 
@@ -292,21 +293,21 @@ export const AuthPage: React.FC = () => {
                     type="text"
                     value={signupData.name}
                     onChange={(e) => setSignupData({ ...signupData, name: e.target.value })}
-                    className={`w-full pl-10 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                      errors.name ? 'border-red-300' : 'border-gray-300'
+                    className={`w-full pl-10 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-brand-accent focus:border-brand-accent ${
+                      errors.name ? 'border-brand-error' : 'border-brand-text/20'
                     }`}
                     placeholder="John Doe"
                     disabled={isLoading}
                   />
                 </div>
                 {errors.name && (
-                  <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+                  <p className="mt-1 text-sm text-brand-error">{errors.name}</p>
                 )}
               </div>
 
               {/* Email */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-brand-text mb-1">
                   Work Email
                 </label>
                 <div className="relative">
@@ -315,15 +316,15 @@ export const AuthPage: React.FC = () => {
                     type="email"
                     value={signupData.email}
                     onChange={(e) => setSignupData({ ...signupData, email: e.target.value })}
-                    className={`w-full pl-10 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                      errors.email ? 'border-red-300' : 'border-gray-300'
+                    className={`w-full pl-10 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-brand-accent focus:border-brand-accent ${
+                      errors.email ? 'border-brand-error' : 'border-brand-text/20'
                     }`}
                     placeholder="john@company.com"
                     disabled={isLoading}
                   />
                 </div>
                 {errors.email && (
-                  <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                  <p className="mt-1 text-sm text-brand-error">{errors.email}</p>
                 )}
               </div>
 
@@ -338,8 +339,8 @@ export const AuthPage: React.FC = () => {
                     type={showPassword ? 'text' : 'password'}
                     value={signupData.password}
                     onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
-                    className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                      errors.password ? 'border-red-300' : 'border-gray-300'
+                    className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-brand-accent focus:border-brand-accent ${
+                      errors.password ? 'border-brand-error' : 'border-brand-text/20'
                     }`}
                     placeholder="Create a strong password"
                     disabled={isLoading}
@@ -353,13 +354,13 @@ export const AuthPage: React.FC = () => {
                   </button>
                 </div>
                 {errors.password && (
-                  <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+                  <p className="mt-1 text-sm text-brand-error">{errors.password}</p>
                 )}
               </div>
 
               {/* Confirm Password */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-brand-text mb-1">
                   Confirm Password
                 </label>
                 <div className="relative">
@@ -368,8 +369,8 @@ export const AuthPage: React.FC = () => {
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={signupData.confirmPassword}
                     onChange={(e) => setSignupData({ ...signupData, confirmPassword: e.target.value })}
-                    className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                      errors.confirmPassword ? 'border-red-300' : 'border-gray-300'
+                    className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-brand-accent focus:border-brand-accent ${
+                      errors.confirmPassword ? 'border-brand-error' : 'border-brand-text/20'
                     }`}
                     placeholder="Confirm your password"
                     disabled={isLoading}
@@ -383,14 +384,14 @@ export const AuthPage: React.FC = () => {
                   </button>
                 </div>
                 {errors.confirmPassword && (
-                  <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
+                  <p className="mt-1 text-sm text-brand-error">{errors.confirmPassword}</p>
                 )}
               </div>
 
               {/* Business Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-brand-text mb-1">
                     Company
                   </label>
                   <input
@@ -403,7 +404,7 @@ export const AuthPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-brand-text mb-1">
                     Team Size
                   </label>
                   <select
@@ -503,9 +504,9 @@ export const AuthPage: React.FC = () => {
 
           {/* Privacy Notice */}
           <div className="mt-6 text-center">
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-brand-text/60">
               We store your password securely hashed. You can{' '}
-              <button className="text-blue-600 hover:text-blue-700 underline">
+              <button className="text-brand-primary hover:text-brand-secondary underline">
                 remove all data anytime
               </button>{' '}
               in Settings.
@@ -516,7 +517,7 @@ export const AuthPage: React.FC = () => {
           <div className="mt-4 text-center">
             <a
               href="mailto:support@fikirisolutions.com"
-              className="text-sm text-blue-600 hover:text-blue-700"
+              className="text-sm text-brand-primary hover:text-brand-secondary"
             >
               Need help? Contact Support
             </a>

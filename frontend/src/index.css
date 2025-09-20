@@ -2,6 +2,126 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fikiri Solutions Brand Colors */
+@layer base {
+  :root {
+    /* Fikiri Brand Colors (refined from logo) */
+    --fikiri-primary: #B33B1E;        /* Primary red-orange */
+    --fikiri-secondary: #E7641C;      /* Bright orange */
+    --fikiri-accent: #F39C12;         /* Golden yellow */
+    --fikiri-warning: #992D1E;        /* Deep red */
+    --fikiri-error: #C0392B;          /* Deep red-orange */
+    --fikiri-text: #4B1E0C;           /* Tree brown */
+    --fikiri-bg: #F7F3E9;            /* Cream background */
+    
+    /* Primary Colors */
+    --primary: 12 45% 50%; /* #B85450 */
+    --primary-foreground: 0 0% 98%;
+    
+    /* Secondary Colors */
+    --secondary: 25 80% 50%; /* #E67E22 */
+    --secondary-foreground: 0 0% 98%;
+    
+    /* Background Colors */
+    --background: 45 100% 95%; /* #FDF6E3 */
+    --foreground: 25 50% 25%; /* #8B4513 */
+    
+    /* Card Colors */
+    --card: 45 100% 95%;
+    --card-foreground: 25 50% 25%;
+    
+    /* Popover Colors */
+    --popover: 45 100% 95%;
+    --popover-foreground: 25 50% 25%;
+    
+    /* Muted Colors */
+    --muted: 45 50% 90%;
+    --muted-foreground: 25 30% 40%;
+    
+    /* Accent Colors */
+    --accent: 45 100% 70%; /* #FFB84D */
+    --accent-foreground: 25 50% 25%;
+    
+    /* Destructive Colors */
+    --destructive: 0 60% 50%; /* #C0392B */
+    --destructive-foreground: 0 0% 98%;
+    
+    /* Border Colors */
+    --border: 25 30% 80%;
+    --input: 25 30% 80%;
+    --ring: 12 45% 50%;
+    
+    /* Radius */
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* Dark mode adjustments */
+    --background: 25 50% 10%; /* Dark brown background */
+    --foreground: 45 100% 95%; /* Light text */
+    --card: 25 50% 15%;
+    --card-foreground: 45 100% 95%;
+    --popover: 25 50% 15%;
+    --popover-foreground: 45 100% 95%;
+    --muted: 25 30% 20%;
+    --muted-foreground: 45 50% 70%;
+    --accent: 25 30% 20%;
+    --accent-foreground: 45 100% 95%;
+    --border: 25 30% 20%;
+    --input: 25 30% 20%;
+  }
+}
+
+/* Fikiri Brand Utilities */
+@layer utilities {
+  .fikiri-gradient {
+    background: linear-gradient(135deg, #F39C12 0%, #E7641C 50%, #B33B1E 100%);
+  }
+  
+  .fikiri-gradient-subtle {
+    background: linear-gradient(135deg, #F7F3E9 0%, #F39C12 100%);
+  }
+  
+  .fikiri-gradient-animated {
+    background: linear-gradient(135deg, #F39C12 0%, #E7641C 50%, #B33B1E 100%);
+    background-size: 200% 200%;
+    animation: gradientShift 3s ease-in-out infinite;
+  }
+  
+  @keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  
+  .text-fikiri-primary {
+    color: #B85450;
+  }
+  
+  .text-fikiri-secondary {
+    color: #E67E22;
+  }
+  
+  .text-fikiri-accent {
+    color: #FFB84D;
+  }
+  
+  .bg-fikiri-primary {
+    background-color: #B85450;
+  }
+  
+  .bg-fikiri-secondary {
+    background-color: #E67E22;
+  }
+  
+  .bg-fikiri-accent {
+    background-color: #FFB84D;
+  }
+  
+  .bg-fikiri-bg {
+    background-color: #FDF6E3;
+  }
+}
+
 /* Font optimization */
 html { 
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; 
