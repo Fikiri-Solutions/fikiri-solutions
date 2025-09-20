@@ -1,0 +1,634 @@
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
+import { 
+  Mail, 
+  Lock, 
+  User, 
+  Building, 
+  Eye, 
+  EyeOff, 
+  ArrowRight, 
+  Chrome, 
+  Github,
+  UserPlus,
+  CheckCircle,
+  AlertCircle
+} from 'lucide-react';
+import { FikiriLogo } from '../components/FikiriLogo';
+
+const Signup: React.FC = () => {
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    company: '',
+    password: '',
+    confirmPassword: '',
+    agreeToTerms: false,
+    subscribeNewsletter: false
+  });
+  
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    setMousePosition({
+      x: (e.clientX / window.innerWidth) * 100,
+      y: (e.clientY / window.innerHeight) * 100,
+    });
+  };
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.firstName.trim()) {
+      newErrors.firstName = 'First name is required';
+    }
+
+    if (!formData.lastName.trim()) {
+      newErrors.lastName = 'Last name is required';
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Email is invalid';
+    }
+
+    if (!formData.company.trim()) {
+      newErrors.company = 'Company name is required';
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters';
+    }
+
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    if (!formData.agreeToTerms) {
+      newErrors.agreeToTerms = 'You must agree to the terms and conditions';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+    
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsLoading(true);
+    
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Redirect to onboarding or dashboard
+      window.location.href = '/onboarding';
+    } catch (error) {
+      console.error('Signup error:', error);
+      setErrors({ submit: 'Failed to create account. Please try again.' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSocialSignup = (provider: string) => {
+    console.log(`Signing up with ${provider}`);
+    // Implement social signup logic
+  };
+
+  return (
+    <div 
+      className="min-h-screen bg-brand-background dark:bg-gray-900 relative overflow-hidden"
+      onMouseMove={handleMouseMove}
+    >
+      {/* Animated Background */}
+      <div className="absolute inset-0">
+        {/* Floating orbs with brand colors */}
+        <motion.div 
+          className="absolute w-72 h-72 bg-brand-accent/20 rounded-full blur-3xl"
+          animate={{
+            x: mousePosition.x * 0.1,
+            y: mousePosition.y * 0.1,
+            scale: [1, 1.1, 1],
+          }}
+          transition={{
+            duration: 4,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+        <motion.div 
+          className="absolute w-96 h-96 bg-brand-secondary/20 rounded-full blur-3xl"
+          animate={{
+            x: mousePosition.x * 0.05,
+            y: mousePosition.y * 0.05,
+            scale: [1.1, 1, 1.1],
+          }}
+          transition={{
+            duration: 6,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+        <motion.div 
+          className="absolute w-64 h-64 bg-brand-primary/20 rounded-full blur-3xl"
+          animate={{
+            x: mousePosition.x * 0.08,
+            y: mousePosition.y * 0.1,
+            scale: [1, 1.2, 1],
+          }}
+          transition={{
+            duration: 5,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+        
+        {/* Geometric shapes */}
+        <motion.div
+          className="absolute top-20 left-20 w-32 h-32 border-2 border-white/10 rounded-lg"
+          animate={{
+            rotate: [0, 90, 180, 270, 360],
+            scale: [1, 1.1, 1],
+          }}
+          transition={{
+            duration: 8,
+            repeat: Infinity,
+            ease: "linear"
+          }}
+        />
+        <motion.div
+          className="absolute bottom-32 right-32 w-24 h-24 bg-brand-accent/10 rounded-full"
+          animate={{
+            y: [-20, 20, -20],
+            x: [-10, 10, -10],
+          }}
+          transition={{
+            duration: 7,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+        <motion.div
+          className="absolute top-1/2 right-20 w-16 h-16 border-2 border-brand-secondary/20 rounded-full"
+          animate={{
+            rotate: [0, 180, 360],
+            scale: [1, 1.2, 1],
+          }}
+          transition={{
+            duration: 6,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+        
+        {/* Grid pattern */}
+        <div className="absolute inset-0 opacity-20" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+        }} />
+        
+        {/* Floating particles */}
+        {[...Array(30)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-2 h-2 bg-white/30 rounded-full"
+            animate={{
+              y: [-20, 20, -20],
+              x: [-10, 10, -10],
+              opacity: [0.3, 0.8, 0.3],
+            }}
+            transition={{
+              duration: 3 + Math.random() * 2,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: Math.random() * 2,
+            }}
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Main Content */}
+      <div className="relative z-10 min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full">
+          {/* Logo and Branding */}
+          <motion.div 
+            className="text-center mb-8"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <div className="flex items-center justify-center mb-6">
+              <FikiriLogo size="xl" variant="white" className="mx-auto" />
+            </div>
+            <motion.h1 
+              className="text-5xl font-bold text-white mb-2 font-serif tracking-tight"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+            >
+              Join Fikiri
+            </motion.h1>
+            <motion.p 
+              className="text-xl text-white/90 mb-1 font-medium"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+            >
+              Start Your Automation Journey
+            </motion.p>
+            <motion.p 
+              className="text-sm text-white/70 font-light"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+            >
+              Transform your business with intelligent automation
+            </motion.p>
+          </motion.div>
+
+          {/* Signup Form */}
+          <motion.div 
+            className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.5 }}
+          >
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-white text-center mb-2 font-serif">
+                Create Your Account
+              </h2>
+              <p className="text-gray-300 text-center text-sm font-light">
+                Get started with Fikiri Solutions today
+              </p>
+            </div>
+            
+            <form className="space-y-6" onSubmit={handleSubmit}>
+              {errors.submit && (
+                <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4 backdrop-blur-sm">
+                  <div className="flex items-center">
+                    <AlertCircle className="h-5 w-5 text-red-300 mr-2" />
+                    <p className="text-sm text-red-200">{errors.submit}</p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Name Fields */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-200 mb-2">
+                    First Name
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <User className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      id="firstName"
+                      name="firstName"
+                      type="text"
+                      required
+                      className={`w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent transition-all duration-200 backdrop-blur-sm ${errors.firstName ? 'border-brand-error focus:ring-brand-error' : ''}`}
+                      placeholder="John"
+                      value={formData.firstName}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  {errors.firstName && (
+                    <p className="mt-2 text-sm text-red-300">{errors.firstName}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label htmlFor="lastName" className="block text-sm font-medium text-gray-200 mb-2">
+                    Last Name
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <User className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      id="lastName"
+                      name="lastName"
+                      type="text"
+                      required
+                      className={`w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent transition-all duration-200 backdrop-blur-sm ${errors.lastName ? 'border-brand-error focus:ring-brand-error' : ''}`}
+                      placeholder="Doe"
+                      value={formData.lastName}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  {errors.lastName && (
+                    <p className="mt-2 text-sm text-red-300">{errors.lastName}</p>
+                  )}
+                </div>
+              </div>
+              
+              {/* Email Field */}
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-200 mb-2">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    className={`w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent transition-all duration-200 backdrop-blur-sm ${errors.email ? 'border-brand-error focus:ring-brand-error' : ''}`}
+                    placeholder="john@company.com"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                {errors.email && (
+                  <p className="mt-2 text-sm text-red-300">{errors.email}</p>
+                )}
+              </div>
+              
+              {/* Company Field */}
+              <div>
+                <label htmlFor="company" className="block text-sm font-medium text-gray-200 mb-2">
+                  Company Name
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Building className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    id="company"
+                    name="company"
+                    type="text"
+                    required
+                    className={`w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent transition-all duration-200 backdrop-blur-sm ${errors.company ? 'border-brand-error focus:ring-brand-error' : ''}`}
+                    placeholder="Your Company"
+                    value={formData.company}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                {errors.company && (
+                  <p className="mt-2 text-sm text-red-300">{errors.company}</p>
+                )}
+              </div>
+              
+              {/* Password Fields */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-200 mb-2">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      required
+                      className={`w-full pl-12 pr-12 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent transition-all duration-200 backdrop-blur-sm ${errors.password ? 'border-brand-error focus:ring-brand-error' : ''}`}
+                      placeholder="••••••••"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-300" />
+                      ) : (
+                        <Eye className="h-5 w-5 text-gray-400 hover:text-gray-300" />
+                      )}
+                    </button>
+                  </div>
+                  {errors.password && (
+                    <p className="mt-2 text-sm text-red-300">{errors.password}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-200 mb-2">
+                    Confirm Password
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      required
+                      className={`w-full pl-12 pr-12 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent transition-all duration-200 backdrop-blur-sm ${errors.confirmPassword ? 'border-brand-error focus:ring-brand-error' : ''}`}
+                      placeholder="••••••••"
+                      value={formData.confirmPassword}
+                      onChange={handleInputChange}
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-300" />
+                      ) : (
+                        <Eye className="h-5 w-5 text-gray-400 hover:text-gray-300" />
+                      )}
+                    </button>
+                  </div>
+                  {errors.confirmPassword && (
+                    <p className="mt-2 text-sm text-red-300">{errors.confirmPassword}</p>
+                  )}
+                </div>
+              </div>
+              
+              {/* Checkboxes */}
+              <div className="space-y-4">
+                <div className="flex items-start">
+                  <div className="flex items-center h-5">
+                    <input
+                      id="agreeToTerms"
+                      name="agreeToTerms"
+                      type="checkbox"
+                      className="w-4 h-4 text-brand-accent bg-white/10 border-white/20 rounded focus:ring-brand-accent focus:ring-2"
+                      checked={formData.agreeToTerms}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="ml-3 text-sm">
+                    <label htmlFor="agreeToTerms" className="text-gray-300">
+                      I agree to the{' '}
+                      <Link to="/terms" className="text-brand-accent hover:text-brand-secondary underline">
+                        Terms of Service
+                      </Link>{' '}
+                      and{' '}
+                      <Link to="/privacy" className="text-brand-accent hover:text-brand-secondary underline">
+                        Privacy Policy
+                      </Link>
+                    </label>
+                    {errors.agreeToTerms && (
+                      <p className="mt-1 text-sm text-red-300">{errors.agreeToTerms}</p>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex items-start">
+                  <div className="flex items-center h-5">
+                    <input
+                      id="subscribeNewsletter"
+                      name="subscribeNewsletter"
+                      type="checkbox"
+                      className="w-4 h-4 text-brand-accent bg-white/10 border-white/20 rounded focus:ring-brand-accent focus:ring-2"
+                      checked={formData.subscribeNewsletter}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="ml-3 text-sm">
+                    <label htmlFor="subscribeNewsletter" className="text-gray-300">
+                      Subscribe to our newsletter for updates and tips
+                    </label>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-brand-primary to-brand-secondary hover:from-brand-secondary hover:to-brand-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Creating Account...
+                  </>
+                ) : (
+                  <>
+                    Create Account
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Social Signup Options */}
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-white/20" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-transparent text-gray-300">Or sign up with</span>
+                </div>
+              </div>
+
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleSocialSignup('gmail')}
+                  className="w-full inline-flex justify-center py-3 px-4 border border-white/20 rounded-xl shadow-sm bg-white/10 text-sm font-medium text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent transition-all duration-200"
+                >
+                  <Chrome className="h-5 w-5 mr-2" />
+                  Gmail
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSocialSignup('github')}
+                  className="w-full inline-flex justify-center py-3 px-4 border border-white/20 rounded-xl shadow-sm bg-white/10 text-sm font-medium text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent transition-all duration-200"
+                >
+                  <Github className="h-5 w-5 mr-2" />
+                  GitHub
+                </button>
+              </div>
+            </div>
+
+            {/* Sign In Link */}
+            <div className="mt-6 text-center">
+              <p className="text-sm text-gray-300">
+                Already have an account?{' '}
+                <Link 
+                  to="/login" 
+                  className="text-brand-accent hover:text-brand-secondary font-medium underline"
+                >
+                  Sign in here
+                </Link>
+              </p>
+            </div>
+          </motion.div>
+
+          {/* Features Preview */}
+          <motion.div 
+            className="mt-8 grid grid-cols-3 gap-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.8 }}
+          >
+            <div className="text-center">
+              <div className="w-12 h-12 bg-brand-accent/20 rounded-xl flex items-center justify-center mx-auto mb-2">
+                <CheckCircle className="h-6 w-6 text-brand-accent" />
+              </div>
+              <p className="text-xs text-gray-300">Free Trial</p>
+            </div>
+            <div className="text-center">
+              <div className="w-12 h-12 bg-brand-secondary/20 rounded-xl flex items-center justify-center mx-auto mb-2">
+                <UserPlus className="h-6 w-6 text-brand-secondary" />
+              </div>
+              <p className="text-xs text-gray-300">Easy Setup</p>
+            </div>
+            <div className="text-center">
+              <div className="w-12 h-12 bg-brand-primary/20 rounded-xl flex items-center justify-center mx-auto mb-2">
+                <ArrowRight className="h-6 w-6 text-brand-primary" />
+              </div>
+              <p className="text-xs text-gray-300">Quick Start</p>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export { Signup };
