@@ -24,10 +24,11 @@ def init_webhook_sentry():
                 FlaskIntegration(),
                 RedisIntegration(),
             ],
-            # Add data like request headers and IP for users
+            # Add data like inputs and responses to/from LLMs and tools;
+            # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
             send_default_pii=True,
-            # Performance monitoring
-            traces_sample_rate=0.1,  # 10% of transactions
+            # Performance monitoring - full tracing for comprehensive monitoring
+            traces_sample_rate=1.0,  # 100% of transactions for performance monitoring
             # Enable logs to be sent to Sentry
             enable_logs=True,
             # Environment

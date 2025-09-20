@@ -184,8 +184,11 @@ def init_sentry(app):
         ],
         environment=os.getenv('SENTRY_ENVIRONMENT', 'development'),
         release=os.getenv('SENTRY_RELEASE', '1.0.0'),
-        traces_sample_rate=0.1,  # 10% of transactions for performance monitoring
-        send_default_pii=False,  # Don't send personally identifiable information
+        # Add data like inputs and responses to/from LLMs and tools;
+        # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+        send_default_pii=True,
+        # Performance monitoring - full tracing for comprehensive monitoring
+        traces_sample_rate=1.0,  # 100% of transactions for performance monitoring
         # Enable logs to be sent to Sentry
         enable_logs=True,
         before_send=before_send_filter,
