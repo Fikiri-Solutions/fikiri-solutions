@@ -421,7 +421,7 @@ export const Login: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
 
         </div>
       </div>
