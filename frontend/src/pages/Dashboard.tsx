@@ -6,6 +6,7 @@ import { ServiceCard } from '../components/ServiceCard'
 import { MetricCard } from '../components/MetricCard'
 import { MiniTrend } from '../components/MiniTrend'
 import { MetricCardSkeleton, ServiceCardSkeleton, ChartSkeleton, ActivitySkeleton } from '../components/Skeleton'
+import { SentryTestButton, SentryErrorBoundary } from '../components/SentryTest'
 import { useToast } from '../components/Toast'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useDashboardTimeseries } from '../hooks/useDashboardTimeseries'
@@ -297,6 +298,13 @@ export const Dashboard: React.FC = () => {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Sentry Test Section */}
+        <div className="mt-8">
+          <SentryErrorBoundary>
+            <SentryTestButton />
+          </SentryErrorBoundary>
         </div>
       </div>
     </div>
