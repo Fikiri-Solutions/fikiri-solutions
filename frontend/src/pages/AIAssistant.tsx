@@ -121,8 +121,8 @@ export const AIAssistant: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">AI Assistant</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <h1 className="text-2xl font-bold text-brand-text dark:text-white">AI Assistant</h1>
+          <p className="mt-1 text-sm text-brand-text/70 dark:text-gray-400">
             Get intelligent help with email responses, lead analysis, and business automation.
           </p>
         </div>
@@ -181,8 +181,8 @@ export const AIAssistant: React.FC = () => {
               <div
                 className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                   message.type === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                    ? 'bg-brand-primary text-white'
+                    : 'bg-brand-background dark:bg-gray-700 text-brand-text dark:text-gray-100 border border-brand-text/10'
                 }`}
               >
                 <div className="flex items-start space-x-2">
@@ -195,7 +195,7 @@ export const AIAssistant: React.FC = () => {
                   <div className="flex-1">
                     <p className="text-sm">{message.content}</p>
                     <p className={`text-xs mt-1 ${
-                      message.type === 'user' ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'
+                      message.type === 'user' ? 'text-white/70' : 'text-brand-text/60 dark:text-gray-400'
                     }`}>
                       {message.timestamp.toLocaleTimeString()}
                     </p>
@@ -208,17 +208,17 @@ export const AIAssistant: React.FC = () => {
           {/* Typing Indicator */}
           {isTyping && (
             <div className="flex justify-start">
-              <div className="bg-gray-100 text-gray-900 max-w-xs lg:max-w-md px-4 py-2 rounded-lg">
+              <div className="bg-brand-background dark:bg-gray-700 text-brand-text dark:text-gray-100 max-w-xs lg:max-w-md px-4 py-2 rounded-lg border border-brand-text/10">
                 <div className="flex items-start space-x-2">
                   <Bot className="h-4 w-4 mt-1 flex-shrink-0" />
                   <div className="flex-1">
                     <div className="flex items-center space-x-1">
                       <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        <div className="w-2 h-2 bg-brand-accent rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-brand-accent rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-brand-accent rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                       </div>
-                      <span className="text-sm text-gray-500 ml-2">AI is typing...</span>
+                      <span className="text-sm text-brand-text/60 dark:text-gray-400 ml-2">AI is typing...</span>
                     </div>
                   </div>
                 </div>
@@ -232,13 +232,13 @@ export const AIAssistant: React.FC = () => {
           {/* Loading Indicator */}
           {isLoading && (
             <div className="flex justify-start">
-              <div className="bg-gray-100 text-gray-900 px-4 py-2 rounded-lg">
+              <div className="bg-brand-background dark:bg-gray-700 text-brand-text dark:text-gray-100 px-4 py-2 rounded-lg border border-brand-text/10">
                 <div className="flex items-center space-x-2">
                   <Bot className="h-4 w-4" />
                   <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                    <div className="w-2 h-2 bg-brand-accent rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-brand-accent rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                    <div className="w-2 h-2 bg-brand-accent rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
                   </div>
                 </div>
               </div>
@@ -247,7 +247,7 @@ export const AIAssistant: React.FC = () => {
         </div>
 
         {/* Input */}
-        <div className="border-t border-gray-200 p-4">
+        <div className="border-t border-brand-text/10 dark:border-gray-700 p-4">
           <div className="flex space-x-4">
             <div className="flex-1">
               <input
@@ -263,7 +263,7 @@ export const AIAssistant: React.FC = () => {
             <button
               onClick={handleSendMessage}
               disabled={!inputMessage.trim() || isLoading}
-              className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-brand-primary hover:bg-brand-secondary text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send className="h-4 w-4" />
               <span>Send</span>
@@ -276,39 +276,39 @@ export const AIAssistant: React.FC = () => {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <button
           onClick={() => setInputMessage('Help me write a professional email response')}
-          className="card hover:shadow-md transition-shadow duration-200 text-left"
+          className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-4 border border-brand-text/10 hover:shadow-lg transition-all duration-200 text-left"
         >
           <div className="flex items-center space-x-3">
-            <Mail className="h-6 w-6 text-blue-600" />
+            <Mail className="h-6 w-6 text-brand-primary" />
             <div>
-              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Email Response</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Generate professional email replies</p>
+              <h3 className="text-sm font-medium text-brand-text dark:text-white">Email Response</h3>
+              <p className="text-xs text-brand-text/70 dark:text-gray-400">Generate professional email replies</p>
             </div>
           </div>
         </button>
 
         <button
           onClick={() => setInputMessage('Analyze my leads and suggest priorities')}
-          className="card hover:shadow-md transition-shadow duration-200 text-left"
+          className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-4 border border-brand-text/10 hover:shadow-lg transition-all duration-200 text-left"
         >
           <div className="flex items-center space-x-3">
-            <Users className="h-6 w-6 text-green-600" />
+            <Users className="h-6 w-6 text-brand-secondary" />
             <div>
-              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Lead Analysis</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Get insights on your leads</p>
+              <h3 className="text-sm font-medium text-brand-text dark:text-white">Lead Analysis</h3>
+              <p className="text-xs text-brand-text/70 dark:text-gray-400">Get insights on your leads</p>
             </div>
           </div>
         </button>
 
         <button
           onClick={() => setInputMessage('Set up automated workflows')}
-          className="card hover:shadow-md transition-shadow duration-200 text-left"
+          className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-4 border border-brand-text/10 hover:shadow-lg transition-all duration-200 text-left"
         >
           <div className="flex items-center space-x-3">
-            <Zap className="h-6 w-6 text-yellow-600" />
+            <Zap className="h-6 w-6 text-brand-accent" />
             <div>
-              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Automation</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Configure business workflows</p>
+              <h3 className="text-sm font-medium text-brand-text dark:text-white">Automation</h3>
+              <p className="text-xs text-brand-text/70 dark:text-gray-400">Configure business workflows</p>
             </div>
           </div>
         </button>
