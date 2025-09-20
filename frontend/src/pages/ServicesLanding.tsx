@@ -33,13 +33,13 @@ export const ServicesLanding: React.FC = () => {
   const pricingTiers = [
     {
       name: "Starter",
-      price: "$29",
+      price: "$39",
       period: "/month",
       description: "Perfect for small businesses",
       features: [
-        "Up to 1,000 emails/month",
+        "Up to 500 emails/month",
         "Basic AI responses",
-        "CRM for 100 contacts",
+        "Simple CRM",
         "Email support",
         "Gmail integration"
       ],
@@ -47,14 +47,14 @@ export const ServicesLanding: React.FC = () => {
       popular: false
     },
     {
-      name: "Professional",
-      price: "$99",
+      name: "Growth",
+      price: "$79",
       period: "/month",
       description: "For growing businesses",
       features: [
-        "Up to 10,000 emails/month",
+        "Up to 2,000 emails/month",
         "Advanced AI responses",
-        "CRM for 1,000 contacts",
+        "Advanced CRM",
         "Priority support",
         "Gmail + Outlook integration",
         "Custom templates",
@@ -64,8 +64,25 @@ export const ServicesLanding: React.FC = () => {
       popular: true
     },
     {
+      name: "Business",
+      price: "$199",
+      period: "/month",
+      description: "For established businesses",
+      features: [
+        "Up to 10,000 emails/month",
+        "White-label options",
+        "Custom integrations",
+        "Phone support",
+        "All integrations",
+        "Custom workflows",
+        "API access"
+      ],
+      cta: "Start Free Trial",
+      popular: false
+    },
+    {
       name: "Enterprise",
-      price: "$299",
+      price: "$399",
       period: "/month",
       description: "For large organizations",
       features: [
@@ -76,7 +93,8 @@ export const ServicesLanding: React.FC = () => {
         "All integrations",
         "Custom workflows",
         "API access",
-        "White-label options"
+        "White-label options",
+        "SLA guarantee"
       ],
       cta: "Contact Sales",
       popular: false

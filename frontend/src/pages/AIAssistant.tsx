@@ -21,7 +21,7 @@ const getFallbackResponse = (message: string): string => {
   }
   
   if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('pricing')) {
-    return 'Our pricing varies based on your specific needs:\n\n• **Starter Plan**: Basic email automation\n• **Professional Plan**: Advanced CRM + automation\n• **Enterprise Plan**: Custom solutions\n\nContact us for a personalized quote based on your industry and requirements.'
+    return 'Our pricing varies based on your specific needs:\n\n• **Starter Plan**: $39/month - Basic email automation\n• **Growth Plan**: $79/month - Advanced CRM + automation\n• **Business Plan**: $199/month - White-label options\n• **Enterprise Plan**: $399/month - Custom solutions\n\nContact us for a personalized quote based on your industry and requirements.'
   }
   
   if (lowerMessage.includes('service') || lowerMessage.includes('what do you do')) {

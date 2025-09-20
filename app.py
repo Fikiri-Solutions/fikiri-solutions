@@ -2801,27 +2801,27 @@ def get_pricing_tiers():
         tiers = {
             'starter': {
                 'name': 'Starter',
-                'price': 29.00,
-                'responses_limit': 100,
-                'features': ['Basic AI responses', 'Email automation', 'Simple CRM']
+                'price': 39.00,
+                'responses_limit': 200,
+                'features': ['Basic AI responses', 'Email automation', 'Simple CRM', '500 emails/month']
             },
-            'professional': {
-                'name': 'Professional',
-                'price': 99.00,
-                'responses_limit': 1000,
-                'features': ['Industry-specific prompts', 'Advanced CRM', 'Calendar integration']
+            'growth': {
+                'name': 'Growth',
+                'price': 79.00,
+                'responses_limit': 800,
+                'features': ['Advanced AI responses', 'Advanced CRM', 'Priority support', '2,000 emails/month']
             },
-            'premium': {
-                'name': 'Premium',
-                'price': 249.00,
-                'responses_limit': 5000,
-                'features': ['Custom workflows', 'Multi-industry support', 'Advanced analytics']
+            'business': {
+                'name': 'Business',
+                'price': 199.00,
+                'responses_limit': 4000,
+                'features': ['White-label options', 'Custom integrations', 'Phone support', '10,000 emails/month']
             },
             'enterprise': {
                 'name': 'Enterprise',
-                'price': 499.00,
+                'price': 399.00,
                 'responses_limit': 'unlimited',
-                'features': ['White-label solution', 'API access', 'Priority support']
+                'features': ['Custom AI training', 'Dedicated support', 'SLA guarantee', 'Unlimited emails']
             }
         }
         
