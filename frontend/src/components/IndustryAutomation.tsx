@@ -323,14 +323,14 @@ export const IndustryAutomation: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 transition-colors duration-300">
+    <div className="min-h-screen bg-brand-background dark:bg-gray-900 p-6 transition-colors duration-300">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          <h1 className="text-3xl font-bold text-brand-text dark:text-white mb-2">
             🚀 Industry-Specific AI Automation
           </h1>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-brand-text/70 dark:text-gray-400">
             Powered by OpenAI Responses API with structured workflows and usage analytics
           </p>
         </div>
@@ -339,8 +339,8 @@ export const IndustryAutomation: React.FC = () => {
           {/* Left Column - Industry Selection & Chat */}
           <div className="lg:col-span-2 space-y-6">
             {/* Industry Selection */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            <div className="bg-brand-background dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-brand-text/10">
+              <h2 className="text-xl font-semibold text-brand-text dark:text-white mb-4">
                 Select Industry & Test AI
               </h2>
               
@@ -357,32 +357,27 @@ export const IndustryAutomation: React.FC = () => {
                   }, {} as Record<string, Array<{industry: string, config: IndustryPrompt}>>)
                 ).map(([category, industries]: [string, Array<{industry: string, config: IndustryPrompt}>]) => (
                   <div key={category} className="space-y-3">
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2">
+                    <h3 className="text-lg font-medium text-brand-text dark:text-white border-b border-brand-text/10 dark:border-gray-700 pb-2">
                       {category}
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
                       {industries.map(({ industry, config }: {industry: string, config: IndustryPrompt}) => (
                         <button
                           key={industry}
                           onClick={() => setSelectedIndustry(industry)}
-                          className={`p-4 rounded-lg border-2 transition-all duration-200 text-left hover:scale-105 ${
+                          className={`p-3 rounded-lg border-2 transition-all duration-200 text-left hover:scale-105 ${
                             selectedIndustry === industry
-                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900 shadow-lg'
-                              : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-md'
+                              ? 'border-brand-primary bg-brand-accent/20 dark:bg-brand-accent/20 shadow-lg'
+                              : 'border-brand-text/20 dark:border-gray-700 hover:border-brand-accent dark:hover:border-gray-600 hover:shadow-md'
                           }`}
                         >
-                          <div className="flex items-start space-x-3">
+                          <div className="flex flex-col items-center text-center space-y-2">
                             <div className="text-2xl">{getIndustryIcon(industry)}</div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-gray-900 dark:text-white capitalize">
-                                {industry.replace('_', ' ')}
-                              </div>
-                              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                {getIndustryDescription(industry)}
-                              </div>
-                              <div className={`inline-block px-2 py-1 rounded-full text-xs font-medium mt-2 ${getTierColor(config.pricing_tier)}`}>
-                                {config.pricing_tier}
-                              </div>
+                            <div className="font-medium text-brand-text dark:text-white capitalize text-sm">
+                              {industry.replace('_', ' ')}
+                            </div>
+                            <div className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getTierColor(config.pricing_tier)}`}>
+                              {config.pricing_tier}
                             </div>
                           </div>
                         </button>
@@ -395,26 +390,26 @@ export const IndustryAutomation: React.FC = () => {
               {/* Chat Interface */}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-2">
                     Client ID
                   </label>
                   <input
                     type="text"
                     value={clientId}
                     onChange={(e) => setClientId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors duration-200"
+                    className="w-full px-3 py-2 border border-brand-text/20 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-brand-text dark:text-white focus:border-brand-accent dark:focus:border-brand-accent focus:ring-brand-accent dark:focus:ring-brand-accent transition-colors duration-200"
                     placeholder="Enter client ID for analytics"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-2">
                     Test Message
                   </label>
                   <textarea
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors duration-200"
+                    className="w-full px-3 py-2 border border-brand-text/20 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-brand-text dark:text-white focus:border-brand-accent dark:focus:border-brand-accent focus:ring-brand-accent dark:focus:ring-brand-accent transition-colors duration-200"
                     rows={3}
                     placeholder={`Test ${selectedIndustry} AI assistant...`}
                   />
@@ -423,7 +418,7 @@ export const IndustryAutomation: React.FC = () => {
                 <button
                   onClick={handleIndustryChat}
                   disabled={isLoading || !message.trim()}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-md transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+                  className="w-full bg-brand-primary hover:bg-brand-secondary disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-md transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2 dark:focus:ring-offset-gray-900"
                 >
                   {isLoading ? 'Processing...' : 'Send Message'}
                 </button>
@@ -432,26 +427,26 @@ export const IndustryAutomation: React.FC = () => {
 
             {/* Response */}
             {response && (
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+              <div className="bg-brand-background dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-brand-text/10">
+                <h3 className="text-lg font-semibold text-brand-text dark:text-white mb-3">
                   AI Response
                 </h3>
                 <div className="prose dark:prose-invert max-w-none">
-                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                  <p className="text-brand-text/80 dark:text-gray-300 whitespace-pre-wrap">
                     {response}
                   </p>
                 </div>
                 
                 {toolsUsed.length > 0 && (
                   <div className="mt-4">
-                    <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                    <h4 className="text-sm font-medium text-brand-text dark:text-white mb-2">
                       Tools Used:
                     </h4>
                     <div className="flex flex-wrap gap-2">
                       {toolsUsed.map((tool, index) => (
                         <span
                           key={index}
-                          className="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 rounded-full text-xs"
+                          className="px-2 py-1 bg-brand-accent/20 text-brand-primary dark:bg-brand-accent/20 dark:text-brand-accent rounded-full text-xs"
                         >
                           {tool.tool}
                         </span>
@@ -467,44 +462,44 @@ export const IndustryAutomation: React.FC = () => {
           <div className="space-y-6">
             {/* Usage Metrics */}
             {usageMetrics && (
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              <div className="bg-brand-background dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-brand-text/10">
+                <h3 className="text-lg font-semibold text-brand-text dark:text-white mb-4">
                   <TrendingUp className="inline-block w-5 h-5 mr-2" />
                   Usage Analytics
                 </h3>
                 
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Current Tier:</span>
+                    <span className="text-brand-text/70 dark:text-gray-400">Current Tier:</span>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTierColor(usageMetrics.tier)}`}>
                       {usageMetrics.tier}
                     </span>
                   </div>
                   
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Responses:</span>
-                    <span className="text-gray-900 dark:text-white font-medium">
+                    <span className="text-brand-text/70 dark:text-gray-400">Responses:</span>
+                    <span className="text-brand-text dark:text-white font-medium">
                       {usageMetrics.responses}
                     </span>
                   </div>
                   
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Tool Calls:</span>
-                    <span className="text-gray-900 dark:text-white font-medium">
+                    <span className="text-brand-text/70 dark:text-gray-400">Tool Calls:</span>
+                    <span className="text-brand-text dark:text-white font-medium">
                       {usageMetrics.tool_calls}
                     </span>
                   </div>
                   
                   <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Tokens:</span>
-                    <span className="text-gray-900 dark:text-white font-medium">
+                    <span className="text-brand-text/70 dark:text-gray-400">Tokens:</span>
+                    <span className="text-brand-text dark:text-white font-medium">
                       {usageMetrics.tokens.toLocaleString()}
                     </span>
                   </div>
                   
-                  <div className="flex justify-between border-t pt-3">
-                    <span className="text-gray-600 dark:text-gray-400">Monthly Cost:</span>
-                    <span className="text-gray-900 dark:text-white font-bold">
+                  <div className="flex justify-between border-t border-brand-text/10 pt-3">
+                    <span className="text-brand-text/70 dark:text-gray-400">Monthly Cost:</span>
+                    <span className="text-brand-text dark:text-white font-bold">
                       ${usageMetrics.monthly_cost}
                     </span>
                   </div>
@@ -513,8 +508,8 @@ export const IndustryAutomation: React.FC = () => {
             )}
 
             {/* Pricing Tiers */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            <div className="bg-brand-background dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-brand-text/10">
+              <h3 className="text-lg font-semibold text-brand-text dark:text-white mb-4">
                 <Building2 className="inline-block w-5 h-5 mr-2" />
                 Pricing Tiers
               </h3>
@@ -529,21 +524,26 @@ export const IndustryAutomation: React.FC = () => {
                       key={tier}
                       className={`p-4 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-md ${
                         isSelectedTier
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900 shadow-lg'
-                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                          ? 'border-brand-primary bg-brand-accent/20 dark:bg-brand-accent/20 shadow-lg'
+                          : 'border-brand-text/20 dark:border-gray-700 hover:border-brand-accent dark:hover:border-gray-600'
                       }`}
                       onClick={() => {
+                        console.log(`Clicked on ${tier} tier`); // Debug log
+                        
                         // Find an industry that uses this tier and select it
                         const industryForTier = Object.keys(prompts).find(
                           industry => prompts[industry]?.pricing_tier === tier
                         );
                         if (industryForTier) {
                           setSelectedIndustry(industryForTier);
+                          console.log(`Selected industry: ${industryForTier}`); // Debug log
                         }
                         
                         // Update usage metrics based on selected tier with consistent data
                         const tierConfig = pricingTiers[tier];
                         if (tierConfig) {
+                          console.log(`Updating metrics for ${tier} tier`); // Debug log
+                          
                           // Define tier-specific usage patterns
                           const tierUsagePatterns = {
                             starter: {
@@ -578,26 +578,31 @@ export const IndustryAutomation: React.FC = () => {
                           const toolCalls = Math.floor(responses * pattern.toolCallRatio);
                           const tokens = responses * pattern.avgTokensPerResponse;
                           
-                          setUsageMetrics({
+                          const newMetrics = {
                             tier: tier,
                             responses: responses,
                             tool_calls: toolCalls,
                             tokens: tokens,
                             monthly_cost: tierConfig.price
-                          });
+                          };
+                          
+                          console.log(`New metrics:`, newMetrics); // Debug log
+                          setUsageMetrics(newMetrics);
+                        } else {
+                          console.error(`No config found for tier: ${tier}`); // Debug log
                         }
                       }}
                     >
                     <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-medium text-gray-900 dark:text-white">
+                      <h4 className="font-medium text-brand-text dark:text-white">
                         {config.name}
                       </h4>
-                      <span className="text-lg font-bold text-gray-900 dark:text-white">
+                      <span className="text-lg font-bold text-brand-text dark:text-white">
                         ${config.price}
                       </span>
                     </div>
                     
-                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    <div className="text-sm text-brand-text/70 dark:text-gray-400 mb-3">
                       {typeof config.responses_limit === 'number' 
                         ? `${config.responses_limit} responses/month`
                         : 'Unlimited responses'
@@ -606,8 +611,8 @@ export const IndustryAutomation: React.FC = () => {
                     
                     <ul className="space-y-1">
                       {config.features.map((feature, index) => (
-                        <li key={index} className="text-sm text-gray-600 dark:text-gray-400 flex items-center">
-                          <CheckCircle className="w-3 h-3 mr-2 text-green-500" />
+                        <li key={index} className="text-sm text-brand-text/70 dark:text-gray-400 flex items-center">
+                          <CheckCircle className="w-3 h-3 mr-2 text-brand-accent" />
                           {feature}
                         </li>
                       ))}
@@ -620,22 +625,22 @@ export const IndustryAutomation: React.FC = () => {
 
             {/* Industry Focus Areas */}
             {prompts[selectedIndustry] && (
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              <div className="bg-brand-background dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-brand-text/10">
+                <h3 className="text-lg font-semibold text-brand-text dark:text-white mb-4">
                   <Settings className="inline-block w-5 h-5 mr-2" />
                   {selectedIndustry.charAt(0).toUpperCase() + selectedIndustry.slice(1)} Focus
                 </h3>
                 
                 <div className="space-y-3">
                   <div>
-                    <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                    <h4 className="text-sm font-medium text-brand-text dark:text-white mb-2">
                       Focus Areas:
                     </h4>
                     <div className="flex flex-wrap gap-2">
                       {prompts[selectedIndustry].focus_areas.map((area, index) => (
                         <span
                           key={index}
-                          className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 rounded-full text-xs"
+                          className="px-2 py-1 bg-brand-accent/20 text-brand-primary dark:bg-brand-accent/20 dark:text-brand-accent rounded-full text-xs"
                         >
                           {area}
                         </span>
@@ -644,14 +649,14 @@ export const IndustryAutomation: React.FC = () => {
                   </div>
                   
                   <div>
-                    <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                    <h4 className="text-sm font-medium text-brand-text dark:text-white mb-2">
                       Available Tools:
                     </h4>
                     <div className="flex flex-wrap gap-2">
                       {prompts[selectedIndustry].tools.map((tool, index) => (
                         <span
                           key={index}
-                          className="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 rounded-full text-xs"
+                          className="px-2 py-1 bg-brand-secondary/20 text-brand-secondary dark:bg-brand-secondary/20 dark:text-brand-secondary rounded-full text-xs"
                         >
                           {tool}
                         </span>

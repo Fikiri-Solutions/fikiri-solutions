@@ -146,57 +146,69 @@ export const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-brand-background dark:bg-gray-900">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          <h1 className="text-3xl font-bold text-brand-text dark:text-white mb-2">
             Dashboard
           </h1>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-brand-text/70 dark:text-gray-400">
             Welcome back! Here's what's happening with your business.
           </p>
         </div>
 
         {/* Metrics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+          <div 
+            className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 border border-brand-text/10"
+            onClick={() => navigate('/crm')}
+          >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Leads</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">1,234</p>
+                <p className="text-sm font-medium text-brand-text/70 dark:text-gray-400">Total Leads</p>
+                <p className="text-2xl font-bold text-brand-text dark:text-white">1,234</p>
               </div>
-              <Users className="h-8 w-8 text-blue-500" />
+              <Users className="h-8 w-8 text-brand-primary" />
             </div>
           </div>
           
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+          <div 
+            className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 border border-brand-text/10"
+            onClick={() => navigate('/services')}
+          >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Emails Processed</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">5,678</p>
+                <p className="text-sm font-medium text-brand-text/70 dark:text-gray-400">Emails Processed</p>
+                <p className="text-2xl font-bold text-brand-text dark:text-white">5,678</p>
               </div>
-              <Mail className="h-8 w-8 text-green-500" />
+              <Mail className="h-8 w-8 text-brand-secondary" />
             </div>
           </div>
           
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+          <div 
+            className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 border border-brand-text/10"
+            onClick={() => navigate('/ai')}
+          >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">AI Responses</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">2,345</p>
+                <p className="text-sm font-medium text-brand-text/70 dark:text-gray-400">AI Responses</p>
+                <p className="text-2xl font-bold text-brand-text dark:text-white">2,345</p>
               </div>
-              <Brain className="h-8 w-8 text-purple-500" />
+              <Brain className="h-8 w-8 text-brand-accent" />
             </div>
           </div>
           
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+          <div 
+            className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 border border-brand-text/10"
+            onClick={() => navigate('/industry')}
+          >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Revenue</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">$12,345</p>
+                <p className="text-sm font-medium text-brand-text/70 dark:text-gray-400">Revenue</p>
+                <p className="text-2xl font-bold text-brand-text dark:text-white">$12,345</p>
               </div>
-              <DollarSign className="h-8 w-8 text-yellow-500" />
+              <DollarSign className="h-8 w-8 text-brand-warning" />
             </div>
           </div>
         </div>
@@ -204,9 +216,9 @@ export const Dashboard: React.FC = () => {
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Email Trends Chart */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-              <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+          <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
+            <h3 className="text-lg font-semibold text-brand-text dark:text-white mb-4 flex items-center">
+              <div className="w-3 h-3 bg-brand-primary rounded-full mr-2"></div>
               Email Trends
             </h3>
             <div className="h-64">
@@ -217,9 +229,9 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Service Performance Chart */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-              <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+          <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
+            <h3 className="text-lg font-semibold text-brand-text dark:text-white mb-4 flex items-center">
+              <div className="w-3 h-3 bg-brand-secondary rounded-full mr-2"></div>
               Service Performance
             </h3>
             <div className="h-64">
@@ -231,9 +243,9 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Service Distribution Chart */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-            <div className="w-3 h-3 bg-purple-500 rounded-full mr-2"></div>
+        <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8 border border-brand-text/10">
+          <h3 className="text-lg font-semibold text-brand-text dark:text-white mb-4 flex items-center">
+            <div className="w-3 h-3 bg-brand-accent rounded-full mr-2"></div>
             Service Distribution
           </h3>
           <div className="h-64">
@@ -246,8 +258,8 @@ export const Dashboard: React.FC = () => {
         {/* Services and Activity Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Active Services */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
+            <h3 className="text-lg font-semibold text-brand-text dark:text-white mb-4">
               Active Services
             </h3>
             {servicesLoading ? (
@@ -265,8 +277,8 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Recent Activity */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
+            <h3 className="text-lg font-semibold text-brand-text dark:text-white mb-4">
               Recent Activity
             </h3>
             {activityLoading ? (
@@ -277,8 +289,8 @@ export const Dashboard: React.FC = () => {
                   <div key={item.id} className="flex items-center space-x-3">
                     {getActivityIcon(item.type, item.status)}
                     <div className="flex-1">
-                      <p className="text-sm font-medium">{item.message}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{item.timestamp}</p>
+                      <p className="text-sm font-medium text-brand-text dark:text-white">{item.message}</p>
+                      <p className="text-xs text-brand-text/60 dark:text-gray-400">{item.timestamp}</p>
                     </div>
                   </div>
                 ))}
