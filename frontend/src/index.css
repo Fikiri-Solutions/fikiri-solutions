@@ -55,21 +55,30 @@
     --radius: 0.5rem;
   }
 
-  .dark {
-    /* Dark mode adjustments */
-    --background: 25 50% 10%; /* Dark brown background */
-    --foreground: 45 100% 95%; /* Light text */
-    --card: 25 50% 15%;
-    --card-foreground: 45 100% 95%;
-    --popover: 25 50% 15%;
-    --popover-foreground: 45 100% 95%;
-    --muted: 25 30% 20%;
-    --muted-foreground: 45 50% 70%;
-    --accent: 25 30% 20%;
-    --accent-foreground: 45 100% 95%;
-    --border: 25 30% 20%;
-    --input: 25 30% 20%;
-  }
+         .dark {
+           /* Dark mode adjustments */
+           --background: 25 50% 10%; /* Dark brown background */
+           --foreground: 45 100% 95%; /* Light text */
+           --card: 25 50% 15%;
+           --card-foreground: 45 100% 95%;
+           --popover: 25 50% 15%;
+           --popover-foreground: 45 100% 95%;
+           --muted: 25 30% 20%;
+           --muted-foreground: 45 50% 70%;
+           --accent: 25 30% 20%;
+           --accent-foreground: 45 100% 95%;
+           --border: 25 30% 20%;
+           --input: 25 30% 20%;
+           
+           /* Fikiri Brand Colors for Dark Mode */
+           --fikiri-primary: #E7641C;        /* Brighter orange for dark mode */
+           --fikiri-secondary: #F39C12;      /* Brighter yellow for dark mode */
+           --fikiri-accent: #F7F3E9;         /* Light cream for dark mode */
+           --fikiri-warning: #C0392B;        /* Brighter red for dark mode */
+           --fikiri-error: #E7641C;          /* Brighter orange for dark mode */
+           --fikiri-text: #F7F3E9;           /* Light cream text */
+           --fikiri-bg: #2C1810;            /* Dark brown background */
+         }
 }
 
 /* Fikiri Brand Utilities */

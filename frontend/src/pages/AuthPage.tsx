@@ -284,16 +284,16 @@ export const AuthPage: React.FC = () => {
             <form onSubmit={handleSignup} className="space-y-4">
               {/* Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-brand-text mb-1">
                   Full Name
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-brand-text/60" />
                   <input
                     type="text"
                     value={signupData.name}
                     onChange={(e) => setSignupData({ ...signupData, name: e.target.value })}
-                    className={`w-full pl-10 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-brand-accent focus:border-brand-accent ${
+                    className={`w-full pl-10 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-brand-accent focus:border-brand-accent bg-white text-brand-text placeholder-brand-text/60 ${
                       errors.name ? 'border-brand-error' : 'border-brand-text/20'
                     }`}
                     placeholder="John Doe"
@@ -311,12 +311,12 @@ export const AuthPage: React.FC = () => {
                   Work Email
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-brand-text/60" />
                   <input
                     type="email"
                     value={signupData.email}
                     onChange={(e) => setSignupData({ ...signupData, email: e.target.value })}
-                    className={`w-full pl-10 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-brand-accent focus:border-brand-accent ${
+                    className={`w-full pl-10 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-brand-accent focus:border-brand-accent bg-white text-brand-text placeholder-brand-text/60 ${
                       errors.email ? 'border-brand-error' : 'border-brand-text/20'
                     }`}
                     placeholder="john@company.com"
@@ -330,16 +330,16 @@ export const AuthPage: React.FC = () => {
 
               {/* Password */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-brand-text mb-1">
                   Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-brand-text/60" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={signupData.password}
                     onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
-                    className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-brand-accent focus:border-brand-accent ${
+                    className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-brand-accent focus:border-brand-accent bg-white text-brand-text placeholder-brand-text/60 ${
                       errors.password ? 'border-brand-error' : 'border-brand-text/20'
                     }`}
                     placeholder="Create a strong password"
@@ -348,7 +348,7 @@ export const AuthPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-brand-text/60 hover:text-brand-text"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -364,12 +364,12 @@ export const AuthPage: React.FC = () => {
                   Confirm Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-brand-text/60" />
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={signupData.confirmPassword}
                     onChange={(e) => setSignupData({ ...signupData, confirmPassword: e.target.value })}
-                    className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-brand-accent focus:border-brand-accent ${
+                    className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-brand-accent focus:border-brand-accent bg-white text-brand-text placeholder-brand-text/60 ${
                       errors.confirmPassword ? 'border-brand-error' : 'border-brand-text/20'
                     }`}
                     placeholder="Confirm your password"
@@ -378,7 +378,7 @@ export const AuthPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-brand-text/60 hover:text-brand-text"
                   >
                     {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -398,7 +398,7 @@ export const AuthPage: React.FC = () => {
                     type="text"
                     value={signupData.businessName}
                     onChange={(e) => setSignupData({ ...signupData, businessName: e.target.value })}
-                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-3 border border-brand-text/20 rounded-lg focus:ring-2 focus:ring-brand-accent focus:border-brand-accent bg-white text-brand-text placeholder-brand-text/60"
                     placeholder="Acme Corp"
                     disabled={isLoading}
                   />
@@ -410,7 +410,7 @@ export const AuthPage: React.FC = () => {
                   <select
                     value={signupData.teamSize}
                     onChange={(e) => setSignupData({ ...signupData, teamSize: e.target.value })}
-                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-3 border border-brand-text/20 rounded-lg focus:ring-2 focus:ring-brand-accent focus:border-brand-accent bg-white text-brand-text"
                     disabled={isLoading}
                   >
                     <option value="">Select size</option>
@@ -426,7 +426,7 @@ export const AuthPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={isLoading || isSubmitting}
-                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                className="w-full bg-brand-primary text-white py-3 px-4 rounded-lg font-medium hover:bg-brand-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               >
                 {isLoading ? (
                   <>
@@ -443,16 +443,16 @@ export const AuthPage: React.FC = () => {
             <form onSubmit={handleLogin} className="space-y-4">
               {/* Email */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-brand-text mb-1">
                   Email
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-brand-text/60" />
                   <input
                     type="email"
                     value={loginData.email}
                     onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-                    className="w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full pl-10 pr-3 py-3 border border-brand-text/20 rounded-lg focus:ring-2 focus:ring-brand-accent focus:border-brand-accent bg-white text-brand-text placeholder-brand-text/60"
                     placeholder="john@company.com"
                     disabled={isLoading}
                   />
@@ -461,23 +461,23 @@ export const AuthPage: React.FC = () => {
 
               {/* Password */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-brand-text mb-1">
                   Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-brand-text/60" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={loginData.password}
                     onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                    className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full pl-10 pr-10 py-3 border border-brand-text/20 rounded-lg focus:ring-2 focus:ring-brand-accent focus:border-brand-accent bg-white text-brand-text placeholder-brand-text/60"
                     placeholder="Enter your password"
                     disabled={isLoading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-brand-text/60 hover:text-brand-text"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -488,7 +488,7 @@ export const AuthPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={isLoading || isSubmitting}
-                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                className="w-full bg-brand-primary text-white py-3 px-4 rounded-lg font-medium hover:bg-brand-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               >
                 {isLoading ? (
                   <>
