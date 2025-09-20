@@ -21,6 +21,8 @@ sentry_sdk.init(
     send_default_pii=True,
     # Performance monitoring
     traces_sample_rate=0.1,  # 10% of transactions for performance monitoring
+    # Enable logs to be sent to Sentry
+    enable_logs=True,
     # Environment
     environment=os.getenv('FLASK_ENV', 'production'),
     # Release tracking

@@ -186,11 +186,22 @@ def init_sentry(app):
         release=os.getenv('SENTRY_RELEASE', '1.0.0'),
         traces_sample_rate=0.1,  # 10% of transactions for performance monitoring
         send_default_pii=False,  # Don't send personally identifiable information
+        # Enable logs to be sent to Sentry
+        enable_logs=True,
         before_send=before_send_filter,
         before_send_transaction=before_send_transaction_filter
     )
     
     logger.info("Sentry initialized for error tracking and performance monitoring")
+    
+    # Example: Send logs directly to Sentry using Sentry's logger
+    sentry_sdk.logger.info("Sentry logging initialized - logs will be sent to Sentry")
+    sentry_sdk.logger.warning("This is a warning message sent to Sentry")
+    
+    # Example: Using Python's built-in logging (automatically forwarded to Sentry)
+    logger.info("This log will be automatically sent to Sentry")
+    logger.warning("User login failed - this will be sent to Sentry")
+    logger.error("Something went wrong - this will be sent to Sentry")
 
 def before_send_filter(event, hint):
     """Filter events before sending to Sentry"""

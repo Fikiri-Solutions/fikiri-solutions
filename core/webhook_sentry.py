@@ -28,6 +28,8 @@ def init_webhook_sentry():
             send_default_pii=True,
             # Performance monitoring
             traces_sample_rate=0.1,  # 10% of transactions
+            # Enable logs to be sent to Sentry
+            enable_logs=True,
             # Environment
             environment=os.getenv('SENTRY_ENVIRONMENT', 'production'),
             # Release tracking
