@@ -53,13 +53,29 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Brand-specific colors
+        // Fikiri Brand Colors (refined from logo)
         brand: {
-          primary: "#3b82f6",
-          secondary: "#8b5cf6", 
-          accent: "#22c55e",
-          warning: "#f97316",
-          error: "#ef4444",
+          primary: "#B33B1E",    // Primary red-orange
+          secondary: "#E7641C",  // Bright orange
+          accent: "#F39C12",     // Golden yellow
+          warning: "#992D1E",    // Deep red
+          error: "#C0392B",      // Deep red-orange
+          text: "#4B1E0C",       // Tree brown
+          background: "#F7F3E9", // Cream background
+        },
+        // Fikiri Color Scale
+        fikiri: {
+          50: "#F7F3E9",   // Cream background
+          100: "#F39C12",  // Golden yellow
+          200: "#E7641C",  // Bright orange
+          300: "#B33B1E",  // Primary red-orange
+          400: "#992D1E",  // Deep red
+          500: "#C0392B",  // Deep red-orange
+          600: "#B33B1E",  // Primary brand color
+          700: "#8B4513",  // Muted brown
+          800: "#4B1E0C",  // Tree brown text
+          900: "#3E2723",  // Dark brown
+          950: "#2C1810",  // Darkest brown
         },
         // Extended Radix color scales
         blue: {
