@@ -239,14 +239,14 @@ export const PrivacySettings: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Privacy & Data Management</h1>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          <h1 className="text-2xl font-bold text-brand-text dark:text-white">Privacy & Data Management</h1>
+          <p className="mt-1 text-sm text-brand-text/70 dark:text-gray-400">
             Control your data privacy settings and manage your information.
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <Shield className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-          <span className="text-sm font-medium text-blue-600 dark:text-blue-400">GDPR Compliant</span>
+          <Shield className="h-6 w-6 text-brand-primary dark:text-brand-accent" />
+          <span className="text-sm font-medium text-brand-primary dark:text-brand-accent">GDPR Compliant</span>
         </div>
       </div>
 
@@ -277,23 +277,23 @@ export const PrivacySettings: React.FC = () => {
 
       {/* Data Summary */}
       {dataSummary && (
-        <div className="card">
+        <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
           <div className="flex items-center space-x-3 mb-4">
-            <Database className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Your Data Summary</h2>
+            <Database className="h-5 w-5 text-brand-primary dark:text-brand-accent" />
+            <h2 className="text-lg font-semibold text-brand-text dark:text-white">Your Data Summary</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{dataSummary.leads_count}</div>
-              <div className="text-sm text-blue-700 dark:text-blue-300">Leads</div>
+            <div className="bg-brand-accent/20 dark:bg-brand-accent/20 rounded-lg p-4">
+              <div className="text-2xl font-bold text-brand-primary dark:text-brand-accent">{dataSummary.leads_count}</div>
+              <div className="text-sm text-brand-text/70 dark:text-gray-300">Leads</div>
             </div>
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
-              <div className="text-2xl font-bold text-green-600 dark:text-green-400">{dataSummary.activities_count}</div>
-              <div className="text-sm text-green-700 dark:text-green-300">Activities</div>
+            <div className="bg-brand-secondary/20 dark:bg-brand-secondary/20 rounded-lg p-4">
+              <div className="text-2xl font-bold text-brand-secondary dark:text-brand-secondary">{dataSummary.activities_count}</div>
+              <div className="text-sm text-brand-text/70 dark:text-gray-300">Activities</div>
             </div>
-            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
-              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{dataSummary.sync_records_count}</div>
-              <div className="text-sm text-purple-700 dark:text-purple-300">Sync Records</div>
+            <div className="bg-brand-warning/20 dark:bg-brand-warning/20 rounded-lg p-4">
+              <div className="text-2xl font-bold text-brand-warning dark:text-brand-warning">{dataSummary.sync_records_count}</div>
+              <div className="text-sm text-brand-text/70 dark:text-gray-300">Sync Records</div>
             </div>
           </div>
         </div>
@@ -301,16 +301,16 @@ export const PrivacySettings: React.FC = () => {
 
       {/* Privacy Settings */}
       {settings && (
-        <div className="card">
+        <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
           <div className="flex items-center space-x-3 mb-6">
-            <Settings className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Privacy Settings</h2>
+            <Settings className="h-5 w-5 text-brand-primary dark:text-brand-accent" />
+            <h2 className="text-lg font-semibold text-brand-text dark:text-white">Privacy Settings</h2>
           </div>
 
           <div className="space-y-6">
             {/* Data Retention */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-2">
                 Data Retention Period
               </label>
               <div className="flex items-center space-x-4">
@@ -320,14 +320,14 @@ export const PrivacySettings: React.FC = () => {
                   max="365"
                   value={settings.data_retention_days}
                   onChange={(e) => updateSetting('data_retention_days', parseInt(e.target.value))}
-                  className="flex-1"
+                  className="flex-1 accent-brand-primary"
                   disabled={isLoading}
                 />
-                <span className="text-sm text-gray-600 min-w-[60px]">
+                <span className="text-sm text-brand-text/70 dark:text-gray-300 min-w-[60px]">
                   {settings.data_retention_days} days
                 </span>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-brand-text/60 dark:text-gray-400 mt-1">
                 Data older than this period will be automatically deleted
               </p>
             </div>
@@ -335,14 +335,14 @@ export const PrivacySettings: React.FC = () => {
             {/* Email Scanning */}
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-medium text-gray-900">Email Scanning</h3>
-                <p className="text-xs text-gray-500">Allow AI to scan emails for lead detection</p>
+                <h3 className="text-sm font-medium text-brand-text dark:text-white">Email Scanning</h3>
+                <p className="text-xs text-brand-text/60 dark:text-gray-400">Allow AI to scan emails for lead detection</p>
               </div>
               <button
                 onClick={() => updateSetting('email_scanning_enabled', !settings.email_scanning_enabled)}
                 disabled={isLoading}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  settings.email_scanning_enabled ? 'bg-blue-600' : 'bg-gray-200'
+                  settings.email_scanning_enabled ? 'bg-brand-primary' : 'bg-brand-text/20'
                 }`}
               >
                 <span
@@ -441,10 +441,10 @@ export const PrivacySettings: React.FC = () => {
       )}
 
       {/* Data Management Actions */}
-      <div className="card">
+      <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
         <div className="flex items-center space-x-3 mb-6">
-          <Database className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Data Management</h2>
+          <Database className="h-5 w-5 text-brand-primary dark:text-brand-accent" />
+          <h2 className="text-lg font-semibold text-brand-text dark:text-white">Data Management</h2>
         </div>
 
         <div className="space-y-4">
@@ -459,7 +459,7 @@ export const PrivacySettings: React.FC = () => {
             <button
               onClick={cleanupExpiredData}
               disabled={isLoading}
-              className="btn-secondary flex items-center space-x-2"
+              className="px-4 py-2 text-brand-text bg-brand-background/50 hover:bg-brand-background/80 border border-brand-text/20 rounded-lg font-medium transition-all duration-200 flex items-center space-x-2"
             >
               <Clock className="h-4 w-4" />
               <span>Cleanup Now</span>
@@ -477,7 +477,7 @@ export const PrivacySettings: React.FC = () => {
             <button
               onClick={exportUserData}
               disabled={isLoading}
-              className="btn-primary flex items-center space-x-2"
+              className="bg-brand-primary hover:bg-brand-secondary text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center space-x-2"
             >
               <Download className="h-4 w-4" />
               <span>Export Data</span>
@@ -495,7 +495,7 @@ export const PrivacySettings: React.FC = () => {
             <button
               onClick={() => setShowDeleteConfirm(true)}
               disabled={isLoading}
-              className="btn-danger flex items-center space-x-2"
+              className="bg-brand-error hover:bg-brand-error/80 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center space-x-2"
             >
               <Trash2 className="h-4 w-4" />
               <span>Delete All</span>
@@ -506,27 +506,27 @@ export const PrivacySettings: React.FC = () => {
 
       {/* Consent History */}
       {consents.length > 0 && (
-        <div className="card">
+        <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
           <div className="flex items-center space-x-3 mb-6">
-            <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Consent History</h2>
+            <Shield className="h-5 w-5 text-brand-primary dark:text-brand-accent" />
+            <h2 className="text-lg font-semibold text-brand-text dark:text-white">Consent History</h2>
           </div>
 
           <div className="space-y-3">
             {consents.map((consent) => (
-              <div key={consent.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div key={consent.id} className="flex items-center justify-between p-3 bg-brand-background/50 dark:bg-gray-700 rounded-lg">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 capitalize">
+                  <h3 className="text-sm font-medium text-brand-text dark:text-white capitalize">
                     {consent.consent_type.replace('_', ' ')}
                   </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-brand-text/60 dark:text-gray-400">
                     {consent.granted ? 'Granted' : 'Denied'} on {new Date(consent.granted_at).toLocaleDateString()}
                   </p>
                 </div>
                 <div className={`px-2 py-1 rounded-full text-xs font-medium ${
                   consent.granted 
-                    ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200' 
-                    : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200'
+                    ? 'bg-brand-accent/20 text-brand-primary dark:bg-brand-accent/20 dark:text-brand-accent' 
+                    : 'bg-brand-error/20 text-brand-error dark:bg-brand-error/20 dark:text-brand-error'
                 }`}>
                   {consent.granted ? 'Granted' : 'Denied'}
                 </div>
@@ -539,25 +539,25 @@ export const PrivacySettings: React.FC = () => {
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+          <div className="bg-brand-background dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 border border-brand-text/10">
             <div className="flex items-center space-x-3 mb-4">
-              <AlertTriangle className="h-6 w-6 text-red-600" />
-              <h3 className="text-lg font-semibold text-gray-900">Delete All Data</h3>
+              <AlertTriangle className="h-6 w-6 text-brand-error" />
+              <h3 className="text-lg font-semibold text-brand-text dark:text-white">Delete All Data</h3>
             </div>
             
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-brand-text/70 dark:text-gray-300 mb-4">
               This action cannot be undone. All your data, including leads, activities, and account information, will be permanently deleted.
             </p>
             
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-2">
                 Type "DELETE_ALL_MY_DATA" to confirm:
               </label>
               <input
                 type="text"
                 value={deleteConfirmation}
                 onChange={(e) => setDeleteConfirmation(e.target.value)}
-                className="input-field"
+                className="bg-white text-brand-text border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                 placeholder="DELETE_ALL_MY_DATA"
               />
             </div>
@@ -568,14 +568,14 @@ export const PrivacySettings: React.FC = () => {
                   setShowDeleteConfirm(false)
                   setDeleteConfirmation('')
                 }}
-                className="btn-secondary flex-1"
+                className="px-4 py-2 text-brand-text bg-brand-background/50 hover:bg-brand-background/80 border border-brand-text/20 rounded-lg font-medium transition-all duration-200 flex-1"
               >
                 Cancel
               </button>
               <button
                 onClick={deleteUserData}
                 disabled={deleteConfirmation !== 'DELETE_ALL_MY_DATA' || isLoading}
-                className="btn-danger flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-brand-error hover:bg-brand-error/80 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Deleting...' : 'Delete All Data'}
               </button>
