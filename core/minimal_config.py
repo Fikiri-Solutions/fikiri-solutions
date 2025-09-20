@@ -34,6 +34,13 @@ class MinimalConfig:
         self.debug = False
         self.dry_run = False
         
+        # Redis settings
+        self.redis_host = "localhost"
+        self.redis_port = 6379
+        self.redis_password = None
+        self.redis_db = 0
+        self.redis_url = None
+        
         # Load from environment
         self._load_from_env()
         
@@ -52,6 +59,13 @@ class MinimalConfig:
             print(f"⚠️ Invalid GMAIL_MAX_RESULTS value, using default: {self.gmail_max_results}")
         self.auto_reply_enabled = os.getenv("AUTO_REPLY_ENABLED", "false").lower() == "true"
         self.log_level = os.getenv("LOG_LEVEL", self.log_level)
+        
+        # Redis configuration
+        self.redis_host = os.getenv("REDIS_HOST", self.redis_host)
+        self.redis_port = int(os.getenv("REDIS_PORT", str(self.redis_port)))
+        self.redis_password = os.getenv("REDIS_PASSWORD")
+        self.redis_db = int(os.getenv("REDIS_DB", str(self.redis_db)))
+        self.redis_url = os.getenv("REDIS_URL")
     
     def _load_from_file(self):
         """Load configuration from config.json if it exists."""

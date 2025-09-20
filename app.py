@@ -30,6 +30,11 @@ from core.email_service_manager import EmailServiceManager
 from core.responses_api_migration import responses_manager
 from core.client_analytics import analytics_engine
 
+# Import billing system
+from core.billing_api import billing_bp
+from core.fikiri_stripe_manager import FikiriStripeManager
+from core.usage_tracker import UsageTracker
+
 # Dashboard routes will be added directly to Flask app
 
 # Import enterprise features
@@ -87,6 +92,9 @@ app.register_blueprint(create_api_blueprint('v2'))
 
 # Register business operations blueprint
 app.register_blueprint(create_business_blueprint())
+
+# Register billing blueprint
+app.register_blueprint(billing_bp)
 
 # Initialize SocketIO for real-time updates (disabled for now)
 # socketio = SocketIO(app, cors_allowed_origins=[
