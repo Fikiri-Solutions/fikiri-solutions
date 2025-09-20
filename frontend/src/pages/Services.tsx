@@ -174,9 +174,9 @@ export const Services: React.FC = () => {
         return (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Response Tone</label>
+              <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Response Tone</label>
               <select
-                className="input-field mt-1"
+                className="bg-white text-brand-text border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.responseTone}
                 onChange={(e) => updateServiceSettings(service.id, 'responseTone', e.target.value)}
               >
@@ -187,10 +187,10 @@ export const Services: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Auto-reply Delay (minutes)</label>
+              <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Auto-reply Delay (minutes)</label>
               <input
                 type="number"
-                className="input-field mt-1"
+                className="bg-white text-brand-text border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.autoReplyDelay}
                 onChange={(e) => updateServiceSettings(service.id, 'autoReplyDelay', parseInt(e.target.value))}
                 min="1"
@@ -198,10 +198,10 @@ export const Services: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Max Responses Per Day</label>
+              <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Max Responses Per Day</label>
               <input
                 type="number"
-                className="input-field mt-1"
+                className="bg-white text-brand-text border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.maxResponsesPerDay}
                 onChange={(e) => updateServiceSettings(service.id, 'maxResponsesPerDay', parseInt(e.target.value))}
                 min="1"
@@ -216,49 +216,49 @@ export const Services: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-gray-700">Auto Lead Creation</label>
-                <p className="text-xs text-gray-500">Automatically create leads from incoming emails</p>
+                <label className="text-sm font-medium text-brand-text dark:text-gray-300">Auto Lead Creation</label>
+                <p className="text-xs text-brand-text/60 dark:text-gray-400">Automatically create leads from incoming emails</p>
               </div>
               <button
                 onClick={() => updateServiceSettings(service.id, 'autoLeadCreation', !service.settings.autoLeadCreation)}
                 className="ml-4"
               >
                 {service.settings.autoLeadCreation ? (
-                  <ToggleRight className="h-6 w-6 text-blue-600" />
+                  <ToggleRight className="h-6 w-6 text-brand-primary" />
                 ) : (
-                  <ToggleLeft className="h-6 w-6 text-gray-400" />
+                  <ToggleLeft className="h-6 w-6 text-brand-text/40" />
                 )}
               </button>
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-gray-700">Lead Scoring</label>
-                <p className="text-xs text-gray-500">Automatically score leads based on email content</p>
+                <label className="text-sm font-medium text-brand-text dark:text-gray-300">Lead Scoring</label>
+                <p className="text-xs text-brand-text/60 dark:text-gray-400">Automatically score leads based on email content</p>
               </div>
               <button
                 onClick={() => updateServiceSettings(service.id, 'leadScoring', !service.settings.leadScoring)}
                 className="ml-4"
               >
                 {service.settings.leadScoring ? (
-                  <ToggleRight className="h-6 w-6 text-blue-600" />
+                  <ToggleRight className="h-6 w-6 text-brand-primary" />
                 ) : (
-                  <ToggleLeft className="h-6 w-6 text-gray-400" />
+                  <ToggleLeft className="h-6 w-6 text-brand-text/40" />
                 )}
               </button>
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-gray-700">Follow-up Reminders</label>
-                <p className="text-xs text-gray-500">Send reminders for follow-up actions</p>
+                <label className="text-sm font-medium text-brand-text dark:text-gray-300">Follow-up Reminders</label>
+                <p className="text-xs text-brand-text/60 dark:text-gray-400">Send reminders for follow-up actions</p>
               </div>
               <button
                 onClick={() => updateServiceSettings(service.id, 'followUpReminders', !service.settings.followUpReminders)}
                 className="ml-4"
               >
                 {service.settings.followUpReminders ? (
-                  <ToggleRight className="h-6 w-6 text-blue-600" />
+                  <ToggleRight className="h-6 w-6 text-brand-primary" />
                 ) : (
-                  <ToggleLeft className="h-6 w-6 text-gray-400" />
+                  <ToggleLeft className="h-6 w-6 text-brand-text/40" />
                 )}
               </button>
             </div>
@@ -377,15 +377,15 @@ export const Services: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">🚀 Strategic Service Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          <h1 className="text-2xl font-bold text-brand-text dark:text-white">🚀 Strategic Service Dashboard</h1>
+          <p className="mt-1 text-sm text-brand-text/70 dark:text-gray-400">
             Test and configure all core Fikiri Solutions services with strategic feature flags
           </p>
         </div>
         <div className="flex space-x-3">
           <button
             onClick={() => loadServiceConfigurations()}
-            className="btn-secondary"
+            className="px-4 py-2 text-brand-text bg-brand-background/50 hover:bg-brand-background/80 border border-brand-text/20 rounded-lg font-medium transition-all duration-200 flex items-center"
           >
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh Data
@@ -393,7 +393,7 @@ export const Services: React.FC = () => {
           <button
             onClick={saveConfigurations}
             disabled={!hasChanges || isLoading}
-            className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-brand-primary hover:bg-brand-secondary text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >
             <Save className="h-4 w-4 mr-2" />
             {isLoading ? 'Saving Changes...' : 'Save Configuration'}
@@ -404,28 +404,28 @@ export const Services: React.FC = () => {
       {/* Services List */}
       <div className="space-y-6">
         {services.map((service) => (
-          <div key={service.id} className="card">
+          <div key={service.id} className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">{service.name}</h3>
+                  <h3 className="text-lg font-medium text-brand-text dark:text-white">{service.name}</h3>
                   <button
                     onClick={() => toggleService(service.id)}
                     className="ml-4"
                   >
                     {service.enabled ? (
-                      <ToggleRight className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                      <ToggleRight className="h-6 w-6 text-brand-primary dark:text-brand-accent" />
                     ) : (
-                      <ToggleLeft className="h-6 w-6 text-gray-400 dark:text-gray-500" />
+                      <ToggleLeft className="h-6 w-6 text-brand-text/40 dark:text-gray-500" />
                     )}
                   </button>
                 </div>
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{service.description}</p>
+                <p className="mt-1 text-sm text-brand-text/70 dark:text-gray-400">{service.description}</p>
                 <div className="mt-2">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                     service.enabled 
-                      ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300' 
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300'
+                      ? 'bg-brand-accent/20 text-brand-primary dark:bg-brand-accent/20 dark:text-brand-accent' 
+                      : 'bg-brand-text/10 dark:bg-gray-800 text-brand-text/60 dark:text-gray-300'
                   }`}>
                     {service.enabled ? 'Enabled' : 'Disabled'}
                   </span>
@@ -434,7 +434,7 @@ export const Services: React.FC = () => {
               <div className="ml-6">
                 <button
                   onClick={() => testService(service.id)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center space-x-2 px-4 py-2 bg-brand-primary hover:bg-brand-secondary text-white text-sm font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={isLoading}
                 >
                   <Zap className="h-4 w-4" />
@@ -445,10 +445,10 @@ export const Services: React.FC = () => {
 
             {/* Service Settings */}
             {service.enabled && (
-              <div className="mt-6 pt-6 border-t border-gray-200">
+              <div className="mt-6 pt-6 border-t border-brand-text/10">
                 <div className="flex items-center mb-4">
-                  <Settings className="h-5 w-5 text-gray-400 mr-2" />
-                  <h4 className="text-sm font-medium text-gray-900">Settings</h4>
+                  <Settings className="h-5 w-5 text-brand-text/60 mr-2" />
+                  <h4 className="text-sm font-medium text-brand-text dark:text-white">Settings</h4>
                 </div>
                 {renderServiceSettings(service)}
               </div>
@@ -460,14 +460,14 @@ export const Services: React.FC = () => {
       {/* Test Result Modal */}
       {testResult && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+          <div className="bg-brand-background dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 border border-brand-text/10">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-lg font-semibold text-brand-text dark:text-white">
                 Test Result: {testResult.serviceName}
               </h3>
               <button
                 onClick={() => setTestResult(null)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-brand-text/60 hover:text-brand-text dark:text-gray-400 dark:hover:text-gray-200"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -480,22 +480,22 @@ export const Services: React.FC = () => {
                   <span className="font-medium">Test Successful</span>
                 </div>
                 
-                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                <div className="bg-brand-background/50 dark:bg-gray-700 rounded-lg p-4 space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Status:</span>
-                    <span className="text-sm font-medium text-green-600">
+                    <span className="text-sm text-brand-text/70 dark:text-gray-400">Status:</span>
+                    <span className="text-sm font-medium text-brand-accent">
                       {testResult.data?.status || 'Active'}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Response Time:</span>
-                    <span className="text-sm font-medium">
+                    <span className="text-sm text-brand-text/70 dark:text-gray-400">Response Time:</span>
+                    <span className="text-sm font-medium text-brand-text dark:text-white">
                       {testResult.data?.response_time || '45ms'}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Last Check:</span>
-                    <span className="text-sm font-medium">
+                    <span className="text-sm text-brand-text/70 dark:text-gray-400">Last Check:</span>
+                    <span className="text-sm font-medium text-brand-text dark:text-white">
                       {testResult.data?.timestamp ? 
                         new Date(testResult.data.timestamp).toLocaleString() : 
                         'Just now'
@@ -503,9 +503,9 @@ export const Services: React.FC = () => {
                     </span>
                   </div>
                   {testResult.data?.message && (
-                    <div className="pt-2 border-t border-gray-200">
-                      <span className="text-sm text-gray-600">Message:</span>
-                      <p className="text-sm text-gray-900 mt-1">
+                    <div className="pt-2 border-t border-brand-text/10">
+                      <span className="text-sm text-brand-text/70 dark:text-gray-400">Message:</span>
+                      <p className="text-sm text-brand-text dark:text-white mt-1">
                         {testResult.data.message}
                       </p>
                     </div>
@@ -519,8 +519,8 @@ export const Services: React.FC = () => {
                   <span className="font-medium">Test Failed</span>
                 </div>
                 
-                <div className="bg-red-50 rounded-lg p-4">
-                  <p className="text-sm text-red-800">
+                <div className="bg-brand-error/10 rounded-lg p-4 border border-brand-error/20">
+                  <p className="text-sm text-brand-error">
                     {testResult.error || 'An unknown error occurred'}
                   </p>
                 </div>
@@ -530,7 +530,7 @@ export const Services: React.FC = () => {
             <div className="mt-6 flex justify-end">
               <button
                 onClick={() => setTestResult(null)}
-                className="btn-primary"
+                className="bg-brand-primary hover:bg-brand-secondary text-white px-4 py-2 rounded-lg font-medium transition-all duration-200"
               >
                 Close
               </button>
