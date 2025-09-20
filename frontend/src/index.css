@@ -15,32 +15,32 @@
     --fikiri-bg: #F7F3E9;            /* Cream background */
     
     /* Primary Colors */
-    --primary: 12 45% 50%; /* #B85450 */
+    --primary: 12 65% 40%; /* #B33B1E */
     --primary-foreground: 0 0% 98%;
     
     /* Secondary Colors */
-    --secondary: 25 80% 50%; /* #E67E22 */
+    --secondary: 25 75% 50%; /* #E7641C */
     --secondary-foreground: 0 0% 98%;
     
     /* Background Colors */
-    --background: 45 100% 95%; /* #FDF6E3 */
-    --foreground: 25 50% 25%; /* #8B4513 */
+    --background: 45 30% 95%; /* #F7F3E9 */
+    --foreground: 25 60% 15%; /* #4B1E0C */
     
     /* Card Colors */
-    --card: 45 100% 95%;
-    --card-foreground: 25 50% 25%;
+    --card: 45 30% 95%;
+    --card-foreground: 25 60% 15%;
     
     /* Popover Colors */
-    --popover: 45 100% 95%;
-    --popover-foreground: 25 50% 25%;
+    --popover: 45 30% 95%;
+    --popover-foreground: 25 60% 15%;
     
     /* Muted Colors */
-    --muted: 45 50% 90%;
-    --muted-foreground: 25 30% 40%;
+    --muted: 45 20% 90%;
+    --muted-foreground: 25 40% 30%;
     
     /* Accent Colors */
-    --accent: 45 100% 70%; /* #FFB84D */
-    --accent-foreground: 25 50% 25%;
+    --accent: 45 85% 50%; /* #F39C12 */
+    --accent-foreground: 25 60% 15%;
     
     /* Destructive Colors */
     --destructive: 0 60% 50%; /* #C0392B */
@@ -49,7 +49,7 @@
     /* Border Colors */
     --border: 25 30% 80%;
     --input: 25 30% 80%;
-    --ring: 12 45% 50%;
+    --ring: 12 65% 40%;
     
     /* Radius */
     --radius: 0.5rem;
@@ -94,31 +94,31 @@
   }
   
   .text-fikiri-primary {
-    color: #B85450;
+    color: #B33B1E;
   }
   
   .text-fikiri-secondary {
-    color: #E67E22;
+    color: #E7641C;
   }
   
   .text-fikiri-accent {
-    color: #FFB84D;
+    color: #F39C12;
   }
   
   .bg-fikiri-primary {
-    background-color: #B85450;
+    background-color: #B33B1E;
   }
   
   .bg-fikiri-secondary {
-    background-color: #E67E22;
+    background-color: #E7641C;
   }
   
   .bg-fikiri-accent {
-    background-color: #FFB84D;
+    background-color: #F39C12;
   }
   
   .bg-fikiri-bg {
-    background-color: #FDF6E3;
+    background-color: #F7F3E9;
   }
 }
 
@@ -134,53 +134,6 @@ html {
   font-weight: 600;
 }
 
-@layer base {
-  :root {
-    /* Custom Radix Colors for Fikiri Solutions */
-    --background: 0 0% 100%;
-    --foreground: 222 84% 5%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 84% 5%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 84% 5%;
-    --primary: 214 100% 50%; /* Brand blue #3b82f6 */
-    --primary-foreground: 0 0% 98%;
-    --secondary: 262 83% 58%; /* AI purple #8b5cf6 */
-    --secondary-foreground: 0 0% 98%;
-    --muted: 210 40% 98%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 210 40% 98%;
-    --accent-foreground: 222 84% 5%;
-    --destructive: 0 84% 60%; /* Error red #ef4444 */
-    --destructive-foreground: 0 0% 98%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 214 100% 50%;
-    --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 222 84% 5%;
-    --foreground: 210 40% 98%;
-    --card: 222 84% 5%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 84% 5%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 214 100% 50%; /* Keep brand blue in dark mode */
-    --primary-foreground: 222 84% 5%;
-    --secondary: 262 83% 58%; /* Keep AI purple in dark mode */
-    --secondary-foreground: 222 84% 5%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 214 100% 50%;
-  }
-}
 
 /* Global Dark Mode Layer */
 @layer base {
@@ -297,45 +250,6 @@ html {
     min-width: 320px;
   }
   
-  /* Fikiri Solutions Brand Colors - Light Theme */
-  :root {
-    --fikiri-primary: #3B82F6;
-    --fikiri-primary-dark: #1D4ED8;
-    --fikiri-secondary: #10B981;
-    --fikiri-accent: #F59E0B;
-    --fikiri-danger: #EF4444;
-    --fikiri-success: #10B981;
-    --fikiri-warning: #F59E0B;
-    --fikiri-info: #3B82F6;
-    
-    /* Light theme colors */
-    --bg-primary: #ffffff;
-    --bg-secondary: #f8fafc;
-    --bg-tertiary: #f1f5f9;
-    --text-primary: #1f2937;
-    --text-secondary: #6b7280;
-    --text-tertiary: #9ca3af;
-    --border-primary: #e5e7eb;
-    --border-secondary: #d1d5db;
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  }
-
-  /* Dark theme colors */
-  .dark {
-    --bg-primary: #111827;
-    --bg-secondary: #1f2937;
-    --bg-tertiary: #374151;
-    --text-primary: #f9fafb;
-    --text-secondary: #d1d5db;
-    --text-tertiary: #9ca3af;
-    --border-primary: #374151;
-    --border-secondary: #4b5563;
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-  }
 }
 
 @layer components {
