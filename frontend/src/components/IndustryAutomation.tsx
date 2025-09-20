@@ -57,14 +57,14 @@ export const IndustryAutomation: React.FC = () => {
           tone: 'friendly',
           focus_areas: ['reservation management', 'menu recommendations', 'special promotions'],
           tools: ['reservation_system', 'menu_api', 'promotion_tracker'],
-          pricing_tier: 'professional'
+          pricing_tier: 'growth'
         },
         medical_practice: {
           industry: 'medical_practice',
           tone: 'professional',
           focus_areas: ['appointment scheduling', 'patient reminders', 'HIPAA compliance'],
           tools: ['calendar', 'patient_portal', 'compliance_checker'],
-          pricing_tier: 'premium'
+          pricing_tier: 'business'
         }
       };
       setPrompts(mockPrompts);
@@ -89,27 +89,27 @@ export const IndustryAutomation: React.FC = () => {
       const mockTiers = {
         starter: {
           name: 'Starter',
-          price: 29,
-          responses_limit: 1000,
-          features: ['Basic AI responses', 'Email automation', 'CRM integration']
+          price: 39,
+          responses_limit: 200,
+          features: ['Basic AI responses', 'Email automation', 'Simple CRM', '500 emails/month']
         },
-        professional: {
-          name: 'Professional',
+        growth: {
+          name: 'Growth',
           price: 79,
-          responses_limit: 5000,
-          features: ['Advanced AI responses', 'Multi-channel automation', 'Analytics dashboard']
+          responses_limit: 800,
+          features: ['Advanced AI responses', 'Advanced CRM', 'Priority support', '2,000 emails/month']
         },
-        premium: {
-          name: 'Premium',
-          price: 149,
-          responses_limit: 15000,
-          features: ['Custom AI training', 'API access', 'Priority support']
+        business: {
+          name: 'Business',
+          price: 199,
+          responses_limit: 4000,
+          features: ['White-label options', 'Custom integrations', 'Phone support', '10,000 emails/month']
         },
         enterprise: {
           name: 'Enterprise',
-          price: 299,
+          price: 399,
           responses_limit: 'unlimited',
-          features: ['White-label solution', 'Custom integrations', 'Dedicated support']
+          features: ['Custom AI training', 'Dedicated support', 'SLA guarantee', 'Unlimited emails']
         }
       };
       setPricingTiers(mockTiers);
@@ -119,9 +119,9 @@ export const IndustryAutomation: React.FC = () => {
       setPricingTiers({
         starter: {
           name: 'Starter',
-          price: 29,
-          responses_limit: 1000,
-          features: ['Basic AI responses', 'Email automation', 'CRM integration']
+          price: 39,
+          responses_limit: 200,
+          features: ['Basic AI responses', 'Email automation', 'Simple CRM', '500 emails/month']
         }
       })
     }
@@ -131,7 +131,7 @@ export const IndustryAutomation: React.FC = () => {
     try {
       // Mock data for now - replace with actual API call when backend endpoints are ready
       const mockAnalytics = {
-        tier: 'professional',
+        tier: 'growth',
         responses: 1250,
         tool_calls: 45,
         tokens: 125000,
@@ -551,12 +551,12 @@ export const IndustryAutomation: React.FC = () => {
                               toolCallRatio: 0.05,   // 5% of responses use tools
                               avgTokensPerResponse: 120
                             },
-                            professional: {
+                            growth: {
                               usagePercentage: 0.65, // 65% usage
                               toolCallRatio: 0.08,   // 8% of responses use tools
                               avgTokensPerResponse: 150
                             },
-                            premium: {
+                            business: {
                               usagePercentage: 0.55, // 55% usage
                               toolCallRatio: 0.12,   // 12% of responses use tools
                               avgTokensPerResponse: 180
