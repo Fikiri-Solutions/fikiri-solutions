@@ -6,12 +6,26 @@ Production-ready security headers, rate limiting, and CORS
 import os
 import time
 from functools import wraps
-from flask import Flask, request, jsonify, g
-from flask_cors import CORS
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-import redis
-from werkzeug.middleware.proxy_fix import ProxyFix
+from typing import Dict, Any, Optional
+
+# Optional imports with fallbacks
+try:
+    from flask import Flask, request, jsonify, g
+    from flask_cors import CORS
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    FLASK_AVAILABLE = True
+except ImportError:
+    FLASK_AVAILABLE = False
+    print("Warning: Flask not available. Install with: pip install flask flask-cors flask-limiter")
+
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    print("Warning: Redis not available. Install with: pip install redis")
 
 def init_security(app: Flask):
     """Initialize security middleware and configurations"""

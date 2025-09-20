@@ -3,9 +3,21 @@ API Documentation for Fikiri Solutions
 Auto-generated Swagger/OpenAPI documentation
 """
 
-from flask import Flask, Blueprint
-from flask_restx import Api, Resource, fields, Namespace
-from core.error_handling import create_success_response, ValidationError, AuthenticationError
+# Optional imports with fallbacks
+try:
+    from flask import Flask, Blueprint
+    from flask_restx import Api, Resource, fields, Namespace
+    FLASK_RESTX_AVAILABLE = True
+except ImportError:
+    FLASK_RESTX_AVAILABLE = False
+    print("Warning: Flask-RESTX not available. Install with: pip install flask-restx")
+
+try:
+    from core.error_handling import create_success_response, ValidationError, AuthenticationError
+    CORE_AVAILABLE = True
+except ImportError:
+    CORE_AVAILABLE = False
+    print("Warning: Core modules not available")
 
 # Create API blueprint
 api_bp = Blueprint('api', __name__, url_prefix='/api')

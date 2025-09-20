@@ -5,16 +5,29 @@ Sentry integration with Slack/Email notifications
 
 import os
 import logging
-import sentry_sdk
-from sentry_sdk.integrations.flask import FlaskIntegration
-from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
-from sentry_sdk.integrations.redis import RedisIntegration
-from sentry_sdk.integrations.logging import LoggingIntegration
-from flask import Flask, request, g
 import requests
 import json
 from datetime import datetime
 from typing import Dict, Any, Optional
+
+# Optional imports with fallbacks
+try:
+    import sentry_sdk
+    from sentry_sdk.integrations.flask import FlaskIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+    from sentry_sdk.integrations.redis import RedisIntegration
+    from sentry_sdk.integrations.logging import LoggingIntegration
+    SENTRY_AVAILABLE = True
+except ImportError:
+    SENTRY_AVAILABLE = False
+    print("Warning: sentry-sdk not available. Install with: pip install sentry-sdk[flask]")
+
+try:
+    from flask import Flask, request, g
+    FLASK_AVAILABLE = True
+except ImportError:
+    FLASK_AVAILABLE = False
+    print("Warning: Flask not available. Install with: pip install flask")
 
 # Configure logging
 logging.basicConfig(
@@ -141,8 +154,16 @@ class AlertManager:
 # Global alert manager instance
 alert_manager = AlertManager()
 
-def init_sentry(app: Flask):
+def init_sentry(app):
     """Initialize Sentry for error tracking and performance monitoring"""
+    
+    if not SENTRY_AVAILABLE:
+        logger.warning("Sentry SDK not available - error tracking disabled")
+        return
+    
+    if not FLASK_AVAILABLE:
+        logger.warning("Flask not available - Sentry initialization skipped")
+        return
     
     sentry_dsn = os.getenv('SENTRY_DSN')
     if not sentry_dsn:
