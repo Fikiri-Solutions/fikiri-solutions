@@ -6,15 +6,25 @@ Production-ready error management with consistent API responses
 import logging
 import traceback
 from typing import Dict, Any, Optional, Union
-from flask import Flask, request, jsonify, current_app
-from werkzeug.exceptions import HTTPException
-import sentry_sdk
-from sentry_sdk.integrations.flask import FlaskIntegration
-from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
-from sentry_sdk.integrations.redis import RedisIntegration
 import uuid
 from datetime import datetime
 import os
+
+# Optional imports with fallbacks
+try:
+    from flask import Flask, request, jsonify, current_app
+    from werkzeug.exceptions import HTTPException
+    FLASK_AVAILABLE = True
+except ImportError:
+    FLASK_AVAILABLE = False
+    print("Warning: Flask not available. Install with: pip install flask")
+
+try:
+    import sentry_sdk
+    SENTRY_AVAILABLE = True
+except ImportError:
+    SENTRY_AVAILABLE = False
+    print("Warning: sentry-sdk not available. Install with: pip install sentry-sdk[flask]")
 
 # Configure logging
 logging.basicConfig(

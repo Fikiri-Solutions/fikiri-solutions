@@ -18,7 +18,14 @@ html5lib>=1.1
 flask>=3.0.0,<4.0.0
 flask-socketio>=5.0.0
 flask-cors>=4.0.0
+flask-limiter>=3.5.0
+flask-restx>=1.2.0
 gunicorn>=20.0.0
+
+# Monitoring and Alerting
+sentry-sdk[flask]>=1.38.0
+schedule>=1.2.0
+boto3>=1.34.0
 
 # Workflow Automation
 fastapi>=0.100.0
