@@ -65,6 +65,13 @@ export const IndustryAutomation: React.FC = () => {
           focus_areas: ['appointment scheduling', 'patient reminders', 'HIPAA compliance'],
           tools: ['calendar', 'patient_portal', 'compliance_checker'],
           pricing_tier: 'business'
+        },
+        enterprise_solutions: {
+          industry: 'enterprise_solutions',
+          tone: 'professional',
+          focus_areas: ['custom workflows', 'multi-industry support', 'advanced analytics'],
+          tools: ['custom_api', 'white_label', 'dedicated_support'],
+          pricing_tier: 'enterprise'
         }
       };
       setPrompts(mockPrompts);
@@ -78,6 +85,13 @@ export const IndustryAutomation: React.FC = () => {
           focus_areas: ['appointment scheduling', 'service quotes', 'seasonal planning'],
           tools: ['calendar', 'quote_generator', 'weather_api'],
           pricing_tier: 'starter'
+        },
+        enterprise_solutions: {
+          industry: 'enterprise_solutions',
+          tone: 'professional',
+          focus_areas: ['custom workflows', 'multi-industry support', 'advanced analytics'],
+          tools: ['custom_api', 'white_label', 'dedicated_support'],
+          pricing_tier: 'enterprise'
         }
       })
     }
@@ -220,6 +234,11 @@ export const IndustryAutomation: React.FC = () => {
       'marketing_agency': '📊',
       'photography': '📸',
       
+      // Enterprise & Technology
+      'enterprise_solutions': '🏢',
+      'software_development': '💻',
+      'consulting': '📈',
+      
       // Professional Services
       'tax_services': '📋',
       'accounting': '💰',
@@ -264,6 +283,11 @@ export const IndustryAutomation: React.FC = () => {
       'content_creation': 'Creative & Marketing',
       'marketing_agency': 'Creative & Marketing',
       'photography': 'Creative & Marketing',
+      
+      // Enterprise & Technology
+      'enterprise_solutions': 'Enterprise & Technology',
+      'software_development': 'Enterprise & Technology',
+      'consulting': 'Enterprise & Technology',
       
       // Professional Services
       'tax_services': 'Professional Services',
