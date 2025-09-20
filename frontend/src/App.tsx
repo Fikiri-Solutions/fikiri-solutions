@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 import { Dashboard } from './pages/Dashboard'
 import { Login } from './pages/Login'
+import { Signup } from './pages/Signup'
 import { Onboarding } from './pages/Onboarding'
 import { Services } from './pages/Services'
 import { CRM } from './pages/CRM'
@@ -48,6 +49,7 @@ function App() {
                   <Suspense fallback={<PageLoader />}>
                     <Routes>
                       <Route path="/login" element={<Login />} />
+                      <Route path="/signup" element={<Signup />} />
                       {features.showOnboarding && <Route path="/onboarding" element={<Onboarding />} />}
                       <Route path="/onboarding-flow" element={<OnboardingFlow />} />
                       <Route path="/onboarding-flow/:step" element={<OnboardingFlow />} />
