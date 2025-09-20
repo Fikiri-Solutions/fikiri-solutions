@@ -4,6 +4,29 @@ Fikiri Solutions - Flask Web Application
 Web interface for testing and deploying Fikiri services.
 """
 
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
+from sentry_sdk.integrations.redis import RedisIntegration
+from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+# Initialize Sentry before Flask app
+sentry_sdk.init(
+    dsn="https://05d4170350ee081a3bfee0dda0220df6@o4510053728845824.ingest.us.sentry.io/4510053767249920",
+    integrations=[
+        FlaskIntegration(),
+        RedisIntegration(),
+        SqlalchemyIntegration(),
+    ],
+    # Add data like request headers and IP for users
+    send_default_pii=True,
+    # Performance monitoring
+    traces_sample_rate=0.1,  # 10% of transactions for performance monitoring
+    # Environment
+    environment=os.getenv('FLASK_ENV', 'production'),
+    # Release tracking
+    release=os.getenv('GITHUB_SHA', 'unknown'),
+)
+
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from flask_cors import CORS
 import json
@@ -2968,3 +2991,39 @@ if __name__ == '__main__':
     # Run Flask app (SocketIO disabled for now)
     debug_mode = os.getenv('DEBUG', 'false').lower() == 'true'
     app.run(debug=debug_mode, host='0.0.0.0', port=int(os.getenv('PORT', 8081)))
+
+# Sentry Test Routes
+@app.route('/api/sentry-test', methods=['GET'])
+def sentry_test():
+    """Test Sentry integration by triggering an error."""
+    try:
+        # This will trigger a Sentry error for testing
+        1/0  # raises a ZeroDivisionError
+    except Exception as e:
+        # Capture the exception in Sentry
+        sentry_sdk.capture_exception(e)
+        return jsonify({
+            'message': 'Sentry test error triggered',
+            'error': str(e),
+            'status': 'error_sent_to_sentry'
+        }), 500
+
+@app.route('/api/sentry-performance-test', methods=['GET'])
+def sentry_performance_test():
+    """Test Sentry performance monitoring."""
+    with sentry_sdk.start_transaction(op="test", name="sentry_performance_test"):
+        # Simulate some work
+        time.sleep(0.1)
+        
+        # Test Redis operations
+        cache = get_cache()
+        if cache.is_connected():
+            cache.cache_ai_response("test", "response", "test_user")
+        
+        return jsonify({
+            'message': 'Sentry performance test completed',
+            'status': 'success',
+            'redis_connected': cache.is_connected()
+        }), 200
+
+if __name__ == '__main__':
