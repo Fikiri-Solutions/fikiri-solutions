@@ -35,6 +35,12 @@ from core.billing_api import billing_bp
 from core.fikiri_stripe_manager import FikiriStripeManager
 from core.usage_tracker import UsageTracker
 
+# Import Redis integration
+from core.redis_cache import get_cache, cache_result
+from core.redis_sessions import init_flask_sessions, create_user_session, get_current_user, logout_user, require_login
+from core.redis_rate_limiting import init_rate_limiting, rate_limit, get_rate_limiter
+from core.redis_queues import get_email_queue, get_ai_queue, get_crm_queue, get_webhook_queue
+
 # Dashboard routes will be added directly to Flask app
 
 # Import enterprise features
@@ -85,6 +91,10 @@ CORS(app, origins=[
     'https://fikirisolutions.com',  # Custom domain
     'https://www.fikirisolutions.com'  # Custom domain with www
 ])
+
+# Initialize Redis integration
+init_flask_sessions(app)
+init_rate_limiting(app)
 
 # Register versioned API blueprints
 app.register_blueprint(create_api_blueprint('v1'))
