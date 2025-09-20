@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { Mail, Lock, ArrowRight, Zap, Sparkles, Shield, Rocket } from 'lucide-react'
+import { Mail, Lock, ArrowRight, Zap, Sparkles, Shield, Rocket, Github, Chrome, UserPlus, Eye, EyeOff } from 'lucide-react'
 import { useUserActivityTracking } from '../contexts/ActivityContext'
 import { FikiriLogo } from '../components/FikiriLogo'
+import { motion } from 'framer-motion'
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('')
@@ -10,6 +11,7 @@ export const Login: React.FC = () => {
   const [error, setError] = useState('')
   const [emailError, setEmailError] = useState('')
   const [passwordError, setPasswordError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const { trackLogin } = useUserActivityTracking()
 
@@ -85,49 +87,111 @@ export const Login: React.FC = () => {
 
   return (
     <div className="min-h-screen relative overflow-hidden fikiri-gradient-animated">
-      {/* Animated Background Elements */}
+      {/* Enhanced Animated Background Elements */}
       <div className="absolute inset-0">
         {/* Floating orbs with brand colors */}
-        <div 
-          className="absolute w-72 h-72 bg-brand-accent/20 rounded-full blur-3xl animate-pulse"
-          style={{
-            left: `${mousePosition.x * 0.1}px`,
-            top: `${mousePosition.y * 0.1}px`,
-            transition: 'all 0.3s ease-out'
+        <motion.div 
+          className="absolute w-72 h-72 bg-brand-accent/20 rounded-full blur-3xl"
+          animate={{
+            x: mousePosition.x * 0.1,
+            y: mousePosition.y * 0.1,
+            scale: [1, 1.1, 1],
+          }}
+          transition={{
+            duration: 4,
+            repeat: Infinity,
+            ease: "easeInOut"
           }}
         />
-        <div 
-          className="absolute w-96 h-96 bg-brand-secondary/20 rounded-full blur-3xl animate-pulse"
-          style={{
-            right: `${mousePosition.x * 0.05}px`,
-            bottom: `${mousePosition.y * 0.05}px`,
-            transition: 'all 0.4s ease-out'
+        <motion.div 
+          className="absolute w-96 h-96 bg-brand-secondary/20 rounded-full blur-3xl"
+          animate={{
+            x: mousePosition.x * 0.05,
+            y: mousePosition.y * 0.05,
+            scale: [1.1, 1, 1.1],
+          }}
+          transition={{
+            duration: 6,
+            repeat: Infinity,
+            ease: "easeInOut"
           }}
         />
-        <div 
-          className="absolute w-64 h-64 bg-brand-primary/20 rounded-full blur-3xl animate-pulse"
-          style={{
-            left: `${mousePosition.x * 0.08}px`,
-            bottom: `${mousePosition.y * 0.1}px`,
-            transition: 'all 0.5s ease-out'
+        <motion.div 
+          className="absolute w-64 h-64 bg-brand-primary/20 rounded-full blur-3xl"
+          animate={{
+            x: mousePosition.x * 0.08,
+            y: mousePosition.y * 0.1,
+            scale: [1, 1.2, 1],
+          }}
+          transition={{
+            duration: 5,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+        
+        {/* Geometric shapes */}
+        <motion.div
+          className="absolute top-20 left-20 w-32 h-32 border-2 border-white/10 rounded-lg"
+          animate={{
+            rotate: [0, 90, 180, 270, 360],
+            scale: [1, 1.1, 1],
+          }}
+          transition={{
+            duration: 8,
+            repeat: Infinity,
+            ease: "linear"
+          }}
+        />
+        <motion.div
+          className="absolute bottom-32 right-32 w-24 h-24 bg-brand-accent/10 rounded-full"
+          animate={{
+            y: [-20, 20, -20],
+            x: [-10, 10, -10],
+          }}
+          transition={{
+            duration: 7,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+        <motion.div
+          className="absolute top-1/2 right-20 w-16 h-16 border-2 border-brand-secondary/20 rounded-full"
+          animate={{
+            rotate: [0, 180, 360],
+            scale: [1, 1.2, 1],
+          }}
+          transition={{
+            duration: 6,
+            repeat: Infinity,
+            ease: "easeInOut"
           }}
         />
         
         {/* Grid pattern */}
-        <div className="absolute inset-0 opacity-30" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+        <div className="absolute inset-0 opacity-20" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
         }} />
         
         {/* Floating particles */}
-        {[...Array(20)].map((_, i) => (
-          <div
+        {[...Array(30)].map((_, i) => (
+          <motion.div
             key={i}
-            className="absolute w-2 h-2 bg-white/20 rounded-full animate-bounce"
+            className="absolute w-2 h-2 bg-white/30 rounded-full"
+            animate={{
+              y: [-20, 20, -20],
+              x: [-10, 10, -10],
+              opacity: [0.3, 0.8, 0.3],
+            }}
+            transition={{
+              duration: 3 + Math.random() * 2,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: Math.random() * 2,
+            }}
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 3}s`,
-              animationDuration: `${2 + Math.random() * 2}s`
             }}
           />
         ))}
@@ -137,28 +201,53 @@ export const Login: React.FC = () => {
       <div className="relative z-10 min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full">
           {/* Logo and Branding */}
-          <div className="text-center mb-8">
+          <motion.div 
+            className="text-center mb-8"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
             <div className="flex items-center justify-center mb-6">
               <FikiriLogo size="xl" variant="white" className="mx-auto" />
             </div>
-            <h1 className="text-4xl font-bold text-white mb-2">
+            <motion.h1 
+              className="text-5xl font-bold text-white mb-2 font-serif tracking-tight"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+            >
               Fikiri Solutions
-            </h1>
-            <p className="text-xl text-white/90 mb-1">
+            </motion.h1>
+            <motion.p 
+              className="text-xl text-white/90 mb-1 font-medium"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+            >
               AI-Powered Business Automation
-            </p>
-            <p className="text-sm text-white/70">
+            </motion.p>
+            <motion.p 
+              className="text-sm text-white/70 font-light"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+            >
               Transform your business with intelligent automation
-            </p>
-          </div>
+            </motion.p>
+          </motion.div>
 
           {/* Login Form */}
-          <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20">
+          <motion.div 
+            className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.5 }}
+          >
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-white text-center mb-2">
+              <h2 className="text-2xl font-bold text-white text-center mb-2 font-serif">
                 Welcome Back
               </h2>
-              <p className="text-gray-300 text-center text-sm">
+              <p className="text-gray-300 text-center text-sm font-light">
                 Sign in to continue your automation journey
               </p>
             </div>
@@ -207,14 +296,25 @@ export const Login: React.FC = () => {
                     <input
                       id="password"
                       name="password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       autoComplete="current-password"
                       required
-                      className={`w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent transition-all duration-200 backdrop-blur-sm ${passwordError ? 'border-brand-error focus:ring-brand-error' : ''}`}
+                      className={`w-full pl-12 pr-12 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent transition-all duration-200 backdrop-blur-sm ${passwordError ? 'border-brand-error focus:ring-brand-error' : ''}`}
                       placeholder="Enter your password"
                       value={password}
                       onChange={handlePasswordChange}
                     />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-300" />
+                      ) : (
+                        <Eye className="h-5 w-5 text-gray-400 hover:text-gray-300" />
+                      )}
+                    </button>
                   </div>
                   {passwordError && (
                     <p className="mt-2 text-sm text-red-300">{passwordError}</p>
@@ -236,7 +336,7 @@ export const Login: React.FC = () => {
                 </div>
 
                 <div className="text-sm">
-                  <a href="#" className="font-medium text-brand-accent hover:text-brand-secondary transition-colors">
+                  <a href="#" className="font-medium text-white hover:text-gray-200 transition-colors">
                     Forgot password?
                   </a>
                 </div>
@@ -261,6 +361,48 @@ export const Login: React.FC = () => {
               </button>
             </form>
 
+            {/* Social Login Options */}
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-white/20" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-transparent text-gray-300">Or continue with</span>
+                </div>
+              </div>
+
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  className="w-full inline-flex justify-center py-3 px-4 border border-white/20 rounded-xl shadow-sm bg-white/10 text-sm font-medium text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent transition-all duration-200"
+                >
+                  <Chrome className="h-5 w-5 mr-2" />
+                  Gmail
+                </button>
+
+                <button
+                  type="button"
+                  className="w-full inline-flex justify-center py-3 px-4 border border-white/20 rounded-xl shadow-sm bg-white/10 text-sm font-medium text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent transition-all duration-200"
+                >
+                  <Github className="h-5 w-5 mr-2" />
+                  GitHub
+                </button>
+              </div>
+            </div>
+
+            {/* Sign Up Button */}
+            <div className="mt-6 text-center">
+              <button
+                type="button"
+                onClick={() => window.location.href = '/signup'}
+                className="w-full inline-flex justify-center items-center py-3 px-4 border border-white/30 rounded-xl shadow-sm bg-white/20 text-sm font-medium text-white hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent transition-all duration-200"
+              >
+                <UserPlus className="h-5 w-5 mr-2" />
+                Create New Account
+              </button>
+            </div>
+
             {/* Features Preview */}
             <div className="mt-8 pt-6 border-t border-white/20">
               <p className="text-xs text-gray-400 text-center mb-4">Powered by AI</p>
@@ -281,15 +423,6 @@ export const Login: React.FC = () => {
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="mt-8 text-center">
-            <p className="text-sm text-gray-400">
-              Don't have an account?{' '}
-              <a href="#" className="font-medium text-brand-accent hover:text-brand-secondary transition-colors">
-                Get started free
-              </a>
-            </p>
-          </div>
         </div>
       </div>
     </div>
