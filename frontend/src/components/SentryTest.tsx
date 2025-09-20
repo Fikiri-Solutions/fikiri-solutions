@@ -29,10 +29,14 @@ export const SentryTestButton: React.FC = () => {
 
   const handleLogTest = () => {
     // Test logging
-    const { logger } = Sentry
-    logger.info("Sentry log test", { 
-      component: "SentryTestButton",
-      timestamp: new Date().toISOString()
+    Sentry.captureMessage("Sentry log test", {
+      level: "info",
+      tags: {
+        component: "SentryTestButton"
+      },
+      extra: {
+        timestamp: new Date().toISOString()
+      }
     })
     console.log('Log test completed - check Sentry logs')
   }
@@ -86,7 +90,7 @@ export const SentryErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ c
             🚨 Something went wrong
           </h2>
           <p className="text-red-600 mb-4">
-            An error occurred: {error?.message}
+            An error occurred: {error?.message || 'Unknown error'}
           </p>
           <button
             onClick={resetError}
