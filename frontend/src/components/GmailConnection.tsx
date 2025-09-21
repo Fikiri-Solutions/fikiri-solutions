@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
-import { CheckCircle, AlertCircle, Mail, Shield, Eye, Clock, Loader2 } from 'lucide-react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { CheckCircle, AlertCircle, Mail, Shield, Eye, Clock, Loader2, ExternalLink, Info, AlertTriangle } from 'lucide-react'
+import { useToast } from './Toast'
 
 interface GmailConnectionProps {
   userId: number
@@ -19,31 +20,71 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
   const [gmailStatus, setGmailStatus] = useState<GmailStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showDetails, setShowDetails] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
+  const { addToast } = useToast()
 
   useEffect(() => {
     checkGmailStatus()
-  }, [userId])
+  }, [checkGmailStatus])
 
-  const checkGmailStatus = async () => {
+  const checkGmailStatus = useCallback(async () => {
+    if (!userId || userId <= 0) {
+      setError('Invalid user ID')
+      return
+    }
+
     try {
-      const response = await fetch(`https://fikirisolutions.onrender.com/api/auth/gmail/status?user_id=${userId}`)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+
+      const response = await fetch(`https://fikirisolutions.onrender.com/api/auth/gmail/status?user_id=${userId}`, {
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+      
+      clearTimeout(timeoutId)
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
       const data = await response.json()
       
       if (data.success) {
         setGmailStatus(data.data)
+        setError(null)
         if (data.data.connected) {
           onConnected()
         }
+      } else {
+        throw new Error(data.error || 'Failed to check Gmail status')
       }
     } catch (error) {
       console.error('Error checking Gmail status:', error)
+      if (error.name === 'AbortError') {
+        setError('Request timed out. Please check your connection.')
+        addToast('Connection timeout. Please try again.', 'error')
+      } else {
+        setError('Failed to check Gmail connection status')
+        addToast('Unable to check Gmail status. Please try again.', 'error')
+      }
     }
-  }
+  }, [userId, onConnected, addToast])
 
   const connectGmail = async () => {
+    if (!userId || userId <= 0) {
+      setError('Invalid user ID')
+      return
+    }
+
     try {
       setIsConnecting(true)
       setError(null)
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
 
       const response = await fetch('https://fikirisolutions.onrender.com/api/auth/gmail/connect', {
         method: 'POST',
@@ -53,21 +94,41 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
         body: JSON.stringify({
           user_id: userId,
           redirect_uri: window.location.origin + '/onboarding-flow/2'
-        })
+        }),
+        signal: controller.signal
       })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
 
       const data = await response.json()
       
-      if (data.success) {
+      if (data.success && data.auth_url) {
+        // Security: Validate the auth URL
+        if (!data.auth_url.startsWith('https://accounts.google.com/')) {
+          throw new Error('Invalid authentication URL')
+        }
+
         // Redirect to Google OAuth
         window.location.href = data.auth_url
+        addToast('Redirecting to Gmail authentication...', 'info')
       } else {
         throw new Error(data.error || 'Failed to initiate Gmail connection')
       }
     } catch (error) {
-      setError('Failed to connect Gmail. Please try again.')
-    } finally {
+      console.error('Error connecting Gmail:', error)
       setIsConnecting(false)
+      
+      if (error.name === 'AbortError') {
+        setError('Request timed out. Please try again.')
+        addToast('Connection timeout. Please try again.', 'error')
+      } else {
+        setError(error.message || 'Failed to connect Gmail. Please try again.')
+        addToast('Failed to connect Gmail. Please try again.', 'error')
+      }
     }
   }
 
