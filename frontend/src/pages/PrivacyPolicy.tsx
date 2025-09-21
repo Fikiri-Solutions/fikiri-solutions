@@ -414,8 +414,8 @@ const PrivacyPolicy: React.FC = () => {
               <div className="flex items-center">
                 <Mail className="h-5 w-5 text-brand-primary mr-3" />
                 <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Privacy Officer</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">privacy@fikirisolutions.com</p>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Email</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">info@fikirisolutions.com</p>
                 </div>
               </div>
               <div className="flex items-center">
