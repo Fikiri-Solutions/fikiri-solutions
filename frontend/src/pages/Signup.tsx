@@ -112,8 +112,8 @@ const Signup: React.FC = () => {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Redirect to onboarding or dashboard
-      window.location.href = '/onboarding';
+      // Redirect to onboarding flow
+      window.location.href = '/onboarding-flow';
     } catch (error) {
       console.error('Signup error:', error);
       setErrors({ submit: 'Failed to create account. Please try again.' });

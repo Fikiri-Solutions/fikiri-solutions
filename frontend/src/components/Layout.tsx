@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Mail, Users, Brain, Settings, Menu, X, Sparkles, Palette, LogOut, Building2, Shield } from 'lucide-react'
+import { Mail, Users, Brain, Settings, Menu, X, Sparkles, Palette, LogOut, Building2, Shield, Zap } from 'lucide-react'
 import { MobileBottomNav } from './MobileBottomNav'
 import { ThemeToggle } from './ThemeToggle'
 import { CustomizationPanel } from './CustomizationPanel'
@@ -55,6 +55,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Industry AI', href: '/industry', icon: Building2 },
     { name: 'Privacy', href: '/privacy', icon: Shield },
   ]
+
+  // Add onboarding link if not completed
+  const onboardingCompleted = localStorage.getItem('fikiri-onboarding-completed')
+  if (onboardingCompleted !== 'true') {
+    navigation.unshift({ name: 'Setup Services', href: '/onboarding-flow', icon: Zap })
+  }
 
   return (
     <div className="min-h-screen bg-brand-background dark:bg-gray-900 transition-colors duration-300">
