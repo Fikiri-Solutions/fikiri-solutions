@@ -6,6 +6,7 @@ import { Dashboard } from './pages/Dashboard'
 import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
 import { TermsOfService } from './pages/TermsOfService'
+import { PrivacyPolicy } from './pages/PrivacyPolicy'
 import { Onboarding } from './pages/Onboarding'
 import { Services } from './pages/Services'
 import { CRM } from './pages/CRM'
@@ -52,6 +53,8 @@ function App() {
                       <Route path="/login" element={<Login />} />
                       <Route path="/signup" element={<Signup />} />
                       <Route path="/terms" element={<TermsOfService />} />
+                      <Route path="/privacy" element={<PrivacyPolicy />} />
+                      <Route path="/privacy-settings" element={<Layout><PrivacySettings /></Layout>} />
                       {features.showOnboarding && <Route path="/onboarding" element={<Onboarding />} />}
                       <Route path="/onboarding-flow" element={<OnboardingFlow />} />
                       <Route path="/onboarding-flow/:step" element={<OnboardingFlow />} />
