@@ -70,8 +70,16 @@ export const Login: React.FC = () => {
         // Track successful login
         trackLogin(email, 'email')
         
-        // Redirect to dashboard
-        window.location.href = '/'
+        // Check if user has completed onboarding
+        const onboardingCompleted = localStorage.getItem('fikiri-onboarding-completed')
+        
+        if (onboardingCompleted === 'true') {
+          // Redirect to dashboard if onboarding is complete
+          window.location.href = '/'
+        } else {
+          // Redirect to onboarding flow if not completed
+          window.location.href = '/onboarding-flow'
+        }
         return
       }
       

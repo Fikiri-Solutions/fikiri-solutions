@@ -194,6 +194,8 @@ export const OnboardingFlow: React.FC = () => {
       navigate('/onboarding/5')
     } else if (currentStep === 5) {
       // Complete onboarding
+      localStorage.setItem('fikiri-onboarding-completed', 'true')
+      trackOnboardingComplete(user?.email || 'unknown', currentStep)
       navigate('/')
     }
   }
