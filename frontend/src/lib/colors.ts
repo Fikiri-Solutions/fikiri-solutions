@@ -107,6 +107,7 @@ export const fikiriColors = {
     error: '#C0392B',     // Deep red-orange
     text: '#4B1E0C',      // Tree brown - text, footer background
     background: '#F7F3E9', // Cream - page background, cards
+    tan: '#8B4513',       // Darker tan/brown - signup backgrounds
     gradient: 'linear-gradient(135deg, #F39C12 0%, #E7641C 50%, #B33B1E 100%)',
   }
 }
@@ -122,6 +123,7 @@ export const fikiriCSSVariables = `
   --fikiri-error: #C0392B;          /* Deep red-orange */
   --fikiri-text: #4B1E0C;           /* Tree brown */
   --fikiri-bg: #F7F3E9;            /* Cream background */
+  --fikiri-tan: #8B4513;           /* Darker tan/brown */
   
   /* Primary Colors */
   --primary: 12 65% 40%; /* #B33B1E */

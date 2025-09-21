@@ -129,7 +129,7 @@ const Signup: React.FC = () => {
 
   return (
     <div 
-      className="min-h-screen bg-brand-background dark:bg-gray-900 relative overflow-hidden"
+      className="min-h-screen bg-brand-tan dark:bg-gray-900 relative overflow-hidden"
       onMouseMove={handleMouseMove}
     >
       {/* Animated Background */}

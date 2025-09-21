@@ -62,6 +62,7 @@ module.exports = {
           error: "#C0392B",      // Deep red-orange
           text: "#4B1E0C",       // Tree brown
           background: "#F7F3E9", // Cream background
+          tan: "#8B4513",        // Darker tan/brown
         },
         // Fikiri Color Scale
         fikiri: {
