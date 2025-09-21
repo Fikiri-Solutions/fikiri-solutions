@@ -12,6 +12,7 @@
 - **Apple iCloud Mail** - Native API support
 - **ProtonMail** - Secure email integration
 - **Fastmail** - Business email provider
+- **Mailchimp** - Email marketing and automation platform
 
 ---
 
@@ -145,7 +146,45 @@ FASTMAIL_JMAP_URL=https://api.fastmail.com/jmap/
 
 ---
 
-## 🚀 **PHASE 5: ADDITIONAL BUSINESS EMAIL SERVICES**
+## 🚀 **PHASE 5: MAILCHIMP INTEGRATION**
+
+### **APIs You Need to Sign Up For:**
+
+#### **1. Mailchimp Marketing API** ⭐⭐ **HIGH PRIORITY**
+- **What:** Email marketing and automation platform
+- **Sign Up:** https://mailchimp.com/developer/
+- **Cost:** Free tier available (2,000 contacts), paid plans from $13/month
+- **Features:**
+  - Email marketing campaigns
+  - Marketing automation
+  - Audience management
+  - Analytics and reporting
+  - A/B testing
+  - Landing pages
+  - E-commerce integration
+
+#### **2. Mailchimp Transactional API**
+- **What:** Transactional email service (formerly Mandrill)
+- **Sign Up:** Same as Marketing API
+- **Cost:** $20/month for 25,000 emails
+- **Features:**
+  - Transactional email delivery
+  - Email templates
+  - Delivery tracking
+  - Bounce handling
+
+### **Implementation Requirements:**
+```python
+# Environment variables needed:
+MAILCHIMP_API_KEY=your_mailchimp_api_key
+MAILCHIMP_SERVER_PREFIX=your_server_prefix
+MAILCHIMP_LIST_ID=your_default_list_id
+MAILCHIMP_WEBHOOK_SECRET=your_webhook_secret
+```
+
+---
+
+## 🚀 **PHASE 6: ADDITIONAL BUSINESS EMAIL SERVICES**
 
 ### **APIs You Need to Sign Up For:**
 
@@ -191,7 +230,20 @@ FASTMAIL_JMAP_URL=https://api.fastmail.com/jmap/
    - Implement connection flow
    - Add status monitoring
 
-### **Week 3-4: Apple iCloud Integration**
+### **Week 3-4: Mailchimp Integration**
+1. **Sign up for Mailchimp Marketing API**
+   - Create Mailchimp account
+   - Generate API key
+   - Set up webhook endpoints
+   - Configure audience lists
+
+2. **Implement Mailchimp Provider**
+   - Create `MailchimpProvider` class
+   - Implement marketing automation
+   - Add campaign management
+   - Test integration
+
+### **Week 5-6: Apple iCloud Integration**
 1. **Sign up for Apple Developer Program**
    - Register for developer account
    - Create app identifier
@@ -236,6 +288,7 @@ FASTMAIL_JMAP_URL=https://api.fastmail.com/jmap/
 
 ### **Monthly Costs (per user):**
 - **Microsoft 365:** $6-22/user (depending on plan)
+- **Mailchimp:** $0-350/month (Free tier: 2,000 contacts, paid: $13-350/month)
 - **Apple iCloud:** $0.99-9.99/user (depending on storage)
 - **ProtonMail:** $6.99/user (Business plan)
 - **Fastmail:** $5/user (Basic plan)
@@ -310,25 +363,31 @@ const emailProviders = [
 - **Effort:** Medium - well-documented API
 - **Cost:** Free tier available
 
-### **2. Apple iCloud Mail** ⭐⭐
+### **2. Mailchimp Marketing API** ⭐⭐⭐
+- **Why:** Major email marketing platform, high business adoption
+- **Impact:** High - covers marketing automation needs
+- **Effort:** Low - simple REST API
+- **Cost:** Free tier available (2,000 contacts)
+
+### **3. Apple iCloud Mail** ⭐⭐
 - **Why:** Growing business adoption
 - **Impact:** Medium - covers Apple ecosystem users
 - **Effort:** Medium - requires developer account
 - **Cost:** $99/year developer fee
 
-### **3. Fastmail JMAP** ⭐⭐
+### **4. Fastmail JMAP** ⭐⭐
 - **Why:** Modern protocol, growing adoption
 - **Impact:** Medium - tech-savvy businesses
 - **Effort:** Low - simple API
 - **Cost:** $5/user/month
 
-### **4. ProtonMail** ⭐
+### **5. ProtonMail** ⭐
 - **Why:** Security-focused businesses
 - **Impact:** Low - niche market
 - **Effort:** High - complex security implementation
 - **Cost:** $6.99/user/month
 
-### **5. Zoho Mail** ⭐
+### **6. Zoho Mail** ⭐
 - **Why:** Small business market
 - **Impact:** Low - limited market share
 - **Effort:** Low - simple integration

@@ -204,6 +204,7 @@ def microsoft_callback():
 
 ### **Monthly Costs (per user):**
 - **Microsoft 365:** $6-22/user (Business Basic to E5)
+- **Mailchimp:** $0-350/month (Free tier: 2,000 contacts, paid: $13-350/month)
 - **Apple iCloud:** $0.99-9.99/user (storage dependent)
 - **ProtonMail:** $6.99/user (Business plan)
 - **Fastmail:** $5/user (Basic plan)
@@ -231,7 +232,20 @@ def microsoft_callback():
 4. ✅ **Test with real business account**
 5. ✅ **Deploy to production**
 
-### **Week 3-4: Apple iCloud Integration**
+### **Week 3-4: Mailchimp Integration**
+1. **Sign up for Mailchimp Marketing API**
+   - Create Mailchimp account
+   - Generate API key
+   - Set up webhook endpoints
+   - Configure audience lists
+
+2. **Implement Mailchimp Provider**
+   - Create `MailchimpProvider` class
+   - Implement marketing automation
+   - Add campaign management
+   - Test integration
+
+### **Week 5-6: Apple iCloud Integration**
 1. ✅ **Sign up for Apple Developer Program**
 2. ✅ **Create app identifier**
 3. ✅ **Generate API keys**
