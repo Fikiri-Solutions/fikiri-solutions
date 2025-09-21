@@ -4,6 +4,7 @@ Fikiri Solutions - Flask Web Application
 Web interface for testing and deploying Fikiri services.
 """
 
+import os
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
@@ -2393,17 +2394,17 @@ def microsoft_connect():
         if not user_id:
             return jsonify({'success': False, 'error': 'User ID required'})
         
-        # Get Microsoft Graph provider
-        email_manager = services.get('email_manager')
-        if not email_manager:
-            return jsonify({'success': False, 'error': 'Email manager not available'})
+        # Import our Microsoft Graph service
+        from core.microsoft_graph import microsoft_graph_service
         
-        microsoft_provider = email_manager.get_provider('microsoft365')
-        if not microsoft_provider:
-            return jsonify({'success': False, 'error': 'Microsoft provider not configured'})
+        if not microsoft_graph_service.is_configured():
+            return jsonify({'success': False, 'error': 'Microsoft Graph not configured'})
         
-        # Generate auth URL
-        auth_url = microsoft_provider.get_auth_url(state=f"user_{user_id}")
+        # Generate auth URL with user state
+        auth_url = microsoft_graph_service.get_auth_url()
+        if auth_url:
+            # Add state parameter to track user
+            auth_url += f"&state=user_{user_id}"
         
         return jsonify({
             'success': True,
@@ -2426,17 +2427,22 @@ def microsoft_callback():
         
         user_id = state.replace('user_', '')
         
-        # Get Microsoft Graph provider
-        email_manager = services.get('email_manager')
-        if not email_manager:
+        # Import our Microsoft Graph service
+        from core.microsoft_graph import microsoft_graph_service
+        
+        if not microsoft_graph_service.is_configured():
             return redirect('/onboarding-flow/2?error=microsoft_provider_unavailable')
         
-        microsoft_provider = email_manager.get_provider('microsoft365')
-        if not microsoft_provider:
-            return redirect('/onboarding-flow/2?error=microsoft_provider_not_configured')
-        
         # Exchange code for token
-        if microsoft_provider.exchange_code_for_token(code):
+        auth_result = microsoft_graph_service.authenticate_user(code)
+        if auth_result['success']:
+            # Store tokens in session or database for the user
+            session[f'microsoft_tokens_{user_id}'] = {
+                'access_token': auth_result['access_token'],
+                'refresh_token': auth_result['refresh_token'],
+                'expires_in': auth_result['expires_in']
+            }
+            
             return redirect(f'/onboarding-flow/3?microsoft_connected=true')
         else:
             return redirect('/onboarding-flow/2?error=microsoft_token_exchange_failed')
@@ -2444,6 +2450,189 @@ def microsoft_callback():
     except Exception as e:
         print(f"❌ Microsoft callback error: {e}")
         return redirect('/onboarding-flow/2?error=microsoft_callback_error')
+
+# Microsoft Graph API Endpoints
+@app.route('/api/microsoft/user/profile', methods=['GET'])
+@handle_api_errors
+def microsoft_user_profile():
+    """Get Microsoft user profile"""
+    try:
+        user_id = request.args.get('user_id')
+        if not user_id:
+            return create_error_response("User ID required", 400, 'MISSING_USER_ID')
+        
+        # Get tokens from session
+        tokens = session.get(f'microsoft_tokens_{user_id}')
+        if not tokens:
+            return create_error_response("Microsoft not connected", 401, 'NOT_CONNECTED')
+        
+        from core.microsoft_graph import microsoft_graph_service
+        
+        # Set tokens in the service
+        microsoft_graph_service.client.access_token = tokens['access_token']
+        microsoft_graph_service.client.refresh_token = tokens['refresh_token']
+        
+        result = microsoft_graph_service.get_user_info()
+        if result['success']:
+            return create_success_response(result['user'], "User profile retrieved")
+        else:
+            return create_error_response(result['error'], 400, 'PROFILE_ERROR')
+            
+    except Exception as e:
+        return create_error_response(str(e), 500, 'INTERNAL_ERROR')
+
+@app.route('/api/microsoft/emails', methods=['GET'])
+@handle_api_errors
+def microsoft_emails():
+    """Get Microsoft emails"""
+    try:
+        user_id = request.args.get('user_id')
+        limit = int(request.args.get('limit', 50))
+        
+        if not user_id:
+            return create_error_response("User ID required", 400, 'MISSING_USER_ID')
+        
+        # Get tokens from session
+        tokens = session.get(f'microsoft_tokens_{user_id}')
+        if not tokens:
+            return create_error_response("Microsoft not connected", 401, 'NOT_CONNECTED')
+        
+        from core.microsoft_graph import microsoft_graph_service
+        
+        # Set tokens in the service
+        microsoft_graph_service.client.access_token = tokens['access_token']
+        microsoft_graph_service.client.refresh_token = tokens['refresh_token']
+        
+        result = microsoft_graph_service.get_user_emails(limit=limit)
+        if result['success']:
+            return create_success_response(result['emails'], "Emails retrieved")
+        else:
+            return create_error_response(result['error'], 400, 'EMAIL_ERROR')
+            
+    except Exception as e:
+        return create_error_response(str(e), 500, 'INTERNAL_ERROR')
+
+@app.route('/api/microsoft/send-email', methods=['POST'])
+@handle_api_errors
+def microsoft_send_email():
+    """Send email via Microsoft Graph"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        to = data.get('to')
+        subject = data.get('subject')
+        body = data.get('body')
+        
+        if not all([user_id, to, subject, body]):
+            return create_error_response("Missing required fields", 400, 'MISSING_FIELDS')
+        
+        # Get tokens from session
+        tokens = session.get(f'microsoft_tokens_{user_id}')
+        if not tokens:
+            return create_error_response("Microsoft not connected", 401, 'NOT_CONNECTED')
+        
+        from core.microsoft_graph import microsoft_graph_service
+        
+        # Set tokens in the service
+        microsoft_graph_service.client.access_token = tokens['access_token']
+        microsoft_graph_service.client.refresh_token = tokens['refresh_token']
+        
+        result = microsoft_graph_service.send_user_email(to, subject, body)
+        if result['success']:
+            return create_success_response({}, "Email sent successfully")
+        else:
+            return create_error_response(result['error'], 400, 'SEND_ERROR')
+            
+    except Exception as e:
+        return create_error_response(str(e), 500, 'INTERNAL_ERROR')
+
+@app.route('/api/microsoft/calendar', methods=['GET'])
+@handle_api_errors
+def microsoft_calendar():
+    """Get Microsoft calendar events"""
+    try:
+        user_id = request.args.get('user_id')
+        days_ahead = int(request.args.get('days_ahead', 7))
+        
+        if not user_id:
+            return create_error_response("User ID required", 400, 'MISSING_USER_ID')
+        
+        # Get tokens from session
+        tokens = session.get(f'microsoft_tokens_{user_id}')
+        if not tokens:
+            return create_error_response("Microsoft not connected", 401, 'NOT_CONNECTED')
+        
+        from core.microsoft_graph import microsoft_graph_service
+        
+        # Set tokens in the service
+        microsoft_graph_service.client.access_token = tokens['access_token']
+        microsoft_graph_service.client.refresh_token = tokens['refresh_token']
+        
+        result = microsoft_graph_service.get_user_calendar(days_ahead=days_ahead)
+        if result['success']:
+            return create_success_response(result['data'], "Calendar events retrieved")
+        else:
+            return create_error_response(result['error'], 400, 'CALENDAR_ERROR')
+            
+    except Exception as e:
+        return create_error_response(str(e), 500, 'INTERNAL_ERROR')
+
+@app.route('/api/microsoft/create-event', methods=['POST'])
+@handle_api_errors
+def microsoft_create_event():
+    """Create Microsoft calendar event"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        subject = data.get('subject')
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+        attendees = data.get('attendees', [])
+        body = data.get('body')
+        
+        if not all([user_id, subject, start_time, end_time]):
+            return create_error_response("Missing required fields", 400, 'MISSING_FIELDS')
+        
+        # Get tokens from session
+        tokens = session.get(f'microsoft_tokens_{user_id}')
+        if not tokens:
+            return create_error_response("Microsoft not connected", 401, 'NOT_CONNECTED')
+        
+        from core.microsoft_graph import microsoft_graph_service
+        
+        # Set tokens in the service
+        microsoft_graph_service.client.access_token = tokens['access_token']
+        microsoft_graph_service.client.refresh_token = tokens['refresh_token']
+        
+        result = microsoft_graph_service.create_calendar_event(
+            subject, start_time, end_time, attendees, body
+        )
+        if result['success']:
+            return create_success_response(result['data'], "Event created successfully")
+        else:
+            return create_error_response(result['error'], 400, 'CREATE_EVENT_ERROR')
+            
+    except Exception as e:
+        return create_error_response(str(e), 500, 'INTERNAL_ERROR')
+
+@app.route('/api/microsoft/disconnect', methods=['POST'])
+@handle_api_errors
+def microsoft_disconnect():
+    """Disconnect Microsoft account"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return create_error_response("User ID required", 400, 'MISSING_USER_ID')
+        
+        # Remove tokens from session
+        session.pop(f'microsoft_tokens_{user_id}', None)
+        
+        return create_success_response({}, "Microsoft account disconnected")
+        
+    except Exception as e:
+        return create_error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @app.route('/api/auth/mailchimp/connect', methods=['POST'])
 def mailchimp_connect():
@@ -3552,3 +3741,85 @@ def webhook_sentry_performance_test():
         }), 200
 
 if __name__ == '__main__':
+    # Create templates directory if it doesn't exist
+    templates_dir = Path('templates')
+    templates_dir.mkdir(exist_ok=True)
+    
+    # Create basic dashboard template
+    dashboard_html = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fikiri Solutions - Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { text-align: center; margin-bottom: 30px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Fikiri Solutions</h1>
+            <p>AI-Powered Email Automation Platform</p>
+        </div>
+        
+        <div class="status success">
+            <strong>✅ Backend Status:</strong> Running successfully
+        </div>
+        
+        <div class="status info">
+            <strong>📧 Email Services:</strong> Gmail, Microsoft 365, Mailchimp, Apple iCloud
+        </div>
+        
+        <div class="status info">
+            <strong>🤖 AI Features:</strong> Email parsing, response generation, lead scoring
+        </div>
+        
+        <div class="status info">
+            <strong>📊 CRM:</strong> Lead management, contact tracking, analytics
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <p>Visit <a href="/api/health">/api/health</a> for detailed system status</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+    
+    # Write dashboard template
+    dashboard_path = templates_dir / 'dashboard.html'
+    dashboard_path.write_text(dashboard_html)
+    
+    print("🚀 Starting Fikiri Solutions Flask Application...")
+    print("📧 Email Services: Gmail, Microsoft 365, Mailchimp, Apple iCloud")
+    print("🤖 AI Features: Email parsing, response generation, lead scoring")
+    print("📊 CRM: Lead management, contact tracking, analytics")
+    print("🌐 Frontend: React application with Vite")
+    print("🔧 Backend: Flask with comprehensive API")
+    print("📱 PWA: Progressive Web App capabilities")
+    print("🔒 Security: Rate limiting, CORS, input validation")
+    print("📈 Monitoring: Sentry integration, performance tracking")
+    print("💾 Database: SQLite with Redis caching")
+    print("🚀 Deployment: Render + Vercel")
+    print("=" * 60)
+    print("🌐 Application will be available at: http://localhost:5000")
+    print("📊 Health check: http://localhost:5000/api/health")
+    print("📚 API docs: http://localhost:5000/api/docs")
+    print("=" * 60)
+    
+    # Start the Flask application
+    app.run(
+        debug=True,
+        host='0.0.0.0',
+        port=5000,
+        use_reloader=True,
+        threaded=True
+    )

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Mail, Lock, ArrowRight, Zap, Sparkles, Shield, Rocket, Github, Chrome, UserPlus, Eye, EyeOff } from 'lucide-react'
+import { Mail, Lock, ArrowRight, Zap, Sparkles, Shield, Rocket, Github, Chrome, UserPlus, Eye, EyeOff, Building2 } from 'lucide-react'
 import { useUserActivityTracking } from '../contexts/ActivityContext'
 import { FikiriLogo } from '../components/FikiriLogo'
 import { motion } from 'framer-motion'
@@ -13,6 +13,7 @@ export const Login: React.FC = () => {
   const [passwordError, setPasswordError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+  const [isMicrosoftLoading, setIsMicrosoftLoading] = useState(false)
   const { trackLogin } = useUserActivityTracking()
 
   // Track mouse position for interactive background
@@ -90,6 +91,45 @@ export const Login: React.FC = () => {
       setError(error instanceof Error ? error.message : 'Login failed. Please try again.')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleMicrosoftLogin = async () => {
+    setIsMicrosoftLoading(true)
+    setError('')
+    
+    try {
+      // Get user ID from localStorage or create a temporary one
+      let userId = localStorage.getItem('fikiri-user-id')
+      if (!userId) {
+        userId = 'temp_' + Date.now()
+        localStorage.setItem('fikiri-user-id', userId)
+      }
+      
+      // Call Microsoft connect endpoint
+      const response = await fetch('https://fikirisolutions.onrender.com/api/auth/microsoft/connect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ user_id: userId })
+      })
+      
+      const data = await response.json()
+      
+      if (data.success && data.auth_url) {
+        // Track Microsoft login attempt
+        trackLogin('microsoft', 'oauth')
+        
+        // Redirect to Microsoft OAuth
+        window.location.href = data.auth_url
+      } else {
+        throw new Error(data.error || 'Failed to initiate Microsoft login')
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Microsoft login failed. Please try again.')
+    } finally {
+      setIsMicrosoftLoading(false)
     }
   }
 
@@ -380,13 +420,23 @@ export const Login: React.FC = () => {
                 </div>
               </div>
 
-              <div className="mt-6 grid grid-cols-2 gap-3">
+              <div className="mt-6 grid grid-cols-3 gap-3">
                 <button
                   type="button"
                   className="w-full inline-flex justify-center py-3 px-4 border border-white/20 rounded-xl shadow-sm bg-white/10 text-sm font-medium text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent transition-all duration-200"
                 >
                   <Chrome className="h-5 w-5 mr-2" />
                   Gmail
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleMicrosoftLogin}
+                  disabled={isMicrosoftLoading}
+                  className="w-full inline-flex justify-center py-3 px-4 border border-white/20 rounded-xl shadow-sm bg-white/10 text-sm font-medium text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Building2 className="h-5 w-5 mr-2" />
+                  {isMicrosoftLoading ? 'Connecting...' : 'Microsoft'}
                 </button>
 
                 <button
