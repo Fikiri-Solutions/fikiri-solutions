@@ -5,6 +5,7 @@ import { SpeedInsights } from '@vercel/speed-insights/react'
 import { Dashboard } from './pages/Dashboard'
 import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
+import { TermsOfService } from './pages/TermsOfService'
 import { Onboarding } from './pages/Onboarding'
 import { Services } from './pages/Services'
 import { CRM } from './pages/CRM'
@@ -50,6 +51,7 @@ function App() {
                     <Routes>
                       <Route path="/login" element={<Login />} />
                       <Route path="/signup" element={<Signup />} />
+                      <Route path="/terms" element={<TermsOfService />} />
                       {features.showOnboarding && <Route path="/onboarding" element={<Onboarding />} />}
                       <Route path="/onboarding-flow" element={<OnboardingFlow />} />
                       <Route path="/onboarding-flow/:step" element={<OnboardingFlow />} />
