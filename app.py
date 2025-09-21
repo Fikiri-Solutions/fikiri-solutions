@@ -2382,6 +2382,464 @@ def api_health():
             'error': str(e)
         }), 500
 
+# Email Service Integration Routes
+@app.route('/api/auth/microsoft/connect', methods=['POST'])
+def microsoft_connect():
+    """Initiate Microsoft Graph OAuth flow"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return jsonify({'success': False, 'error': 'User ID required'})
+        
+        # Get Microsoft Graph provider
+        email_manager = services.get('email_manager')
+        if not email_manager:
+            return jsonify({'success': False, 'error': 'Email manager not available'})
+        
+        microsoft_provider = email_manager.get_provider('microsoft365')
+        if not microsoft_provider:
+            return jsonify({'success': False, 'error': 'Microsoft provider not configured'})
+        
+        # Generate auth URL
+        auth_url = microsoft_provider.get_auth_url(state=f"user_{user_id}")
+        
+        return jsonify({
+            'success': True,
+            'auth_url': auth_url
+        })
+        
+    except Exception as e:
+        print(f"❌ Microsoft connect error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to initiate Microsoft connection'})
+
+@app.route('/api/auth/microsoft/callback', methods=['GET'])
+def microsoft_callback():
+    """Handle Microsoft Graph OAuth callback"""
+    try:
+        code = request.args.get('code')
+        state = request.args.get('state')
+        
+        if not code or not state:
+            return redirect('/onboarding-flow/2?error=microsoft_auth_failed')
+        
+        user_id = state.replace('user_', '')
+        
+        # Get Microsoft Graph provider
+        email_manager = services.get('email_manager')
+        if not email_manager:
+            return redirect('/onboarding-flow/2?error=microsoft_provider_unavailable')
+        
+        microsoft_provider = email_manager.get_provider('microsoft365')
+        if not microsoft_provider:
+            return redirect('/onboarding-flow/2?error=microsoft_provider_not_configured')
+        
+        # Exchange code for token
+        if microsoft_provider.exchange_code_for_token(code):
+            return redirect(f'/onboarding-flow/3?microsoft_connected=true')
+        else:
+            return redirect('/onboarding-flow/2?error=microsoft_token_exchange_failed')
+            
+    except Exception as e:
+        print(f"❌ Microsoft callback error: {e}")
+        return redirect('/onboarding-flow/2?error=microsoft_callback_error')
+
+@app.route('/api/auth/mailchimp/connect', methods=['POST'])
+def mailchimp_connect():
+    """Connect Mailchimp account"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return jsonify({'success': False, 'error': 'User ID required'})
+        
+        # Get Mailchimp provider
+        email_manager = services.get('email_manager')
+        if not email_manager:
+            return jsonify({'success': False, 'error': 'Email manager not available'})
+        
+        mailchimp_provider = email_manager.get_provider('mailchimp')
+        if not mailchimp_provider:
+            return jsonify({'success': False, 'error': 'Mailchimp provider not configured'})
+        
+        # Test connection
+        if mailchimp_provider.authenticate():
+            return jsonify({
+                'success': True,
+                'message': 'Mailchimp connected successfully'
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Failed to authenticate with Mailchimp'})
+        
+    except Exception as e:
+        print(f"❌ Mailchimp connect error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to connect Mailchimp'})
+
+@app.route('/api/auth/apple/connect', methods=['POST'])
+def apple_connect():
+    """Connect Apple iCloud account"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return jsonify({'success': False, 'error': 'User ID required'})
+        
+        # Get Apple iCloud provider
+        email_manager = services.get('email_manager')
+        if not email_manager:
+            return jsonify({'success': False, 'error': 'Email manager not available'})
+        
+        apple_provider = email_manager.get_provider('icloud')
+        if not apple_provider:
+            return jsonify({'success': False, 'error': 'Apple iCloud provider not configured'})
+        
+        # Test connection
+        if apple_provider.authenticate():
+            return jsonify({
+                'success': True,
+                'message': 'Apple iCloud connected successfully'
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Failed to authenticate with Apple iCloud'})
+        
+    except Exception as e:
+        print(f"❌ Apple iCloud connect error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to connect Apple iCloud'})
+
+@app.route('/api/email/services/status', methods=['GET'])
+def email_services_status():
+    """Get status of all email services"""
+    try:
+        email_manager = services.get('email_manager')
+        if not email_manager:
+            return jsonify({'success': False, 'error': 'Email manager not available'})
+        
+        status = email_manager.get_provider_status()
+        
+        return jsonify({
+            'success': True,
+            'services': status
+        })
+        
+    except Exception as e:
+        print(f"❌ Email services status error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to get email services status'})
+
+@app.route('/api/email/services/<service_name>/messages', methods=['GET'])
+def get_service_messages(service_name):
+    """Get messages from a specific email service"""
+    try:
+        limit = request.args.get('limit', 10, type=int)
+        
+        email_manager = services.get('email_manager')
+        if not email_manager:
+            return jsonify({'success': False, 'error': 'Email manager not available'})
+        
+        provider = email_manager.get_provider(service_name)
+        if not provider:
+            return jsonify({'success': False, 'error': f'Service {service_name} not available'})
+        
+        if not provider.is_authenticated():
+            return jsonify({'success': False, 'error': f'Service {service_name} not authenticated'})
+        
+        messages = provider.get_messages(limit)
+        
+        return jsonify({
+            'success': True,
+            'messages': messages,
+            'service': service_name
+        })
+        
+    except Exception as e:
+        print(f"❌ Get service messages error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to get messages'})
+
+@app.route('/api/email/services/<service_name>/send', methods=['POST'])
+def send_service_message(service_name):
+    """Send message via a specific email service"""
+    try:
+        data = request.get_json()
+        to = data.get('to')
+        subject = data.get('subject')
+        body = data.get('body')
+        
+        if not all([to, subject, body]):
+            return jsonify({'success': False, 'error': 'Missing required fields: to, subject, body'})
+        
+        email_manager = services.get('email_manager')
+        if not email_manager:
+            return jsonify({'success': False, 'error': 'Email manager not available'})
+        
+        provider = email_manager.get_provider(service_name)
+        if not provider:
+            return jsonify({'success': False, 'error': f'Service {service_name} not available'})
+        
+        if not provider.is_authenticated():
+            return jsonify({'success': False, 'error': f'Service {service_name} not authenticated'})
+        
+        success = provider.send_message(to, subject, body)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Message sent successfully',
+                'service': service_name
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Failed to send message'})
+        
+    except Exception as e:
+        print(f"❌ Send service message error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to send message'})
+
+# Mailchimp specific routes
+@app.route('/api/mailchimp/campaigns', methods=['GET'])
+def get_mailchimp_campaigns():
+    """Get Mailchimp campaigns"""
+    try:
+        limit = request.args.get('limit', 10, type=int)
+        
+        email_manager = services.get('email_manager')
+        if not email_manager:
+            return jsonify({'success': False, 'error': 'Email manager not available'})
+        
+        mailchimp_provider = email_manager.get_provider('mailchimp')
+        if not mailchimp_provider:
+            return jsonify({'success': False, 'error': 'Mailchimp provider not available'})
+        
+        if not mailchimp_provider.is_authenticated():
+            return jsonify({'success': False, 'error': 'Mailchimp not authenticated'})
+        
+        campaigns = mailchimp_provider.get_campaigns(limit)
+        
+        return jsonify({
+            'success': True,
+            'campaigns': campaigns
+        })
+        
+    except Exception as e:
+        print(f"❌ Get Mailchimp campaigns error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to get campaigns'})
+
+@app.route('/api/mailchimp/subscribers', methods=['GET'])
+def get_mailchimp_subscribers():
+    """Get Mailchimp subscribers"""
+    try:
+        limit = request.args.get('limit', 10, type=int)
+        
+        email_manager = services.get('email_manager')
+        if not email_manager:
+            return jsonify({'success': False, 'error': 'Email manager not available'})
+        
+        mailchimp_provider = email_manager.get_provider('mailchimp')
+        if not mailchimp_provider:
+            return jsonify({'success': False, 'error': 'Mailchimp provider not available'})
+        
+        if not mailchimp_provider.is_authenticated():
+            return jsonify({'success': False, 'error': 'Mailchimp not authenticated'})
+        
+        subscribers = mailchimp_provider.get_subscribers(limit=limit)
+        
+        return jsonify({
+            'success': True,
+            'subscribers': subscribers
+        })
+        
+    except Exception as e:
+        print(f"❌ Get Mailchimp subscribers error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to get subscribers'})
+
+@app.route('/api/mailchimp/subscribers', methods=['POST'])
+def add_mailchimp_subscriber():
+    """Add subscriber to Mailchimp"""
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        first_name = data.get('first_name')
+        last_name = data.get('last_name')
+        tags = data.get('tags', [])
+        
+        if not email:
+            return jsonify({'success': False, 'error': 'Email required'})
+        
+        email_manager = services.get('email_manager')
+        if not email_manager:
+            return jsonify({'success': False, 'error': 'Email manager not available'})
+        
+        mailchimp_provider = email_manager.get_provider('mailchimp')
+        if not mailchimp_provider:
+            return jsonify({'success': False, 'error': 'Mailchimp provider not available'})
+        
+        if not mailchimp_provider.is_authenticated():
+            return jsonify({'success': False, 'error': 'Mailchimp not authenticated'})
+        
+        success = mailchimp_provider.add_subscriber(email, first_name, last_name, tags)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Subscriber added successfully'
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Failed to add subscriber'})
+        
+    except Exception as e:
+        print(f"❌ Add Mailchimp subscriber error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to add subscriber'})
+
+# Microsoft Graph specific routes
+@app.route('/api/microsoft/calendar/events', methods=['GET'])
+def get_microsoft_calendar_events():
+    """Get Microsoft Graph calendar events"""
+    try:
+        limit = request.args.get('limit', 10, type=int)
+        
+        email_manager = services.get('email_manager')
+        if not email_manager:
+            return jsonify({'success': False, 'error': 'Email manager not available'})
+        
+        microsoft_provider = email_manager.get_provider('microsoft365')
+        if not microsoft_provider:
+            return jsonify({'success': False, 'error': 'Microsoft provider not available'})
+        
+        if not microsoft_provider.is_authenticated():
+            return jsonify({'success': False, 'error': 'Microsoft not authenticated'})
+        
+        events = microsoft_provider.get_calendar_events(limit)
+        
+        return jsonify({
+            'success': True,
+            'events': events
+        })
+        
+    except Exception as e:
+        print(f"❌ Get Microsoft calendar events error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to get calendar events'})
+
+@app.route('/api/microsoft/contacts', methods=['GET'])
+def get_microsoft_contacts():
+    """Get Microsoft Graph contacts"""
+    try:
+        limit = request.args.get('limit', 10, type=int)
+        
+        email_manager = services.get('email_manager')
+        if not email_manager:
+            return jsonify({'success': False, 'error': 'Email manager not available'})
+        
+        microsoft_provider = email_manager.get_provider('microsoft365')
+        if not microsoft_provider:
+            return jsonify({'success': False, 'error': 'Microsoft provider not available'})
+        
+        if not microsoft_provider.is_authenticated():
+            return jsonify({'success': False, 'error': 'Microsoft not authenticated'})
+        
+        contacts = microsoft_provider.get_contacts(limit)
+        
+        return jsonify({
+            'success': True,
+            'contacts': contacts
+        })
+        
+    except Exception as e:
+        print(f"❌ Get Microsoft contacts error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to get contacts'})
+
+# Apple iCloud specific routes
+@app.route('/api/apple/calendar/events', methods=['GET'])
+def get_apple_calendar_events():
+    """Get Apple iCloud calendar events"""
+    try:
+        limit = request.args.get('limit', 10, type=int)
+        
+        email_manager = services.get('email_manager')
+        if not email_manager:
+            return jsonify({'success': False, 'error': 'Email manager not available'})
+        
+        apple_provider = email_manager.get_provider('icloud')
+        if not apple_provider:
+            return jsonify({'success': False, 'error': 'Apple iCloud provider not available'})
+        
+        if not apple_provider.is_authenticated():
+            return jsonify({'success': False, 'error': 'Apple iCloud not authenticated'})
+        
+        events = apple_provider.get_calendar_events(limit)
+        
+        return jsonify({
+            'success': True,
+            'events': events
+        })
+        
+    except Exception as e:
+        print(f"❌ Get Apple calendar events error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to get calendar events'})
+
+@app.route('/api/apple/contacts', methods=['GET'])
+def get_apple_contacts():
+    """Get Apple iCloud contacts"""
+    try:
+        limit = request.args.get('limit', 10, type=int)
+        
+        email_manager = services.get('email_manager')
+        if not email_manager:
+            return jsonify({'success': False, 'error': 'Email manager not available'})
+        
+        apple_provider = email_manager.get_provider('icloud')
+        if not apple_provider:
+            return jsonify({'success': False, 'error': 'Apple iCloud provider not available'})
+        
+        if not apple_provider.is_authenticated():
+            return jsonify({'success': False, 'error': 'Apple iCloud not authenticated'})
+        
+        contacts = apple_provider.get_contacts(limit)
+        
+        return jsonify({
+            'success': True,
+            'contacts': contacts
+        })
+        
+    except Exception as e:
+        print(f"❌ Get Apple contacts error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to get contacts'})
+
+# Webhook routes
+@app.route('/api/webhooks/mailchimp', methods=['POST'])
+def mailchimp_webhook():
+    """Handle Mailchimp webhooks"""
+    try:
+        # Get webhook signature
+        signature = request.headers.get('X-Mailchimp-Signature')
+        payload = request.get_data(as_text=True)
+        
+        # Verify webhook signature
+        email_manager = services.get('email_manager')
+        if email_manager:
+            mailchimp_provider = email_manager.get_provider('mailchimp')
+            if mailchimp_provider and not mailchimp_provider.verify_webhook(payload, signature):
+                return jsonify({'success': False, 'error': 'Invalid webhook signature'}), 401
+        
+        # Process webhook data
+        data = request.get_json()
+        event_type = data.get('type')
+        
+        print(f"📧 Mailchimp webhook received: {event_type}")
+        
+        # Handle different webhook events
+        if event_type == 'subscribe':
+            print(f"✅ New subscriber: {data.get('data', {}).get('email')}")
+        elif event_type == 'unsubscribe':
+            print(f"❌ Unsubscribed: {data.get('data', {}).get('email')}")
+        elif event_type == 'profile':
+            print(f"🔄 Profile updated: {data.get('data', {}).get('email')}")
+        
+        return jsonify({'success': True, 'message': 'Webhook processed'})
+        
+    except Exception as e:
+        print(f"❌ Mailchimp webhook error: {e}")
+        return jsonify({'success': False, 'error': 'Webhook processing failed'}), 500
+
 if __name__ == '__main__':
     # Create templates directory if it doesn't exist
     templates_dir = Path('templates')

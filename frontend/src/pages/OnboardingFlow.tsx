@@ -611,6 +611,10 @@ export const OnboardingFlow: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
+                { id: 'gmail', name: 'Gmail', description: 'Email management and automation', icon: Mail },
+                { id: 'microsoft365', name: 'Microsoft 365', description: 'Business email and calendar', icon: Mail },
+                { id: 'mailchimp', name: 'Mailchimp', description: 'Email marketing campaigns', icon: Mail },
+                { id: 'icloud', name: 'Apple iCloud', description: 'Apple ecosystem integration', icon: Mail },
                 { id: 'hubspot', name: 'HubSpot CRM', description: 'Customer relationship management', icon: Users },
                 { id: 'shopify', name: 'Shopify', description: 'E-commerce platform', icon: Zap },
                 { id: 'calendly', name: 'Calendly', description: 'Scheduling and appointments', icon: Mail },

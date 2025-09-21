@@ -469,7 +469,56 @@ def create_email_service_manager() -> EmailServiceManager:
         except Exception as e:
             print(f"⚠️  Gmail provider setup failed: {e}")
     
-    # Add Outlook provider if credentials are available
+    # Add Microsoft Graph provider if credentials are available
+    microsoft_client_id = os.getenv('MICROSOFT_CLIENT_ID')
+    if microsoft_client_id:
+        try:
+            from .microsoft_graph_provider import MicrosoftGraphProvider
+            microsoft_config = {
+                'client_id': microsoft_client_id,
+                'client_secret': os.getenv('MICROSOFT_CLIENT_SECRET'),
+                'tenant_id': os.getenv('MICROSOFT_TENANT_ID'),
+                'redirect_uri': os.getenv('MICROSOFT_REDIRECT_URI'),
+                'stored_tokens': {}
+            }
+            microsoft_provider = MicrosoftGraphProvider(microsoft_config)
+            manager.add_provider('microsoft365', microsoft_provider)
+        except Exception as e:
+            print(f"⚠️  Microsoft Graph provider setup failed: {e}")
+    
+    # Add Mailchimp provider if credentials are available
+    mailchimp_api_key = os.getenv('MAILCHIMP_API_KEY')
+    if mailchimp_api_key:
+        try:
+            from .mailchimp_provider import MailchimpProvider
+            mailchimp_config = {
+                'api_key': mailchimp_api_key,
+                'server_prefix': os.getenv('MAILCHIMP_SERVER_PREFIX', 'us1'),
+                'list_id': os.getenv('MAILCHIMP_LIST_ID'),
+                'webhook_secret': os.getenv('MAILCHIMP_WEBHOOK_SECRET')
+            }
+            mailchimp_provider = MailchimpProvider(mailchimp_config)
+            manager.add_provider('mailchimp', mailchimp_provider)
+        except Exception as e:
+            print(f"⚠️  Mailchimp provider setup failed: {e}")
+    
+    # Add Apple iCloud provider if credentials are available
+    apple_team_id = os.getenv('APPLE_TEAM_ID')
+    if apple_team_id:
+        try:
+            from .apple_icloud_provider import AppleiCloudProvider
+            apple_config = {
+                'team_id': apple_team_id,
+                'key_id': os.getenv('APPLE_KEY_ID'),
+                'private_key': os.getenv('APPLE_PRIVATE_KEY'),
+                'bundle_id': os.getenv('APPLE_BUNDLE_ID')
+            }
+            apple_provider = AppleiCloudProvider(apple_config)
+            manager.add_provider('icloud', apple_provider)
+        except Exception as e:
+            print(f"⚠️  Apple iCloud provider setup failed: {e}")
+    
+    # Add Outlook provider if credentials are available (legacy)
     outlook_token = os.getenv('OUTLOOK_ACCESS_TOKEN')
     if outlook_token:
         try:
