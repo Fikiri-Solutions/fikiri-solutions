@@ -47,14 +47,6 @@
         {
           "key": "Expires",
           "value": "0"
-        },
-        {
-          "key": "X-Deployment-Timestamp",
-          "value": "2025-09-19T01:10:00Z"
-        },
-        {
-          "key": "X-Cache-Version",
-          "value": "1.0.9"
         }
       ]
     },
