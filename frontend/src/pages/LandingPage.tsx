@@ -242,7 +242,7 @@ const LandingPage: React.FC = () => {
                 <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg flex items-center justify-center mb-4">
                   <prop.icon className="w-6 h-6 text-white" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">{prop.title}</h3>
+                <h3 className="text-xl font-semibold mb-2 bg-gradient-to-r from-orange-400 via-orange-500 to-blue-500 bg-clip-text text-transparent">{prop.title}</h3>
                 <p className="text-orange-100">{prop.description}</p>
               </motion.div>
             ))}
