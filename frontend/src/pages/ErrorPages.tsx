@@ -14,7 +14,7 @@ export const NotFoundPage: React.FC = () => {
           </p>
           <div className="mt-6">
             <Link
-              to="/"
+              to="/home"
               className="fikiri-button inline-flex items-center"
             >
               <Home className="h-4 w-4 mr-2" />
@@ -46,7 +46,7 @@ export const ErrorPage: React.FC = () => {
               Try Again
             </button>
             <Link
-              to="/"
+              to="/home"
               className="btn-secondary inline-flex items-center"
             >
               <Home className="h-4 w-4 mr-2" />

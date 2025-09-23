@@ -225,10 +225,38 @@ db_pool = DatabaseConnectionPool()
 class CacheManager:
     """Redis-based caching system"""
     
-    def __init__(self, host: str = 'localhost', port: int = 6379, db: int = 0):
+    def __init__(self, host: str = None, port: int = None, db: int = None):
         if REDIS_AVAILABLE:
             try:
-                self.redis_client = redis.Redis(host=host, port=port, db=db, decode_responses=True)
+                # Use configuration system for Redis connection
+                from core.minimal_config import get_config
+                config = get_config()
+                
+                # Use provided parameters or fall back to config
+                redis_host = host or config.redis_host
+                redis_port = port or config.redis_port
+                redis_db = db or config.redis_db
+                redis_password = config.redis_password
+                
+                # Connect using config parameters
+                if config.redis_url:
+                    self.redis_client = redis.from_url(
+                        config.redis_url,
+                        decode_responses=True,
+                        socket_connect_timeout=5,
+                        socket_timeout=5
+                    )
+                else:
+                    self.redis_client = redis.Redis(
+                        host=redis_host,
+                        port=redis_port,
+                        password=redis_password,
+                        db=redis_db,
+                        decode_responses=True,
+                        socket_connect_timeout=5,
+                        socket_timeout=5
+                    )
+                
                 self.redis_client.ping()  # Test connection
                 self.enabled = True
                 logger.info("Redis cache connected successfully")

@@ -358,3 +358,4 @@ class MicrosoftGraphService:
 
 # Global instance
 microsoft_graph_service = MicrosoftGraphService()
+

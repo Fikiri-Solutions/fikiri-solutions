@@ -23,6 +23,8 @@ import { IndustryAutomation } from './components/IndustryAutomation'
 import { About } from './pages/About'
 import { PrivacySettings } from './components/PrivacySettings'
 import { OnboardingFlow } from './pages/OnboardingFlow'
+import { PublicOnboardingFlow } from './pages/PublicOnboardingFlow'
+import LandingPage from './pages/LandingPage'
 import { QueryProvider } from './providers/QueryProvider'
 import { ToastProvider } from './components/Toast'
 import { ThemeProvider } from './contexts/ThemeContext'
@@ -56,22 +58,22 @@ function App() {
                       <Route path="/privacy" element={<PrivacyPolicy />} />
                       <Route path="/privacy-settings" element={<Layout><PrivacySettings /></Layout>} />
                       {features.showOnboarding && <Route path="/onboarding" element={<Onboarding />} />}
-                      <Route path="/onboarding-flow" element={<OnboardingFlow />} />
-                      <Route path="/onboarding-flow/:step" element={<OnboardingFlow />} />
-                      <Route path="/" element={<Layout><Dashboard /></Layout>} />
+                      <Route path="/onboarding-flow" element={<PublicOnboardingFlow />} />
+                      <Route path="/onboarding-flow/:step" element={<PublicOnboardingFlow />} />
+                      <Route path="/" element={<LandingPage />} />
+                      <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
                       <Route path="/services" element={<Layout><Services /></Layout>} />
                       <Route path="/services-landing" element={<ServicesLanding />} />
                       <Route path="/ai-landing" element={<AIAssistantLanding />} />
                       <Route path="/industries/landscaping" element={<LandscapingLanding />} />
                       <Route path="/industries/restaurant" element={<RestaurantLanding />} />
                       <Route path="/industries/medical" element={<MedicalLanding />} />
-                      <Route path="/home" element={<RenderInspiredLanding />} />
+                      <Route path="/home" element={<Layout><Dashboard /></Layout>} />
                       <Route path="/crm" element={<Layout><CRM /></Layout>} />
                       <Route path="/ai" element={<Layout><AIAssistant /></Layout>} />
                       <Route path="/assistant" element={<Layout><AIAssistant /></Layout>} />
                       <Route path="/industry" element={<Layout><IndustryAutomation /></Layout>} />
                               <Route path="/about" element={<Layout><About /></Layout>} />
-                              <Route path="/privacy" element={<Layout><PrivacySettings /></Layout>} />
                       <Route path="/error" element={<ErrorPage />} />
                       <Route path="*" element={<NotFoundPage />} />
                     </Routes>

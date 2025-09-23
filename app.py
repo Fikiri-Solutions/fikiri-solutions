@@ -1493,10 +1493,7 @@ def api_admin_security_stats():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/')
-def index():
-    """Main dashboard page."""
-    return render_template('dashboard.html')
+# Removed root route - frontend now handles root URL with React landing page
 
 @app.route('/api/health-old')
 def api_health_old():

@@ -69,7 +69,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-75" onClick={() => setSidebarOpen(false)} />
         <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-brand-background dark:bg-gray-800 transition-colors duration-300">
           <div className="flex h-16 items-center justify-between px-4">
-            <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
+            <Link to="/home" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
               <Sparkles className="h-8 w-8 text-brand-primary dark:text-brand-accent" />
               <h1 className="text-xl font-bold text-brand-text dark:text-white">Fikiri Solutions</h1>
             </Link>
@@ -101,7 +101,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex flex-col flex-grow bg-brand-background dark:bg-gray-800 border-r border-brand-text/10 dark:border-gray-700 transition-colors duration-300">
           <div className="flex h-16 items-center px-4">
-            <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
+            <Link to="/home" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
               <Sparkles className="h-8 w-8 text-brand-primary dark:text-brand-accent" />
               <h1 className="text-xl font-bold text-brand-text dark:text-white">Fikiri Solutions</h1>
             </Link>

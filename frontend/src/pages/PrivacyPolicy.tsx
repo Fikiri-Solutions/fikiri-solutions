@@ -32,7 +32,7 @@ const PrivacyPolicy: React.FC = () => {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <Link to="/" className="flex items-center">
+              <Link to="/home" className="flex items-center">
                 <FikiriLogo size="md" variant="default" />
               </Link>
               <div>
@@ -53,7 +53,7 @@ const PrivacyPolicy: React.FC = () => {
                 Privacy Settings
               </Link>
               <Link
-                to="/"
+                to="/home"
                 className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
