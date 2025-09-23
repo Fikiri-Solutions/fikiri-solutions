@@ -105,8 +105,9 @@ export const Dashboard: React.FC = () => {
       day: item.day,
       leads: item.leads || 0,
       emails: item.emails || 0,
+      responses: item.responses || item.aiResponses || 0, // Support both field names
       revenue: item.revenue || 0,
-      value: (item.leads || 0) + (item.emails || 0) + (item.revenue || 0) / 100 // Combined value for pie charts
+      value: (item.leads || 0) + (item.emails || 0) + (item.responses || item.aiResponses || 0) + (item.revenue || 0) / 100 // Combined value for pie charts
     }))
   }
 
@@ -117,13 +118,15 @@ export const Dashboard: React.FC = () => {
     const totals = data.reduce((acc, item) => ({
       leads: acc.leads + (item.leads || 0),
       emails: acc.emails + (item.emails || 0),
+      responses: acc.responses + (item.responses || item.aiResponses || 0),
       revenue: acc.revenue + (item.revenue || 0)
-    }), { leads: 0, emails: 0, revenue: 0 })
+    }), { leads: 0, emails: 0, responses: 0, revenue: 0 })
 
     return [
       { name: 'Leads', value: totals.leads, color: '#3b82f6' },
       { name: 'Emails', value: totals.emails, color: '#22c55e' },
-      { name: 'Revenue', value: totals.revenue, color: '#f97316' }
+      { name: 'AI Responses', value: totals.responses, color: '#f97316' },
+      { name: 'Revenue', value: totals.revenue, color: '#8b5cf6' }
     ].filter(item => item.value > 0)
   }
 
