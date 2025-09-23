@@ -190,21 +190,23 @@ const LandingPage: React.FC = () => {
             </button>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={heroInView ? { opacity: 1 } : { opacity: 0 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-            className="mt-12 text-sm text-gray-400"
-          >
-            <div className="flex flex-wrap justify-center items-center gap-6">
-              {features.map((feature, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-400" />
-                  <span>{feature}</span>
-                </div>
-              ))}
-            </div>
-          </motion.div>
+                 <motion.div
+                   initial={{ opacity: 0 }}
+                   animate={heroInView ? { opacity: 1 } : { opacity: 0 }}
+                   transition={{ duration: 0.8, delay: 0.4 }}
+                   className="mt-12"
+                 >
+                   <div className="bg-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-gray-700/50 max-w-4xl mx-auto">
+                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                       {features.map((feature, index) => (
+                         <div key={index} className="flex items-center gap-3 text-center sm:text-left">
+                           <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
+                           <span className="text-gray-200 font-medium">{feature}</span>
+                         </div>
+                       ))}
+                     </div>
+                   </div>
+                 </motion.div>
         </div>
       </section>
 
