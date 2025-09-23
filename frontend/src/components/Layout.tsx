@@ -49,7 +49,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   }
 
   const navigation = [
-    { name: 'Dashboard', href: '/', icon: Mail },
+    { name: 'Dashboard', href: '/dashboard', icon: Mail },
     { name: 'Services', href: '/services', icon: Settings },
     { name: 'CRM', href: '/crm', icon: Users },
     { name: 'AI Assistant', href: '/ai', icon: Brain },
@@ -70,7 +70,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-75" onClick={() => setSidebarOpen(false)} />
         <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-brand-background dark:bg-gray-800 transition-colors duration-300">
           <div className="flex h-16 items-center justify-between px-4">
-            <Link to="/home" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
+            <Link to="/dashboard" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
               <img
                 src={logo}
                 alt="Fikiri Solutions Logo"
@@ -106,7 +106,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex flex-col flex-grow bg-brand-background dark:bg-gray-800 border-r border-brand-text/10 dark:border-gray-700 transition-colors duration-300">
           <div className="flex h-16 items-center px-4">
-            <Link to="/home" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
+            <Link to="/dashboard" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
               <img
                 src={logo}
                 alt="Fikiri Solutions Logo"
