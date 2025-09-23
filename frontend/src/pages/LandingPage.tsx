@@ -222,7 +222,7 @@ const LandingPage: React.FC = () => {
             transition={{ duration: 0.8 }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-blue-500 bg-clip-text text-transparent">
               Everything You Need to Automate Your Business
             </h2>
             <p className="text-xl text-orange-100 max-w-2xl mx-auto">
@@ -259,7 +259,7 @@ const LandingPage: React.FC = () => {
             transition={{ duration: 0.8 }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-blue-500 bg-clip-text text-transparent">
               How It Works
             </h2>
             <p className="text-xl text-orange-100 max-w-2xl mx-auto">
@@ -279,7 +279,7 @@ const LandingPage: React.FC = () => {
                 <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
                   <span className="text-2xl font-bold">{step.step}</span>
                 </div>
-                <h3 className="text-2xl font-semibold mb-4">{step.title}</h3>
+                <h3 className="text-2xl font-semibold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-blue-500 bg-clip-text text-transparent">{step.title}</h3>
                 <p className="text-orange-100">{step.description}</p>
               </motion.div>
             ))}
@@ -296,7 +296,7 @@ const LandingPage: React.FC = () => {
             transition={{ duration: 0.8 }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-blue-500 bg-clip-text text-transparent">
               Trusted by Growing Businesses
             </h2>
             <p className="text-xl text-orange-100 max-w-2xl mx-auto">
@@ -356,7 +356,7 @@ const LandingPage: React.FC = () => {
             animate={ctaInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
             transition={{ duration: 0.8 }}
           >
-            <h2 className="text-3xl sm:text-4xl font-bold mb-6">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-6 bg-gradient-to-r from-orange-400 via-orange-500 to-blue-500 bg-clip-text text-transparent">
               Start Automating Today
             </h2>
             <p className="text-xl text-orange-100 mb-8">
@@ -396,7 +396,7 @@ const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
-              <h3 className="text-xl font-bold mb-4">Fikiri Solutions</h3>
+              <h3 className="text-xl font-bold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-blue-500 bg-clip-text text-transparent">Fikiri Solutions</h3>
               <p className="text-orange-200">
                 AI-powered automation for small businesses
               </p>
