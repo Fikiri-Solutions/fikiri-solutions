@@ -1,6 +1,7 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion, useInView } from 'framer-motion'
+import { useRef } from 'react'
 import Particles from '@tsparticles/react'
 import { loadSlim } from '@tsparticles/slim'
 import type { Engine } from '@tsparticles/engine'
@@ -17,6 +18,18 @@ import {
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate()
+  
+  // Performance optimization: detect mobile devices
+  const [isMobile, setIsMobile] = useState(false)
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent))
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   // Initialize particles engine
   const particlesInit = useCallback(async (engine: Engine) => {
@@ -30,7 +43,7 @@ const LandingPage: React.FC = () => {
         value: "transparent",
       },
     },
-    fpsLimit: 120,
+    fpsLimit: isMobile ? 30 : 60, // Reduce FPS on mobile for battery life
     interactivity: {
       events: {
         onClick: {
@@ -95,7 +108,7 @@ const LandingPage: React.FC = () => {
           enable: true,
           area: 800,
         },
-        value: 100,
+        value: isMobile ? 50 : 100, // Reduce particle count on mobile
       },
       opacity: {
         value: 0.4,
@@ -191,14 +204,32 @@ const LandingPage: React.FC = () => {
     "24/7 customer support"
   ]
 
+  // Refs for scroll-triggered animations
+  const heroRef = useRef(null)
+  const valuePropsRef = useRef(null)
+  const howItWorksRef = useRef(null)
+  const testimonialsRef = useRef(null)
+  const ctaRef = useRef(null)
+
+  // Check if elements are in view
+  const heroInView = useInView(heroRef, { once: true, margin: "-100px" })
+  const valuePropsInView = useInView(valuePropsRef, { once: true, margin: "-100px" })
+  const howItWorksInView = useInView(howItWorksRef, { once: true, margin: "-100px" })
+  const testimonialsInView = useInView(testimonialsRef, { once: true, margin: "-100px" })
+  const ctaInView = useInView(ctaRef, { once: true, margin: "-100px" })
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-orange-900/20 to-red-900/20 text-white overflow-hidden relative">
       {/* Header Navigation */}
       <header className="relative z-20 w-full px-4 sm:px-6 lg:px-8 py-6">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <Link to="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity duration-200">
+          <Link 
+            to="/" 
+            className="flex items-center space-x-3 hover:opacity-80 transition-opacity duration-200"
+            aria-label="Fikiri Solutions - Return to homepage"
+          >
             <div className="w-12 h-12 bg-gradient-to-r from-orange-600 to-red-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-2xl">F</span>
+              <span className="text-white font-bold text-2xl" aria-hidden="true">F</span>
             </div>
             <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 via-red-500 to-orange-600 bg-clip-text text-transparent">
               Fikiri
@@ -216,12 +247,14 @@ const LandingPage: React.FC = () => {
             <button
               onClick={() => navigate('/login')}
               className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
+              aria-label="Sign in to your Fikiri account"
             >
               Sign in
             </button>
             <button
               onClick={() => navigate('/signup')}
               className="px-6 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white font-semibold rounded-lg hover:from-orange-700 hover:to-red-700 transition-all duration-300"
+              aria-label="Get started with Fikiri Solutions - Create your account"
             >
               Get started
             </button>
@@ -246,11 +279,11 @@ const LandingPage: React.FC = () => {
       </div>
 
       {/* Hero Section */}
-      <section className="relative z-10 min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8">
+      <section ref={heroRef} className="relative z-10 min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
+            animate={heroInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
             transition={{ duration: 0.8 }}
           >
             <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold mb-6 bg-gradient-to-r from-orange-400 via-red-500 to-orange-600 bg-clip-text text-transparent">
@@ -267,26 +300,30 @@ const LandingPage: React.FC = () => {
 
           <motion.div
             initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
+            animate={heroInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
             transition={{ duration: 0.8, delay: 0.2 }}
             className="flex flex-col sm:flex-row gap-4 justify-center items-center"
           >
             <button
               onClick={() => navigate('/onboarding-flow')}
               className="px-8 py-4 bg-gradient-to-r from-orange-600 to-red-600 text-white font-semibold rounded-lg hover:from-orange-700 hover:to-red-700 transition-all duration-300 transform hover:scale-105 flex items-center gap-2 shadow-lg"
+              aria-label="Get started with Fikiri Solutions - Free trial"
             >
               Get Started Free
-              <ArrowRight className="w-5 h-5" />
+              <ArrowRight className="w-5 h-5" aria-hidden="true" />
             </button>
-            <button className="px-8 py-4 border border-gray-600 text-white font-semibold rounded-lg hover:bg-gray-800 transition-all duration-300 flex items-center gap-2">
-              <Play className="w-5 h-5" />
+            <button 
+              className="px-8 py-4 border border-gray-600 text-white font-semibold rounded-lg hover:bg-gray-800 transition-all duration-300 flex items-center gap-2"
+              aria-label="Watch Fikiri Solutions demo video"
+            >
+              <Play className="w-5 h-5" aria-hidden="true" />
               Watch Demo
             </button>
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            animate={heroInView ? { opacity: 1 } : { opacity: 0 }}
             transition={{ duration: 0.8, delay: 0.4 }}
             className="mt-12 text-sm text-gray-400"
           >
@@ -303,13 +340,12 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* Value Proposition Section */}
-      <section className="relative z-10 py-20 px-4 sm:px-6 lg:px-8">
+      <section ref={valuePropsRef} id="features" className="relative z-10 py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            animate={valuePropsInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
             transition={{ duration: 0.8 }}
-            viewport={{ once: true }}
             className="text-center mb-16"
           >
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
@@ -325,9 +361,8 @@ const LandingPage: React.FC = () => {
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                animate={valuePropsInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
                 transition={{ duration: 0.8, delay: index * 0.1 }}
-                viewport={{ once: true }}
                 className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 hover:border-orange-500 transition-all duration-300"
               >
                 <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg flex items-center justify-center mb-4">
@@ -342,13 +377,12 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* How It Works Section */}
-      <section className="relative z-10 py-20 px-4 sm:px-6 lg:px-8 bg-gray-800/30">
+      <section ref={howItWorksRef} id="how-it-works" className="relative z-10 py-20 px-4 sm:px-6 lg:px-8 bg-gray-800/30">
         <div className="max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            animate={howItWorksInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
             transition={{ duration: 0.8 }}
-            viewport={{ once: true }}
             className="text-center mb-16"
           >
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
@@ -364,9 +398,8 @@ const LandingPage: React.FC = () => {
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                animate={howItWorksInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
                 transition={{ duration: 0.8, delay: index * 0.2 }}
-                viewport={{ once: true }}
                 className="text-center"
               >
                 <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -381,13 +414,12 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* Social Proof Section */}
-      <section className="relative z-10 py-20 px-4 sm:px-6 lg:px-8">
+      <section ref={testimonialsRef} id="testimonials" className="relative z-10 py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            animate={testimonialsInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
             transition={{ duration: 0.8 }}
-            viewport={{ once: true }}
             className="text-center mb-16"
           >
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
@@ -404,9 +436,8 @@ const LandingPage: React.FC = () => {
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                animate={testimonialsInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
                 transition={{ duration: 0.8, delay: index * 0.1 }}
-                viewport={{ once: true }}
                 className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700"
               >
                 <div className="flex mb-4">
@@ -426,9 +457,8 @@ const LandingPage: React.FC = () => {
           {/* Tech Stack Logos */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            animate={testimonialsInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
             transition={{ duration: 0.8 }}
-            viewport={{ once: true }}
             className="text-center"
           >
             <p className="text-gray-400 mb-8">Powered by industry-leading technology</p>
@@ -445,13 +475,12 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* Final CTA Section */}
-      <section className="relative z-10 py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-orange-600/20 to-red-600/20">
+      <section ref={ctaRef} className="relative z-10 py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-orange-600/20 to-red-600/20">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            animate={ctaInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
             transition={{ duration: 0.8 }}
-            viewport={{ once: true }}
           >
             <h2 className="text-3xl sm:text-4xl font-bold mb-6">
               Start Automating Today
@@ -459,21 +488,28 @@ const LandingPage: React.FC = () => {
             <p className="text-xl text-gray-300 mb-8">
               Free trial, no credit card required. Join thousands of businesses already saving time with AI.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={ctaInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="flex flex-col sm:flex-row gap-4 justify-center items-center"
+            >
               <button
                 onClick={() => navigate('/onboarding-flow')}
                 className="px-8 py-4 bg-gradient-to-r from-orange-600 to-red-600 text-white font-semibold rounded-lg hover:from-orange-700 hover:to-red-700 transition-all duration-300 transform hover:scale-105 flex items-center gap-2 shadow-lg"
+                aria-label="Get started with Fikiri Solutions - Free trial"
               >
                 Get Started Free
-                <ArrowRight className="w-5 h-5" />
+                <ArrowRight className="w-5 h-5" aria-hidden="true" />
               </button>
               <button
                 onClick={() => navigate('/signup')}
                 className="px-8 py-4 border border-gray-600 text-white font-semibold rounded-lg hover:bg-gray-800 transition-all duration-300"
+                aria-label="Create your Fikiri Solutions account"
               >
                 Create Account
               </button>
-            </div>
+            </motion.div>
             <p className="text-sm text-gray-400 mt-4">
               No setup fees • Cancel anytime • 24/7 support
             </p>
