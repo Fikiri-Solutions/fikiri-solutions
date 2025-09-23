@@ -78,7 +78,7 @@ export const RenderInspiredLanding: React.FC = () => {
       <nav className="fixed top-0 w-full z-50 bg-brand-background/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-brand-text/10 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
+            <Link to="/home" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
               <Sparkles className="h-8 w-8 text-brand-primary dark:text-brand-accent" />
               <span className="text-xl font-bold text-brand-text dark:text-white">Fikiri Solutions</span>
             </Link>
@@ -131,7 +131,16 @@ export const RenderInspiredLanding: React.FC = () => {
                 <span className="fikiri-gradient bg-clip-text text-transparent">
                   workflows
                 </span>{' '}
-                in minutes with AI
+                <span className="relative inline-block">
+                  in minutes
+                  <motion.div
+                    initial={{ scaleX: 0, opacity: 0 }}
+                    animate={{ scaleX: 1, opacity: 0.3 }}
+                    transition={{ duration: 1, delay: 0.5, ease: "easeOut" }}
+                    className="absolute -bottom-1 left-0 right-0 h-3 bg-gradient-to-r from-orange-400 to-red-500 rounded-full -z-10"
+                  />
+                </span>{' '}
+                with AI
               </h1>
               <p className="text-xl md:text-2xl text-brand-text/70 dark:text-gray-400 mb-8 max-w-3xl mx-auto">
                 Industry-specific AI automation that handles your business processes while you focus on growth

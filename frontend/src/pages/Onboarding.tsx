@@ -107,7 +107,7 @@ export const Onboarding: React.FC = () => {
       updateOnboardingStep(5)
     } else if (currentStep === 5) {
       // Complete onboarding
-      navigate('/')
+      navigate('/home')
     }
   }
 

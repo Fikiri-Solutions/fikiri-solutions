@@ -171,7 +171,7 @@ export const OnboardingFlow: React.FC = () => {
         // If user has completed onboarding, redirect to dashboard
         if (data.data.user.onboarding_completed) {
           trackOnboardingComplete(data.data.user.email, data.data.user.onboarding_step)
-          navigate('/')
+          navigate('/home')
           return
         }
         
@@ -252,7 +252,7 @@ export const OnboardingFlow: React.FC = () => {
         localStorage.setItem('fikiri-onboarding-completed', 'true')
         trackOnboardingComplete(user?.email || 'unknown', currentStep)
         addToast('Welcome to Fikiri! Your workspace is ready.', 'success')
-        navigate('/')
+        navigate('/home')
       }
     } catch (error) {
       console.error('Onboarding error:', error)

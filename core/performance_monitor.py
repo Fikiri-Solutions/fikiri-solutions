@@ -84,6 +84,7 @@ class PerformanceMonitor:
         
         # Start monitoring
         self.start_time = time.time()
+        # Enable system monitoring with improved error handling
         self._start_system_monitoring()
     
     def record_request(self, endpoint: str, method: str, response_time: float, 
@@ -208,25 +209,46 @@ class PerformanceMonitor:
             logger.warning(f"Performance alert: {alert['message']}")
     
     def _start_system_monitoring(self):
-        """Start background system monitoring"""
+        """Start background system monitoring with comprehensive error handling"""
         def monitor_system():
+            consecutive_errors = 0
+            max_errors = 5
+            
             while True:
                 try:
-                    # Collect system metrics
-                    if PSUTIL_AVAILABLE:
-                        cpu_percent = psutil.cpu_percent(interval=1)
-                        memory_percent = psutil.virtual_memory().percent
-                        disk_percent = psutil.disk_usage('/').percent
-                        load_avg = psutil.getloadavg() if hasattr(psutil, 'getloadavg') else (0, 0, 0)
-                        active_connections = len(psutil.net_connections())
-                    else:
-                        cpu_percent = 0.0
-                        memory_percent = 0.0
-                        disk_percent = 0.0
-                        load_avg = (0, 0, 0)
-                        active_connections = 0
+                    # Collect system metrics safely
+                    cpu_percent = 0.0
+                    memory_percent = 0.0
+                    disk_percent = 0.0
+                    load_avg = (0, 0, 0)
+                    active_connections = 0
                     
-                    # Create system metric
+                    if PSUTIL_AVAILABLE:
+                        try:
+                            # Safe system metrics collection
+                            cpu_percent = psutil.cpu_percent(interval=0.1)  # Reduced interval
+                            memory_percent = psutil.virtual_memory().percent
+                            disk_percent = psutil.disk_usage('/').percent
+                            
+                            # Load average (Unix-like systems only)
+                            if hasattr(psutil, 'getloadavg'):
+                                try:
+                                    load_avg = psutil.getloadavg()
+                                except (OSError, AttributeError):
+                                    load_avg = (0, 0, 0)
+                            
+                            # Network connections (may fail due to permissions)
+                            try:
+                                active_connections = len(psutil.net_connections())
+                            except (psutil.AccessDenied, PermissionError, OSError):
+                                # Expected on macOS and some systems - not an error
+                                active_connections = 0
+                                
+                        except Exception as e:
+                            # Individual metric collection failed - use defaults
+                            logger.debug(f"Individual metric collection failed: {e}")
+                    
+                    # Create system metric with collected data
                     system_metric = SystemMetrics(
                         timestamp=datetime.now(),
                         cpu_percent=cpu_percent,
@@ -240,16 +262,33 @@ class PerformanceMonitor:
                     # Store system metric
                     self.system_metrics.append(system_metric)
                     
+                    # Reset error counter on success
+                    consecutive_errors = 0
+                    
                     # Sleep for 30 seconds
                     time.sleep(30)
                     
                 except Exception as e:
-                    logger.error(f"Error in system monitoring: {e}")
-                    time.sleep(30)
+                    consecutive_errors += 1
+                    
+                    # Only log first few errors to avoid spam
+                    if consecutive_errors <= 3:
+                        logger.debug(f"System monitoring error #{consecutive_errors}: {type(e).__name__}: {e}")
+                    
+                    # If too many consecutive errors, increase sleep time
+                    if consecutive_errors >= max_errors:
+                        logger.info("System monitoring experiencing repeated errors, reducing frequency")
+                        time.sleep(300)  # 5 minutes
+                    else:
+                        time.sleep(30)
         
-        # Start monitoring thread
-        monitor_thread = threading.Thread(target=monitor_system, daemon=True)
-        monitor_thread.start()
+        # Start monitoring thread with error isolation
+        try:
+            monitor_thread = threading.Thread(target=monitor_system, daemon=True)
+            monitor_thread.start()
+            logger.info("System monitoring thread started successfully")
+        except Exception as e:
+            logger.warning(f"Failed to start system monitoring thread: {e}")
     
     def get_performance_summary(self) -> Dict[str, Any]:
         """Get comprehensive performance summary"""
