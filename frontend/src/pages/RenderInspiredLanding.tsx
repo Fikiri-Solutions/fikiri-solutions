@@ -17,6 +17,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { AnimatedWorkflow } from '../components/AnimatedWorkflow';
+import logo from '../assets/logo.svg';
 
 export const RenderInspiredLanding: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -79,7 +80,11 @@ export const RenderInspiredLanding: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link to="/home" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
-              <Sparkles className="h-8 w-8 text-brand-primary dark:text-brand-accent" />
+              <img
+                src={logo}
+                alt="Fikiri Solutions Logo"
+                className="h-8 w-8 md:h-10 md:w-10 object-contain"
+              />
               <span className="text-xl font-bold text-brand-text dark:text-white">Fikiri Solutions</span>
             </Link>
             
