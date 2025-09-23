@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion, useInView } from 'framer-motion'
 import { useRef } from 'react'
-import HybridBackground from '../components/HybridBackground'
+import SimpleAnimatedBackground from '../components/SimpleAnimatedBackground'
 import { 
   ArrowRight, 
   Mail, 
@@ -144,8 +144,8 @@ const LandingPage: React.FC = () => {
         </div>
       </header>
 
-      {/* Hybrid Background - 3D Mesh for Desktop, Particles for Mobile */}
-      <HybridBackground />
+             {/* Simple Animated Background - CSS-based mesh effect */}
+             <SimpleAnimatedBackground />
 
       {/* Hero Section */}
       <section ref={heroRef} className="relative z-10 min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8">
