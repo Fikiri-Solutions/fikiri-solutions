@@ -5,6 +5,7 @@ interface TimeseriesData {
   day: string;
   leads: number;
   emails: number;
+  responses: number;
   revenue: number;
 }
 
@@ -14,6 +15,10 @@ interface SummaryData {
     positive: boolean;
   };
   emails: {
+    change_pct: number | null;
+    positive: boolean;
+  };
+  responses: {
     change_pct: number | null;
     positive: boolean;
   };
@@ -28,6 +33,7 @@ export function useDashboardTimeseries() {
   const [summary, setSummary] = useState<SummaryData>({
     leads: { change_pct: null, positive: true },
     emails: { change_pct: null, positive: true },
+    responses: { change_pct: null, positive: true },
     revenue: { change_pct: null, positive: true }
   });
   const [loading, setLoading] = useState(true);
