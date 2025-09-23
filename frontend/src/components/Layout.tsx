@@ -7,6 +7,7 @@ import { CustomizationPanel } from './CustomizationPanel'
 import { BackToTop } from './BackToTop'
 import { useCustomization } from '../contexts/CustomizationContext'
 import { useTheme } from '../contexts/ThemeContext'
+import logo from '../assets/logo.svg'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -70,7 +71,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-brand-background dark:bg-gray-800 transition-colors duration-300">
           <div className="flex h-16 items-center justify-between px-4">
             <Link to="/home" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
-              <Sparkles className="h-8 w-8 text-brand-primary dark:text-brand-accent" />
+              <img
+                src={logo}
+                alt="Fikiri Solutions Logo"
+                className="h-8 w-8 md:h-10 md:w-10 object-contain"
+              />
               <h1 className="text-xl font-bold text-brand-text dark:text-white">Fikiri Solutions</h1>
             </Link>
             <button onClick={() => setSidebarOpen(false)} className="text-brand-text dark:text-gray-300 hover:text-brand-primary dark:hover:text-white">
@@ -102,7 +107,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="flex flex-col flex-grow bg-brand-background dark:bg-gray-800 border-r border-brand-text/10 dark:border-gray-700 transition-colors duration-300">
           <div className="flex h-16 items-center px-4">
             <Link to="/home" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
-              <Sparkles className="h-8 w-8 text-brand-primary dark:text-brand-accent" />
+              <img
+                src={logo}
+                alt="Fikiri Solutions Logo"
+                className="h-8 w-8 md:h-10 md:w-10 object-contain"
+              />
               <h1 className="text-xl font-bold text-brand-text dark:text-white">Fikiri Solutions</h1>
             </Link>
           </div>

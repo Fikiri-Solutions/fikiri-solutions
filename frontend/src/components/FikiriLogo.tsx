@@ -1,4 +1,5 @@
 import React from 'react';
+import logo from '../assets/logo.svg';
 
 interface FikiriLogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
@@ -21,10 +22,10 @@ export const FikiriLogo: React.FC<FikiriLogoProps> = ({
   };
 
   const logoSrc = {
-    full: '/logo/fikiri-logo-full.svg',
-    monochrome: '/logo/fikiri-logo-monochrome.svg',
-    simplified: '/logo/fikiri-logo-simplified.svg',
-    white: '/logo/fikiri-logo-white.svg'
+    full: logo,
+    monochrome: logo,
+    simplified: logo,
+    white: logo
   };
 
   const animationClass = animated ? 'animate-pulse' : '';
