@@ -55,13 +55,13 @@ const LandingPage: React.FC = () => {
     },
     particles: {
       color: {
-        value: "#3B82F6",
+        value: "#F97316",
       },
       links: {
-        color: "#3B82F6",
+        color: "#F97316",
         distance: 150,
         enable: true,
-        opacity: 0.2,
+        opacity: 0.3,
         width: 1,
       },
       move: {
@@ -165,6 +165,40 @@ const LandingPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white overflow-hidden relative">
+      {/* Header Navigation */}
+      <header className="relative z-20 w-full px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 bg-gradient-to-r from-orange-600 to-red-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-lg">F</span>
+            </div>
+            <span className="text-xl font-bold">Fikiri</span>
+          </div>
+          
+          <nav className="hidden md:flex items-center space-x-8">
+            <a href="#features" className="text-gray-300 hover:text-white transition-colors">Features</a>
+            <a href="#how-it-works" className="text-gray-300 hover:text-white transition-colors">How it works</a>
+            <a href="#testimonials" className="text-gray-300 hover:text-white transition-colors">Testimonials</a>
+            <a href="/pricing" className="text-gray-300 hover:text-white transition-colors">Pricing</a>
+          </nav>
+
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => navigate('/login')}
+              className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
+            >
+              Sign in
+            </button>
+            <button
+              onClick={() => navigate('/signup')}
+              className="px-6 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white font-semibold rounded-lg hover:from-orange-700 hover:to-red-700 transition-all duration-300"
+            >
+              Get started
+            </button>
+          </div>
+        </div>
+      </header>
+
       {/* Animated Particle Background */}
       <div className="fixed inset-0 w-full h-full z-0">
         <div 
@@ -187,10 +221,10 @@ const LandingPage: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
           >
-            <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold mb-6 bg-gradient-to-r from-blue-400 via-purple-500 to-cyan-400 bg-clip-text text-transparent">
-              AI-Powered Automation
+            <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold mb-6 bg-gradient-to-r from-orange-400 via-red-500 to-orange-600 bg-clip-text text-transparent">
+              The platform for
               <br />
-              for Small Businesses
+              reliable automation
             </h1>
             <p className="text-xl sm:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto">
               Save time, close more leads, and automate your workflows with Fikiri Solutions.
@@ -207,7 +241,7 @@ const LandingPage: React.FC = () => {
           >
             <button
               onClick={() => navigate('/onboarding-flow')}
-              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 flex items-center gap-2 shadow-lg"
+              className="px-8 py-4 bg-gradient-to-r from-orange-600 to-red-600 text-white font-semibold rounded-lg hover:from-orange-700 hover:to-red-700 transition-all duration-300 transform hover:scale-105 flex items-center gap-2 shadow-lg"
             >
               Get Started Free
               <ArrowRight className="w-5 h-5" />
