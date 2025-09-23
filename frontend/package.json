@@ -1,6 +1,6 @@
 {
   "name": "fikiri-solutions-frontend",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "private": true,
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
