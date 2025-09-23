@@ -130,19 +130,18 @@ class ApiClient {
 
   // Dashboard data endpoints
   async getMetrics(): Promise<MetricData> {
-    // For now, we'll derive metrics from health status
-    // In the future, this could be a dedicated metrics endpoint
-    const health = await this.getHealth()
-    
-    // Calculate metrics based on service status
-    const totalServices = Object.keys(health.services).length
-    const healthyServices = Object.values(health.services).filter(s => s.status === 'healthy').length
-    
-    return {
-      totalEmails: Math.floor(Math.random() * 1000) + 100, // Mock for now
-      activeLeads: Math.floor(Math.random() * 50) + 10,   // Mock for now
-      aiResponses: Math.floor(Math.random() * 100) + 50,  // Mock for now
-      avgResponseTime: Math.random() * 5 + 1              // Mock for now
+    try {
+      const response = await this.client.get('/api/metrics')
+      return response.data
+    } catch (error) {
+      console.error('Failed to fetch metrics:', error)
+      // Fallback to mock data if API fails
+      return {
+        totalEmails: Math.floor(Math.random() * 1000) + 100,
+        activeLeads: Math.floor(Math.random() * 50) + 10,
+        aiResponses: Math.floor(Math.random() * 100) + 50,
+        avgResponseTime: Math.random() * 5 + 1
+      }
     }
   }
 

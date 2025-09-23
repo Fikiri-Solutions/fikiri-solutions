@@ -117,6 +117,7 @@ export const EnhancedDashboard: React.FC = () => {
           trend="up"
           icon={<Users className="h-5 w-5" />}
           color="blue"
+          onClick={() => navigate('/crm')}
         >
           <MiniTrend 
             data={transformedTimeseriesData} 
@@ -133,6 +134,7 @@ export const EnhancedDashboard: React.FC = () => {
           trend="up"
           icon={<Mail className="h-5 w-5" />}
           color="green"
+          onClick={() => navigate('/ai')}
         >
           <MiniTrend 
             data={transformedTimeseriesData} 
@@ -149,6 +151,7 @@ export const EnhancedDashboard: React.FC = () => {
           trend="up"
           icon={<TrendingUp className="h-5 w-5" />}
           color="purple"
+          onClick={() => navigate('/ai')}
         >
           <MiniTrend 
             data={transformedTimeseriesData} 
@@ -165,6 +168,7 @@ export const EnhancedDashboard: React.FC = () => {
           trend="up"
           icon={<DollarSign className="h-5 w-5" />}
           color="orange"
+          onClick={() => navigate('/services')}
         >
           <MiniTrend 
             data={transformedTimeseriesData} 
@@ -202,8 +206,12 @@ export const EnhancedDashboard: React.FC = () => {
           ) : (
             <div className="space-y-3">
               {activity.slice(0, 5).map((item) => (
-                <div key={item.id} className="flex items-center space-x-3">
+                <div key={item.id} className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                   <div className="flex-shrink-0">
+                    {item.type === 'ai_response' && <Brain className="h-4 w-4 text-purple-500" />}
+                    {item.type === 'lead_added' && <UserPlus className="h-4 w-4 text-green-500" />}
+                    {item.type === 'email_processed' && <Mail className="h-4 w-4 text-blue-500" />}
+                    {item.type === 'service_error' && <AlertTriangle className="h-4 w-4 text-red-500" />}
                     {item.type === 'email' && <Mail className="h-4 w-4 text-blue-500" />}
                     {item.type === 'lead' && <UserPlus className="h-4 w-4 text-green-500" />}
                     {item.type === 'automation' && <Zap className="h-4 w-4 text-yellow-500" />}
@@ -216,6 +224,11 @@ export const EnhancedDashboard: React.FC = () => {
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       {item.timestamp}
                     </p>
+                  </div>
+                  <div className="flex-shrink-0">
+                    {item.status === 'success' && <div className="w-2 h-2 bg-green-500 rounded-full" />}
+                    {item.status === 'warning' && <div className="w-2 h-2 bg-yellow-500 rounded-full" />}
+                    {item.status === 'error' && <div className="w-2 h-2 bg-red-500 rounded-full" />}
                   </div>
                 </div>
               ))}
