@@ -53,17 +53,18 @@ export function useDashboardTimeseries() {
         
         // Fallback data for development
         setData([
-          { day: "2024-01-01", leads: 5, emails: 12, revenue: 1500 },
-          { day: "2024-01-02", leads: 8, emails: 18, revenue: 2200 },
-          { day: "2024-01-03", leads: 12, emails: 25, revenue: 3100 },
-          { day: "2024-01-04", leads: 7, emails: 15, revenue: 1800 },
-          { day: "2024-01-05", leads: 15, emails: 32, revenue: 4200 },
-          { day: "2024-01-06", leads: 9, emails: 21, revenue: 2600 },
-          { day: "2024-01-07", leads: 11, emails: 28, revenue: 3400 }
+          { day: "2024-01-01", leads: 5, emails: 12, responses: 8, revenue: 1500 },
+          { day: "2024-01-02", leads: 8, emails: 18, responses: 12, revenue: 2200 },
+          { day: "2024-01-03", leads: 12, emails: 25, responses: 18, revenue: 3100 },
+          { day: "2024-01-04", leads: 7, emails: 15, responses: 10, revenue: 1800 },
+          { day: "2024-01-05", leads: 15, emails: 32, responses: 22, revenue: 4200 },
+          { day: "2024-01-06", leads: 9, emails: 21, responses: 14, revenue: 2600 },
+          { day: "2024-01-07", leads: 11, emails: 28, responses: 19, revenue: 3400 }
         ]);
         setSummary({
           leads: { change_pct: 15.2, positive: true },
           emails: { change_pct: 8.7, positive: true },
+          responses: { change_pct: 12.3, positive: true },
           revenue: { change_pct: 22.1, positive: true }
         });
       } finally {
