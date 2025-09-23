@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Mail, Users, Brain, Settings, Menu, X, Sparkles, Palette, LogOut, Building2, Shield, Zap } from 'lucide-react'
+import { Mail, Users, Brain, Settings, Menu, X, Palette, LogOut, Building2, Shield, Zap } from 'lucide-react'
 import { MobileBottomNav } from './MobileBottomNav'
 import { ThemeToggle } from './ThemeToggle'
 import { CustomizationPanel } from './CustomizationPanel'

@@ -1,20 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
   ArrowRight, 
-  Sparkles, 
-  Mail, 
   Users, 
   Brain, 
   Zap, 
-  CheckCircle,
   Play,
   ChevronRight,
   BarChart3,
-  MessageSquare,
-  Calendar,
-  TrendingUp
+  MessageSquare
 } from 'lucide-react';
 import { AnimatedWorkflow } from '../components/AnimatedWorkflow';
 import logo from '../assets/logo.svg';
