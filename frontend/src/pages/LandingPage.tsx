@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import Particles from '@tsparticles/react'
 import { loadSlim } from '@tsparticles/slim'
@@ -23,7 +23,7 @@ const LandingPage: React.FC = () => {
     await loadSlim(engine)
   }, [])
 
-  // Particle configuration for LangChain-like effect
+  // Particle configuration for LangChain-like effect with wave movement
   const particlesConfig = {
     background: {
       color: {
@@ -71,24 +71,52 @@ const LandingPage: React.FC = () => {
           default: "bounce",
         },
         random: false,
-        speed: 1,
+        speed: 0.5,
         straight: false,
+        // Add wave-like movement
+        path: {
+          enable: true,
+          options: {
+            sides: {
+              count: 1,
+              value: 1
+            }
+          }
+        },
+        // Add gravity for wave effect
+        gravity: {
+          enable: true,
+          acceleration: 0.1,
+          maxSpeed: 0.5
+        }
       },
       number: {
         density: {
           enable: true,
           area: 800,
         },
-        value: 80,
+        value: 100,
       },
       opacity: {
-        value: 0.3,
+        value: 0.4,
+        animation: {
+          enable: true,
+          speed: 0.5,
+          minimumValue: 0.1,
+          sync: false
+        }
       },
       shape: {
         type: "circle",
       },
       size: {
-        value: { min: 1, max: 3 },
+        value: { min: 1, max: 4 },
+        animation: {
+          enable: true,
+          speed: 1,
+          minimumValue: 0.5,
+          sync: false
+        }
       },
     },
     detectRetina: true,
@@ -164,16 +192,18 @@ const LandingPage: React.FC = () => {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white overflow-hidden relative">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-orange-900/20 to-red-900/20 text-white overflow-hidden relative">
       {/* Header Navigation */}
       <header className="relative z-20 w-full px-4 sm:px-6 lg:px-8 py-6">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-to-r from-orange-600 to-red-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">F</span>
+          <Link to="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity duration-200">
+            <div className="w-12 h-12 bg-gradient-to-r from-orange-600 to-red-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-2xl">F</span>
             </div>
-            <span className="text-xl font-bold">Fikiri</span>
-          </div>
+            <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 via-red-500 to-orange-600 bg-clip-text text-transparent">
+              Fikiri
+            </span>
+          </Link>
           
           <nav className="hidden md:flex items-center space-x-8">
             <a href="#features" className="text-gray-300 hover:text-white transition-colors">Features</a>
@@ -203,7 +233,9 @@ const LandingPage: React.FC = () => {
       <div className="fixed inset-0 w-full h-full z-0">
         <div 
           className="absolute inset-0 w-full h-full"
-          style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)' }}
+          style={{ 
+            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 30%, #7c2d12 60%, #991b1b 100%)' 
+          }}
         />
         <Particles
           id="tsparticles"
@@ -229,7 +261,7 @@ const LandingPage: React.FC = () => {
             <p className="text-xl sm:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto">
               Save time, close more leads, and automate your workflows with Fikiri Solutions.
               <br />
-              <span className="text-blue-400">Transform your business with intelligent automation.</span>
+              <span className="text-orange-400">Transform your business with intelligent automation.</span>
             </p>
           </motion.div>
 
@@ -296,9 +328,9 @@ const LandingPage: React.FC = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: index * 0.1 }}
                 viewport={{ once: true }}
-                className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 hover:border-blue-500 transition-all duration-300"
+                className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 hover:border-orange-500 transition-all duration-300"
               >
-                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center mb-4">
+                <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg flex items-center justify-center mb-4">
                   <prop.icon className="w-6 h-6 text-white" />
                 </div>
                 <h3 className="text-xl font-semibold mb-2">{prop.title}</h3>
@@ -337,7 +369,7 @@ const LandingPage: React.FC = () => {
                 viewport={{ once: true }}
                 className="text-center"
               >
-                <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
                   <span className="text-2xl font-bold">{step.step}</span>
                 </div>
                 <h3 className="text-2xl font-semibold mb-4">{step.title}</h3>
@@ -413,7 +445,7 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* Final CTA Section */}
-      <section className="relative z-10 py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-blue-600/20 to-purple-600/20">
+      <section className="relative z-10 py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-orange-600/20 to-red-600/20">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -430,7 +462,7 @@ const LandingPage: React.FC = () => {
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <button
                 onClick={() => navigate('/onboarding-flow')}
-                className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 flex items-center gap-2 shadow-lg"
+                className="px-8 py-4 bg-gradient-to-r from-orange-600 to-red-600 text-white font-semibold rounded-lg hover:from-orange-700 hover:to-red-700 transition-all duration-300 transform hover:scale-105 flex items-center gap-2 shadow-lg"
               >
                 Get Started Free
                 <ArrowRight className="w-5 h-5" />
