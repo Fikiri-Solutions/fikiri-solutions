@@ -129,16 +129,16 @@ const LandingPage: React.FC = () => {
           </Link>
           
           <nav className="hidden md:flex items-center space-x-8">
-            <a href="#features" className="text-orange-200 hover:text-orange-100 transition-colors">Features</a>
-            <a href="#how-it-works" className="text-orange-200 hover:text-orange-100 transition-colors">How it works</a>
-            <a href="#testimonials" className="text-orange-200 hover:text-orange-100 transition-colors">Testimonials</a>
-            <a href="/pricing" className="text-orange-200 hover:text-orange-100 transition-colors">Pricing</a>
+            <a href="#features" className="text-white hover:text-orange-200 transition-colors">Features</a>
+            <a href="#how-it-works" className="text-white hover:text-orange-200 transition-colors">How it works</a>
+            <a href="#testimonials" className="text-white hover:text-orange-200 transition-colors">Testimonials</a>
+            <a href="/pricing" className="text-white hover:text-orange-200 transition-colors">Pricing</a>
           </nav>
 
           <div className="flex items-center space-x-4">
             <button
               onClick={() => navigate('/login')}
-              className="px-4 py-2 text-orange-200 hover:text-orange-100 transition-colors"
+              className="px-4 py-2 text-white hover:text-orange-200 transition-colors"
               aria-label="Sign in to your Fikiri account"
             >
               Sign in
@@ -176,10 +176,10 @@ const LandingPage: React.FC = () => {
               <br />
               reliable automation
             </h1>
-            <p className="text-xl sm:text-2xl text-orange-100 mb-8 max-w-3xl mx-auto">
+            <p className="text-xl sm:text-2xl text-white mb-8 max-w-3xl mx-auto">
               Save time, close more leads, and automate your workflows with Fikiri Solutions.
               <br />
-              <span className="text-orange-400">Transform your business with intelligent automation.</span>
+              <span className="text-orange-200">Transform your business with intelligent automation.</span>
             </p>
           </motion.div>
 
@@ -217,7 +217,7 @@ const LandingPage: React.FC = () => {
                        {features.map((feature, index) => (
                          <div key={index} className="flex items-center gap-3 text-center sm:text-left">
                            <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                           <span className="text-orange-100 font-medium">{feature}</span>
+                           <span className="text-white font-medium">{feature}</span>
                          </div>
                        ))}
                      </div>
@@ -242,7 +242,7 @@ const LandingPage: React.FC = () => {
             }}>
               Everything You Need to Automate Your Business
             </h2>
-            <p className="text-xl text-orange-100 max-w-2xl mx-auto">
+            <p className="text-xl text-white max-w-2xl mx-auto">
               Powerful AI tools designed specifically for small businesses
             </p>
           </motion.div>
@@ -264,7 +264,7 @@ const LandingPage: React.FC = () => {
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent'
                 }}>{prop.title}</h3>
-                <p className="text-orange-100">{prop.description}</p>
+                <p className="text-white">{prop.description}</p>
               </motion.div>
             ))}
           </div>
@@ -283,7 +283,7 @@ const LandingPage: React.FC = () => {
             <h2 className="text-3xl sm:text-4xl font-bold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-blue-500 bg-clip-text text-transparent">
               How It Works
             </h2>
-            <p className="text-xl text-orange-100 max-w-2xl mx-auto">
+            <p className="text-xl text-white max-w-2xl mx-auto">
               Get started in minutes, see results immediately
             </p>
           </motion.div>
@@ -301,7 +301,7 @@ const LandingPage: React.FC = () => {
                   <span className="text-2xl font-bold">{step.step}</span>
                 </div>
                 <h3 className="text-2xl font-semibold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-blue-500 bg-clip-text text-transparent">{step.title}</h3>
-                <p className="text-orange-100">{step.description}</p>
+                <p className="text-white">{step.description}</p>
               </motion.div>
             ))}
           </div>
@@ -320,7 +320,7 @@ const LandingPage: React.FC = () => {
             <h2 className="text-3xl sm:text-4xl font-bold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-blue-500 bg-clip-text text-transparent">
               Trusted by Growing Businesses
             </h2>
-            <p className="text-xl text-orange-100 max-w-2xl mx-auto">
+            <p className="text-xl text-white max-w-2xl mx-auto">
               Join thousands of businesses already automating with Fikiri
             </p>
           </motion.div>
@@ -340,7 +340,7 @@ const LandingPage: React.FC = () => {
                     <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
                   ))}
                 </div>
-                <p className="text-orange-100 mb-4 italic">"{testimonial.quote}"</p>
+                <p className="text-white mb-4 italic">"{testimonial.quote}"</p>
                 <div>
                   <p className="font-semibold">{testimonial.name}</p>
                   <p className="text-orange-200 text-sm">{testimonial.company}</p>
@@ -356,7 +356,7 @@ const LandingPage: React.FC = () => {
             transition={{ duration: 0.8 }}
             className="text-center"
           >
-            <p className="text-orange-200 mb-8">Powered by industry-leading technology</p>
+            <p className="text-white mb-8">Powered by industry-leading technology</p>
             <div className="flex flex-wrap justify-center items-center gap-8 opacity-60">
               <div className="text-2xl font-bold">OpenAI</div>
               <div className="text-2xl font-bold">Google</div>
@@ -380,7 +380,7 @@ const LandingPage: React.FC = () => {
             <h2 className="text-3xl sm:text-4xl font-bold mb-6 bg-gradient-to-r from-orange-400 via-orange-500 to-blue-500 bg-clip-text text-transparent">
               Start Automating Today
             </h2>
-            <p className="text-xl text-orange-100 mb-8">
+            <p className="text-xl text-white mb-8">
               Free trial, no credit card required. Join thousands of businesses already saving time with AI.
             </p>
             <motion.div
@@ -407,7 +407,7 @@ const LandingPage: React.FC = () => {
                 Create Account
               </button>
             </motion.div>
-            <p className="text-sm text-orange-200 mt-4">
+            <p className="text-sm text-white mt-4">
               No setup fees • Cancel anytime • 24/7 support
             </p>
           </motion.div>
@@ -420,36 +420,36 @@ const LandingPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
               <h3 className="text-xl font-bold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-blue-500 bg-clip-text text-transparent">Fikiri Solutions</h3>
-              <p className="text-orange-200">
+              <p className="text-white">
                 AI-powered automation for small businesses
               </p>
             </div>
             <div>
               <h4 className="font-semibold mb-4">Product</h4>
-              <ul className="space-y-2 text-orange-200">
-                <li><a href="/services" className="hover:text-orange-100 transition-colors">Services</a></li>
-                <li><a href="/ai" className="hover:text-orange-100 transition-colors">AI Assistant</a></li>
-                <li><a href="/crm" className="hover:text-orange-100 transition-colors">CRM</a></li>
+              <ul className="space-y-2 text-white">
+                <li><a href="/services" className="hover:text-orange-200 transition-colors">Services</a></li>
+                <li><a href="/ai" className="hover:text-orange-200 transition-colors">AI Assistant</a></li>
+                <li><a href="/crm" className="hover:text-orange-200 transition-colors">CRM</a></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-orange-200">
-                <li><a href="/about" className="hover:text-orange-100 transition-colors">About</a></li>
-                <li><a href="/privacy" className="hover:text-orange-100 transition-colors">Privacy</a></li>
-                <li><a href="/terms" className="hover:text-orange-100 transition-colors">Terms</a></li>
+              <ul className="space-y-2 text-white">
+                <li><a href="/about" className="hover:text-orange-200 transition-colors">About</a></li>
+                <li><a href="/privacy" className="hover:text-orange-200 transition-colors">Privacy</a></li>
+                <li><a href="/terms" className="hover:text-orange-200 transition-colors">Terms</a></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold mb-4">Support</h4>
-              <ul className="space-y-2 text-orange-200">
-                <li><a href="/onboarding-flow" className="hover:text-orange-100 transition-colors">Get Started</a></li>
-                <li><a href="/login" className="hover:text-orange-100 transition-colors">Sign In</a></li>
-                <li><a href="/signup" className="hover:text-orange-100 transition-colors">Sign Up</a></li>
+              <ul className="space-y-2 text-white">
+                <li><a href="/onboarding-flow" className="hover:text-orange-200 transition-colors">Get Started</a></li>
+                <li><a href="/login" className="hover:text-orange-200 transition-colors">Sign In</a></li>
+                <li><a href="/signup" className="hover:text-orange-200 transition-colors">Sign Up</a></li>
               </ul>
             </div>
           </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-orange-200">
+          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-white">
             <p>&copy; 2024 Fikiri Solutions. All rights reserved.</p>
           </div>
         </div>
