@@ -1,6 +1,6 @@
 <svg width="200" height="100" viewBox="0 0 200 100" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- Sunset gradient matching original -->
+    <!-- Sunset gradient matching the image -->
     <linearGradient id="sunsetGradient" x1="0%" y1="100%" x2="0%" y2="0%">
       <stop offset="0%" style="stop-color:#F97316;stop-opacity:1" />
       <stop offset="50%" style="stop-color:#FF8C42;stop-opacity:1" />
@@ -9,8 +9,8 @@
     
     <!-- Texture filter for vintage look -->
     <filter id="grainyTexture">
-      <feTurbulence type="fractalNoise" baseFrequency="0.6" numOctaves="3" result="noise" />
-      <feDiffuseLighting in="noise" lightingColor="white" surfaceScale="2">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" result="noise" />
+      <feDiffuseLighting in="noise" lightingColor="white" surfaceScale="3">
         <feDistantLight azimuth="225" elevation="45" />
       </feDiffuseLighting>
       <feComposite in="SourceGraphic" in2="diffuseLighting" operator="arithmetic" k1="1" k2="0" k3="0" k4="0" />
@@ -26,8 +26,8 @@
   <circle cx="100" cy="50" r="33" fill="url(#sunsetGradient)" filter="url(#grainyTexture)"/>
   
   <!-- Horizon lines -->
-  <path d="M70 60 Q85 55 100 57 T130 60 L130 75 L70 75 Z" fill="#4A2C2A" opacity="0.1" filter="url(#grainyTexture)"/>
-  <path d="M75 65 Q90 60 100 62 T125 65 L125 70 L75 70 Z" fill="#4A2C2A" opacity="0.15" filter="url(#grainyTexture)"/>
+  <path d="M70 60 Q85 55 100 57 T130 60" stroke="#4A2C2A" stroke-width="1" fill="none" opacity="0.6" filter="url(#grainyTexture)"/>
+  <path d="M75 65 Q90 60 100 62 T125 65" stroke="#4A2C2A" stroke-width="0.8" fill="none" opacity="0.4" filter="url(#grainyTexture)"/>
   
   <!-- Baobab Tree -->
   <!-- Trunk -->
@@ -40,12 +40,12 @@
   <path d="M110 45 C105 40 100 43 100 50 C100 43 95 35 90 35 C85 35 80 43 80 50 C80 43 85 40 90 45 Z" fill="#4A2C2A" filter="url(#grainyTexture)"/>
   
   <!-- Dense reddish-brown canopy -->
-  <circle cx="100" cy="30" r="12" fill="#8B4513" opacity="0.9" filter="url(#grainyTexture)"/>
-  <circle cx="95" cy="25" r="8" fill="#8B4513" opacity="0.8" filter="url(#grainyTexture)"/>
-  <circle cx="105" cy="25" r="8" fill="#8B4513" opacity="0.8" filter="url(#grainyTexture)"/>
-  <circle cx="100" cy="20" r="6" fill="#8B4513" opacity="0.9" filter="url(#grainyTexture)"/>
-  <circle cx="90" cy="30" r="5" fill="#8B4513" opacity="0.7" filter="url(#grainyTexture)"/>
-  <circle cx="110" cy="30" r="5" fill="#8B4513" opacity="0.7" filter="url(#grainyTexture)"/>
+  <circle cx="100" cy="30" r="12" fill="#4A2C2A" opacity="0.9" filter="url(#grainyTexture)"/>
+  <circle cx="95" cy="25" r="8" fill="#4A2C2A" opacity="0.8" filter="url(#grainyTexture)"/>
+  <circle cx="105" cy="25" r="8" fill="#4A2C2A" opacity="0.8" filter="url(#grainyTexture)"/>
+  <circle cx="100" cy="20" r="6" fill="#4A2C2A" opacity="0.9" filter="url(#grainyTexture)"/>
+  <circle cx="90" cy="30" r="5" fill="#4A2C2A" opacity="0.7" filter="url(#grainyTexture)"/>
+  <circle cx="110" cy="30" r="5" fill="#4A2C2A" opacity="0.7" filter="url(#grainyTexture)"/>
   
   <!-- FIKIRI text - curved above circle -->
   <text x="100" y="25" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#4A2C2A" filter="url(#grainyTexture)">
