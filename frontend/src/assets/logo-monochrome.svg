@@ -2,8 +2,8 @@
   <defs>
     <!-- Texture filter for vintage look -->
     <filter id="grainyTextureMonochrome">
-      <feTurbulence type="fractalNoise" baseFrequency="0.6" numOctaves="3" result="noise" />
-      <feDiffuseLighting in="noise" lightingColor="white" surfaceScale="2">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" result="noise" />
+      <feDiffuseLighting in="noise" lightingColor="white" surfaceScale="3">
         <feDistantLight azimuth="225" elevation="45" />
       </feDiffuseLighting>
       <feComposite in="SourceGraphic" in2="diffuseLighting" operator="arithmetic" k1="1" k2="0" k3="0" k4="0" />
@@ -15,8 +15,8 @@
   <circle cx="50" cy="50" r="46" fill="#555" filter="url(#grainyTextureMonochrome)"/>
   
   <!-- Horizon lines -->
-  <path d="M15 60 Q30 50 50 55 T85 60 L85 90 L15 90 Z" fill="#333" opacity="0.1" filter="url(#grainyTextureMonochrome)"/>
-  <path d="M20 65 Q35 55 50 60 T80 65 L80 85 L20 85 Z" fill="#333" opacity="0.15" filter="url(#grainyTextureMonochrome)"/>
+  <path d="M15 60 Q30 50 50 55 T85 60" stroke="#333" stroke-width="1" fill="none" opacity="0.6" filter="url(#grainyTextureMonochrome)"/>
+  <path d="M20 65 Q35 55 50 60 T80 65" stroke="#333" stroke-width="0.8" fill="none" opacity="0.4" filter="url(#grainyTextureMonochrome)"/>
   
   <!-- Baobab Tree -->
   <!-- Trunk -->
