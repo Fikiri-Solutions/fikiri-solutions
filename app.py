@@ -138,6 +138,10 @@ app.register_blueprint(billing_bp)
 from core.webhook_api import webhook_bp
 app.register_blueprint(webhook_bp)
 
+# Register CRM completion blueprint
+from core.crm_completion_api import crm_bp
+app.register_blueprint(crm_bp)
+
 # Initialize SocketIO for real-time updates (disabled for now)
 # socketio = SocketIO(app, cors_allowed_origins=[
 #     'http://localhost:3000',
