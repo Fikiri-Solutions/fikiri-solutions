@@ -134,6 +134,10 @@ app.register_blueprint(create_business_blueprint())
 # Register billing blueprint
 app.register_blueprint(billing_bp)
 
+# Register webhook blueprint
+from core.webhook_api import webhook_bp
+app.register_blueprint(webhook_bp)
+
 # Initialize SocketIO for real-time updates (disabled for now)
 # socketio = SocketIO(app, cors_allowed_origins=[
 #     'http://localhost:3000',
