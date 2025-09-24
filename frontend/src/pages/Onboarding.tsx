@@ -247,11 +247,23 @@ export const Onboarding: React.FC = () => {
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="">Select your industry</option>
-                  <option value="landscaping">Landscaping</option>
-                  <option value="restaurant">Restaurant</option>
-                  <option value="medical">Medical</option>
-                  <option value="consulting">Consulting</option>
-                  <option value="real-estate">Real Estate</option>
+                  <option value="retail">Retail & E-commerce</option>
+                  <option value="healthcare">Healthcare & Social Assistance</option>
+                  <option value="professional">Professional, Scientific & Technical Services</option>
+                  <option value="construction">Construction & Contracting</option>
+                  <option value="food-service">Accommodation & Food Services</option>
+                  <option value="real-estate">Real Estate & Rental Services</option>
+                  <option value="administrative">Administrative & Support Services</option>
+                  <option value="education">Educational Services</option>
+                  <option value="transportation">Transportation & Warehousing</option>
+                  <option value="arts-entertainment">Arts, Entertainment & Recreation</option>
+                  <option value="landscaping">Landscaping & Lawn Care</option>
+                  <option value="automotive">Automotive Services</option>
+                  <option value="beauty-wellness">Beauty & Wellness</option>
+                  <option value="finance-insurance">Finance & Insurance</option>
+                  <option value="technology">Technology & Software</option>
+                  <option value="manufacturing">Manufacturing</option>
+                  <option value="agriculture">Agriculture & Farming</option>
                   <option value="other">Other</option>
                 </select>
               </div>

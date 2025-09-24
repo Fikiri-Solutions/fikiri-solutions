@@ -125,7 +125,12 @@ const LandingPage: React.FC = () => {
             <a href="#features" className="text-white hover:text-orange-200 transition-colors">Features</a>
             <a href="#how-it-works" className="text-white hover:text-orange-200 transition-colors">How it works</a>
             <a href="#testimonials" className="text-white hover:text-orange-200 transition-colors">Testimonials</a>
-            <a href="/pricing" className="text-white hover:text-orange-200 transition-colors">Pricing</a>
+            <button 
+              onClick={() => navigate('/pricing')}
+              className="text-white hover:text-orange-200 transition-colors"
+            >
+              Pricing
+            </button>
           </nav>
 
           <div className="flex items-center space-x-4">
@@ -191,7 +196,8 @@ const LandingPage: React.FC = () => {
               <ArrowRight className="w-5 h-5" aria-hidden="true" />
             </button>
             <button 
-              className="px-8 py-4 border border-gray-600 text-white font-semibold rounded-lg hover:bg-gray-800 transition-all duration-300 flex items-center gap-2"
+              onClick={() => navigate('/services-landing')}
+              className="px-8 py-4 border border-orange-400 text-white font-semibold rounded-lg hover:bg-orange-500/20 hover:border-orange-300 transition-all duration-300 flex items-center gap-2"
               aria-label="Watch Fikiri Solutions demo video"
             >
               <Play className="w-5 h-5" aria-hidden="true" />
@@ -420,25 +426,25 @@ const LandingPage: React.FC = () => {
             <div>
               <h4 className="font-semibold mb-4">Product</h4>
               <ul className="space-y-2 text-white">
-                <li><a href="/services" className="hover:text-orange-200 transition-colors">Services</a></li>
-                <li><a href="/ai" className="hover:text-orange-200 transition-colors">AI Assistant</a></li>
-                <li><a href="/crm" className="hover:text-orange-200 transition-colors">CRM</a></li>
+                <li><button onClick={() => navigate('/services')} className="hover:text-orange-200 transition-colors">Services</button></li>
+                <li><button onClick={() => navigate('/ai')} className="hover:text-orange-200 transition-colors">AI Assistant</button></li>
+                <li><button onClick={() => navigate('/crm')} className="hover:text-orange-200 transition-colors">CRM</button></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold mb-4">Company</h4>
               <ul className="space-y-2 text-white">
-                <li><a href="/about" className="hover:text-orange-200 transition-colors">About</a></li>
-                <li><a href="/privacy" className="hover:text-orange-200 transition-colors">Privacy</a></li>
-                <li><a href="/terms" className="hover:text-orange-200 transition-colors">Terms</a></li>
+                <li><button onClick={() => navigate('/about')} className="hover:text-orange-200 transition-colors">About</button></li>
+                <li><button onClick={() => navigate('/privacy')} className="hover:text-orange-200 transition-colors">Privacy</button></li>
+                <li><button onClick={() => navigate('/terms')} className="hover:text-orange-200 transition-colors">Terms</button></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold mb-4">Support</h4>
               <ul className="space-y-2 text-white">
-                <li><a href="/onboarding-flow" className="hover:text-orange-200 transition-colors">Get Started</a></li>
-                <li><a href="/login" className="hover:text-orange-200 transition-colors">Sign In</a></li>
-                <li><a href="/signup" className="hover:text-orange-200 transition-colors">Sign Up</a></li>
+                <li><button onClick={() => navigate('/onboarding-flow')} className="hover:text-orange-200 transition-colors">Get Started</button></li>
+                <li><button onClick={() => navigate('/login')} className="hover:text-orange-200 transition-colors">Sign In</button></li>
+                <li><button onClick={() => navigate('/signup')} className="hover:text-orange-200 transition-colors">Sign Up</button></li>
               </ul>
             </div>
           </div>

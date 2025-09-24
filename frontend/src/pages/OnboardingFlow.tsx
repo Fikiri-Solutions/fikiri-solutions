@@ -117,6 +117,16 @@ export const OnboardingFlow: React.FC = () => {
     loadOnboardingStatus()
   }, [])
 
+  // Update currentStep when URL parameter changes
+  useEffect(() => {
+    if (step) {
+      const stepNumber = parseInt(step)
+      if (stepNumber >= 1 && stepNumber <= 5) {
+        setCurrentStep(stepNumber)
+      }
+    }
+  }, [step])
+
   // Poll for onboarding job status with error handling
   useEffect(() => {
     if (currentStep >= 3 && user) {
@@ -456,17 +466,23 @@ export const OnboardingFlow: React.FC = () => {
                   }`}
                 >
                   <option value="">Select your industry</option>
-                  <option value="landscaping">Landscaping & Lawn Care</option>
-                  <option value="restaurant">Restaurant & Food Service</option>
-                  <option value="medical">Medical & Healthcare</option>
-                  <option value="consulting">Consulting & Professional Services</option>
-                  <option value="real-estate">Real Estate</option>
                   <option value="retail">Retail & E-commerce</option>
+                  <option value="healthcare">Healthcare & Social Assistance</option>
+                  <option value="professional">Professional, Scientific & Technical Services</option>
                   <option value="construction">Construction & Contracting</option>
+                  <option value="food-service">Accommodation & Food Services</option>
+                  <option value="real-estate">Real Estate & Rental Services</option>
+                  <option value="administrative">Administrative & Support Services</option>
+                  <option value="education">Educational Services</option>
+                  <option value="transportation">Transportation & Warehousing</option>
+                  <option value="arts-entertainment">Arts, Entertainment & Recreation</option>
+                  <option value="landscaping">Landscaping & Lawn Care</option>
                   <option value="automotive">Automotive Services</option>
-                  <option value="beauty">Beauty & Wellness</option>
-                  <option value="education">Education & Training</option>
+                  <option value="beauty-wellness">Beauty & Wellness</option>
+                  <option value="finance-insurance">Finance & Insurance</option>
                   <option value="technology">Technology & Software</option>
+                  <option value="manufacturing">Manufacturing</option>
+                  <option value="agriculture">Agriculture & Farming</option>
                   <option value="other">Other</option>
                 </select>
                 {validationErrors.industry && (
@@ -726,7 +742,7 @@ export const OnboardingFlow: React.FC = () => {
       case 1: return validateStep(1)
       case 2: return gmailConnected
       case 3: return onboardingJob?.status === 'completed'
-      case 4: return formData.services.length > 0
+      case 4: return formData.services.length >= 0 // Allow proceeding even with no services selected
       case 5: return true
       default: return false
     }

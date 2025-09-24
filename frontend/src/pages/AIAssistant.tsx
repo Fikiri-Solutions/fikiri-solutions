@@ -129,20 +129,13 @@ export const AIAssistant: React.FC = () => {
       const rawResponse = response.data?.response || 'I apologize, but I encountered an issue generating a response.'
       const formattedResponse = formatAIResponse(rawResponse)
 
-      // Remove placeholder and add typing effect
-      setMessages(prev => prev.filter(msg => msg.id !== aiMessageId))
-      
-      // Simulate typing effect
+      // Simulate typing effect by updating the existing placeholder message
       await simulateTyping(formattedResponse, (currentText) => {
-        setMessages(prev => {
-          const updatedMessages = prev.filter(msg => msg.id !== aiMessageId)
-          return [...updatedMessages, {
-            id: aiMessageId,
-            type: 'ai' as const,
-            content: currentText,
-            timestamp: new Date()
-          }]
-        })
+        setMessages(prev => prev.map(msg => 
+          msg.id === aiMessageId 
+            ? { ...msg, content: currentText, isTyping: false }
+            : msg
+        ))
       }, 25) // 25ms per word for natural typing speed
 
     } catch (error) {
@@ -150,19 +143,13 @@ export const AIAssistant: React.FC = () => {
       const fallbackResponse = getFallbackResponse(inputMessage.trim())
       const formattedFallback = formatAIResponse(fallbackResponse)
       
-      // Remove placeholder and add typing effect for fallback
-      setMessages(prev => prev.filter(msg => msg.id !== aiMessageId))
-      
+      // Simulate typing effect for fallback response
       await simulateTyping(formattedFallback, (currentText) => {
-        setMessages(prev => {
-          const updatedMessages = prev.filter(msg => msg.id !== aiMessageId)
-          return [...updatedMessages, {
-            id: aiMessageId,
-            type: 'ai' as const,
-            content: currentText,
-            timestamp: new Date()
-          }]
-        })
+        setMessages(prev => prev.map(msg => 
+          msg.id === aiMessageId 
+            ? { ...msg, content: currentText, isTyping: false }
+            : msg
+        ))
       }, 25)
       
       setError(null) // Clear error since we provided a fallback

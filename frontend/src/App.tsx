@@ -56,6 +56,7 @@ function App() {
                       <Route path="/privacy" element={<PrivacyPolicy />} />
                       <Route path="/privacy-settings" element={<Layout><PrivacySettings /></Layout>} />
                       {features.showOnboarding && <Route path="/onboarding" element={<Onboarding />} />}
+                      {features.showOnboarding && <Route path="/onboarding/:step" element={<OnboardingFlow />} />}
                       <Route path="/onboarding-flow" element={<PublicOnboardingFlow />} />
                       <Route path="/onboarding-flow/:step" element={<PublicOnboardingFlow />} />
                       <Route path="/" element={<LandingPage />} />

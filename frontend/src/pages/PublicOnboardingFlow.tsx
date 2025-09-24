@@ -115,7 +115,7 @@ export const PublicOnboardingFlow: React.FC = () => {
         setCurrentStep(3)
       } else if (currentStep === 3) {
         // Complete onboarding and redirect to signup
-        localStorage.setItem('fikiri-onboarding-completed', 'true')
+        // Don't set onboarding-completed flag yet - that should only be set after full authenticated onboarding
         addToast('Welcome to Fikiri! Please create your account to continue.', 'success')
         navigate('/signup')
       }
@@ -202,11 +202,23 @@ export const PublicOnboardingFlow: React.FC = () => {
             } dark:bg-gray-800 dark:text-white`}
           >
             <option value="">Select your industry</option>
-            <option value="landscaping">Landscaping & Lawn Care</option>
-            <option value="restaurant">Restaurant & Food Service</option>
-            <option value="medical">Medical & Healthcare</option>
             <option value="retail">Retail & E-commerce</option>
-            <option value="professional">Professional Services</option>
+            <option value="healthcare">Healthcare & Social Assistance</option>
+            <option value="professional">Professional, Scientific & Technical Services</option>
+            <option value="construction">Construction & Contracting</option>
+            <option value="food-service">Accommodation & Food Services</option>
+            <option value="real-estate">Real Estate & Rental Services</option>
+            <option value="administrative">Administrative & Support Services</option>
+            <option value="education">Educational Services</option>
+            <option value="transportation">Transportation & Warehousing</option>
+            <option value="arts-entertainment">Arts, Entertainment & Recreation</option>
+            <option value="landscaping">Landscaping & Lawn Care</option>
+            <option value="automotive">Automotive Services</option>
+            <option value="beauty-wellness">Beauty & Wellness</option>
+            <option value="finance-insurance">Finance & Insurance</option>
+            <option value="technology">Technology & Software</option>
+            <option value="manufacturing">Manufacturing</option>
+            <option value="agriculture">Agriculture & Farming</option>
             <option value="other">Other</option>
           </select>
           {validationErrors.industry && (
