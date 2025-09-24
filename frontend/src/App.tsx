@@ -8,6 +8,7 @@ import { Signup } from './pages/Signup'
 import { TermsOfService } from './pages/TermsOfService'
 import { PrivacyPolicy } from './pages/PrivacyPolicy'
 import { Onboarding } from './pages/Onboarding'
+import { OnboardingFlow } from './pages/OnboardingFlow'
 import { Services } from './pages/Services'
 import { CRM } from './pages/CRM'
 import { AIAssistant } from './pages/AIAssistant'
@@ -23,6 +24,7 @@ import { About } from './pages/About'
 import { PrivacySettings } from './components/PrivacySettings'
 import { PublicOnboardingFlow } from './pages/PublicOnboardingFlow'
 import LandingPage from './pages/LandingPage'
+import PricingPage from './pages/PricingPage'
 import { QueryProvider } from './providers/QueryProvider'
 import { ToastProvider } from './components/Toast'
 import { ThemeProvider } from './contexts/ThemeContext'
@@ -60,6 +62,7 @@ function App() {
                       <Route path="/onboarding-flow" element={<PublicOnboardingFlow />} />
                       <Route path="/onboarding-flow/:step" element={<PublicOnboardingFlow />} />
                       <Route path="/" element={<LandingPage />} />
+                      <Route path="/pricing" element={<PricingPage />} />
                       <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
                       <Route path="/services" element={<Layout><Services /></Layout>} />
                       <Route path="/services-landing" element={<ServicesLanding />} />
