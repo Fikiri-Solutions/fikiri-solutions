@@ -389,15 +389,20 @@ export const PublicOnboardingFlow: React.FC = () => {
               <div
                 key={step}
                 className={`w-3 h-3 rounded-full ${
-                  step <= currentStep ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-                }`}
+                  step <= currentStep ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
+                }`} style={{
+                  backgroundColor: step <= currentStep ? '#FF6B35' : '#D1D5DB'
+                }}
               />
             ))}
           </div>
         </div>
 
         {/* Main content */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8" style={{
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(10px)'
+        }}>
           {renderCurrentStep()}
 
           {/* Error message */}
