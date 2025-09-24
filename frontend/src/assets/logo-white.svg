@@ -1,25 +1,38 @@
 <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- Tree shadow for definition -->
-    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
-      <feMerge>
-        <feMergeNode in="blur" />
-        <feMergeNode in="SourceGraphic" />
-      </feMerge>
+    <!-- Texture filter for vintage look -->
+    <filter id="grainyTextureWhite">
+      <feTurbulence type="fractalNoise" baseFrequency="0.6" numOctaves="3" result="noise" />
+      <feDiffuseLighting in="noise" lightingColor="white" surfaceScale="2">
+        <feDistantLight azimuth="225" elevation="45" />
+      </feDiffuseLighting>
+      <feComposite in="SourceGraphic" in2="diffuseLighting" operator="arithmetic" k1="1" k2="0" k3="0" k4="0" />
     </filter>
   </defs>
   
-  <!-- Circular border -->
+  <!-- Main circular logo -->
   <circle cx="50" cy="50" r="48" stroke="white" stroke-width="2" fill="none"/>
+  <circle cx="50" cy="50" r="46" fill="white" filter="url(#grainyTextureWhite)"/>
   
-  <!-- Background -->
-  <circle cx="50" cy="50" r="46" fill="white"/>
+  <!-- Horizon lines -->
+  <path d="M15 60 Q30 50 50 55 T85 60 L85 90 L15 90 Z" fill="#EEE" opacity="0.1" filter="url(#grainyTextureWhite)"/>
+  <path d="M20 65 Q35 55 50 60 T80 65 L80 85 L20 85 Z" fill="#EEE" opacity="0.15" filter="url(#grainyTextureWhite)"/>
   
-  <!-- Ground -->
-  <path d="M15 60 Q30 50 50 55 T85 60 L85 90 L15 90 Z" fill="#EEE"/>
+  <!-- Baobab Tree -->
+  <!-- Trunk -->
+  <path d="M48 70 L52 70 L52 50 C52 45 55 40 50 40 C45 40 48 45 48 50 L48 70 Z" fill="#DDD" filter="url(#grainyTextureWhite)"/>
   
-  <!-- Baobab tree trunk -->
-  <rect x="46" y="35" width="8" height="30" fill="#DDD" rx="2"/>
-  <circle cx="50" cy="30" r="18" fill="#CCC" opacity="0.8"/>
+  <!-- Branches - sparse and characteristic -->
+  <path d="M50 40 C45 35 40 38 40 45 C40 38 45 30 50 30 C55 30 60 38 60 45 C60 38 55 35 50 40 Z" fill="#DDD" filter="url(#grainyTextureWhite)"/>
+  <path d="M50 40 C55 35 60 38 60 45 C60 38 65 30 70 30 C75 30 80 38 80 45 C80 38 75 35 70 40 Z" fill="#DDD" filter="url(#grainyTextureWhite)"/>
+  <path d="M40 45 C35 40 30 43 30 50 C30 43 35 35 40 35 C45 35 50 43 50 50 C50 43 45 40 40 45 Z" fill="#DDD" filter="url(#grainyTextureWhite)"/>
+  <path d="M60 45 C55 40 50 43 50 50 C50 43 45 35 40 35 C35 35 30 43 30 50 C30 43 35 40 40 45 Z" fill="#DDD" filter="url(#grainyTextureWhite)"/>
+  
+  <!-- Dense canopy -->
+  <circle cx="50" cy="30" r="12" fill="#DDD" opacity="0.9" filter="url(#grainyTextureWhite)"/>
+  <circle cx="45" cy="25" r="8" fill="#DDD" opacity="0.8" filter="url(#grainyTextureWhite)"/>
+  <circle cx="55" cy="25" r="8" fill="#DDD" opacity="0.8" filter="url(#grainyTextureWhite)"/>
+  <circle cx="50" cy="20" r="6" fill="#DDD" opacity="0.9" filter="url(#grainyTextureWhite)"/>
+  <circle cx="40" cy="30" r="5" fill="#DDD" opacity="0.7" filter="url(#grainyTextureWhite)"/>
+  <circle cx="60" cy="30" r="5" fill="#DDD" opacity="0.7" filter="url(#grainyTextureWhite)"/>
 </svg>
