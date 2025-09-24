@@ -23,15 +23,18 @@
   <!-- Secondary trunk sections for gnarled appearance -->
   <path d="M15 26 L17 26 L17 16 C17 15 17 15 16 15 C15 15 15 15 15 16 L15 26 Z" fill="#4A2C2A" opacity="0.8"/>
   
-  <!-- Characteristic sparse branches -->
-  <!-- Left main branch -->
-  <path d="M14 14 C10 12 8 13 8 15 C8 13 10 11 14 11 C18 11 20 13 20 15 C20 13 18 12 14 14 Z" fill="#4A2C2A"/>
+  <!-- Proper Baobab Branches - straight and sparse -->
+  <!-- Left branch -->
+  <path d="M14 14 L10 12" stroke="#4A2C2A" stroke-width="1.5" fill="none"/>
+  <path d="M14 14 L12 10" stroke="#4A2C2A" stroke-width="1" fill="none"/>
   
-  <!-- Right main branch -->
-  <path d="M18 14 C22 12 24 13 24 15 C24 13 22 11 18 11 C14 11 12 13 12 15 C12 13 14 12 18 14 Z" fill="#4A2C2A"/>
+  <!-- Right branch -->
+  <path d="M18 14 L22 12" stroke="#4A2C2A" stroke-width="1.5" fill="none"/>
+  <path d="M18 14 L20 10" stroke="#4A2C2A" stroke-width="1" fill="none"/>
   
   <!-- Upper branches -->
-  <path d="M16 11 C13 9 10 10 10 12 C10 10 13 8 16 8 C19 8 22 10 22 12 C22 10 19 9 16 11 Z" fill="#4A2C2A"/>
+  <path d="M16 11 L14 8" stroke="#4A2C2A" stroke-width="1" fill="none"/>
+  <path d="M16 11 L18 8" stroke="#4A2C2A" stroke-width="1" fill="none"/>
   
   <!-- Dense reddish-brown canopy clusters -->
   <!-- Main canopy -->
