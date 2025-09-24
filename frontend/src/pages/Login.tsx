@@ -256,7 +256,7 @@ export const Login: React.FC = () => {
             transition={{ duration: 0.6 }}
           >
             <div className="flex items-center justify-center mb-6">
-              <FikiriLogo size="xl" variant="white" className="mx-auto" />
+              <FikiriLogo size="xl" variant="full" className="mx-auto" />
             </div>
             <motion.h1 
               className="text-5xl font-bold text-white mb-2 font-serif tracking-tight"
@@ -314,7 +314,7 @@ export const Login: React.FC = () => {
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <Mail className="h-5 w-5 text-gray-400" />
+                      <Mail className="h-5 w-5 text-gray-500" />
                     </div>
                     <input
                       id="email"
@@ -322,7 +322,7 @@ export const Login: React.FC = () => {
                       type="email"
                       autoComplete="email"
                       required
-                      className={`w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent transition-all duration-200 backdrop-blur-sm ${emailError ? 'border-brand-error focus:ring-brand-error' : ''}`}
+                      className={`w-full pl-12 pr-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 ${emailError ? 'border-red-500 focus:ring-red-500' : ''}`}
                       placeholder="Enter your email"
                       value={email}
                       onChange={handleEmailChange}
@@ -339,7 +339,7 @@ export const Login: React.FC = () => {
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <Lock className="h-5 w-5 text-gray-400" />
+                      <Lock className="h-5 w-5 text-gray-500" />
                     </div>
                     <input
                       id="password"
@@ -347,7 +347,7 @@ export const Login: React.FC = () => {
                       type={showPassword ? "text" : "password"}
                       autoComplete="current-password"
                       required
-                      className={`w-full pl-12 pr-12 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-accent focus:border-transparent transition-all duration-200 backdrop-blur-sm ${passwordError ? 'border-brand-error focus:ring-brand-error' : ''}`}
+                      className={`w-full pl-12 pr-12 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 ${passwordError ? 'border-red-500 focus:ring-red-500' : ''}`}
                       placeholder="Enter your password"
                       value={password}
                       onChange={handlePasswordChange}
@@ -358,9 +358,9 @@ export const Login: React.FC = () => {
                       onClick={() => setShowPassword(!showPassword)}
                     >
                       {showPassword ? (
-                        <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-300" />
+                        <EyeOff className="h-5 w-5 text-gray-500 hover:text-gray-700" />
                       ) : (
-                        <Eye className="h-5 w-5 text-gray-400 hover:text-gray-300" />
+                        <Eye className="h-5 w-5 text-gray-500 hover:text-gray-700" />
                       )}
                     </button>
                   </div>
