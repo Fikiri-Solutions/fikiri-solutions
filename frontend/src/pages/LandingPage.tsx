@@ -4,6 +4,7 @@ import { motion, useInView } from 'framer-motion'
 import { useRef, useState } from 'react'
 import SimpleAnimatedBackground from '../components/SimpleAnimatedBackground'
 import { FikiriLogo } from '../components/FikiriLogo'
+import DemoVideoModal from '../components/DemoVideoModal'
 import { 
   ArrowRight, 
   Mail, 
@@ -20,6 +21,7 @@ import {
 const LandingPage: React.FC = () => {
   const navigate = useNavigate()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isDemoVideoOpen, setIsDemoVideoOpen] = useState(false)
 
   const valueProps = [
     {
@@ -281,8 +283,8 @@ const LandingPage: React.FC = () => {
               Get Started Free
               <ArrowRight className="w-5 h-5" aria-hidden="true" />
             </button>
-            <button 
-              onClick={() => navigate('/services-landing')}
+            <button
+              onClick={() => setIsDemoVideoOpen(true)}
               className="px-8 py-4 border border-orange-400 text-white font-semibold rounded-lg hover:bg-orange-500/20 hover:border-orange-300 transition-all duration-300 flex items-center gap-2"
               aria-label="Watch Fikiri Solutions demo video"
             >
@@ -539,6 +541,13 @@ const LandingPage: React.FC = () => {
           </div>
         </div>
       </footer>
+
+      {/* Demo Video Modal */}
+      <DemoVideoModal 
+        isOpen={isDemoVideoOpen}
+        onClose={() => setIsDemoVideoOpen(false)}
+        videoUrl="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" // Replace with your Kling AI generated video URL
+      />
     </div>
   )
 }
