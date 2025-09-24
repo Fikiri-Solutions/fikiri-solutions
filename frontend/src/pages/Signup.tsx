@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { 
@@ -34,6 +34,25 @@ const Signup: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+  // Load onboarding data if available
+  useEffect(() => {
+    const onboardingData = localStorage.getItem('fikiri-onboarding-data');
+    if (onboardingData) {
+      try {
+        const data = JSON.parse(onboardingData);
+        setFormData(prev => ({
+          ...prev,
+          email: data.businessEmail || prev.email,
+          company: data.businessName || prev.company
+        }));
+        // Clear the onboarding data after using it
+        localStorage.removeItem('fikiri-onboarding-data');
+      } catch (error) {
+        console.error('Error parsing onboarding data:', error);
+      }
+    }
+  }, []);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     setMousePosition({
