@@ -150,6 +150,76 @@ def update_leads_table_for_pipeline(db_path: str = "data/fikiri.db"):
         logger.error(f"❌ Failed to update leads table: {e}")
         return False
 
+def create_reminders_alerts_tables(db_path: str = "data/fikiri.db"):
+    """Create reminders and alerts tables"""
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Create reminders table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS reminders (
+                id TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                lead_id TEXT,
+                reminder_type TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT,
+                due_date TIMESTAMP NOT NULL,
+                priority TEXT DEFAULT 'medium',
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+        
+        # Create alerts table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS alerts (
+                id TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                alert_type TEXT NOT NULL,
+                title TEXT NOT NULL,
+                message TEXT NOT NULL,
+                priority TEXT DEFAULT 'medium',
+                is_read BOOLEAN DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+        
+        # Create follow_up_tasks table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS follow_up_tasks (
+                id TEXT PRIMARY KEY,
+                lead_id TEXT NOT NULL,
+                user_id INTEGER NOT NULL,
+                template_id TEXT NOT NULL,
+                scheduled_for TIMESTAMP NOT NULL,
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+        
+        # Create indexes
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_reminders_user_id ON reminders (user_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_reminders_due_date ON reminders (due_date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_alerts_user_id ON alerts (user_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_alerts_created_at ON alerts (created_at)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_follow_up_tasks_user_id ON follow_up_tasks (user_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_follow_up_tasks_scheduled_for ON follow_up_tasks (scheduled_for)")
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info("✅ Reminders and alerts tables created successfully")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to create reminders and alerts tables: {e}")
+        return False
+
 def run_phase1_migrations():
     """Run all Phase 1 database migrations"""
     logger.info("🚀 Running Phase 1 database migrations...")
@@ -166,6 +236,10 @@ def run_phase1_migrations():
     
     # Update leads table
     if not update_leads_table_for_pipeline():
+        success = False
+    
+    # Create reminders and alerts tables
+    if not create_reminders_alerts_tables():
         success = False
     
     if success:
