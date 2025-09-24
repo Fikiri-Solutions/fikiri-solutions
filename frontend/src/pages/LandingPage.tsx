@@ -1,7 +1,7 @@
 import React from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion, useInView } from 'framer-motion'
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import SimpleAnimatedBackground from '../components/SimpleAnimatedBackground'
 import { FikiriLogo } from '../components/FikiriLogo'
 import { 
@@ -12,11 +12,14 @@ import {
   BarChart3, 
   CheckCircle, 
   Play,
-  Star
+  Star,
+  Menu,
+  X
 } from 'lucide-react'
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate()
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const valueProps = [
     {
@@ -121,6 +124,7 @@ const LandingPage: React.FC = () => {
             />
           </Link>
           
+          {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
             <a href="#features" className="text-white hover:text-orange-200 transition-colors">Features</a>
             <a href="#how-it-works" className="text-white hover:text-orange-200 transition-colors">How it works</a>
@@ -133,7 +137,8 @@ const LandingPage: React.FC = () => {
             </button>
           </nav>
 
-          <div className="flex items-center space-x-4">
+          {/* Desktop Auth Buttons */}
+          <div className="hidden md:flex items-center space-x-4">
             <button
               onClick={() => navigate('/login')}
               className="px-4 py-2 text-white hover:text-orange-200 transition-colors"
@@ -151,7 +156,88 @@ const LandingPage: React.FC = () => {
               Get started
             </button>
           </div>
+
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden p-2 text-white hover:text-orange-200 transition-colors"
+            aria-label="Toggle mobile menu"
+          >
+            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
         </div>
+
+        {/* Mobile Menu */}
+        {isMobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="md:hidden mt-4 bg-gray-900/95 backdrop-blur-sm rounded-lg border border-gray-700"
+          >
+            <div className="px-4 py-6 space-y-4">
+              {/* Mobile Navigation Links */}
+              <div className="space-y-3">
+                <a 
+                  href="#features" 
+                  className="block text-white hover:text-orange-200 transition-colors py-2"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Features
+                </a>
+                <a 
+                  href="#how-it-works" 
+                  className="block text-white hover:text-orange-200 transition-colors py-2"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  How it works
+                </a>
+                <a 
+                  href="#testimonials" 
+                  className="block text-white hover:text-orange-200 transition-colors py-2"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Testimonials
+                </a>
+                <button 
+                  onClick={() => {
+                    navigate('/pricing')
+                    setIsMobileMenuOpen(false)
+                  }}
+                  className="block text-white hover:text-orange-200 transition-colors py-2"
+                >
+                  Pricing
+                </button>
+              </div>
+              
+              {/* Mobile Auth Buttons */}
+              <div className="pt-4 border-t border-gray-700 space-y-3">
+                <button
+                  onClick={() => {
+                    navigate('/login')
+                    setIsMobileMenuOpen(false)
+                  }}
+                  className="w-full px-4 py-3 text-white hover:text-orange-200 transition-colors text-left"
+                  aria-label="Sign in to your Fikiri account"
+                >
+                  Sign in
+                </button>
+                <button
+                  onClick={() => {
+                    navigate('/signup')
+                    setIsMobileMenuOpen(false)
+                  }}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 text-white font-semibold rounded-lg hover:from-orange-700 hover:to-red-700 transition-all duration-300" style={{
+                    background: 'linear-gradient(to right, #FF6B35, #8B0000)'
+                  }}
+                  aria-label="Get started with Fikiri Solutions - Create your account"
+                >
+                  Get started
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
       </header>
 
              {/* Simple Animated Background - CSS-based mesh effect */}
