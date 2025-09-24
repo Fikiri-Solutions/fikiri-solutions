@@ -1,27 +1,55 @@
 <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
   <!-- Main circular logo -->
-  <circle cx="50" cy="50" r="48" stroke="white" stroke-width="2" fill="none"/>
-  <circle cx="50" cy="50" r="46" fill="white"/>
+  <circle cx="50" cy="50" r="45" stroke="white" stroke-width="2" fill="none"/>
+  <circle cx="50" cy="50" r="43" fill="white"/>
   
   <!-- Horizon lines -->
-  <path d="M15 60 Q30 50 50 55 T85 60" stroke="#EEE" stroke-width="1" fill="none" opacity="0.6"/>
-  <path d="M20 65 Q35 55 50 60 T80 65" stroke="#EEE" stroke-width="0.8" fill="none" opacity="0.4"/>
+  <path d="M20 60 Q35 55 50 57 T80 60" stroke="white" stroke-width="1" fill="none" opacity="0.6"/>
+  <path d="M25 65 Q40 60 50 62 T75 65" stroke="white" stroke-width="0.8" fill="none" opacity="0.4"/>
   
-  <!-- Baobab Tree -->
-  <!-- Trunk -->
-  <path d="M48 70 L52 70 L52 50 C52 45 55 40 50 40 C45 40 48 45 48 50 L48 70 Z" fill="#DDD"/>
+  <!-- Authentic Baobab Tree Design -->
+  <!-- Main trunk - thick and characteristic -->
+  <path d="M45 80 L55 80 L55 45 C55 40 58 35 50 35 C42 35 45 40 45 45 L45 80 Z" fill="white"/>
   
-  <!-- Branches - sparse and characteristic -->
-  <path d="M50 40 C45 35 40 38 40 45 C40 38 45 30 50 30 C55 30 60 38 60 45 C60 38 55 35 50 40 Z" fill="#DDD"/>
-  <path d="M50 40 C55 35 60 38 60 45 C60 38 65 30 70 30 C75 30 80 38 80 45 C80 38 75 35 70 40 Z" fill="#DDD"/>
-  <path d="M40 45 C35 40 30 43 30 50 C30 43 35 35 40 35 C45 35 50 43 50 50 C50 43 45 40 40 45 Z" fill="#DDD"/>
-  <path d="M60 45 C55 40 50 43 50 50 C50 43 45 35 40 35 C35 35 30 43 30 50 C30 43 35 40 40 45 Z" fill="#DDD"/>
+  <!-- Secondary trunk sections for gnarled appearance -->
+  <path d="M47 80 L53 80 L53 50 C53 48 54 46 50 46 C46 46 47 48 47 50 L47 80 Z" fill="white" opacity="0.8"/>
+  <path d="M46 80 L54 80 L54 55 C54 53 55 51 50 51 C45 51 46 53 46 55 L46 80 Z" fill="white" opacity="0.6"/>
   
-  <!-- Dense canopy -->
-  <circle cx="50" cy="30" r="12" fill="#DDD" opacity="0.9"/>
-  <circle cx="45" cy="25" r="8" fill="#DDD" opacity="0.8"/>
-  <circle cx="55" cy="25" r="8" fill="#DDD" opacity="0.8"/>
-  <circle cx="50" cy="20" r="6" fill="#DDD" opacity="0.9"/>
-  <circle cx="40" cy="30" r="5" fill="#DDD" opacity="0.7"/>
-  <circle cx="60" cy="30" r="5" fill="#DDD" opacity="0.7"/>
+  <!-- Characteristic sparse branches -->
+  <!-- Left main branch -->
+  <path d="M45 45 C38 40 32 42 32 48 C32 42 38 35 45 35 C52 35 58 42 58 48 C58 42 52 40 45 45 Z" fill="white"/>
+  
+  <!-- Right main branch -->
+  <path d="M55 45 C62 40 68 42 68 48 C68 42 62 35 55 35 C48 35 42 42 42 48 C42 42 48 40 55 45 Z" fill="white"/>
+  
+  <!-- Upper branches -->
+  <path d="M50 35 C45 30 40 32 40 38 C40 32 45 25 50 25 C55 25 60 32 60 38 C60 32 55 30 50 35 Z" fill="white"/>
+  
+  <!-- Lower side branches -->
+  <path d="M40 48 C35 43 30 45 30 51 C30 45 35 38 40 38 C45 38 50 45 50 51 C50 45 45 43 40 48 Z" fill="white"/>
+  <path d="M60 48 C65 43 70 45 70 51 C70 45 65 38 60 38 C55 38 50 45 50 51 C50 45 55 43 60 48 Z" fill="white"/>
+  
+  <!-- Dense reddish-brown canopy clusters -->
+  <!-- Main canopy -->
+  <circle cx="50" cy="25" r="18" fill="white" opacity="0.9"/>
+  
+  <!-- Left canopy cluster -->
+  <circle cx="35" cy="20" r="14" fill="white" opacity="0.8"/>
+  <circle cx="30" cy="25" r="10" fill="white" opacity="0.7"/>
+  <circle cx="38" cy="15" r="8" fill="white" opacity="0.8"/>
+  
+  <!-- Right canopy cluster -->
+  <circle cx="65" cy="20" r="14" fill="white" opacity="0.8"/>
+  <circle cx="70" cy="25" r="10" fill="white" opacity="0.7"/>
+  <circle cx="62" cy="15" r="8" fill="white" opacity="0.8"/>
+  
+  <!-- Top canopy cluster -->
+  <circle cx="50" cy="10" r="12" fill="white" opacity="0.9"/>
+  <circle cx="45" cy="8" r="8" fill="white" opacity="0.8"/>
+  <circle cx="55" cy="8" r="8" fill="white" opacity="0.8"/>
+  
+  <!-- Additional canopy details -->
+  <circle cx="42" cy="30" r="6" fill="white" opacity="0.7"/>
+  <circle cx="58" cy="30" r="6" fill="white" opacity="0.7"/>
+  <circle cx="50" cy="35" r="5" fill="white" opacity="0.6"/>
 </svg>
