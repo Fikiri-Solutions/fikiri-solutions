@@ -114,18 +114,11 @@ const LandingPage: React.FC = () => {
             aria-label="Fikiri Solutions - Return to homepage"
           >
             <FikiriLogo 
-              size="lg" 
-              variant="circle" 
+              size="xl" 
+              variant="full" 
               animated={true}
               className="hover:scale-105 transition-transform duration-200"
             />
-            <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent" style={{
-              background: 'linear-gradient(to right, #FF6B35, #D2691E, #8B0000)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent'
-            }}>
-              Fikiri
-            </span>
           </Link>
           
           <nav className="hidden md:flex items-center space-x-8">

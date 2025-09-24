@@ -76,12 +76,11 @@ export const RenderInspiredLanding: React.FC = () => {
           <div className="flex justify-between items-center h-16">
             <Link to="/home" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
               <FikiriLogo 
-                size="md" 
-                variant="circle" 
+                size="lg" 
+                variant="full" 
                 animated={true}
                 className="hover:scale-105 transition-transform duration-200"
               />
-              <span className="text-xl font-bold text-brand-text dark:text-white">Fikiri Solutions</span>
             </Link>
             
             <div className="hidden md:flex items-center space-x-8">

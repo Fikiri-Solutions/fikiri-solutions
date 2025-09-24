@@ -72,12 +72,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex h-16 items-center justify-between px-4">
             <Link to="/dashboard" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
               <FikiriLogo 
-                size="md" 
-                variant="circle" 
+                size="lg" 
+                variant="full" 
                 animated={true}
                 className="hover:scale-105 transition-transform duration-200"
               />
-              <h1 className="text-xl font-bold text-brand-text dark:text-white">Fikiri Solutions</h1>
             </Link>
             <button onClick={() => setSidebarOpen(false)} className="text-brand-text dark:text-gray-300 hover:text-brand-primary dark:hover:text-white">
               <X className="h-6 w-6" />
@@ -109,12 +108,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex h-16 items-center px-4">
             <Link to="/dashboard" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
               <FikiriLogo 
-                size="md" 
-                variant="circle" 
+                size="lg" 
+                variant="full" 
                 animated={true}
                 className="hover:scale-105 transition-transform duration-200"
               />
-              <h1 className="text-xl font-bold text-brand-text dark:text-white">Fikiri Solutions</h1>
             </Link>
           </div>
           <nav className="flex-1 px-4 py-4">
