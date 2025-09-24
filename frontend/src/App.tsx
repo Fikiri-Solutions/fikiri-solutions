@@ -42,52 +42,52 @@ function App() {
 
   return (
     <ErrorBoundary>
-            <ThemeProvider>
-              <CustomizationProvider>
-                <ActivityProvider>
-                  <QueryProvider>
+      <ThemeProvider>
+        <CustomizationProvider>
+          <ActivityProvider>
+            <QueryProvider>
               <ToastProvider>
-              <Router>
-                <ScrollToTop />
-                <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                  <Suspense fallback={<PageLoader />}>
-                    <Routes>
-                      <Route path="/login" element={<Login />} />
-                      <Route path="/signup" element={<Signup />} />
-                      <Route path="/terms" element={<TermsOfService />} />
-                      <Route path="/privacy" element={<PrivacyPolicy />} />
-                      <Route path="/privacy-settings" element={<Layout><PrivacySettings /></Layout>} />
-                      {features.showOnboarding && <Route path="/onboarding" element={<Onboarding />} />}
-                      {features.showOnboarding && <Route path="/onboarding/:step" element={<OnboardingFlow />} />}
-                      <Route path="/onboarding-flow" element={<PublicOnboardingFlow />} />
-                      <Route path="/onboarding-flow/:step" element={<PublicOnboardingFlow />} />
-                      <Route path="/" element={<LandingPage />} />
-                      <Route path="/pricing" element={<PricingPage />} />
-                      <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
-                      <Route path="/services" element={<Layout><Services /></Layout>} />
-                      <Route path="/services-landing" element={<ServicesLanding />} />
-                      <Route path="/ai-landing" element={<AIAssistantLanding />} />
-                      <Route path="/industries/landscaping" element={<LandscapingLanding />} />
-                      <Route path="/industries/restaurant" element={<RestaurantLanding />} />
-                      <Route path="/industries/medical" element={<MedicalLanding />} />
-                      <Route path="/home" element={<Layout><Dashboard /></Layout>} />
-                      <Route path="/crm" element={<Layout><CRM /></Layout>} />
-                      <Route path="/ai" element={<Layout><AIAssistant /></Layout>} />
-                      <Route path="/assistant" element={<Layout><AIAssistant /></Layout>} />
-                      <Route path="/industry" element={<Layout><IndustryAutomation /></Layout>} />
-                              <Route path="/about" element={<Layout><About /></Layout>} />
-                      <Route path="/error" element={<ErrorPage />} />
-                      <Route path="*" element={<NotFoundPage />} />
-                    </Routes>
-                  </Suspense>
-                </div>
-                <Analytics />
-                <SpeedInsights />
-              </Router>
-            </ToastProvider>
-                  </QueryProvider>
-                </ActivityProvider>
-              </CustomizationProvider>
+                <Router>
+                  <ScrollToTop />
+                  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                    <Suspense fallback={<PageLoader />}>
+                      <Routes>
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/signup" element={<Signup />} />
+                        <Route path="/terms" element={<TermsOfService />} />
+                        <Route path="/privacy" element={<PrivacyPolicy />} />
+                        <Route path="/privacy-settings" element={<Layout><PrivacySettings /></Layout>} />
+                        {features.showOnboarding && <Route path="/onboarding" element={<Onboarding />} />}
+                        {features.showOnboarding && <Route path="/onboarding/:step" element={<OnboardingFlow />} />}
+                        <Route path="/onboarding-flow" element={<PublicOnboardingFlow />} />
+                        <Route path="/onboarding-flow/:step" element={<PublicOnboardingFlow />} />
+                        <Route path="/" element={<LandingPage />} />
+                        <Route path="/pricing" element={<PricingPage />} />
+                        <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+                        <Route path="/services" element={<Layout><Services /></Layout>} />
+                        <Route path="/services-landing" element={<ServicesLanding />} />
+                        <Route path="/ai-landing" element={<AIAssistantLanding />} />
+                        <Route path="/industries/landscaping" element={<LandscapingLanding />} />
+                        <Route path="/industries/restaurant" element={<RestaurantLanding />} />
+                        <Route path="/industries/medical" element={<MedicalLanding />} />
+                        <Route path="/home" element={<Layout><Dashboard /></Layout>} />
+                        <Route path="/crm" element={<Layout><CRM /></Layout>} />
+                        <Route path="/ai" element={<Layout><AIAssistant /></Layout>} />
+                        <Route path="/assistant" element={<Layout><AIAssistant /></Layout>} />
+                        <Route path="/industry" element={<Layout><IndustryAutomation /></Layout>} />
+                        <Route path="/about" element={<Layout><About /></Layout>} />
+                        <Route path="/error" element={<ErrorPage />} />
+                        <Route path="*" element={<NotFoundPage />} />
+                      </Routes>
+                    </Suspense>
+                  </div>
+                  <Analytics />
+                  <SpeedInsights />
+                </Router>
+              </ToastProvider>
+            </QueryProvider>
+          </ActivityProvider>
+        </CustomizationProvider>
       </ThemeProvider>
     </ErrorBoundary>
   )
