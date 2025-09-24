@@ -12,7 +12,7 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { AnimatedWorkflow } from '../components/AnimatedWorkflow';
-import logo from '../assets/logo.svg';
+import { FikiriLogo } from '../components/FikiriLogo';
 
 export const RenderInspiredLanding: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -75,10 +75,11 @@ export const RenderInspiredLanding: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link to="/home" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
-              <img
-                src={logo}
-                alt="Fikiri Solutions Logo"
-                className="h-8 w-8 md:h-10 md:w-10 object-contain"
+              <FikiriLogo 
+                size="md" 
+                variant="circle" 
+                animated={true}
+                className="hover:scale-105 transition-transform duration-200"
               />
               <span className="text-xl font-bold text-brand-text dark:text-white">Fikiri Solutions</span>
             </Link>

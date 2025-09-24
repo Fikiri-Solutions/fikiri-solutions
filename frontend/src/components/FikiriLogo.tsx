@@ -1,34 +1,57 @@
 import React from 'react';
-import logo from '../assets/logo.svg';
+import logoFull from '../assets/logo-full.svg';
+import logoCircle from '../assets/logo-circle.svg';
+import logoMonochrome from '../assets/logo-monochrome.svg';
+import logoWhite from '../assets/logo-white.svg';
 
 interface FikiriLogoProps {
-  size?: 'sm' | 'md' | 'lg' | 'xl';
-  variant?: 'full' | 'monochrome' | 'simplified' | 'white';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  variant?: 'full' | 'circle' | 'monochrome' | 'white';
   className?: string;
   animated?: boolean;
+  showText?: boolean;
 }
 
 export const FikiriLogo: React.FC<FikiriLogoProps> = ({ 
   size = 'md', 
-  variant = 'full',
+  variant = 'circle',
   className = '',
-  animated = false
+  animated = false,
+  showText = false
 }) => {
   const sizeClasses = {
-    sm: 'h-8',
-    md: 'h-12',
-    lg: 'h-16',
-    xl: 'h-24'
+    xs: 'h-4',
+    sm: 'h-6',
+    md: 'h-8',
+    lg: 'h-12',
+    xl: 'h-16',
+    '2xl': 'h-24'
   };
 
   const logoSrc = {
-    full: logo,
-    monochrome: logo,
-    simplified: logo,
-    white: logo
+    full: logoFull,
+    circle: logoCircle,
+    monochrome: logoMonochrome,
+    white: logoWhite
   };
 
   const animationClass = animated ? 'animate-pulse' : '';
+
+  if (variant === 'full' || showText) {
+    return (
+      <div className={`flex items-center space-x-3 ${className}`}>
+        <img 
+          src={logoCircle}
+          alt="Fikiri Solutions"
+          className={`${sizeClasses[size]} ${animationClass}`}
+        />
+        <div className="flex flex-col">
+          <span className="text-lg font-bold text-gray-800 dark:text-white">FIKIRI</span>
+          <span className="text-sm font-medium text-gray-600 dark:text-gray-300">SOLUTIONS</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <img 

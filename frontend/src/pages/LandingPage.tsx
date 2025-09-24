@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { motion, useInView } from 'framer-motion'
 import { useRef } from 'react'
 import SimpleAnimatedBackground from '../components/SimpleAnimatedBackground'
-import logo from '../assets/logo.svg'
+import { FikiriLogo } from '../components/FikiriLogo'
 import { 
   ArrowRight, 
   Mail, 
@@ -111,10 +111,11 @@ const LandingPage: React.FC = () => {
             className="flex items-center space-x-3 hover:opacity-80 transition-opacity duration-200"
             aria-label="Fikiri Solutions - Return to homepage"
           >
-            <img
-              src={logo}
-              alt="Fikiri Solutions Logo"
-              className="w-12 h-12 md:w-14 md:h-14 object-contain"
+            <FikiriLogo 
+              size="lg" 
+              variant="circle" 
+              animated={true}
+              className="hover:scale-105 transition-transform duration-200"
             />
             <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 via-red-500 to-orange-600 bg-clip-text text-transparent">
               Fikiri
