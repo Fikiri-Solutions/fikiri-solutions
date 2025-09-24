@@ -378,7 +378,9 @@ export const PublicOnboardingFlow: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" style={{
+      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 20%, #FF6B35 40%, #D2691E 60%, #8B0000 80%, #991b1b 100%)'
+    }}>
       <div className="max-w-md w-full space-y-8">
         {/* Progress indicator */}
         <div className="flex justify-center">
@@ -414,7 +416,9 @@ export const PublicOnboardingFlow: React.FC = () => {
                 currentStep === 1
                   ? 'text-gray-400 cursor-not-allowed'
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`}
+              }`} style={{
+                color: currentStep === 1 ? '#9CA3AF' : '#FF6B35'
+              }}
             >
               <ArrowLeft className="w-4 h-4 inline mr-1" />
               Previous
@@ -423,7 +427,9 @@ export const PublicOnboardingFlow: React.FC = () => {
             <button
               onClick={handleNext}
               disabled={isLoading}
-              className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center" style={{
+                background: 'linear-gradient(to right, #FF6B35, #8B0000)'
+              }}
             >
               {isLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />

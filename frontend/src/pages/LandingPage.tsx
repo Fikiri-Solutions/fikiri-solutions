@@ -102,7 +102,9 @@ const LandingPage: React.FC = () => {
   const ctaInView = useInView(ctaRef, { once: true, margin: "-100px" })
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-orange-900/20 to-red-900/20 text-white overflow-hidden relative">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-orange-900/30 to-red-900/30 text-white overflow-hidden relative" style={{
+      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 20%, #FF6B35 40%, #D2691E 60%, #8B0000 80%, #991b1b 100%)'
+    }}>
       {/* Header Navigation */}
       <header className="relative z-20 w-full px-4 sm:px-6 lg:px-8 py-6">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -117,7 +119,11 @@ const LandingPage: React.FC = () => {
               animated={true}
               className="hover:scale-105 transition-transform duration-200"
             />
-            <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 via-red-500 to-orange-600 bg-clip-text text-transparent">
+            <span className="text-2xl font-bold bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent" style={{
+              background: 'linear-gradient(to right, #FF6B35, #D2691E, #8B0000)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>
               Fikiri
             </span>
           </Link>
@@ -139,7 +145,9 @@ const LandingPage: React.FC = () => {
             </button>
             <button
               onClick={() => navigate('/signup')}
-              className="px-6 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white font-semibold rounded-lg hover:from-orange-700 hover:to-red-700 transition-all duration-300"
+              className="px-6 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white font-semibold rounded-lg hover:from-orange-700 hover:to-red-700 transition-all duration-300" style={{
+                background: 'linear-gradient(to right, #FF6B35, #8B0000)'
+              }}
               aria-label="Get started with Fikiri Solutions - Create your account"
             >
               Get started
@@ -159,7 +167,11 @@ const LandingPage: React.FC = () => {
             animate={heroInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
             transition={{ duration: 0.8 }}
           >
-            <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold mb-6 bg-gradient-to-r from-orange-400 via-red-500 to-orange-600 bg-clip-text text-transparent">
+            <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold mb-6 bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent" style={{
+              background: 'linear-gradient(to right, #FF6B35, #D2691E, #8B0000)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>
               The platform for
               <br />
               reliable automation
@@ -223,7 +235,11 @@ const LandingPage: React.FC = () => {
             transition={{ duration: 0.8 }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-blue-500 bg-clip-text text-transparent">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent" style={{
+              background: 'linear-gradient(to right, #FF6B35, #D2691E, #8B0000)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>
               Everything You Need to Automate Your Business
             </h2>
             <p className="text-xl text-orange-100 max-w-2xl mx-auto">
@@ -243,7 +259,11 @@ const LandingPage: React.FC = () => {
                 <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg flex items-center justify-center mb-4">
                   <prop.icon className="w-6 h-6 text-white" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2 bg-gradient-to-r from-orange-400 via-orange-500 to-blue-500 bg-clip-text text-transparent">{prop.title}</h3>
+                <h3 className="text-xl font-semibold mb-2 bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent" style={{
+                  background: 'linear-gradient(to right, #FF6B35, #D2691E, #8B0000)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent'
+                }}>{prop.title}</h3>
                 <p className="text-orange-100">{prop.description}</p>
               </motion.div>
             ))}
@@ -371,7 +391,9 @@ const LandingPage: React.FC = () => {
             >
               <button
                 onClick={() => navigate('/onboarding-flow')}
-                className="px-8 py-4 bg-gradient-to-r from-orange-600 to-red-600 text-white font-semibold rounded-lg hover:from-orange-700 hover:to-red-700 transition-all duration-300 transform hover:scale-105 flex items-center gap-2 shadow-lg"
+                className="px-8 py-4 bg-gradient-to-r from-orange-600 to-red-600 text-white font-semibold rounded-lg hover:from-orange-700 hover:to-red-700 transition-all duration-300 transform hover:scale-105 flex items-center gap-2 shadow-lg" style={{
+                  background: 'linear-gradient(to right, #FF6B35, #8B0000)'
+                }}
                 aria-label="Get started with Fikiri Solutions - Free trial"
               >
                 Get Started Free
