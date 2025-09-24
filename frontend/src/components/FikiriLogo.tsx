@@ -5,7 +5,7 @@ import logoMonochrome from '../assets/logo-monochrome.svg';
 import logoWhite from '../assets/logo-white.svg';
 
 interface FikiriLogoProps {
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
   variant?: 'full' | 'circle' | 'monochrome' | 'white';
   className?: string;
   animated?: boolean;
@@ -20,12 +20,13 @@ export const FikiriLogo: React.FC<FikiriLogoProps> = ({
   showText = false
 }) => {
   const sizeClasses = {
-    xs: 'h-4',
-    sm: 'h-6',
-    md: 'h-8',
-    lg: 'h-12',
-    xl: 'h-16',
-    '2xl': 'h-24'
+    xs: 'h-8',
+    sm: 'h-12',
+    md: 'h-16',
+    lg: 'h-20',
+    xl: 'h-24',
+    '2xl': 'h-32',
+    '3xl': 'h-40'
   };
 
   const logoSrc = {
@@ -39,15 +40,15 @@ export const FikiriLogo: React.FC<FikiriLogoProps> = ({
 
   if (variant === 'full' || showText) {
     return (
-      <div className={`flex items-center space-x-3 ${className}`}>
+      <div className={`flex items-center space-x-4 ${className}`}>
         <img 
           src={logoCircle}
           alt="Fikiri Solutions"
           className={`${sizeClasses[size]} ${animationClass}`}
         />
         <div className="flex flex-col">
-          <span className="text-lg font-bold text-gray-800 dark:text-white">FIKIRI</span>
-          <span className="text-sm font-medium text-gray-600 dark:text-gray-300">SOLUTIONS</span>
+          <span className="text-xl font-bold text-gray-800 dark:text-white tracking-wide">FIKIRI</span>
+          <span className="text-base font-medium text-gray-600 dark:text-gray-300 tracking-wide">SOLUTIONS</span>
         </div>
       </div>
     );
@@ -73,7 +74,7 @@ export const HeroSection: React.FC = () => {
       <div className="relative z-10 text-center px-6 max-w-4xl mx-auto">
         {/* Logo */}
         <div className="mb-8">
-          <FikiriLogo size="xl" variant="white" className="mx-auto" />
+          <FikiriLogo size="3xl" variant="white" className="mx-auto" />
         </div>
         
         {/* Main Heading */}
