@@ -341,7 +341,7 @@ const LandingPage: React.FC = () => {
                 </div>
                 <p className="text-white mb-4 italic">"{testimonial.quote}"</p>
                 <div>
-                  <p className="font-semibold">{testimonial.name}</p>
+                  <p className="font-semibold text-white">{testimonial.name}</p>
                   <p className="text-orange-200 text-sm">{testimonial.company}</p>
                 </div>
               </motion.div>
@@ -356,13 +356,13 @@ const LandingPage: React.FC = () => {
             className="text-center"
           >
             <p className="text-white mb-8">Powered by industry-leading technology</p>
-            <div className="flex flex-wrap justify-center items-center gap-8 opacity-60">
-              <div className="text-2xl font-bold">OpenAI</div>
-              <div className="text-2xl font-bold">Google</div>
-              <div className="text-2xl font-bold">Redis</div>
-              <div className="text-2xl font-bold">Shopify</div>
-              <div className="text-2xl font-bold">Microsoft</div>
-              <div className="text-2xl font-bold">Stripe</div>
+            <div className="flex flex-wrap justify-center items-center gap-8 opacity-80">
+              <div className="text-2xl font-bold text-white">OpenAI</div>
+              <div className="text-2xl font-bold text-white">Google</div>
+              <div className="text-2xl font-bold text-white">Redis</div>
+              <div className="text-2xl font-bold text-white">Shopify</div>
+              <div className="text-2xl font-bold text-white">Microsoft</div>
+              <div className="text-2xl font-bold text-white">Stripe</div>
             </div>
           </motion.div>
         </div>
