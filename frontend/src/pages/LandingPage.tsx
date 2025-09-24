@@ -177,7 +177,7 @@ const LandingPage: React.FC = () => {
             <p className="text-xl sm:text-2xl text-white mb-8 max-w-3xl mx-auto">
               Save time, close more leads, and automate your workflows with Fikiri Solutions.
               <br />
-              <span className="text-orange-200">Transform your business with intelligent automation.</span>
+              <span className="text-orange-300 font-medium">Transform your business with intelligent automation.</span>
             </p>
           </motion.div>
 
@@ -241,7 +241,7 @@ const LandingPage: React.FC = () => {
             }}>
               Everything You Need to Automate Your Business
             </h2>
-            <p className="text-xl text-white max-w-2xl mx-auto">
+            <p className="text-xl text-gray-100 max-w-2xl mx-auto">
               Powerful AI tools designed specifically for small businesses
             </p>
           </motion.div>
@@ -263,7 +263,7 @@ const LandingPage: React.FC = () => {
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent'
                 }}>{prop.title}</h3>
-                <p className="text-white">{prop.description}</p>
+                <p className="text-gray-100">{prop.description}</p>
               </motion.div>
             ))}
           </div>
