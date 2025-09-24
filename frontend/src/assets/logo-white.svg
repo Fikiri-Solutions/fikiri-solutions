@@ -15,19 +15,22 @@
   <path d="M47 80 L53 80 L53 50 C53 48 54 46 50 46 C46 46 47 48 47 50 L47 80 Z" fill="white" opacity="0.8"/>
   <path d="M46 80 L54 80 L54 55 C54 53 55 51 50 51 C45 51 46 53 46 55 L46 80 Z" fill="white" opacity="0.6"/>
   
-  <!-- Characteristic sparse branches -->
-  <!-- Left main branch -->
-  <path d="M45 45 C38 40 32 42 32 48 C32 42 38 35 45 35 C52 35 58 42 58 48 C58 42 52 40 45 45 Z" fill="white"/>
+  <!-- Proper Baobab Branches - straight and sparse -->
+  <!-- Left branch -->
+  <path d="M45 45 L35 40" stroke="white" stroke-width="3" fill="none"/>
+  <path d="M45 45 L38 35" stroke="white" stroke-width="2" fill="none"/>
   
-  <!-- Right main branch -->
-  <path d="M55 45 C62 40 68 42 68 48 C68 42 62 35 55 35 C48 35 42 42 42 48 C42 42 48 40 55 45 Z" fill="white"/>
+  <!-- Right branch -->
+  <path d="M55 45 L65 40" stroke="white" stroke-width="3" fill="none"/>
+  <path d="M55 45 L62 35" stroke="white" stroke-width="2" fill="none"/>
   
   <!-- Upper branches -->
-  <path d="M50 35 C45 30 40 32 40 38 C40 32 45 25 50 25 C55 25 60 32 60 38 C60 32 55 30 50 35 Z" fill="white"/>
+  <path d="M50 35 L45 25" stroke="white" stroke-width="2" fill="none"/>
+  <path d="M50 35 L55 25" stroke="white" stroke-width="2" fill="none"/>
   
   <!-- Lower side branches -->
-  <path d="M40 48 C35 43 30 45 30 51 C30 45 35 38 40 38 C45 38 50 45 50 51 C50 45 45 43 40 48 Z" fill="white"/>
-  <path d="M60 48 C65 43 70 45 70 51 C70 45 65 38 60 38 C55 38 50 45 50 51 C50 45 55 43 60 48 Z" fill="white"/>
+  <path d="M45 50 L38 55" stroke="white" stroke-width="2" fill="none"/>
+  <path d="M55 50 L62 55" stroke="white" stroke-width="2" fill="none"/>
   
   <!-- Dense reddish-brown canopy clusters -->
   <!-- Main canopy -->
