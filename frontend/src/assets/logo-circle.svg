@@ -1,33 +1,41 @@
 <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- Sunset gradient -->
-    <linearGradient id="sunsetGradient" x1="0%" y1="100%" x2="0%" y2="0%">
-      <stop offset="0%" style="stop-color:#FF6B35;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#D2691E;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#8B0000;stop-opacity:1" />
+    <!-- Sunset gradient matching original -->
+    <linearGradient id="sunsetGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F97316;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#EF4444;stop-opacity:1" />
     </linearGradient>
-    <!-- Ground gradient -->
-    <linearGradient id="groundGradient" x1="0%" y1="100%" x2="0%" y2="0%">
-      <stop offset="0%" style="stop-color:#8B4513;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#A0522D;stop-opacity:1" />
-    </linearGradient>
+    <!-- Tree shadow for definition -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
   </defs>
   
-  <!-- Circular border -->
-  <circle cx="50" cy="50" r="45" stroke="#8B4513" stroke-width="3" fill="none"/>
+  <!-- Circular background with sunset gradient -->
+  <rect x="0" y="0" width="100" height="100" rx="20" ry="20" fill="url(#sunsetGradient)"/>
   
-  <!-- Background sky -->
-  <circle cx="50" cy="50" r="42" fill="url(#sunsetGradient)"/>
+  <!-- Dark circle for contrast -->
+  <circle cx="50" cy="50" r="40" fill="#1a202c" filter="url(#glow)"/>
   
-  <!-- Ground/hills -->
-  <path d="M8 58 Q20 50 35 55 T65 52 T92 58 L92 92 L8 92 Z" fill="url(#groundGradient)"/>
+  <!-- Baobab tree silhouette - clearly defined -->
+  <path d="M50 15 L30 85 L70 85 Z" fill="#4A2C2A"/>
   
   <!-- Tree trunk -->
-  <rect x="45" y="45" width="10" height="20" fill="#654321" rx="3"/>
+  <circle cx="50" cy="85" r="5" fill="#4A2C2A"/>
+  <rect x="48" y="20" width="4" height="65" fill="#4A2C2A"/>
   
-  <!-- Tree branches and canopy -->
-  <circle cx="50" cy="40" r="15" fill="#228B22" opacity="0.8"/>
-  <circle cx="42" cy="37" r="10" fill="#228B22" opacity="0.7"/>
-  <circle cx="58" cy="37" r="10" fill="#228B22" opacity="0.7"/>
-  <circle cx="50" cy="30" r="8" fill="#228B22" opacity="0.9"/>
+  <!-- Baobab branches and canopy details -->
+  <circle cx="35" cy="40" r="3" fill="#4A2C2A"/>
+  <circle cx="65" cy="45" r="4" fill="#4A2C2A"/>
+  <circle cx="40" cy="60" r="3" fill="#4A2C2A"/>
+  <circle cx="60" cy="65" r="4" fill="#4A2C2A"/>
+  
+  <!-- Additional baobab canopy details -->
+  <circle cx="45" cy="35" r="2" fill="#4A2C2A"/>
+  <circle cx="55" cy="30" r="3" fill="#4A2C2A"/>
+  <circle cx="50" cy="25" r="2" fill="#4A2C2A"/>
 </svg>
