@@ -47,8 +47,16 @@ export const FikiriLogo: React.FC<FikiriLogoProps> = ({
           className={`${sizeClasses[size]} ${animationClass}`}
         />
         <div className="flex flex-col">
-          <span className="text-xl font-bold text-gray-800 dark:text-white tracking-wide">FIKIRI</span>
-          <span className="text-base font-medium text-gray-600 dark:text-gray-300 tracking-wide">SOLUTIONS</span>
+          <span className="text-xl font-bold bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent tracking-wide" style={{
+            background: 'linear-gradient(to right, #FF6B35, #D2691E, #8B0000)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent'
+          }}>FIKIRI</span>
+          <span className="text-base font-medium bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent tracking-wide" style={{
+            background: 'linear-gradient(to right, #FF6B35, #D2691E, #8B0000)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent'
+          }}>SOLUTIONS</span>
         </div>
       </div>
     );
