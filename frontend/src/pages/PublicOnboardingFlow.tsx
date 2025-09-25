@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CheckCircle, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import { useAuth } from '../contexts/AuthContext'
 
 interface OnboardingData {
   businessName: string
@@ -28,6 +29,7 @@ export const PublicOnboardingFlow: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(1)
   const { addToast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
+  const { setOnboardingData } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
   const [formData, setFormData] = useState<OnboardingData>({
@@ -104,8 +106,8 @@ export const PublicOnboardingFlow: React.FC = () => {
           businessEmail: sanitizeInput(formData.businessEmail)
         }
         
-        // Store data in localStorage for later use
-        localStorage.setItem('fikiri-onboarding-data', JSON.stringify(sanitizedData))
+        // Store data using auth context
+        setOnboardingData(sanitizedData)
         
         // Move to next step
         setCurrentStep(2)

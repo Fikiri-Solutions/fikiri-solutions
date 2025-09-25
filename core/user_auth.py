@@ -83,16 +83,24 @@ class UserAuthManager:
             # Hash password
             password_hash, salt = self._hash_password(password)
             
-            # Create user record
-            user_id = db_optimizer.execute_query(
-                """INSERT INTO users 
-                   (email, name, password_hash, business_name, business_email, 
-                    industry, team_size, metadata) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (email, name, password_hash, business_name, business_email,
-                 industry, team_size, json.dumps({'salt': salt})),
-                fetch=False
-            )
+            # Create user record - we need to get the lastrowid, so let's do this manually
+            try:
+                with db_optimizer.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        """INSERT INTO users 
+                           (email, name, password_hash, business_name, business_email, 
+                            industry, team_size, metadata, role, is_active, email_verified, 
+                            onboarding_completed, onboarding_step) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (email, name, password_hash, business_name, business_email,
+                         industry, team_size, json.dumps({'salt': salt}), 'user', True, False, False, 1)
+                    )
+                    user_id = cursor.lastrowid
+                    conn.commit()
+            except Exception as e:
+                logger.error(f"Error inserting user: {e}")
+                raise
             
             # Get the created user
             user_data = db_optimizer.execute_query(
@@ -134,11 +142,26 @@ class UserAuthManager:
                 }
             
             user = user_data[0]
-            metadata = json.loads(user['metadata'] or '{}')
+            # Handle SQLite Row objects by converting to dict
+            if hasattr(user, 'keys'):
+                user_dict = dict(user)
+            else:
+                user_dict = user
+                
+            metadata = json.loads(user_dict.get('metadata', '{}'))
             salt = metadata.get('salt', '')
             
             # Verify password
-            if not self._verify_password(password, user['password_hash'], salt):
+            password_hash = user_dict.get('password_hash', '')
+            if not password_hash:
+                logger.warning(f"No password hash found for user {email}")
+                return {
+                    'success': False,
+                    'error': 'Invalid email or password',
+                    'error_code': 'INVALID_CREDENTIALS'
+                }
+            
+            if not self._verify_password(password, password_hash, salt):
                 return {
                     'success': False,
                     'error': 'Invalid email or password',
@@ -147,13 +170,13 @@ class UserAuthManager:
             
             # Create session
             session_result = self._create_session(
-                user['id'], ip_address, user_agent
+                user_dict['id'], ip_address, user_agent
             )
             
             # Update last login
             db_optimizer.execute_query(
                 "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?",
-                (user['id'],),
+                (user_dict['id'],),
                 fetch=False
             )
             
@@ -344,22 +367,28 @@ class UserAuthManager:
     
     def _format_user_profile(self, user_data: Dict[str, Any]) -> UserProfile:
         """Format user data into UserProfile object"""
-        metadata = json.loads(user_data.get('metadata', '{}'))
+        # Handle SQLite Row objects by converting to dict
+        if hasattr(user_data, 'keys'):
+            user_dict = dict(user_data)
+        else:
+            user_dict = user_data
+            
+        metadata = json.loads(user_dict.get('metadata', '{}'))
         
         return UserProfile(
-            id=user_data['id'],
-            email=user_data['email'],
-            name=user_data['name'],
-            role=user_data['role'],
-            business_name=user_data.get('business_name'),
-            business_email=user_data.get('business_email'),
-            industry=user_data.get('industry'),
-            team_size=user_data.get('team_size'),
-            is_active=bool(user_data['is_active']),
-            email_verified=bool(user_data['email_verified']),
-            created_at=datetime.fromisoformat(user_data['created_at']),
-            onboarding_completed=bool(user_data['onboarding_completed']),
-            onboarding_step=user_data['onboarding_step'],
+            id=user_dict['id'],
+            email=user_dict['email'],
+            name=user_dict['name'],
+            role=user_dict.get('role', 'user'),
+            business_name=user_dict.get('business_name'),
+            business_email=user_dict.get('business_email'),
+            industry=user_dict.get('industry'),
+            team_size=user_dict.get('team_size'),
+            is_active=bool(user_dict.get('is_active', True)),
+            email_verified=bool(user_dict.get('email_verified', False)),
+            created_at=datetime.fromisoformat(user_dict['created_at']),
+            onboarding_completed=bool(user_dict.get('onboarding_completed', False)),
+            onboarding_step=user_dict.get('onboarding_step', 1),
             metadata=metadata
         )
     

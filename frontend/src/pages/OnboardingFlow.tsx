@@ -5,6 +5,7 @@ import { GmailConnection } from '../components/GmailConnection'
 import { SyncProgress } from '../components/SyncProgress'
 import { useUserActivityTracking } from '../contexts/ActivityContext'
 import { useToast } from '../components/Toast'
+import { useAuth } from '../contexts/AuthContext'
 
 interface OnboardingData {
   businessName: string
@@ -49,6 +50,7 @@ export const OnboardingFlow: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(parseInt(step || '1'))
   const { trackOnboardingStart, trackOnboardingComplete, trackServiceConfiguration } = useUserActivityTracking()
   const { addToast } = useToast()
+  const { user: authUser, updateUser } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [user, setUser] = useState<User | null>(null)
@@ -139,18 +141,13 @@ export const OnboardingFlow: React.FC = () => {
 
   const loadOnboardingStatus = async () => {
     try {
-      const userId = localStorage.getItem('fikiri-user-id')
-      if (!userId) {
+      // Use auth context user instead of localStorage
+      if (!authUser) {
         navigate('/login')
         return
       }
 
-      // Security: Validate user ID format
-      if (!/^\d+$/.test(userId)) {
-        addToast('Invalid user session. Please log in again.', 'error')
-        navigate('/login')
-        return
-      }
+      const userId = authUser.id.toString()
 
       // Load onboarding summary with timeout
       const controller = new AbortController()
@@ -172,21 +169,25 @@ export const OnboardingFlow: React.FC = () => {
       const data = await response.json()
       
       if (data.success) {
-        setUser(data.data.user)
+        const userData = data.data.user
+        setUser(userData)
         setGmailConnected(data.data.gmail_connected)
         
+        // Update auth context with latest user data
+        updateUser(userData)
+        
         // Track onboarding start
-        trackOnboardingStart(data.data.user.email, `Step ${data.data.user.onboarding_step || 1}`)
+        trackOnboardingStart(userData.email, `Step ${userData.onboarding_step || 1}`)
         
         // If user has completed onboarding, redirect to dashboard
-        if (data.data.user.onboarding_completed) {
-          trackOnboardingComplete(data.data.user.email, data.data.user.onboarding_step)
+        if (userData.onboarding_completed) {
+          trackOnboardingComplete(userData.email, userData.onboarding_step)
           navigate('/home')
           return
         }
         
         // Set current step based on user's progress
-        setCurrentStep(data.data.user.onboarding_step || 1)
+        setCurrentStep(userData.onboarding_step || 1)
       } else {
         throw new Error(data.error || 'Failed to load onboarding status')
       }
