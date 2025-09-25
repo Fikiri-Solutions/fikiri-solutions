@@ -263,51 +263,104 @@ Fikiri Solutions Team"""
         }
     
     def generate_chat_response(self, user_message: str, conversation_history: List[Dict] = None) -> Dict[str, Any]:
-        """Generate AI response for chat interface with intent classification."""
-        # Import intent classifier and action router
+        """Generate AI response for chat interface with advanced features."""
         try:
-            from core.intent_classifier import create_intent_classifier
-            from core.action_router import create_action_router
-            from core.minimal_crm_service import MinimalCRMService
+            # Import advanced features
+            from core.advanced_sentiment_analyzer import get_sentiment_analyzer
+            from core.multi_language_support import get_multi_language_support
+            from core.advanced_email_templates import get_email_templates
+            from core.email_scheduling_system import get_email_scheduler
+            from core.advanced_analytics_system import get_analytics_system
             
-            # Initialize components
-            intent_classifier = create_intent_classifier()
-            crm_service = MinimalCRMService()
-            action_router = create_action_router(self, crm_service, None)
+            # Initialize advanced components
+            sentiment_analyzer = get_sentiment_analyzer()
+            multi_lang_support = get_multi_language_support()
+            email_templates = get_email_templates()
+            email_scheduler = get_email_scheduler()
+            analytics_system = get_analytics_system()
             
-            # Classify intent
-            intent_result = intent_classifier.classify_intent(user_message)
-            intent = intent_result["intent"]
-            confidence = intent_result["confidence"]
-            urgency = intent_result["urgency"]
+            # Analyze sentiment
+            sentiment_result = sentiment_analyzer.analyze_sentiment(user_message) if sentiment_analyzer else None
             
-            # Route to appropriate action
-            action_result = action_router.route_action(intent, user_message, {
-                "conversation_history": conversation_history or []
-            })
+            # Detect language
+            lang_result = multi_lang_support.detect_language(user_message) if multi_lang_support else None
             
-            # Generate AI response if needed for general inquiries
-            if intent == "general_inquiry" and self.is_enabled():
+            # Generate AI response with advanced context
+            if self.is_enabled():
                 try:
-                    ai_response = self._generate_ai_response(user_message, conversation_history)
-                    action_result["response"] = ai_response
-                    action_result["ai_generated"] = True
+                    # Enhanced AI response with sentiment and language context
+                    ai_response = self._generate_advanced_ai_response(
+                        user_message, 
+                        conversation_history,
+                        sentiment_result,
+                        lang_result
+                    )
+                    
+                    # Track analytics
+                    if analytics_system:
+                        analytics_system.track_metric(
+                            "ai_response_generated", 1, "count", "operational",
+                            {"sentiment": sentiment_result.sentiment if sentiment_result else "unknown",
+                             "language": lang_result.language_code if lang_result else "en"}
+                        )
+                    
+                    return {
+                        "response": ai_response,
+                        "action_taken": "ai_response",
+                        "success": True,
+                        "ai_generated": True,
+                        "sentiment_analysis": {
+                            "sentiment": sentiment_result.sentiment if sentiment_result else "neutral",
+                            "confidence": sentiment_result.confidence if sentiment_result else 0.5,
+                            "urgency": sentiment_result.urgency if sentiment_result else "low",
+                            "response_tone": sentiment_result.response_tone if sentiment_result else "professional"
+                        } if sentiment_result else None,
+                        "language_detection": {
+                            "language": lang_result.language if lang_result else "english",
+                            "language_code": lang_result.language_code if lang_result else "en",
+                            "confidence": lang_result.confidence if lang_result else 0.5,
+                            "is_supported": lang_result.is_supported if lang_result else True
+                        } if lang_result else None,
+                        "classification": {
+                            "intent": "general_inquiry",
+                            "confidence": 0.8,
+                            "urgency": sentiment_result.urgency if sentiment_result else "normal",
+                            "suggested_action": "ai_response"
+                        }
+                    }
+                    
                 except Exception as e:
-                    print(f"AI response generation failed: {e}")
-            
-            # Add classification metadata (for internal use only)
-            action_result["classification"] = {
-                "intent": intent,
-                "confidence": confidence,
-                "urgency": urgency,
-                "suggested_action": action_result["action_taken"]
-            }
-            
-            # Debug output removed
-            return action_result
-            
+                    print(f"Advanced AI response generation failed: {e}")
+                    # Fallback to basic AI response
+                    ai_response = self._generate_ai_response(user_message, conversation_history)
+                    return {
+                        "response": ai_response,
+                        "action_taken": "ai_response_fallback",
+                        "success": True,
+                        "ai_generated": True,
+                        "classification": {
+                            "intent": "general_inquiry",
+                            "confidence": 0.7,
+                            "urgency": "normal",
+                            "suggested_action": "ai_response"
+                        }
+                    }
+            else:
+                # Fallback response
+                return {
+                    "response": self._enhanced_fallback_response(user_message),
+                    "action_taken": "fallback_response",
+                    "success": True,
+                    "classification": {
+                        "intent": "general_inquiry",
+                        "confidence": 0.6,
+                        "urgency": "normal",
+                        "suggested_action": "provide_information"
+                    }
+                }
+                
         except ImportError as e:
-            print(f"❌ Failed to import intent classifier: {e}")
+            print(f"❌ Failed to import advanced features: {e}")
             return {
                 "response": self._enhanced_fallback_response(user_message),
                 "action_taken": "fallback_response",
@@ -320,7 +373,7 @@ Fikiri Solutions Team"""
                 }
             }
         except Exception as e:
-            print(f"❌ Chat response generation failed: {e}")
+            print(f"❌ Advanced chat response generation failed: {e}")
             return {
                 "response": self._enhanced_fallback_response(user_message),
                 "action_taken": "error_fallback",
@@ -332,6 +385,88 @@ Fikiri Solutions Team"""
                     "suggested_action": "provide_information"
                 }
             }
+    
+    def _generate_advanced_ai_response(self, user_message: str, conversation_history: List[Dict] = None,
+                                      sentiment_result=None, lang_result=None) -> str:
+        """Generate advanced AI response with sentiment and language context."""
+        if not self.is_enabled():
+            return self._enhanced_fallback_response(user_message)
+        
+        try:
+            # Build conversation context
+            messages = []
+            
+            # Enhanced system context with advanced features
+            system_context = """You are Fikiri Solutions AI Assistant, powered by ChatGPT 3.5 Turbo. You are an expert business automation consultant specializing in:
+
+- Email automation and intelligent responses
+- Lead management and CRM optimization  
+- Business process automation
+- Customer communication strategies
+- Data analysis and insights
+- Multi-language support and translation
+- Sentiment analysis and customer mood detection
+- Advanced email templates and scheduling
+- Performance analytics and insights
+
+Guidelines:
+- Be helpful, professional, and conversational
+- Provide specific, actionable advice
+- When users ask about data/numbers, guide them to set up integrations
+- Always suggest concrete next steps
+- Use emojis sparingly but effectively
+- Keep responses concise but comprehensive
+- If asked about technical capabilities, explain what Fikiri Solutions can do
+- Adapt your tone based on customer sentiment and urgency
+- Support multiple languages when needed
+
+You are the primary AI interface - handle ALL user queries with intelligence and expertise."""
+            
+            # Add sentiment and language context
+            if sentiment_result:
+                system_context += f"\n\nCurrent customer sentiment: {sentiment_result.sentiment} (confidence: {sentiment_result.confidence:.2f})"
+                system_context += f"\nUrgency level: {sentiment_result.urgency}"
+                system_context += f"\nRecommended response tone: {sentiment_result.response_tone}"
+            
+            if lang_result:
+                system_context += f"\n\nDetected language: {lang_result.language} ({lang_result.language_code})"
+                system_context += f"\nLanguage confidence: {lang_result.confidence:.2f}"
+                system_context += f"\nTranslation available: {lang_result.translation_available}"
+            
+            messages.append({"role": "system", "content": system_context})
+            
+            # Add conversation history
+            if conversation_history:
+                for msg in conversation_history[-6:]:  # Last 6 messages for context
+                    messages.append({
+                        "role": "user" if msg.get('type') == 'user' else "assistant",
+                        "content": msg.get('content', '')
+                    })
+            
+            # Add current user message
+            messages.append({
+                "role": "user",
+                "content": user_message
+            })
+            
+            # Call ChatGPT 3.5 Turbo with optimized parameters
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                max_tokens=600,  # Increased for more comprehensive responses
+                temperature=0.7,  # Balanced creativity and consistency
+                top_p=0.9,
+                frequency_penalty=0.1,
+                presence_penalty=0.1
+            )
+            
+            generated_response = response.choices[0].message.content.strip()
+            print(f"✅ Advanced AI response generated")
+            return generated_response
+            
+        except Exception as e:
+            print(f"❌ Advanced ChatGPT 3.5 Turbo API call failed: {e}")
+            return self._enhanced_fallback_response(user_message)
     
     def _generate_ai_response(self, user_message: str, conversation_history: List[Dict] = None) -> str:
         """Generate AI response using OpenAI API."""

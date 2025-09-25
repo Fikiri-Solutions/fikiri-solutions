@@ -142,6 +142,22 @@ app.register_blueprint(webhook_bp)
 from core.crm_completion_api import crm_bp
 app.register_blueprint(crm_bp)
 
+# Register Docs & Forms blueprint
+from core.docs_forms_api import docs_forms_bp
+app.register_blueprint(docs_forms_bp)
+
+# Register Chatbot/Smart FAQ blueprint
+from core.chatbot_smart_faq_api import chatbot_bp
+app.register_blueprint(chatbot_bp)
+
+# Register Workflow Templates blueprint
+from core.workflow_templates_api import workflow_templates_bp
+app.register_blueprint(workflow_templates_bp)
+
+# Register Monitoring Dashboard blueprint
+from core.monitoring_dashboard_api import monitoring_dashboard_bp
+app.register_blueprint(monitoring_dashboard_bp)
+
 # Initialize SocketIO for real-time updates (disabled for now)
 # socketio = SocketIO(app, cors_allowed_origins=[
 #     'http://localhost:3000',
