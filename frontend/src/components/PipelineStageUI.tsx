@@ -1,7 +1,7 @@
-"""
-Pipeline Stage UI Component for Fikiri Solutions
-Provides drag-and-drop pipeline management interface
-"""
+/**
+ * Pipeline Stage UI Component for Fikiri Solutions
+ * Provides drag-and-drop pipeline management interface
+ */
 
 import React, { useState, useEffect } from 'react'
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'

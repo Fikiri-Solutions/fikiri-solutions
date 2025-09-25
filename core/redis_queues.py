@@ -384,9 +384,9 @@ def get_crm_queue() -> RedisQueue:
     """Get CRM processing queue"""
     return crm_queue
 
-def get_webhook_queue() -> RedisQueue:
-    """Get webhook processing queue"""
-    return webhook_queue
+def get_redis_queue() -> RedisQueue:
+    """Get default Redis queue instance"""
+    return email_queue
 
 # Task decorators
 def task(queue: RedisQueue, max_retries: int = 3):

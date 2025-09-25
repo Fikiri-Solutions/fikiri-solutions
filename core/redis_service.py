@@ -316,6 +316,6 @@ class RedisService:
 # Global Redis service instance
 redis_service = RedisService()
 
-def get_redis_service() -> RedisService:
-    """Get Redis service instance."""
-    return redis_service
+def get_redis_client() -> Optional[redis.Redis]:
+    """Get Redis client instance."""
+    return redis_service.redis_client

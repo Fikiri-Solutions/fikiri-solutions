@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, useInView } from 'framer-motion';
 import { useRef } from 'react';
 import { FikiriLogo } from '../components/FikiriLogo';
+import SimpleAnimatedBackground from '../components/SimpleAnimatedBackground';
 import { 
   Check, 
   ArrowRight, 
@@ -194,7 +195,9 @@ const PricingPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-orange-900/30 to-red-900/30 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-orange-900/30 to-red-900/30 text-white overflow-hidden relative" style={{
+      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 20%, #FF6B35 40%, #D2691E 60%, #8B0000 80%, #991b1b 100%)'
+    }}>
       {/* Header Navigation */}
       <header className="relative z-20 w-full px-4 sm:px-6 lg:px-8 py-6">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -227,13 +230,18 @@ const PricingPage: React.FC = () => {
             </button>
             <button
               onClick={() => navigate('/signup')}
-              className="px-6 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white font-semibold rounded-lg hover:from-orange-700 hover:to-red-700 transition-all duration-300"
+              className="px-6 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white font-semibold rounded-lg hover:from-orange-700 hover:to-red-700 transition-all duration-300" style={{
+                background: 'linear-gradient(to right, #FF6B35, #8B0000)'
+              }}
             >
               Get started
             </button>
           </div>
         </div>
       </header>
+
+      {/* Simple Animated Background - CSS-based mesh effect */}
+      <SimpleAnimatedBackground />
 
       {/* Hero Section */}
       <section ref={heroRef} className="relative z-10 py-20 px-4 sm:px-6 lg:px-8">
@@ -243,7 +251,11 @@ const PricingPage: React.FC = () => {
             animate={heroInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
             transition={{ duration: 0.8 }}
           >
-            <h1 className="text-4xl sm:text-6xl font-bold mb-6 bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent">
+            <h1 className="text-4xl sm:text-6xl font-bold mb-6 bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent" style={{
+              background: 'linear-gradient(to right, #FF6B35, #D2691E, #8B0000)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>
               Plans for businesses of any size
             </h1>
             <p className="text-xl text-white/80 mb-8">
@@ -356,7 +368,11 @@ const PricingPage: React.FC = () => {
             transition={{ duration: 0.8 }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent" style={{
+              background: 'linear-gradient(to right, #FF6B35, #D2691E, #8B0000)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>
               Industry-Specific Solutions
             </h2>
             <p className="text-xl text-white/80 max-w-2xl mx-auto">
@@ -412,7 +428,11 @@ const PricingPage: React.FC = () => {
             transition={{ duration: 0.8 }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent" style={{
+              background: 'linear-gradient(to right, #FF6B35, #D2691E, #8B0000)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>
               Compare Plans
             </h2>
           </motion.div>
@@ -479,7 +499,11 @@ const PricingPage: React.FC = () => {
       <section className="relative z-10 py-20 px-4 sm:px-6 lg:px-8 bg-gray-800/30">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent" style={{
+              background: 'linear-gradient(to right, #FF6B35, #D2691E, #8B0000)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>
               Frequently Asked Questions
             </h2>
           </div>
@@ -515,7 +539,11 @@ const PricingPage: React.FC = () => {
       {/* CTA Section */}
       <section className="relative z-10 py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold mb-6 bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent">
+          <h2 className="text-3xl sm:text-4xl font-bold mb-6 bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent" style={{
+            background: 'linear-gradient(to right, #FF6B35, #D2691E, #8B0000)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent'
+          }}>
             Ready to start automating?
           </h2>
           <p className="text-xl text-white/80 mb-8">
@@ -524,7 +552,9 @@ const PricingPage: React.FC = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
               onClick={() => navigate('/signup')}
-              className="px-8 py-4 bg-gradient-to-r from-orange-600 to-red-600 text-white font-semibold rounded-lg hover:from-orange-700 hover:to-red-700 transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2"
+              className="px-8 py-4 bg-gradient-to-r from-orange-600 to-red-600 text-white font-semibold rounded-lg hover:from-orange-700 hover:to-red-700 transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2" style={{
+                background: 'linear-gradient(to right, #FF6B35, #8B0000)'
+              }}
             >
               Start Free Trial
               <ArrowRight className="w-5 h-5" />

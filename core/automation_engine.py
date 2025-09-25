@@ -33,6 +33,15 @@ class ActionType(Enum):
     ARCHIVE_EMAIL = "archive_email"
     CREATE_TASK = "create_task"
     SEND_NOTIFICATION = "send_notification"
+    # Advanced workflow actions
+    SCHEDULE_FOLLOW_UP = "schedule_follow_up"
+    CREATE_CALENDAR_EVENT = "create_calendar_event"
+    UPDATE_CRM_FIELD = "update_crm_field"
+    TRIGGER_WEBHOOK = "trigger_webhook"
+    GENERATE_DOCUMENT = "generate_document"
+    SEND_SMS = "send_sms"
+    CREATE_INVOICE = "create_invoice"
+    ASSIGN_TEAM_MEMBER = "assign_team_member"
 
 class AutomationStatus(Enum):
     """Automation status"""
@@ -92,7 +101,16 @@ class AutomationEngine:
             ActionType.APPLY_LABEL: self._execute_apply_label,
             ActionType.ARCHIVE_EMAIL: self._execute_archive_email,
             ActionType.CREATE_TASK: self._execute_create_task,
-            ActionType.SEND_NOTIFICATION: self._execute_send_notification
+            ActionType.SEND_NOTIFICATION: self._execute_send_notification,
+            # Advanced workflow action handlers
+            ActionType.SCHEDULE_FOLLOW_UP: self._execute_schedule_follow_up,
+            ActionType.CREATE_CALENDAR_EVENT: self._execute_create_calendar_event,
+            ActionType.UPDATE_CRM_FIELD: self._execute_update_crm_field,
+            ActionType.TRIGGER_WEBHOOK: self._execute_trigger_webhook,
+            ActionType.GENERATE_DOCUMENT: self._execute_generate_document,
+            ActionType.SEND_SMS: self._execute_send_sms,
+            ActionType.CREATE_INVOICE: self._execute_create_invoice,
+            ActionType.ASSIGN_TEAM_MEMBER: self._execute_assign_team_member
         }
     
     def create_automation_rule(self, user_id: int, rule_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -750,6 +768,188 @@ class AutomationEngine:
     def _handle_keyword_detected_trigger(self, trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Handle keyword detected trigger"""
         return self.execute_automation_rules(TriggerType.KEYWORD_DETECTED, trigger_data, user_id)
+    
+    # Advanced workflow action implementations
+    def _execute_schedule_follow_up(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+        """Schedule a follow-up action"""
+        try:
+            lead_id = action_data.get('lead_id')
+            follow_up_date = action_data.get('follow_up_date')
+            follow_up_type = action_data.get('follow_up_type', 'email')
+            message = action_data.get('message', '')
+            
+            # Store follow-up in database
+            follow_up_id = db_optimizer.execute_query(
+                """INSERT INTO scheduled_follow_ups 
+                   (user_id, lead_id, follow_up_date, follow_up_type, message, status, created_at) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (user_id, lead_id, follow_up_date, follow_up_type, message, 'scheduled', datetime.now().isoformat()),
+                fetch=False
+            )
+            
+            logger.info(f"Scheduled follow-up {follow_up_id} for lead {lead_id}")
+            return {'success': True, 'follow_up_id': follow_up_id}
+            
+        except Exception as e:
+            logger.error(f"Error scheduling follow-up: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def _execute_create_calendar_event(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+        """Create a calendar event"""
+        try:
+            event_title = action_data.get('title', 'Meeting')
+            event_date = action_data.get('date')
+            event_duration = action_data.get('duration', 60)
+            event_description = action_data.get('description', '')
+            lead_id = action_data.get('lead_id')
+            
+            # Store calendar event in database
+            event_id = db_optimizer.execute_query(
+                """INSERT INTO calendar_events 
+                   (user_id, lead_id, title, event_date, duration, description, status, created_at) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (user_id, lead_id, event_title, event_date, event_duration, event_description, 'scheduled', datetime.now().isoformat()),
+                fetch=False
+            )
+            
+            logger.info(f"Created calendar event {event_id}")
+            return {'success': True, 'event_id': event_id}
+            
+        except Exception as e:
+            logger.error(f"Error creating calendar event: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def _execute_update_crm_field(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+        """Update a CRM field"""
+        try:
+            lead_id = action_data.get('lead_id')
+            field_name = action_data.get('field_name')
+            field_value = action_data.get('field_value')
+            
+            # Update lead field
+            db_optimizer.execute_query(
+                """UPDATE leads SET {} = ? WHERE id = ? AND user_id = ?""".format(field_name),
+                (field_value, lead_id, user_id),
+                fetch=False
+            )
+            
+            logger.info(f"Updated CRM field {field_name} for lead {lead_id}")
+            return {'success': True}
+            
+        except Exception as e:
+            logger.error(f"Error updating CRM field: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def _execute_trigger_webhook(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+        """Trigger a webhook"""
+        try:
+            webhook_url = action_data.get('webhook_url')
+            payload = action_data.get('payload', {})
+            
+            # Add user context to payload
+            payload['user_id'] = user_id
+            payload['timestamp'] = datetime.now().isoformat()
+            
+            # In a real implementation, you would make an HTTP request here
+            # For now, we'll log the webhook trigger
+            logger.info(f"Triggered webhook to {webhook_url} with payload: {payload}")
+            
+            return {'success': True, 'webhook_url': webhook_url}
+            
+        except Exception as e:
+            logger.error(f"Error triggering webhook: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def _execute_generate_document(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+        """Generate a document"""
+        try:
+            template_id = action_data.get('template_id')
+            lead_id = action_data.get('lead_id')
+            variables = action_data.get('variables', {})
+            
+            # Import document templates system
+            from core.document_templates_system import get_document_templates
+            
+            doc_templates = get_document_templates()
+            document = doc_templates.generate_document(template_id, variables, user_id)
+            
+            logger.info(f"Generated document {document.id} for lead {lead_id}")
+            return {'success': True, 'document_id': document.id}
+            
+        except Exception as e:
+            logger.error(f"Error generating document: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def _execute_send_sms(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+        """Send SMS message"""
+        try:
+            phone_number = action_data.get('phone_number')
+            message = action_data.get('message', '')
+            lead_id = action_data.get('lead_id')
+            
+            # In a real implementation, you would integrate with SMS service like Twilio
+            # For now, we'll log the SMS
+            logger.info(f"Sending SMS to {phone_number}: {message}")
+            
+            # Store SMS record
+            sms_id = db_optimizer.execute_query(
+                """INSERT INTO sms_messages 
+                   (user_id, lead_id, phone_number, message, status, sent_at) 
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (user_id, lead_id, phone_number, message, 'sent', datetime.now().isoformat()),
+                fetch=False
+            )
+            
+            return {'success': True, 'sms_id': sms_id}
+            
+        except Exception as e:
+            logger.error(f"Error sending SMS: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def _execute_create_invoice(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+        """Create an invoice"""
+        try:
+            lead_id = action_data.get('lead_id')
+            amount = action_data.get('amount', 0)
+            description = action_data.get('description', '')
+            due_date = action_data.get('due_date')
+            
+            # Create invoice record
+            invoice_id = db_optimizer.execute_query(
+                """INSERT INTO invoices 
+                   (user_id, lead_id, amount, description, due_date, status, created_at) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (user_id, lead_id, amount, description, due_date, 'pending', datetime.now().isoformat()),
+                fetch=False
+            )
+            
+            logger.info(f"Created invoice {invoice_id} for lead {lead_id}")
+            return {'success': True, 'invoice_id': invoice_id}
+            
+        except Exception as e:
+            logger.error(f"Error creating invoice: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def _execute_assign_team_member(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+        """Assign team member to lead"""
+        try:
+            lead_id = action_data.get('lead_id')
+            team_member_id = action_data.get('team_member_id')
+            assignment_type = action_data.get('assignment_type', 'owner')
+            
+            # Update lead assignment
+            db_optimizer.execute_query(
+                """UPDATE leads SET assigned_to = ?, assignment_type = ? WHERE id = ? AND user_id = ?""",
+                (team_member_id, assignment_type, lead_id, user_id),
+                fetch=False
+            )
+            
+            logger.info(f"Assigned team member {team_member_id} to lead {lead_id}")
+            return {'success': True}
+            
+        except Exception as e:
+            logger.error(f"Error assigning team member: {e}")
+            return {'success': False, 'error': str(e)}
 
 # Global automation engine instance
 automation_engine = AutomationEngine()
