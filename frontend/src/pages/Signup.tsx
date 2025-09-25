@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Mail, 
   Lock, 
@@ -16,6 +16,8 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { FikiriLogo } from '../components/FikiriLogo';
+import { useAuth } from '../contexts/AuthContext';
+import { useUserActivityTracking } from '../contexts/ActivityContext';
 
 const Signup: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -34,6 +36,10 @@ const Signup: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  
+  const { signup, getRedirectPath } = useAuth();
+  const { trackSignup } = useUserActivityTracking();
+  const navigate = useNavigate();
 
   // Load onboarding data if available
   useEffect(() => {
@@ -128,11 +134,23 @@ const Signup: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Create account using auth context
+      const result = await signup(
+        formData.email,
+        formData.password,
+        `${formData.firstName} ${formData.lastName}`
+      );
       
-      // Redirect to onboarding flow
-      window.location.href = '/onboarding-flow';
+      if (result.success) {
+        // Track successful signup
+        trackSignup(formData.email, 'email');
+        
+        // Get the appropriate redirect path based on user state
+        const redirectPath = getRedirectPath();
+        navigate(redirectPath);
+      } else {
+        setErrors({ submit: result.error || 'Failed to create account. Please try again.' });
+      }
     } catch (error) {
       console.error('Signup error:', error);
       setErrors({ submit: 'Failed to create account. Please try again.' });

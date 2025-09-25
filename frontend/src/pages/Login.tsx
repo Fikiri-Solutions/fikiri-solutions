@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Mail, Lock, ArrowRight, Zap, Sparkles, Shield, Rocket, Github, Chrome, UserPlus, Eye, EyeOff, Building2 } from 'lucide-react'
 import { useUserActivityTracking } from '../contexts/ActivityContext'
+import { useAuth } from '../contexts/AuthContext'
 import { FikiriLogo } from '../components/FikiriLogo'
 import { motion } from 'framer-motion'
 
@@ -15,6 +16,8 @@ export const Login: React.FC = () => {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const [isMicrosoftLoading, setIsMicrosoftLoading] = useState(false)
   const { trackLogin } = useUserActivityTracking()
+  const { login, getRedirectPath } = useAuth()
+  const navigate = useNavigate()
 
   // Track mouse position for interactive background
   useEffect(() => {
@@ -56,38 +59,33 @@ export const Login: React.FC = () => {
     setError('')
     
     try {
-      // Implement login API call
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Simulate validation
+      // Validate inputs
       if (!email || !password) {
         throw new Error('Please enter both email and password')
       }
       
-      // For demo purposes, allow any valid email/password combination
-      if (validateEmail(email) && password.length >= 6) {
+      if (!validateEmail(email)) {
+        throw new Error('Please enter a valid email address')
+      }
+      
+      if (password.length < 6) {
+        throw new Error('Password must be at least 6 characters')
+      }
+      
+      // Attempt login using auth context
+      const result = await login(email, password)
+      
+      if (result.success) {
         // Track successful login
         trackLogin(email, 'email')
         
-        // Check if user has completed onboarding
-        const onboardingCompleted = localStorage.getItem('fikiri-onboarding-completed')
-        
-        if (onboardingCompleted === 'true') {
-          // Redirect to dashboard if onboarding is complete
-          window.location.href = '/'
-        } else {
-          // Redirect to onboarding flow if not completed
-          window.location.href = '/onboarding-flow'
-        }
-        return
+        // Get the appropriate redirect path based on user state
+        const redirectPath = getRedirectPath()
+        navigate(redirectPath)
+      } else {
+        setError(result.error || 'Login failed. Please try again.')
       }
-      
-      // TODO: Implement real authentication API
-      throw new Error('Authentication service not yet implemented')
     } catch (error) {
-      // Login failed
       setError(error instanceof Error ? error.message : 'Login failed. Please try again.')
     } finally {
       setIsLoading(false)

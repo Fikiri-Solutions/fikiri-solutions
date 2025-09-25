@@ -30,9 +30,11 @@ import { ToastProvider } from './components/Toast'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { CustomizationProvider } from './contexts/CustomizationContext'
 import { ActivityProvider } from './contexts/ActivityContext'
+import { AuthProvider } from './contexts/AuthContext'
 import { ScrollToTop } from './components/ScrollToTop'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { PageLoader } from './components/PageLoader'
+import { ProtectedRoute, AuthRoute, OnboardingRoute } from './components/RouteGuard'
 import { getFeatureConfig } from './config'
 import { useWarmRoutes } from './hooks/useWarmRoutes'
 
@@ -45,47 +47,124 @@ function App() {
       <ThemeProvider>
         <CustomizationProvider>
           <ActivityProvider>
-            <QueryProvider>
-              <ToastProvider>
-                <Router>
-                  <ScrollToTop />
-                  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                    <Suspense fallback={<PageLoader />}>
-                      <Routes>
-                        <Route path="/login" element={<Login />} />
-                        <Route path="/signup" element={<Signup />} />
-                        <Route path="/terms" element={<TermsOfService />} />
-                        <Route path="/privacy" element={<PrivacyPolicy />} />
-                        <Route path="/privacy-settings" element={<Layout><PrivacySettings /></Layout>} />
-                        {features.showOnboarding && <Route path="/onboarding" element={<Onboarding />} />}
-                        {features.showOnboarding && <Route path="/onboarding/:step" element={<OnboardingFlow />} />}
-                        <Route path="/onboarding-flow" element={<PublicOnboardingFlow />} />
-                        <Route path="/onboarding-flow/:step" element={<PublicOnboardingFlow />} />
-                        <Route path="/" element={<LandingPage />} />
-                        <Route path="/pricing" element={<PricingPage />} />
-                        <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
-                        <Route path="/services" element={<Layout><Services /></Layout>} />
-                        <Route path="/services-landing" element={<ServicesLanding />} />
-                        <Route path="/ai-landing" element={<AIAssistantLanding />} />
-                        <Route path="/industries/landscaping" element={<LandscapingLanding />} />
-                        <Route path="/industries/restaurant" element={<RestaurantLanding />} />
-                        <Route path="/industries/medical" element={<MedicalLanding />} />
-                        <Route path="/home" element={<Layout><Dashboard /></Layout>} />
-                        <Route path="/crm" element={<Layout><CRM /></Layout>} />
-                        <Route path="/ai" element={<Layout><AIAssistant /></Layout>} />
-                        <Route path="/assistant" element={<Layout><AIAssistant /></Layout>} />
-                        <Route path="/industry" element={<Layout><IndustryAutomation /></Layout>} />
-                        <Route path="/about" element={<Layout><About /></Layout>} />
-                        <Route path="/error" element={<ErrorPage />} />
-                        <Route path="*" element={<NotFoundPage />} />
-                      </Routes>
-                    </Suspense>
-                  </div>
-                  <Analytics />
-                  <SpeedInsights />
-                </Router>
-              </ToastProvider>
-            </QueryProvider>
+            <AuthProvider>
+              <QueryProvider>
+                <ToastProvider>
+                  <Router>
+                    <ScrollToTop />
+                    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                      <Suspense fallback={<PageLoader />}>
+                        <Routes>
+                          {/* Public routes - no authentication required */}
+                          <Route path="/" element={<LandingPage />} />
+                          <Route path="/pricing" element={<PricingPage />} />
+                          <Route path="/services-landing" element={<ServicesLanding />} />
+                          <Route path="/ai-landing" element={<AIAssistantLanding />} />
+                          <Route path="/industries/landscaping" element={<LandscapingLanding />} />
+                          <Route path="/industries/restaurant" element={<RestaurantLanding />} />
+                          <Route path="/industries/medical" element={<MedicalLanding />} />
+                          <Route path="/terms" element={<TermsOfService />} />
+                          <Route path="/privacy" element={<PrivacyPolicy />} />
+                          <Route path="/error" element={<ErrorPage />} />
+                          
+                          {/* Pre-authentication onboarding flow */}
+                          <Route path="/onboarding-flow" element={
+                            <AuthRoute>
+                              <PublicOnboardingFlow />
+                            </AuthRoute>
+                          } />
+                          <Route path="/onboarding-flow/:step" element={
+                            <AuthRoute>
+                              <PublicOnboardingFlow />
+                            </AuthRoute>
+                          } />
+                          
+                          {/* Authentication routes */}
+                          <Route path="/login" element={
+                            <AuthRoute>
+                              <Login />
+                            </AuthRoute>
+                          } />
+                          <Route path="/signup" element={
+                            <AuthRoute>
+                              <Signup />
+                            </AuthRoute>
+                          } />
+                          
+                          {/* Onboarding routes - require authentication but not completed onboarding */}
+                          {features.showOnboarding && (
+                            <>
+                              <Route path="/onboarding" element={
+                                <OnboardingRoute>
+                                  <Onboarding />
+                                </OnboardingRoute>
+                              } />
+                              <Route path="/onboarding/:step" element={
+                                <OnboardingRoute>
+                                  <OnboardingFlow />
+                                </OnboardingRoute>
+                              } />
+                            </>
+                          )}
+                          
+                          {/* Protected routes - require authentication and completed onboarding */}
+                          <Route path="/home" element={
+                            <ProtectedRoute>
+                              <Layout><Dashboard /></Layout>
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/dashboard" element={
+                            <ProtectedRoute>
+                              <Layout><Dashboard /></Layout>
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/services" element={
+                            <ProtectedRoute>
+                              <Layout><Services /></Layout>
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/crm" element={
+                            <ProtectedRoute>
+                              <Layout><CRM /></Layout>
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/ai" element={
+                            <ProtectedRoute>
+                              <Layout><AIAssistant /></Layout>
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/assistant" element={
+                            <ProtectedRoute>
+                              <Layout><AIAssistant /></Layout>
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/industry" element={
+                            <ProtectedRoute>
+                              <Layout><IndustryAutomation /></Layout>
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/about" element={
+                            <ProtectedRoute>
+                              <Layout><About /></Layout>
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/privacy-settings" element={
+                            <ProtectedRoute>
+                              <Layout><PrivacySettings /></Layout>
+                            </ProtectedRoute>
+                          } />
+                          
+                          {/* 404 route */}
+                          <Route path="*" element={<NotFoundPage />} />
+                        </Routes>
+                      </Suspense>
+                    </div>
+                    <Analytics />
+                    <SpeedInsights />
+                  </Router>
+                </ToastProvider>
+              </QueryProvider>
+            </AuthProvider>
           </ActivityProvider>
         </CustomizationProvider>
       </ThemeProvider>

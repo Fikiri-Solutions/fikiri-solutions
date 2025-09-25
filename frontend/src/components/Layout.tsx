@@ -7,6 +7,7 @@ import { CustomizationPanel } from './CustomizationPanel'
 import { BackToTop } from './BackToTop'
 import { useCustomization } from '../contexts/CustomizationContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { useAuth } from '../contexts/AuthContext'
 import { FikiriLogo } from './FikiriLogo'
 
 interface LayoutProps {
@@ -19,6 +20,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation()
   const { customization } = useCustomization()
   const { resolvedTheme } = useTheme()
+  const { user, logout } = useAuth()
 
   // Persist sidebar state in localStorage
   useEffect(() => {
@@ -41,11 +43,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   // Handle sign out
   const handleSignOut = () => {
-    // Clear any stored authentication data
-    localStorage.removeItem('fikiri-auth-token')
-    localStorage.removeItem('fikiri-user')
-    // Redirect to login page
-    window.location.href = '/login'
+    logout()
   }
 
   const navigation = [
