@@ -78,7 +78,7 @@ const PricingPage: React.FC = () => {
         '2,000 emails/month',
         'Priority email support',
         'Advanced analytics',
-        'Custom integrations',
+        'Basic integrations',
         'Workflow automation'
       ],
       highlighted: true,
@@ -124,7 +124,7 @@ const PricingPage: React.FC = () => {
         'Advanced security'
       ],
       cta: 'Contact Sales',
-      buttonStyle: 'bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white'
+      buttonStyle: 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white'
     }
   ];
 
@@ -133,42 +133,42 @@ const PricingPage: React.FC = () => {
       name: 'Landscaping',
       icon: '🌱',
       tier: 'Starter',
-      price: '$39',
+      price: billingPeriod === 'monthly' ? 39 : 390,
       features: ['Appointment scheduling', 'Service quotes', 'Seasonal planning']
     },
     {
       name: 'Restaurant',
       icon: '🍽️',
       tier: 'Growth',
-      price: '$79',
+      price: billingPeriod === 'monthly' ? 79 : 790,
       features: ['Reservation management', 'Menu recommendations', 'Special promotions']
     },
     {
       name: 'Medical Practice',
       icon: '🏥',
       tier: 'Business',
-      price: '$199',
+      price: billingPeriod === 'monthly' ? 199 : 1990,
       features: ['Appointment scheduling', 'Patient reminders', 'HIPAA compliance']
     },
     {
       name: 'Real Estate',
       icon: '🏠',
       tier: 'Business',
-      price: '$199',
+      price: billingPeriod === 'monthly' ? 199 : 1990,
       features: ['Property listings', 'Client consultations', 'Market analysis']
     },
     {
       name: 'E-commerce',
       icon: '🛍️',
       tier: 'Growth',
-      price: '$79',
+      price: billingPeriod === 'monthly' ? 79 : 790,
       features: ['Order management', 'Customer support', 'Inventory sync']
     },
     {
       name: 'Enterprise Solutions',
       icon: '🏢',
       tier: 'Enterprise',
-      price: '$399',
+      price: billingPeriod === 'monthly' ? 399 : 3990,
       features: ['Custom workflows', 'Multi-industry support', 'Advanced analytics']
     }
   ];
@@ -179,17 +179,21 @@ const PricingPage: React.FC = () => {
       features: [
         { name: 'AI Responses per month', starter: '200', growth: '800', business: '4,000', enterprise: 'Unlimited' },
         { name: 'Email automation', starter: true, growth: true, business: true, enterprise: true },
+        { name: 'Email limit per month', starter: '500', growth: '2,000', business: '10,000', enterprise: 'Unlimited' },
         { name: 'CRM integration', starter: 'Basic', growth: 'Advanced', business: 'Advanced', enterprise: 'Custom' },
-        { name: 'Analytics', starter: 'Basic', growth: 'Advanced', business: 'Advanced', enterprise: 'Custom' }
+        { name: 'Analytics', starter: 'Basic', growth: 'Advanced', business: 'Advanced', enterprise: 'Custom' },
+        { name: 'Integrations', starter: 'Basic', growth: 'Basic', business: 'Custom', enterprise: 'Custom' }
       ]
     },
     {
       category: 'Support & Training',
       features: [
-        { name: 'Support', starter: 'Community', growth: 'Email', business: 'Phone', enterprise: 'Dedicated team' },
+        { name: 'Support', starter: 'Community', growth: 'Priority Email', business: 'Phone', enterprise: 'Dedicated team' },
         { name: 'Onboarding', starter: 'Self-service', growth: 'Guided', business: 'White-glove', enterprise: 'Custom' },
         { name: 'Training', starter: false, growth: false, business: true, enterprise: 'Custom' },
-        { name: 'SLA', starter: false, growth: false, business: false, enterprise: true }
+        { name: 'SLA', starter: false, growth: false, business: false, enterprise: true },
+        { name: 'Multi-user access', starter: false, growth: false, business: true, enterprise: true },
+        { name: 'API access', starter: false, growth: false, business: true, enterprise: true }
       ]
     }
   ];
@@ -290,7 +294,7 @@ const PricingPage: React.FC = () => {
                 }`}
               >
                 <span>Yearly</span>
-                <span className="ml-2 text-xs bg-green-500 text-white px-2 py-1 rounded-full">Save 15%</span>
+                <span className="ml-2 text-xs bg-green-500 text-white px-2 py-1 rounded-full">Save 17%</span>
               </button>
             </div>
           </motion.div>
@@ -394,7 +398,7 @@ const PricingPage: React.FC = () => {
                   <h3 className="text-xl font-semibold text-white">{industry.name}</h3>
                   <div className="flex items-center justify-center gap-2 mt-2">
                     <span className="text-orange-400 font-medium">{industry.tier}</span>
-                    <span className="text-white font-bold">{industry.price}/mo</span>
+                    <span className="text-white font-bold">${industry.price}{billingPeriod === 'monthly' ? '/mo' : '/yr'}</span>
                   </div>
                 </div>
 
