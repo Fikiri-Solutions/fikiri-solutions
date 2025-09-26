@@ -66,7 +66,7 @@ from core.usage_tracker import UsageTracker
 from core.redis_cache import get_cache, cache_result
 from core.redis_sessions import init_flask_sessions, create_user_session, get_current_user, logout_user, require_login
 from core.redis_rate_limiting import init_rate_limiting, rate_limit, get_rate_limiter
-from core.redis_queues import get_email_queue, get_ai_queue, get_crm_queue, get_webhook_queue
+from core.redis_queues import get_email_queue, get_ai_queue, get_crm_queue, webhook_queue
 from core.webhook_sentry import capture_webhook_error, capture_webhook_performance
 
 # Dashboard routes will be added directly to Flask app
@@ -3742,7 +3742,7 @@ def webhook_sentry_performance_test():
             cache.cache_ai_response("webhook_test", "webhook_response", "test_user")
         
         # Test webhook queue
-        webhook_queue = get_webhook_queue()
+        # webhook_queue is already imported
         if webhook_queue.is_connected():
             job_id = webhook_queue.enqueue_job(
                 "process_webhook",

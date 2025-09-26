@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Mail, Users, Brain, Settings, Menu, X, Palette, LogOut, Building2, Shield, Zap } from 'lucide-react'
+import { Mail, Users, Brain, Settings, Menu, X, Palette, LogOut, Building2, Shield, Zap, User } from 'lucide-react'
 import { MobileBottomNav } from './MobileBottomNav'
 import { ThemeToggle } from './ThemeToggle'
 import { CustomizationPanel } from './CustomizationPanel'
 import { BackToTop } from './BackToTop'
+import { AccountManagement } from './AccountManagement'
+import { OnboardingWizard } from './OnboardingWizard'
 import { useCustomization } from '../contexts/CustomizationContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -17,6 +19,8 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [customizationOpen, setCustomizationOpen] = useState(false)
+  const [accountManagementOpen, setAccountManagementOpen] = useState(false)
+  const [onboardingWizardOpen, setOnboardingWizardOpen] = useState(false)
   const location = useLocation()
   const { customization } = useCustomization()
   const { resolvedTheme } = useTheme()
@@ -56,9 +60,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   ]
 
   // Add onboarding link if not completed
-  const onboardingCompleted = localStorage.getItem('fikiri-onboarding-completed')
-  if (onboardingCompleted !== 'true') {
-    navigation.unshift({ name: 'Setup Services', href: '/onboarding-flow', icon: Zap })
+  if (user && !user.onboarding_completed) {
+    navigation.unshift({ name: 'Complete Setup', href: '#', icon: Zap })
   }
 
   return (
@@ -82,19 +85,33 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
           <nav className="flex-1 px-4 py-4">
             {navigation.map((item) => (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
-                  location.pathname === item.href
-                    ? 'bg-brand-accent/20 dark:bg-brand-accent/20 text-brand-primary dark:text-brand-accent'
-                    : 'text-brand-text dark:text-gray-300 hover:bg-brand-accent/10 dark:hover:bg-gray-700'
-                }`}
-                onClick={() => setSidebarOpen(false)}
-              >
-                <item.icon className="mr-3 h-5 w-5" />
-                {item.name}
-              </Link>
+              item.href === '#' ? (
+                <button
+                  key={item.name}
+                  onClick={() => {
+                    setOnboardingWizardOpen(true)
+                    setSidebarOpen(false)
+                  }}
+                  className="flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 text-brand-text dark:text-gray-300 hover:bg-brand-accent/10 dark:hover:bg-gray-700"
+                >
+                  <item.icon className="mr-3 h-5 w-5" />
+                  {item.name}
+                </button>
+              ) : (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                    location.pathname === item.href
+                      ? 'bg-brand-accent/20 dark:bg-brand-accent/20 text-brand-primary dark:text-brand-accent'
+                      : 'text-brand-text dark:text-gray-300 hover:bg-brand-accent/10 dark:hover:bg-gray-700'
+                  }`}
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <item.icon className="mr-3 h-5 w-5" />
+                  {item.name}
+                </Link>
+              )
             ))}
           </nav>
         </div>
@@ -115,18 +132,29 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
           <nav className="flex-1 px-4 py-4">
             {navigation.map((item) => (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
-                  location.pathname === item.href
-                    ? 'bg-brand-accent/20 dark:bg-brand-accent/20 text-brand-primary dark:text-brand-accent'
-                    : 'text-brand-text dark:text-gray-300 hover:bg-brand-accent/10 dark:hover:bg-gray-700'
-                }`}
-              >
-                <item.icon className="mr-3 h-5 w-5" />
-                {item.name}
-              </Link>
+              item.href === '#' ? (
+                <button
+                  key={item.name}
+                  onClick={() => setOnboardingWizardOpen(true)}
+                  className="flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 text-brand-text dark:text-gray-300 hover:bg-brand-accent/10 dark:hover:bg-gray-700"
+                >
+                  <item.icon className="mr-3 h-5 w-5" />
+                  {item.name}
+                </button>
+              ) : (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                    location.pathname === item.href
+                      ? 'bg-brand-accent/20 dark:bg-brand-accent/20 text-brand-primary dark:text-brand-accent'
+                      : 'text-brand-text dark:text-gray-300 hover:bg-brand-accent/10 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <item.icon className="mr-3 h-5 w-5" />
+                  {item.name}
+                </Link>
+              )
             ))}
           </nav>
         </div>
@@ -154,6 +182,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               >
                 <Palette className="h-5 w-5" />
               </button>
+              <button
+                onClick={() => setAccountManagementOpen(true)}
+                className="p-2 text-brand-text hover:text-brand-primary dark:text-gray-300 dark:hover:text-white transition-colors"
+                title="Account settings"
+              >
+                <User className="h-5 w-5" />
+              </button>
               <button 
                 onClick={handleSignOut}
                 className="flex items-center gap-2 text-sm font-medium text-brand-text hover:text-brand-primary dark:text-gray-300 dark:hover:text-white transition-colors"
@@ -180,6 +215,19 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <CustomizationPanel 
         isOpen={customizationOpen} 
         onClose={() => setCustomizationOpen(false)} 
+      />
+      
+      {/* Account Management Modal */}
+      <AccountManagement 
+        isOpen={accountManagementOpen} 
+        onClose={() => setAccountManagementOpen(false)} 
+      />
+      
+      {/* Onboarding Wizard */}
+      <OnboardingWizard 
+        isOpen={onboardingWizardOpen} 
+        onClose={() => setOnboardingWizardOpen(false)}
+        onComplete={() => setOnboardingWizardOpen(false)}
       />
       
       {/* Back to Top Button */}
