@@ -25,7 +25,11 @@ Sentry.init({
 })
 
 // Initialize cache invalidation before app starts
-initializeCacheInvalidation()
+try {
+  initializeCacheInvalidation()
+} catch (error) {
+  console.error('Error initializing cache invalidation:', error)
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
