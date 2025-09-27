@@ -4,13 +4,30 @@ Webhook Sentry Configuration for Fikiri Solutions
 Separate Sentry instance for webhook and background job monitoring
 """
 
-import sentry_sdk
-from sentry_sdk.integrations.flask import FlaskIntegration
-from sentry_sdk.integrations.redis import RedisIntegration
 import os
+
+# Optional Sentry integration
+try:
+    import sentry_sdk
+    from sentry_sdk.integrations.flask import FlaskIntegration
+    from sentry_sdk.integrations.redis import RedisIntegration
+    SENTRY_AVAILABLE = True
+except ImportError:
+    SENTRY_AVAILABLE = False
+    # Create dummy functions when Sentry is not available
+    def sentry_sdk():
+        pass
+    def FlaskIntegration():
+        pass
+    def RedisIntegration():
+        pass
 
 def init_webhook_sentry():
     """Initialize Sentry for webhook monitoring"""
+    if not SENTRY_AVAILABLE:
+        print("⚠️ Sentry SDK not available, skipping webhook Sentry")
+        return None
+        
     webhook_dsn = os.getenv('SENTRY_DSN_WEBHOOKS')
     
     if not webhook_dsn:
@@ -69,6 +86,10 @@ def add_webhook_context(event, hint):
 
 def capture_webhook_error(error, webhook_data=None, user_id=None):
     """Capture webhook-specific errors"""
+    if not SENTRY_AVAILABLE:
+        print(f"⚠️ Sentry not available, skipping error capture: {error}")
+        return
+        
     try:
         with sentry_sdk.push_scope() as scope:
             # Add webhook-specific context
@@ -89,6 +110,10 @@ def capture_webhook_error(error, webhook_data=None, user_id=None):
 
 def capture_webhook_performance(operation_name, webhook_data=None, duration=None):
     """Capture webhook performance metrics"""
+    if not SENTRY_AVAILABLE:
+        print(f"⚠️ Sentry not available, skipping performance capture: {operation_name}")
+        return
+        
     try:
         with sentry_sdk.start_transaction(op="webhook", name=operation_name) as transaction:
             # Add webhook-specific context
