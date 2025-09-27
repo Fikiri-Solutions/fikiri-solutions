@@ -38,6 +38,9 @@ export class CacheInvalidationManager {
    * Checks version and clears caches if needed
    */
   public initialize(): void {
+    // Skip cache invalidation in production to prevent errors
+    if (typeof window === 'undefined') return
+    
     const storedCacheVersion = localStorage.getItem('appCacheVersion')
     const storedBuildTimestamp = localStorage.getItem('appBuildTimestamp')
 
@@ -45,11 +48,15 @@ export class CacheInvalidationManager {
       console.log('🚨 Cache mismatch detected! Clearing all client-side caches.')
       // Delay cache clearing to allow React app to render first
       setTimeout(() => {
-        this.clearAllCaches()
-        localStorage.setItem('appCacheVersion', CURRENT_CACHE_VERSION)
-        localStorage.setItem('appBuildTimestamp', CURRENT_BUILD_TIMESTAMP)
-        console.log(`✅ New cache version stored: ${CURRENT_CACHE_VERSION} (${CURRENT_BUILD_TIMESTAMP})`)
-      }, 1000) // Wait 1 second for React to render
+        try {
+          this.clearAllCaches()
+          localStorage.setItem('appCacheVersion', CURRENT_CACHE_VERSION)
+          localStorage.setItem('appBuildTimestamp', CURRENT_BUILD_TIMESTAMP)
+          console.log(`✅ New cache version stored: ${CURRENT_CACHE_VERSION} (${CURRENT_BUILD_TIMESTAMP})`)
+        } catch (error) {
+          console.error('Error during cache invalidation:', error)
+        }
+      }, 2000) // Wait 2 seconds for React to fully render
     } else {
       console.log('✅ Client-side cache is up to date.')
     }
