@@ -5,31 +5,41 @@ Web interface for testing and deploying Fikiri services.
 """
 
 import os
-import sentry_sdk
-from sentry_sdk.integrations.flask import FlaskIntegration
-from sentry_sdk.integrations.redis import RedisIntegration
-from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
-# Initialize Sentry before Flask app
-sentry_sdk.init(
-    dsn="https://05d4170350ee081a3bfee0dda0220df6@o4510053728845824.ingest.us.sentry.io/4510053767249920",
-    integrations=[
-        FlaskIntegration(),
-        RedisIntegration(),
-        SqlalchemyIntegration(),
-    ],
-    # Add data like inputs and responses to/from LLMs and tools;
-    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
-    send_default_pii=True,
-    # Performance monitoring - full tracing for comprehensive monitoring
-    traces_sample_rate=1.0,  # 100% of transactions for performance monitoring
-    # Enable logs to be sent to Sentry
-    enable_logs=True,
-    # Environment
-    environment=os.getenv('FLASK_ENV', 'production'),
-    # Release tracking
-    release=os.getenv('GITHUB_SHA', 'unknown'),
-)
+# Sentry integration (optional - only if sentry_sdk is available)
+try:
+    import sentry_sdk
+    from sentry_sdk.integrations.flask import FlaskIntegration
+    from sentry_sdk.integrations.redis import RedisIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+    # Initialize Sentry before Flask app
+    sentry_sdk.init(
+        dsn="https://05d4170350ee081a3bfee0dda0220df6@o4510053728845824.ingest.us.sentry.io/4510053767249920",
+        integrations=[
+            FlaskIntegration(),
+            RedisIntegration(),
+            SqlalchemyIntegration(),
+        ],
+        # Add data like inputs and responses to/from LLMs and tools;
+        # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+        send_default_pii=True,
+        # Performance monitoring - full tracing for comprehensive monitoring
+        traces_sample_rate=1.0,  # 100% of transactions for performance monitoring
+        # Enable logs to be sent to Sentry
+        enable_logs=True,
+        # Environment
+        environment=os.getenv('FLASK_ENV', 'production'),
+        # Release tracking
+        release=os.getenv('GITHUB_SHA', 'unknown'),
+    )
+    print("✅ Sentry initialized successfully")
+except ImportError:
+    print("⚠️ Sentry SDK not available, skipping Sentry initialization")
+    sentry_sdk = None
+except Exception as e:
+    print(f"⚠️ Sentry initialization failed: {e}")
+    sentry_sdk = None
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from flask_cors import CORS
@@ -3058,12 +3068,13 @@ def sentry_test():
         # This will trigger a Sentry error for testing
         1/0  # raises a ZeroDivisionError
     except Exception as e:
-        # Capture the exception in Sentry
-        sentry_sdk.capture_exception(e)
+        # Capture the exception in Sentry (if available)
+        if sentry_sdk:
+            sentry_sdk.capture_exception(e)
         return jsonify({
             'message': 'Sentry test error triggered',
             'error': str(e),
-            'sentry_captured': True
+            'sentry_captured': sentry_sdk is not None
         }), 200
 
 if __name__ == '__main__':
@@ -3611,19 +3622,25 @@ if __name__ == '__main__':
 @app.route('/api/sentry-performance-test', methods=['GET'])
 def sentry_performance_test():
     """Test Sentry performance monitoring."""
-    with sentry_sdk.start_transaction(op="test", name="sentry_performance_test"):
-        # Simulate some work
-        time.sleep(0.1)
-        
-        # Test Redis operations
-        cache = get_cache()
-        if cache.is_connected():
-            cache.cache_ai_response("test", "response", "test_user")
-        
+    if sentry_sdk:
+        with sentry_sdk.start_transaction(op="test", name="sentry_performance_test"):
+            # Simulate some work
+            time.sleep(0.1)
+            
+            # Test Redis operations
+            cache = get_cache()
+            if cache.is_connected():
+                cache.cache_ai_response("test", "response", "test_user")
+            
+            return jsonify({
+                'message': 'Sentry performance test completed',
+                'status': 'success',
+                'redis_connected': cache.is_connected()
+            }), 200
+    else:
         return jsonify({
-            'message': 'Sentry performance test completed',
-            'status': 'success',
-            'redis_connected': cache.is_connected()
+            'message': 'Sentry not available',
+            'status': 'skipped'
         }), 200
 
 # Webhook Sentry Test Routes
