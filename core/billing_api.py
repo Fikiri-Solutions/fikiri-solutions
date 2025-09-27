@@ -4,8 +4,19 @@ Flask API endpoints for subscription management and billing
 """
 
 from flask import Blueprint, request, jsonify, current_app
-from flask_jwt_extended import jwt_required, get_jwt_identity
 import logging
+
+# Optional JWT integration
+try:
+    from flask_jwt_extended import jwt_required, get_jwt_identity
+    JWT_AVAILABLE = True
+except ImportError:
+    JWT_AVAILABLE = False
+    # Create dummy decorators when JWT is not available
+    def jwt_required(f):
+        return f
+    def get_jwt_identity():
+        return None
 from core.fikiri_stripe_manager import FikiriStripeManager
 from core.stripe_webhooks import StripeWebhookHandler
 
