@@ -4,15 +4,20 @@ Handles subscription management, usage tracking, and billing operations
 """
 
 import os
-import stripe
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from enum import Enum
 
-# Configure Stripe
-stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+# Optional Stripe integration
+try:
+    import stripe
+    stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+    STRIPE_AVAILABLE = True
+except ImportError:
+    STRIPE_AVAILABLE = False
+    stripe = None
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +102,10 @@ class FikiriBillingManager:
 
     def create_subscription(self, customer_id: str, price_id: str, trial_days: int = 14) -> Dict[str, Any]:
         """Create a new subscription with free trial"""
+        if not STRIPE_AVAILABLE:
+            logger.warning("Stripe not available, skipping subscription creation")
+            return {}
+            
         try:
             subscription = stripe.Subscription.create(
                 customer=customer_id,

@@ -4,12 +4,25 @@ Redis Service for Fikiri Solutions
 Handles Redis Cloud connection and operations
 """
 
-import redis
 import json
 import time
 import logging
 from typing import Optional, Dict, Any, List, Union
-from core.minimal_config import get_config
+
+# Optional Redis integration
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    redis = None
+
+try:
+    from core.minimal_config import get_config
+    CONFIG_AVAILABLE = True
+except ImportError:
+    CONFIG_AVAILABLE = False
+    get_config = None
 
 logger = logging.getLogger(__name__)
 
@@ -18,14 +31,21 @@ class RedisService:
     
     def __init__(self):
         """Initialize Redis connection."""
-        self.config = get_config()
+        if CONFIG_AVAILABLE:
+            self.config = get_config()
+        else:
+            self.config = {}
         self.redis_client = None
         self._connect()
     
     def _connect(self):
         """Connect to Redis Cloud."""
+        if not REDIS_AVAILABLE:
+            logger.warning("Redis not available, skipping connection")
+            return
+            
         try:
-            if self.config.redis_url:
+            if hasattr(self.config, 'redis_url') and self.config.redis_url:
                 # Use Redis URL if available
                 self.redis_client = redis.from_url(
                     self.config.redis_url,
@@ -36,10 +56,10 @@ class RedisService:
             else:
                 # Use individual connection parameters
                 self.redis_client = redis.Redis(
-                    host=self.config.redis_host,
-                    port=self.config.redis_port,
-                    password=self.config.redis_password,
-                    db=self.config.redis_db,
+                    host=getattr(self.config, 'redis_host', 'localhost'),
+                    port=getattr(self.config, 'redis_port', 6379),
+                    password=getattr(self.config, 'redis_password', None),
+                    db=getattr(self.config, 'redis_db', 0),
                     decode_responses=True,
                     socket_connect_timeout=5,
                     socket_timeout=5
