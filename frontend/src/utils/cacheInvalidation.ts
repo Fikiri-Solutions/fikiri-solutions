@@ -43,10 +43,13 @@ export class CacheInvalidationManager {
 
     if (storedCacheVersion !== CURRENT_CACHE_VERSION || storedBuildTimestamp !== CURRENT_BUILD_TIMESTAMP) {
       console.log('🚨 Cache mismatch detected! Clearing all client-side caches.')
-      this.clearAllCaches()
-      localStorage.setItem('appCacheVersion', CURRENT_CACHE_VERSION)
-      localStorage.setItem('appBuildTimestamp', CURRENT_BUILD_TIMESTAMP)
-      console.log(`✅ New cache version stored: ${CURRENT_CACHE_VERSION} (${CURRENT_BUILD_TIMESTAMP})`)
+      // Delay cache clearing to allow React app to render first
+      setTimeout(() => {
+        this.clearAllCaches()
+        localStorage.setItem('appCacheVersion', CURRENT_CACHE_VERSION)
+        localStorage.setItem('appBuildTimestamp', CURRENT_BUILD_TIMESTAMP)
+        console.log(`✅ New cache version stored: ${CURRENT_CACHE_VERSION} (${CURRENT_BUILD_TIMESTAMP})`)
+      }, 1000) // Wait 1 second for React to render
     } else {
       console.log('✅ Client-side cache is up to date.')
     }
@@ -95,8 +98,8 @@ export class CacheInvalidationManager {
       }).catch(error => console.error('Error clearing Service Worker caches:', error))
     }
 
-    // Force browser to refetch all resources
-    window.location.reload()
+    // Don't reload immediately - let the app render first
+    console.log('  - Cache cleared. App will continue loading.')
   }
 
   /**

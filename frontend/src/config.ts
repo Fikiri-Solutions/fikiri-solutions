@@ -41,9 +41,9 @@ export const config = {
   
   // App Configuration
   appName: 'Fikiri Solutions',
-  version: '1.0.9', // Force deployment refresh
-  buildTimestamp: '2025-09-19T01:10:00Z', // Force cache refresh
-  cacheVersion: 'v1.0.9-20250919', // Force cache refresh
+  version: '1.0.11', // Force deployment refresh
+  buildTimestamp: '2025-09-25T19:00:00Z', // Force cache refresh
+  cacheVersion: 'v1.0.11-20250925', // Force cache refresh
   
   // Development flags
   isDevelopment: typeof window !== 'undefined' && window.location.hostname === 'localhost',
@@ -69,4 +69,4 @@ export const getFeatureConfig = () => ({
   debugMode: isFeatureEnabled('debugMode'),
 })
 
-// Deployment timestamp: Fri Sep 19 01:10:00 EDT 2025 - Force Vercel deployment with fixes
+// Deployment timestamp: Wed Sep 25 18:35:00 EDT 2025 - Fix landing page loading issue
