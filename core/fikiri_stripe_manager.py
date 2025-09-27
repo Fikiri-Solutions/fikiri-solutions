@@ -4,15 +4,20 @@ Implements Stripe's Products, Features, and Entitlements system for proper featu
 """
 
 import os
-import stripe
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from enum import Enum
 
-# Configure Stripe
-stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+# Optional Stripe integration
+try:
+    import stripe
+    stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+    STRIPE_AVAILABLE = True
+except ImportError:
+    STRIPE_AVAILABLE = False
+    stripe = None
 
 logger = logging.getLogger(__name__)
 
@@ -248,6 +253,10 @@ class FikiriStripeManager:
 
     def create_features(self) -> Dict[str, str]:
         """Create all Fikiri features in Stripe"""
+        if not STRIPE_AVAILABLE:
+            logger.warning("Stripe not available, skipping feature creation")
+            return {}
+            
         created_features = {}
         
         for feature_name, feature in self.features.items():
@@ -266,6 +275,10 @@ class FikiriStripeManager:
 
     def create_products(self, feature_ids: Dict[str, str]) -> Dict[str, str]:
         """Create all Fikiri products in Stripe"""
+        if not STRIPE_AVAILABLE:
+            logger.warning("Stripe not available, skipping product creation")
+            return {}
+            
         created_products = {}
         
         for tier, product_config in self.products.items():
@@ -305,6 +318,10 @@ class FikiriStripeManager:
 
     def _create_product_prices(self, product_id: str, pricing: Dict[str, int]):
         """Create monthly and annual prices for a product"""
+        if not STRIPE_AVAILABLE:
+            logger.warning("Stripe not available, skipping price creation")
+            return
+            
         try:
             # Create monthly price
             monthly_price = stripe.Price.create(
@@ -331,6 +348,10 @@ class FikiriStripeManager:
 
     def create_subscription(self, customer_id: str, price_id: str, trial_days: int = 14) -> Dict[str, Any]:
         """Create a new subscription with free trial"""
+        if not STRIPE_AVAILABLE:
+            logger.warning("Stripe not available, skipping subscription creation")
+            return {}
+            
         try:
             subscription = stripe.Subscription.create(
                 customer=customer_id,
