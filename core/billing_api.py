@@ -13,8 +13,10 @@ try:
 except ImportError:
     JWT_AVAILABLE = False
     # Create dummy decorators when JWT is not available
-    def jwt_required(f):
-        return f
+    def jwt_required(fresh=False, optional=False):
+        def decorator(func):
+            return func
+        return decorator
     def get_jwt_identity():
         return None
 from core.fikiri_stripe_manager import FikiriStripeManager
