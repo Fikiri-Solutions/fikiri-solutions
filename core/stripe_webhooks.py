@@ -4,11 +4,25 @@ Handles Stripe webhook events for subscription management
 """
 
 import os
-import stripe
 import logging
 from typing import Dict, Any
 from datetime import datetime
-from core.billing_manager import FikiriBillingManager, SubscriptionStatus
+
+# Optional Stripe integration
+try:
+    import stripe
+    STRIPE_AVAILABLE = True
+except ImportError:
+    STRIPE_AVAILABLE = False
+    stripe = None
+
+try:
+    from core.billing_manager import FikiriBillingManager, SubscriptionStatus
+    BILLING_AVAILABLE = True
+except ImportError:
+    BILLING_AVAILABLE = False
+    FikiriBillingManager = None
+    SubscriptionStatus = None
 
 logger = logging.getLogger(__name__)
 
@@ -16,11 +30,18 @@ class StripeWebhookHandler:
     """Handles Stripe webhook events"""
     
     def __init__(self):
-        self.billing_manager = FikiriBillingManager()
+        if BILLING_AVAILABLE:
+            self.billing_manager = FikiriBillingManager()
+        else:
+            self.billing_manager = None
         self.webhook_secret = os.getenv('STRIPE_WEBHOOK_SECRET')
     
-    def verify_webhook_signature(self, payload: bytes, sig_header: str) -> stripe.Event:
+    def verify_webhook_signature(self, payload: bytes, sig_header: str):
         """Verify webhook signature and construct event"""
+        if not STRIPE_AVAILABLE:
+            logger.warning("Stripe not available, skipping webhook verification")
+            return None
+            
         try:
             event = stripe.Webhook.construct_event(
                 payload, sig_header, self.webhook_secret

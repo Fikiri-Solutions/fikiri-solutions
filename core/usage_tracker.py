@@ -4,8 +4,15 @@ Tracks usage for overage billing and feature gating
 """
 
 import os
-import stripe
 import logging
+
+# Optional Stripe integration
+try:
+    import stripe
+    STRIPE_AVAILABLE = True
+except ImportError:
+    STRIPE_AVAILABLE = False
+    stripe = None
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from dataclasses import dataclass
@@ -321,6 +328,10 @@ class UsageTracker:
     
     def create_usage_invoice_items(self, user_id: str, subscription_item_id: str, overages: Dict[str, int]) -> List[Dict[str, Any]]:
         """Create Stripe invoice items for overage charges"""
+        if not STRIPE_AVAILABLE:
+            logger.warning("Stripe not available, skipping invoice item creation")
+            return []
+            
         try:
             invoice_items = []
             
