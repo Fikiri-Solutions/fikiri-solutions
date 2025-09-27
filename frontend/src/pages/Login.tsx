@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
-import { Mail, Lock, ArrowRight, Zap, Sparkles, Shield, Rocket, Github, Chrome, UserPlus, Eye, EyeOff, Building2 } from 'lucide-react'
+import { Mail, Lock, ArrowRight, Zap, Shield, Rocket, Github, Chrome, UserPlus, Eye, EyeOff, Building2 } from 'lucide-react'
 import { useUserActivityTracking } from '../contexts/ActivityContext'
 import { useAuth } from '../contexts/AuthContext'
 import { FikiriLogo } from '../components/FikiriLogo'
 import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('')

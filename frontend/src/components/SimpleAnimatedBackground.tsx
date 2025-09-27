@@ -58,7 +58,7 @@ const SimpleAnimatedBackground: React.FC = () => {
       </div>
       
       {/* CSS Animations */}
-      <style jsx>{`
+        <style dangerouslySetInnerHTML={{ __html: `
         @keyframes floatHorizontal {
           0%, 100% { transform: translateX(0px) scaleX(1); opacity: 0.3; }
           25% { transform: translateX(20px) scaleX(1.1); opacity: 0.6; }
@@ -91,7 +91,7 @@ const SimpleAnimatedBackground: React.FC = () => {
             opacity: 0.9; 
           }
         }
-      `}</style>
+      `}} />
     </div>
   )
 }

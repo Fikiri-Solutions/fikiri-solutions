@@ -106,6 +106,16 @@ export const useUserActivityTracking = () => {
     })
   }
 
+  const trackSignup = (userId?: string, method?: string) => {
+    addActivity({
+      type: 'user_login', // Using user_login type for signup as well
+      message: `User signed up${method ? ` via ${method}` : ''}`,
+      status: 'success',
+      userId,
+      metadata: { method, action: 'signup' }
+    })
+  }
+
   const trackOnboardingStart = (userId?: string, step?: string) => {
     addActivity({
       type: 'onboarding_started',
@@ -198,6 +208,7 @@ export const useUserActivityTracking = () => {
   return {
     trackLogin,
     trackLogout,
+    trackSignup,
     trackOnboardingStart,
     trackOnboardingComplete,
     trackProfileUpdate,

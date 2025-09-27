@@ -1,7 +1,4 @@
 import React from 'react';
-import { SkipToContent } from './SkipToContent';
-import { KeyboardNavigation } from './KeyboardNavigation';
-import { ColorContrastChecker } from './ColorContrastChecker';
 
 // Accessibility Provider Component
 export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

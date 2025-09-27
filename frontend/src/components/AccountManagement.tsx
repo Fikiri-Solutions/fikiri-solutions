@@ -1,34 +1,25 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   User,
   Mail,
   Lock,
-  Phone,
-  MapPin,
-  Calendar,
   Settings,
   Eye,
   EyeOff,
   Save,
   Edit,
   X,
-  Check,
   AlertCircle,
-  Info,
   Shield,
   Bell,
-  Globe,
   Download,
-  Upload,
   Trash2,
   Key,
   Smartphone,
   Monitor,
-  LogOut,
-  ChevronRight,
-  ExternalLink,
-  RefreshCw
+  RefreshCw,
+  Building2
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from './Toast'
@@ -177,9 +168,9 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
       }
       
       setIsEditing(false)
-      addToast('Profile updated successfully!', 'success')
+      addToast({ type: 'success', title: 'Profile updated successfully!' })
     } catch (error) {
-      addToast('Failed to update profile. Please try again.', 'error')
+      addToast({ type: 'error', title: 'Failed to update profile. Please try again.' })
     } finally {
       setIsLoading(false)
     }
@@ -187,12 +178,12 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
 
   const handleChangePassword = async () => {
     if (securitySettings.newPassword !== securitySettings.confirmPassword) {
-      addToast('New passwords do not match', 'error')
+      addToast({ type: 'error', title: 'New passwords do not match' })
       return
     }
 
     if (securitySettings.newPassword.length < 8) {
-      addToast('Password must be at least 8 characters long', 'error')
+      addToast({ type: 'error', title: 'Password must be at least 8 characters long' })
       return
     }
 
@@ -208,9 +199,9 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
         confirmPassword: ''
       }))
       
-      addToast('Password changed successfully!', 'success')
+      addToast({ type: 'success', title: 'Password changed successfully!' })
     } catch (error) {
-      addToast('Failed to change password. Please try again.', 'error')
+      addToast({ type: 'error', title: 'Failed to change password. Please try again.' })
     } finally {
       setIsLoading(false)
     }
@@ -235,9 +226,9 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
       
-      addToast('Account data exported successfully!', 'success')
+      addToast({ type: 'success', title: 'Account data exported successfully!' })
     } catch (error) {
-      addToast('Failed to export data. Please try again.', 'error')
+      addToast({ type: 'error', title: 'Failed to export data. Please try again.' })
     }
   }
 
@@ -249,9 +240,9 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
         await new Promise(resolve => setTimeout(resolve, 2000))
         
         logout()
-        addToast('Account deleted successfully', 'success')
+        addToast({ type: 'success', title: 'Account deleted successfully' })
       } catch (error) {
-        addToast('Failed to delete account. Please try again.', 'error')
+        addToast({ type: 'error', title: 'Failed to delete account. Please try again.' })
       } finally {
         setIsLoading(false)
       }
