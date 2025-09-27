@@ -256,8 +256,8 @@ const LandingPage: React.FC = () => {
         )}
       </header>
 
-             {/* Simple Animated Background - CSS-based mesh effect */}
-             <SimpleAnimatedBackground />
+      {/* Simple Animated Background - CSS-based mesh effect */}
+      <SimpleAnimatedBackground />
 
       {/* Hero Section */}
       <section ref={heroRef} className="relative z-10 min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8">
@@ -307,23 +307,23 @@ const LandingPage: React.FC = () => {
             </button>
           </motion.div>
 
-                 <motion.div
-                   initial={{ opacity: 0 }}
-                   animate={heroInView ? { opacity: 1 } : { opacity: 0 }}
-                   transition={{ duration: 0.8, delay: 0.4 }}
-                   className="mt-12"
-                 >
-                   <div className="bg-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-gray-700/50 max-w-4xl mx-auto">
-                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                       {features.map((feature, index) => (
-                         <div key={index} className="flex items-center gap-3 text-center sm:text-left">
-                           <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                           <span className="text-white font-medium">{feature}</span>
-                         </div>
-                       ))}
-                     </div>
-                   </div>
-                 </motion.div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={heroInView ? { opacity: 1 } : { opacity: 0 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
+            className="mt-12"
+          >
+            <div className="bg-gray-800/60 backdrop-blur-sm rounded-2xl p-6 border border-gray-700/50 max-w-4xl mx-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {features.map((feature, index) => (
+                  <div key={index} className="flex items-center gap-3 text-center sm:text-left">
+                    <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
+                    <span className="text-white font-medium">{feature}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
         </div>
       </section>
 
@@ -567,6 +567,3 @@ const LandingPage: React.FC = () => {
 }
 
 export default LandingPage
-// Force deployment update Mon Sep 22 21:23:21 EDT 2025
-// Force Vercel deployment update Mon Sep 22 21:42:37 EDT 2025
-// Fix landing page loading issue - Wed Sep 25 19:00:00 EDT 2025
