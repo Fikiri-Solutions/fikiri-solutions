@@ -6,13 +6,10 @@ import {
   ArrowLeft, 
   Mail, 
   Users, 
-  Settings, 
   Brain,
-  Building2,
-  Shield,
   Zap,
-  Info,
-  Star
+  Star,
+  Info
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from './Toast'
@@ -33,7 +30,6 @@ interface Step {
 
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ 
   isOpen, 
-  onClose, 
   onComplete 
 }) => {
   const { user, updateUser } = useAuth()
@@ -238,7 +234,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       }
       updateUser(updatedUser)
     }
-    addToast('Welcome to Fikiri! Your workspace is ready.', 'success')
+    addToast({ type: 'success', title: 'Welcome to Fikiri! Your workspace is ready.' })
     onComplete()
   }
 

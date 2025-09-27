@@ -31,7 +31,7 @@ const TermsOfService: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <Link to="/home" className="flex items-center">
-                <FikiriLogo size="md" variant="default" />
+                <FikiriLogo size="md" variant="full" />
               </Link>
               <div>
                 <h1 className="text-2xl font-bold text-brand-text dark:text-white font-serif">
