@@ -1,9 +1,4 @@
 import React from 'react'
-import { motion, useInView } from 'framer-motion'
-import { useRef, useState } from 'react'
-import SimpleAnimatedBackground from '../components/SimpleAnimatedBackground'
-import { FikiriLogo } from '../components/FikiriLogo'
-import DemoVideoModal from '../components/DemoVideoModal'
 import { 
   ArrowRight, 
   Mail, 
@@ -18,8 +13,6 @@ import {
 } from 'lucide-react'
 
 const LandingPage: React.FC = () => {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isDemoVideoOpen, setIsDemoVideoOpen] = useState(false)
 
   const valueProps = [
     {
