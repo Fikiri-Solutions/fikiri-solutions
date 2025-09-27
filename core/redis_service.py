@@ -45,29 +45,33 @@ class RedisService:
             return
             
         try:
-            if hasattr(self.config, 'redis_url') and self.config.redis_url:
-                # Use Redis URL if available
-                self.redis_client = redis.from_url(
-                    self.config.redis_url,
-                    decode_responses=True,
-                    socket_connect_timeout=5,
-                    socket_timeout=5
-                )
+            if REDIS_AVAILABLE:
+                if hasattr(self.config, 'redis_url') and self.config.redis_url:
+                    # Use Redis URL if available
+                    self.redis_client = redis.from_url(
+                        self.config.redis_url,
+                        decode_responses=True,
+                        socket_connect_timeout=5,
+                        socket_timeout=5
+                    )
+                else:
+                    # Use individual connection parameters
+                    self.redis_client = redis.Redis(
+                        host=getattr(self.config, 'redis_host', 'localhost'),
+                        port=getattr(self.config, 'redis_port', 6379),
+                        password=getattr(self.config, 'redis_password', None),
+                        db=getattr(self.config, 'redis_db', 0),
+                        decode_responses=True,
+                        socket_connect_timeout=5,
+                        socket_timeout=5
+                    )
             else:
-                # Use individual connection parameters
-                self.redis_client = redis.Redis(
-                    host=getattr(self.config, 'redis_host', 'localhost'),
-                    port=getattr(self.config, 'redis_port', 6379),
-                    password=getattr(self.config, 'redis_password', None),
-                    db=getattr(self.config, 'redis_db', 0),
-                    decode_responses=True,
-                    socket_connect_timeout=5,
-                    socket_timeout=5
-                )
+                self.redis_client = None
             
             # Test connection
-            self.redis_client.ping()
-            logger.info("✅ Connected to Redis Cloud successfully")
+            if self.redis_client:
+                self.redis_client.ping()
+                logger.info("✅ Connected to Redis Cloud successfully")
             
         except Exception as e:
             logger.error(f"❌ Failed to connect to Redis: {e}")
@@ -336,6 +340,6 @@ class RedisService:
 # Global Redis service instance
 redis_service = RedisService()
 
-def get_redis_client() -> Optional[redis.Redis]:
+def get_redis_client():
     """Get Redis client instance."""
     return redis_service.redis_client
