@@ -3607,21 +3607,6 @@ if __name__ == '__main__':
 </html>
 """
 
-# Sentry Test Routes
-@app.route('/api/sentry-test', methods=['GET'])
-def sentry_test():
-    """Test Sentry integration by triggering an error."""
-    try:
-        # This will trigger a Sentry error for testing
-        1/0  # raises a ZeroDivisionError
-    except Exception as e:
-        # Capture the exception in Sentry
-        sentry_sdk.capture_exception(e)
-        return jsonify({
-            'message': 'Sentry test error triggered',
-            'error': str(e),
-            'status': 'error_sent_to_sentry'
-        }), 500
 
 @app.route('/api/sentry-performance-test', methods=['GET'])
 def sentry_performance_test():
