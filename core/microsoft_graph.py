@@ -8,9 +8,23 @@ import json
 import logging
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
-import requests
-from msal import ConfidentialClientApplication, PublicClientApplication
 import time
+
+# Optional dependencies
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
+    requests = None
+
+try:
+    from msal import ConfidentialClientApplication, PublicClientApplication
+    MSAL_AVAILABLE = True
+except ImportError:
+    MSAL_AVAILABLE = False
+    ConfidentialClientApplication = None
+    PublicClientApplication = None
 
 logger = logging.getLogger(__name__)
 

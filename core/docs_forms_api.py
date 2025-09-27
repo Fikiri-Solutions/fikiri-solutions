@@ -9,8 +9,16 @@ import io
 from typing import Dict, Any, List, Optional, Union
 from datetime import datetime
 from flask import Blueprint, request, jsonify, send_file
-from werkzeug.utils import secure_filename
 import uuid
+
+# Optional dependencies
+try:
+    from werkzeug.utils import secure_filename
+    WERKZEUG_AVAILABLE = True
+except ImportError:
+    WERKZEUG_AVAILABLE = False
+    def secure_filename(filename):
+        return filename
 
 from core.ai_document_processor import get_document_processor
 from core.form_automation_system import get_form_automation

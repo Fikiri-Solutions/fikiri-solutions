@@ -6,12 +6,25 @@ iCloud Mail API integration using CloudKit
 
 import os
 import json
-import requests
-import jwt
 import time
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import base64
+
+# Optional dependencies
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
+    requests = None
+
+try:
+    import jwt
+    JWT_AVAILABLE = True
+except ImportError:
+    JWT_AVAILABLE = False
+    jwt = None
 
 class AppleiCloudProvider:
     """Apple iCloud Mail provider using CloudKit API."""

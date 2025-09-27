@@ -10,11 +10,45 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-import psutil
-from core.redis_service import redis_service
-from core.redis_queues import email_queue, ai_queue, crm_queue, webhook_queue
-from core.redis_cache import fikiri_cache
-from core.redis_sessions import session_manager
+
+# Optional dependencies
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    psutil = None
+
+try:
+    from core.redis_service import redis_service
+    REDIS_SERVICE_AVAILABLE = True
+except ImportError:
+    REDIS_SERVICE_AVAILABLE = False
+    redis_service = None
+
+try:
+    from core.redis_queues import email_queue, ai_queue, crm_queue, webhook_queue
+    REDIS_QUEUES_AVAILABLE = True
+except ImportError:
+    REDIS_QUEUES_AVAILABLE = False
+    email_queue = None
+    ai_queue = None
+    crm_queue = None
+    webhook_queue = None
+
+try:
+    from core.redis_cache import fikiri_cache
+    REDIS_CACHE_AVAILABLE = True
+except ImportError:
+    REDIS_CACHE_AVAILABLE = False
+    fikiri_cache = None
+
+try:
+    from core.redis_sessions import session_manager
+    REDIS_SESSIONS_AVAILABLE = True
+except ImportError:
+    REDIS_SESSIONS_AVAILABLE = False
+    session_manager = None
 
 logger = logging.getLogger(__name__)
 

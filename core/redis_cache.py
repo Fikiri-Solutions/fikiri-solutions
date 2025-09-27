@@ -4,14 +4,27 @@ Redis Production Cache Layer for Fikiri Solutions
 High-performance caching for AI responses, email parsing, and lead scoring
 """
 
-import redis
 import json
 import time
 import hashlib
 import logging
 from typing import Optional, Dict, Any, List, Union
 from functools import wraps
-from core.minimal_config import get_config
+
+# Optional Redis integration
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    redis = None
+
+try:
+    from core.minimal_config import get_config
+    CONFIG_AVAILABLE = True
+except ImportError:
+    CONFIG_AVAILABLE = False
+    get_config = None
 
 logger = logging.getLogger(__name__)
 

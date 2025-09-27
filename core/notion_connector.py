@@ -8,8 +8,21 @@ import logging
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from datetime import datetime
-import requests
-from core.minimal_config import get_config
+
+# Optional dependencies
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
+    requests = None
+
+try:
+    from core.minimal_config import get_config
+    CONFIG_AVAILABLE = True
+except ImportError:
+    CONFIG_AVAILABLE = False
+    get_config = None
 
 logger = logging.getLogger(__name__)
 

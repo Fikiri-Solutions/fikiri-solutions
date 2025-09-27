@@ -408,11 +408,14 @@ def init_api_docs(app: Flask):
     app.register_blueprint(api_bp)
     
     # Add CORS support for API docs
-    from flask_cors import CORS
-    CORS(app, resources={
-        r"/api/*": {
-            "origins": ["http://localhost:3000", "https://fikirisolutions.com"],
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"]
-        }
-    })
+    try:
+        from flask_cors import CORS
+        CORS(app, resources={
+            r"/api/*": {
+                "origins": ["http://localhost:3000", "https://fikirisolutions.com"],
+                "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+                "allow_headers": ["Content-Type", "Authorization"]
+            }
+        })
+    except ImportError:
+        print("⚠️  flask-cors not available, skipping CORS configuration")

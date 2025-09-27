@@ -4,13 +4,34 @@ Redis Rate Limiting Middleware for Fikiri Solutions
 Distributed rate limiting across all server instances
 """
 
-import redis
 import time
 import logging
 from typing import Dict, Any, Optional
-from flask import request, jsonify, g
 from functools import wraps
-from core.minimal_config import get_config
+
+# Optional Redis integration
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    redis = None
+
+try:
+    from flask import request, jsonify, g
+    FLASK_AVAILABLE = True
+except ImportError:
+    FLASK_AVAILABLE = False
+    request = None
+    jsonify = None
+    g = None
+
+try:
+    from core.minimal_config import get_config
+    CONFIG_AVAILABLE = True
+except ImportError:
+    CONFIG_AVAILABLE = False
+    get_config = None
 
 logger = logging.getLogger(__name__)
 

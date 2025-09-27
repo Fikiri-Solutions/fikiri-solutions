@@ -14,11 +14,31 @@ import tarfile
 from datetime import datetime, timedelta
 from pathlib import Path
 import logging
-import schedule
+# Optional dependencies
+try:
+    import schedule
+    SCHEDULE_AVAILABLE = True
+except ImportError:
+    SCHEDULE_AVAILABLE = False
+    schedule = None
+
+try:
+    import boto3
+    from botocore.exceptions import ClientError
+    BOTO3_AVAILABLE = True
+except ImportError:
+    BOTO3_AVAILABLE = False
+    boto3 = None
+    ClientError = None
+
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    redis = None
+
 import time
-import boto3
-from botocore.exceptions import ClientError
-import redis
 from typing import Dict, Any, Optional, List
 
 # Configure logging

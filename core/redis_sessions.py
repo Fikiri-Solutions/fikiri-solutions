@@ -4,14 +4,35 @@ Redis Session Management for Fikiri Solutions
 Replace Flask's in-memory sessions with Redis-backed sessions
 """
 
-import redis
 import json
 import time
 import uuid
 import logging
 from typing import Optional, Dict, Any, List
-from flask import session, request, g
-from core.minimal_config import get_config
+
+# Optional Redis integration
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    redis = None
+
+try:
+    from flask import session, request, g
+    FLASK_AVAILABLE = True
+except ImportError:
+    FLASK_AVAILABLE = False
+    session = None
+    request = None
+    g = None
+
+try:
+    from core.minimal_config import get_config
+    CONFIG_AVAILABLE = True
+except ImportError:
+    CONFIG_AVAILABLE = False
+    get_config = None
 
 logger = logging.getLogger(__name__)
 
