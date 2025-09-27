@@ -3050,72 +3050,28 @@ def mailchimp_webhook():
         print(f"❌ Mailchimp webhook error: {e}")
         return jsonify({'success': False, 'error': 'Webhook processing failed'}), 500
 
+# Sentry Test Routes
+@app.route('/api/sentry-test', methods=['GET'])
+def sentry_test():
+    """Test Sentry integration by triggering an error."""
+    try:
+        # This will trigger a Sentry error for testing
+        1/0  # raises a ZeroDivisionError
+    except Exception as e:
+        # Capture the exception in Sentry
+        sentry_sdk.capture_exception(e)
+        return jsonify({
+            'message': 'Sentry test error triggered',
+            'error': str(e),
+            'sentry_captured': True
+        }), 200
+
 if __name__ == '__main__':
     # Create templates directory if it doesn't exist
     templates_dir = Path('templates')
     templates_dir.mkdir(exist_ok=True)
     
-    # Create basic dashboard template
-    dashboard_html = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fikiri Solutions - Dashboard</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .header { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-        .services { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
-        .service { background: white; padding: 20px; border-radius: 8px; }
-        .status { padding: 5px 10px; border-radius: 4px; color: white; font-size: 12px; }
-        .active { background: #10b981; }
-        .inactive { background: #ef4444; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🚀 Fikiri Solutions - Backend Dashboard</h1>
-            <p>All services are running and ready for production!</p>
-        </div>
-        <div class="services">
-            <div class="service">
-                <h3>AI Assistant</h3>
-                <span class="status active">Active</span>
-                <p>AI-powered email responses and lead analysis</p>
-            </div>
-            <div class="service">
-                <h3>CRM Service</h3>
-                <span class="status active">Active</span>
-                <p>Lead management and customer relationships</p>
-            </div>
-            <div class="service">
-                <h3>Email Parser</h3>
-                <span class="status active">Active</span>
-                <p>Email processing and content extraction</p>
-            </div>
-            <div class="service">
-                <h3>Automation Engine</h3>
-                <span class="status active">Active</span>
-                <p>Automated workflows and email actions</p>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
-    """
     
-    with open('templates/dashboard.html', 'w') as f:
-        f.write(dashboard_html)
-    
-    print("🚀 Starting Fikiri Flask Application...")
-    base_url = os.getenv('BASE_URL', 'http://localhost:8081')
-    print(f"📊 Dashboard: {base_url}")
-    print(f"🔧 API Endpoints: {base_url}/api/")
-    
-    # Flask app will be started at the end of the file
 
 # Dashboard Data Endpoints
 @app.route('/api/services', methods=['GET'])
@@ -3601,8 +3557,7 @@ if __name__ == '__main__':
     templates_dir.mkdir(exist_ok=True)
     
     # Create basic dashboard template
-    dashboard_html = """
-<!DOCTYPE html>
+    dashboard_html = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -3650,19 +3605,7 @@ if __name__ == '__main__':
     </div>
 </body>
 </html>
-    """
-    
-    with open('templates/dashboard.html', 'w') as f:
-        f.write(dashboard_html)
-    
-    print("🚀 Starting Fikiri Flask Application...")
-    base_url = os.getenv('BASE_URL', 'http://localhost:8081')
-    print(f"📊 Dashboard: {base_url}")
-    print(f"🔧 API Endpoints: {base_url}/api/")
-    
-    # Run Flask app (SocketIO disabled for now)
-    debug_mode = os.getenv('DEBUG', 'false').lower() == 'true'
-    app.run(debug=debug_mode, host='0.0.0.0', port=int(os.getenv('PORT', 8081)))
+"""
 
 # Sentry Test Routes
 @app.route('/api/sentry-test', methods=['GET'])
@@ -3766,9 +3709,9 @@ if __name__ == '__main__':
     templates_dir = Path('templates')
     templates_dir.mkdir(exist_ok=True)
     
-    # Create basic dashboard template
-    dashboard_html = """
-<!DOCTYPE html>
+    
+    # Write dashboard template
+    dashboard_html = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -3812,10 +3755,8 @@ if __name__ == '__main__':
         </div>
     </div>
 </body>
-</html>
-"""
+</html>"""
     
-    # Write dashboard template
     dashboard_path = templates_dir / 'dashboard.html'
     dashboard_path.write_text(dashboard_html)
     
