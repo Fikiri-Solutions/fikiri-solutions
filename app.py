@@ -2327,6 +2327,25 @@ def api_restore_backup():
         logger.error(f"Error restoring backup: {e}")
         return create_error_response("Failed to restore backup", 500, "BACKUP_ERROR")
 
+@app.route('/', methods=['GET'])
+def index():
+    """Root endpoint - API information."""
+    return jsonify({
+        'message': 'Fikiri Solutions API',
+        'status': 'running',
+        'version': '1.0.0',
+        'timestamp': datetime.now().isoformat(),
+        'endpoints': {
+            'health': '/api/health',
+            'auth': '/api/auth/*',
+            'email': '/api/email/*',
+            'crm': '/api/crm/*',
+            'ai': '/api/ai/*',
+            'docs': '/api/docs'
+        },
+        'frontend': 'https://fikirisolutions.com'
+    })
+
 @app.route('/api/health', methods=['GET'])
 def api_health():
     """Health check endpoint for deployment monitoring."""
