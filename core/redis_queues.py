@@ -4,7 +4,6 @@ Redis Queues for Background Jobs - Fikiri Solutions
 Async task processing with Redis as message broker
 """
 
-import redis
 import json
 import time
 import uuid
@@ -12,7 +11,21 @@ import logging
 from typing import Dict, Any, Optional, Callable, List
 from enum import Enum
 from dataclasses import dataclass
-from core.minimal_config import get_config
+
+# Optional Redis integration
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    redis = None
+
+try:
+    from core.minimal_config import get_config
+    CONFIG_AVAILABLE = True
+except ImportError:
+    CONFIG_AVAILABLE = False
+    get_config = None
 
 logger = logging.getLogger(__name__)
 

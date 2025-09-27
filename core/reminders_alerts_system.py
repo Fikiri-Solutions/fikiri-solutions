@@ -8,9 +8,28 @@ import logging
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-import redis
-from core.minimal_config import get_config
-from core.database_optimization import db_optimizer
+
+# Optional Redis integration
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    redis = None
+
+try:
+    from core.minimal_config import get_config
+    CONFIG_AVAILABLE = True
+except ImportError:
+    CONFIG_AVAILABLE = False
+    get_config = None
+
+try:
+    from core.database_optimization import db_optimizer
+    DB_OPTIMIZER_AVAILABLE = True
+except ImportError:
+    DB_OPTIMIZER_AVAILABLE = False
+    db_optimizer = None
 
 logger = logging.getLogger(__name__)
 

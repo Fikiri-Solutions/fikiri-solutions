@@ -5,7 +5,6 @@ Simulates high load to test system performance and identify bottlenecks.
 """
 
 import asyncio
-import aiohttp
 import time
 import json
 import statistics
@@ -13,6 +12,14 @@ from typing import List, Dict, Any
 from dataclasses import dataclass
 import argparse
 import sys
+
+# Optional dependencies
+try:
+    import aiohttp
+    AIOHTTP_AVAILABLE = True
+except ImportError:
+    AIOHTTP_AVAILABLE = False
+    aiohttp = None
 
 @dataclass
 class LoadTestResult:

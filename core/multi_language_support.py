@@ -8,8 +8,21 @@ import logging
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
-import openai
-from core.minimal_config import get_config
+
+# Optional dependencies
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    openai = None
+
+try:
+    from core.minimal_config import get_config
+    CONFIG_AVAILABLE = True
+except ImportError:
+    CONFIG_AVAILABLE = False
+    get_config = None
 
 logger = logging.getLogger(__name__)
 

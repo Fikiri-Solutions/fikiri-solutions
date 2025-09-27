@@ -8,11 +8,42 @@ import logging
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-import openai
-from core.minimal_config import get_config
-from core.gmail_oauth import gmail_oauth_manager
-from core.database_optimization import db_optimizer
-from core.email_action_handlers import get_email_action_handler
+
+# Optional dependencies
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    openai = None
+
+try:
+    from core.minimal_config import get_config
+    CONFIG_AVAILABLE = True
+except ImportError:
+    CONFIG_AVAILABLE = False
+    get_config = None
+
+try:
+    from core.gmail_oauth import gmail_oauth_manager
+    GMAIL_OAUTH_AVAILABLE = True
+except ImportError:
+    GMAIL_OAUTH_AVAILABLE = False
+    gmail_oauth_manager = None
+
+try:
+    from core.database_optimization import db_optimizer
+    DB_OPTIMIZER_AVAILABLE = True
+except ImportError:
+    DB_OPTIMIZER_AVAILABLE = False
+    db_optimizer = None
+
+try:
+    from core.email_action_handlers import get_email_action_handler
+    EMAIL_ACTION_HANDLERS_AVAILABLE = True
+except ImportError:
+    EMAIL_ACTION_HANDLERS_AVAILABLE = False
+    get_email_action_handler = None
 
 logger = logging.getLogger(__name__)
 
