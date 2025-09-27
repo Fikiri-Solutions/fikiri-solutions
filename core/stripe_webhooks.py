@@ -43,19 +43,26 @@ class StripeWebhookHandler:
             return None
             
         try:
-            event = stripe.Webhook.construct_event(
-                payload, sig_header, self.webhook_secret
-            )
-            return event
+            if STRIPE_AVAILABLE:
+                event = stripe.Webhook.construct_event(
+                    payload, sig_header, self.webhook_secret
+                )
+                return event
+            else:
+                logger.warning("Stripe not available, skipping webhook verification")
+                return None
         except ValueError as e:
             logger.error(f"Invalid payload: {e}")
             raise
-        except stripe.error.SignatureVerificationError as e:
-            logger.error(f"Invalid signature: {e}")
+        except Exception as e:
+            logger.error(f"Webhook verification error: {e}")
             raise
     
-    def handle_event(self, event: stripe.Event) -> Dict[str, Any]:
+    def handle_event(self, event) -> Dict[str, Any]:
         """Route webhook events to appropriate handlers"""
+        if not event:
+            return {'status': 'error', 'message': 'No event data'}
+            
         event_type = event['type']
         
         handlers = {
