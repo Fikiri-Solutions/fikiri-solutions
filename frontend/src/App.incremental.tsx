@@ -4,6 +4,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { CustomizationProvider } from './contexts/CustomizationContext'
 import { ActivityProvider } from './contexts/ActivityContext'
+import { AuthProvider } from './contexts/AuthContext'
 
 function App() {
   try {
@@ -13,19 +14,21 @@ function App() {
           <ThemeProvider>
             <CustomizationProvider>
               <ActivityProvider>
-                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                  <div className="text-center">
-                    <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                      Fikiri Solutions
-                    </h1>
-                    <p className="text-xl text-gray-600 mb-4">
-                      Added ActivityProvider - testing incrementally
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Test deployment - {new Date().toISOString()}
-                    </p>
+                <AuthProvider>
+                  <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                    <div className="text-center">
+                      <h1 className="text-4xl font-bold text-gray-900 mb-4">
+                        Fikiri Solutions
+                      </h1>
+                      <p className="text-xl text-gray-600 mb-4">
+                        Added AuthProvider - testing incrementally
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Test deployment - {new Date().toISOString()}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                </AuthProvider>
               </ActivityProvider>
             </CustomizationProvider>
           </ThemeProvider>
