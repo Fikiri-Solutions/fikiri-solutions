@@ -3,6 +3,7 @@ import { BrowserRouter as Router } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { CustomizationProvider } from './contexts/CustomizationContext'
+import { ActivityProvider } from './contexts/ActivityContext'
 
 function App() {
   try {
@@ -11,19 +12,21 @@ function App() {
         <Router>
           <ThemeProvider>
             <CustomizationProvider>
-              <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                  <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                    Fikiri Solutions
-                  </h1>
-                  <p className="text-xl text-gray-600 mb-4">
-                    Added CustomizationProvider - testing incrementally
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Test deployment - {new Date().toISOString()}
-                  </p>
+              <ActivityProvider>
+                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                  <div className="text-center">
+                    <h1 className="text-4xl font-bold text-gray-900 mb-4">
+                      Fikiri Solutions
+                    </h1>
+                    <p className="text-xl text-gray-600 mb-4">
+                      Added ActivityProvider - testing incrementally
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Test deployment - {new Date().toISOString()}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              </ActivityProvider>
             </CustomizationProvider>
           </ThemeProvider>
         </Router>
