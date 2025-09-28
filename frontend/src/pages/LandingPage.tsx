@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react'
+import { useInView } from 'react-intersection-observer'
 import { 
   ArrowRight, 
   Mail, 
