@@ -27,9 +27,31 @@ import './index.css'
 // Initialize cache invalidation before app starts
 // initializeCacheInvalidation()
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-)
+// Add error handling for React rendering
+try {
+  const rootElement = document.getElementById('root')
+  if (!rootElement) {
+    throw new Error('Root element not found')
+  }
+  
+  const root = ReactDOM.createRoot(rootElement)
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  )
+} catch (error) {
+  console.error('React rendering error:', error)
+  // Fallback: show error message in the DOM
+  const rootElement = document.getElementById('root')
+  if (rootElement) {
+    rootElement.innerHTML = `
+      <div style="padding: 20px; text-align: center; font-family: Arial, sans-serif;">
+        <h1>Application Error</h1>
+        <p>Failed to load the application: ${error.message}</p>
+        <p>Please check the console for more details.</p>
+      </div>
+    `
+  }
+}
 

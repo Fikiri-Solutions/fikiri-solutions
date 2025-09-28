@@ -39,22 +39,23 @@ import { getFeatureConfig } from './config'
 import { useWarmRoutes } from './hooks/useWarmRoutes'
 
 function App() {
-  const features = getFeatureConfig()
-  useWarmRoutes() // Warm up routes after first paint
+  try {
+    const features = getFeatureConfig()
+    useWarmRoutes() // Warm up routes after first paint
 
-  return (
-    <ErrorBoundary>
-      <ThemeProvider>
-        <CustomizationProvider>
-          <ActivityProvider>
-            <AuthProvider>
-              <QueryProvider>
-                <ToastProvider>
-                  <Router>
-                    <ScrollToTop />
-                    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-                      <Suspense fallback={<PageLoader />}>
-                        <Routes>
+    return (
+      <ErrorBoundary>
+        <ThemeProvider>
+          <CustomizationProvider>
+            <ActivityProvider>
+              <AuthProvider>
+                <QueryProvider>
+                  <ToastProvider>
+                    <Router>
+                      <ScrollToTop />
+                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                        <Suspense fallback={<PageLoader />}>
+                          <Routes>
                           {/* Public routes - no authentication required */}
                           <Route path="/" element={<LandingPage />} />
                           <Route path="/pricing" element={<PricingPage />} />
@@ -170,6 +171,24 @@ function App() {
       </ThemeProvider>
     </ErrorBoundary>
   )
+  } catch (error) {
+    console.error('App component error:', error)
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center p-8">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Application Error</h1>
+          <p className="text-gray-600 mb-4">Failed to initialize the application</p>
+          <p className="text-sm text-gray-500">Error: {error.message}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Reload Page
+          </button>
+        </div>
+      </div>
+    )
+  }
 }
 
 export default App
