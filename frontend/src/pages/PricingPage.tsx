@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, useInView } from 'framer-motion';
+import { motion } from 'framer-motion';
+import { useInView } from 'react-intersection-observer';
 import { useRef } from 'react';
 import { FikiriLogo } from '../components/FikiriLogo';
 import SimpleAnimatedBackground from '../components/SimpleAnimatedBackground';
