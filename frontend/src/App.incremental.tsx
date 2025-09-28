@@ -1,5 +1,5 @@
 import React from 'react'
-import { BrowserRouter as Router } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { CustomizationProvider } from './contexts/CustomizationContext'
@@ -7,6 +7,7 @@ import { ActivityProvider } from './contexts/ActivityContext'
 import { AuthProvider } from './contexts/AuthContext'
 import { QueryProvider } from './providers/QueryProvider'
 import { ToastProvider } from './components/Toast'
+import LandingPage from './pages/LandingPage'
 
 function App() {
   try {
@@ -19,18 +20,10 @@ function App() {
                 <AuthProvider>
                   <QueryProvider>
                     <ToastProvider>
-                      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                        <div className="text-center">
-                          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                            Fikiri Solutions
-                          </h1>
-                          <p className="text-xl text-gray-600 mb-4">
-                            Added ToastProvider - testing incrementally
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            Test deployment - {new Date().toISOString()}
-                          </p>
-                        </div>
+                      <div className="min-h-screen bg-gray-50">
+                        <Routes>
+                          <Route path="/" element={<LandingPage />} />
+                        </Routes>
                       </div>
                     </ToastProvider>
                   </QueryProvider>
