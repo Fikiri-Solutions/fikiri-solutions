@@ -1,0 +1,46 @@
+import React from 'react'
+import { BrowserRouter as Router } from 'react-router-dom'
+import { ErrorBoundary } from './components/ErrorBoundary'
+
+function App() {
+  try {
+    return (
+      <ErrorBoundary>
+        <Router>
+          <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div className="text-center">
+              <h1 className="text-4xl font-bold text-gray-900 mb-4">
+                Fikiri Solutions
+              </h1>
+              <p className="text-xl text-gray-600 mb-4">
+                Router test - React is working!
+              </p>
+              <p className="text-sm text-gray-500">
+                Test deployment - {new Date().toISOString()}
+              </p>
+            </div>
+          </div>
+        </Router>
+      </ErrorBoundary>
+    )
+  } catch (error) {
+    console.error('App component error:', error)
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center p-8">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Application Error</h1>
+          <p className="text-gray-600 mb-4">Failed to initialize the application</p>
+          <p className="text-sm text-gray-500">Error: {error.message}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Reload Page
+          </button>
+        </div>
+      </div>
+    )
+  }
+}
+
+export default App
