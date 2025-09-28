@@ -2,6 +2,7 @@ import React from 'react'
 import { BrowserRouter as Router } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ThemeProvider } from './contexts/ThemeContext'
+import { CustomizationProvider } from './contexts/CustomizationContext'
 
 function App() {
   try {
@@ -9,19 +10,21 @@ function App() {
       <ErrorBoundary>
         <Router>
           <ThemeProvider>
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-              <div className="text-center">
-                <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                  Fikiri Solutions
-                </h1>
-                <p className="text-xl text-gray-600 mb-4">
-                  Added ThemeProvider - testing incrementally
-                </p>
-                <p className="text-sm text-gray-500">
-                  Test deployment - {new Date().toISOString()}
-                </p>
+            <CustomizationProvider>
+              <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                  <h1 className="text-4xl font-bold text-gray-900 mb-4">
+                    Fikiri Solutions
+                  </h1>
+                  <p className="text-xl text-gray-600 mb-4">
+                    Added CustomizationProvider - testing incrementally
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Test deployment - {new Date().toISOString()}
+                  </p>
+                </div>
               </div>
-            </div>
+            </CustomizationProvider>
           </ThemeProvider>
         </Router>
       </ErrorBoundary>
