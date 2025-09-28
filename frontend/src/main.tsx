@@ -1,7 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 // import * as Sentry from '@sentry/react'
-import App from './App.router-test'
+import App from './App.incremental'
 import './index.css'
 // import { initializeCacheInvalidation } from './utils/cacheInvalidation'
 
