@@ -6,6 +6,7 @@ import { CustomizationProvider } from './contexts/CustomizationContext'
 import { ActivityProvider } from './contexts/ActivityContext'
 import { AuthProvider } from './contexts/AuthContext'
 import { QueryProvider } from './providers/QueryProvider'
+import { ToastProvider } from './components/Toast'
 
 function App() {
   try {
@@ -17,19 +18,21 @@ function App() {
               <ActivityProvider>
                 <AuthProvider>
                   <QueryProvider>
-                    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                      <div className="text-center">
-                        <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                          Fikiri Solutions
-                        </h1>
-                        <p className="text-xl text-gray-600 mb-4">
-                          Added QueryProvider - testing incrementally
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          Test deployment - {new Date().toISOString()}
-                        </p>
+                    <ToastProvider>
+                      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                        <div className="text-center">
+                          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+                            Fikiri Solutions
+                          </h1>
+                          <p className="text-xl text-gray-600 mb-4">
+                            Added ToastProvider - testing incrementally
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Test deployment - {new Date().toISOString()}
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    </ToastProvider>
                   </QueryProvider>
                 </AuthProvider>
               </ActivityProvider>
