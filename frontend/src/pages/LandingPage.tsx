@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react'
 import { useInView } from 'react-intersection-observer'
+import { motion } from 'framer-motion'
 import { 
   ArrowRight, 
   Mail, 
@@ -12,8 +13,14 @@ import {
   Menu,
   X
 } from 'lucide-react'
+import FikiriLogo from '@/components/FikiriLogo'
+import SimpleAnimatedBackground from '@/components/SimpleAnimatedBackground'
+import DemoVideoModal from '@/components/DemoVideoModal'
 
 const LandingPage: React.FC = () => {
+  // State for mobile menu and demo video
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isDemoVideoOpen, setIsDemoVideoOpen] = useState(false)
 
   const valueProps = [
     {
