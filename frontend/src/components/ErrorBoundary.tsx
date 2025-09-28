@@ -117,15 +117,20 @@ export class ErrorBoundary extends Component<Props, State> {
               </div>
             </div>
             
-            {process.env.NODE_ENV === 'development' && this.state.error && (
+            {/* Always show error details for debugging */}
+            {this.state.error && (
               <details className="mt-6">
                 <summary className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-gray-100">
-                  Error Details (Development Only)
+                  Error Details (Click to expand)
                 </summary>
-                <pre className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900 p-3 rounded overflow-auto max-h-40">
-                  {this.state.error.message}
-                  {this.state.errorInfo?.componentStack}
-                </pre>
+                <div className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900 p-3 rounded overflow-auto max-h-40">
+                  <div className="font-bold mb-2">Error Message:</div>
+                  <div className="mb-4">{this.state.error.message}</div>
+                  <div className="font-bold mb-2">Component Stack:</div>
+                  <div className="mb-4 whitespace-pre-wrap">{this.state.errorInfo?.componentStack}</div>
+                  <div className="font-bold mb-2">Error Stack:</div>
+                  <div className="whitespace-pre-wrap">{this.state.error.stack}</div>
+                </div>
               </details>
             )}
           </div>
