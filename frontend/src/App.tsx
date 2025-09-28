@@ -45,13 +45,13 @@ function App() {
 
     return (
       <ErrorBoundary>
-        <ThemeProvider>
-          <CustomizationProvider>
-            <ActivityProvider>
-              <AuthProvider>
-                <QueryProvider>
-                  <ToastProvider>
-                    <Router>
+        <Router>
+          <ThemeProvider>
+            <CustomizationProvider>
+              <ActivityProvider>
+                <AuthProvider>
+                  <QueryProvider>
+                    <ToastProvider>
                       <ScrollToTop />
                       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
                         <Suspense fallback={<PageLoader />}>
@@ -162,15 +162,15 @@ function App() {
                     </div>
                     <Analytics />
                     <SpeedInsights />
-                  </Router>
-                </ToastProvider>
-              </QueryProvider>
-            </AuthProvider>
-          </ActivityProvider>
-        </CustomizationProvider>
-      </ThemeProvider>
-    </ErrorBoundary>
-  )
+                    </ToastProvider>
+                  </QueryProvider>
+                </AuthProvider>
+              </ActivityProvider>
+            </CustomizationProvider>
+          </ThemeProvider>
+        </Router>
+      </ErrorBoundary>
+    )
   } catch (error) {
     console.error('App component error:', error)
     return (
