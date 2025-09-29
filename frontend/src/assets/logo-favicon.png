@@ -1,0 +1,55 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Sunset gradient matching the clean image -->
+    <linearGradient id="sunsetGradient" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" style="stop-color:#F97316;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#FF8C42;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#EF4444;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main circular logo -->
+  <circle cx="16" cy="16" r="14" stroke="#4A2C2A" stroke-width="1" fill="none"/>
+  <circle cx="16" cy="16" r="13" fill="url(#sunsetGradient)"/>
+  
+  <!-- Horizon lines -->
+  <path d="M6 19 Q11 18 16 18 T26 19" stroke="#4A2C2A" stroke-width="0.5" fill="none" opacity="0.6"/>
+  <path d="M8 21 Q13 19 16 20 T24 21" stroke="#4A2C2A" stroke-width="0.4" fill="none" opacity="0.4"/>
+  
+  <!-- Authentic Baobab Tree Design -->
+  <!-- Main trunk - thick and characteristic -->
+  <path d="M14 26 L18 26 L18 14 C18 13 19 11 16 11 C13 11 14 13 14 14 L14 26 Z" fill="#4A2C2A"/>
+  
+  <!-- Secondary trunk sections for gnarled appearance -->
+  <path d="M15 26 L17 26 L17 16 C17 15 17 15 16 15 C15 15 15 15 15 16 L15 26 Z" fill="#4A2C2A" opacity="0.8"/>
+  
+  <!-- Proper Baobab Branches - straight and sparse -->
+  <!-- Left branch -->
+  <path d="M14 14 L10 12" stroke="#4A2C2A" stroke-width="1.5" fill="none"/>
+  <path d="M14 14 L12 10" stroke="#4A2C2A" stroke-width="1" fill="none"/>
+  
+  <!-- Right branch -->
+  <path d="M18 14 L22 12" stroke="#4A2C2A" stroke-width="1.5" fill="none"/>
+  <path d="M18 14 L20 10" stroke="#4A2C2A" stroke-width="1" fill="none"/>
+  
+  <!-- Upper branches -->
+  <path d="M16 11 L14 8" stroke="#4A2C2A" stroke-width="1" fill="none"/>
+  <path d="M16 11 L18 8" stroke="#4A2C2A" stroke-width="1" fill="none"/>
+  
+  <!-- Dense reddish-brown canopy clusters -->
+  <!-- Main canopy -->
+  <circle cx="16" cy="8" r="6" fill="#4A2C2A" opacity="0.9"/>
+  
+  <!-- Left canopy cluster -->
+  <circle cx="11" cy="6" r="4" fill="#4A2C2A" opacity="0.8"/>
+  <circle cx="9" cy="8" r="3" fill="#4A2C2A" opacity="0.7"/>
+  
+  <!-- Right canopy cluster -->
+  <circle cx="21" cy="6" r="4" fill="#4A2C2A" opacity="0.8"/>
+  <circle cx="23" cy="8" r="3" fill="#4A2C2A" opacity="0.7"/>
+  
+  <!-- Top canopy cluster -->
+  <circle cx="16" cy="3" r="4" fill="#4A2C2A" opacity="0.9"/>
+  <circle cx="14" cy="3" r="2" fill="#4A2C2A" opacity="0.8"/>
+  <circle cx="18" cy="3" r="2" fill="#4A2C2A" opacity="0.8"/>
+</svg>

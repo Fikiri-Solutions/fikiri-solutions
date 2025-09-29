@@ -1,8 +1,8 @@
 import React from 'react';
-import logoFull from '../assets/logo-full.svg';
-import logoCircle from '../assets/logo-circle.svg';
-import logoMonochrome from '../assets/logo-monochrome.svg';
-import logoWhite from '../assets/logo-white.svg';
+import logoFull from '../assets/logo-full.png';
+import logoCircle from '../assets/logo-circle.png';
+import logoMonochrome from '../assets/logo-monochrome.png';
+import logoWhite from '../assets/logo-white.png';
 
 interface FikiriLogoProps {
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
