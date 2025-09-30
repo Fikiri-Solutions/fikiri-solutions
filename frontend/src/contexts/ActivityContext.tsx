@@ -36,20 +36,24 @@ export const ActivityProvider: React.FC<ActivityProviderProps> = ({ children }) 
 
   // Load activities from localStorage on mount
   useEffect(() => {
-    const savedActivities = localStorage.getItem('fikiri-activities')
-    if (savedActivities) {
-      try {
-        const parsed = JSON.parse(savedActivities)
-        setActivities(parsed)
-      } catch (error) {
-        console.error('Failed to parse saved activities:', error)
+    if (typeof window !== 'undefined') {
+      const savedActivities = localStorage.getItem('fikiri-activities')
+      if (savedActivities) {
+        try {
+          const parsed = JSON.parse(savedActivities)
+          setActivities(parsed)
+        } catch (error) {
+          console.error('Failed to parse saved activities:', error)
+        }
       }
     }
   }, [])
 
   // Save activities to localStorage whenever activities change
   useEffect(() => {
-    localStorage.setItem('fikiri-activities', JSON.stringify(activities))
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('fikiri-activities', JSON.stringify(activities))
+    }
   }, [activities])
 
   const addActivity = (activity: Omit<ActivityItem, 'id' | 'timestamp'>) => {
@@ -64,7 +68,9 @@ export const ActivityProvider: React.FC<ActivityProviderProps> = ({ children }) 
 
   const clearActivities = () => {
     setActivities([])
-    localStorage.removeItem('fikiri-activities')
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('fikiri-activities')
+    }
   }
 
   const getRecentActivities = (limit: number = 10) => {

@@ -271,7 +271,9 @@ export const OnboardingFlow: React.FC = () => {
         navigate('/onboarding/5')
       } else if (currentStep === 5) {
         // Complete onboarding
-        localStorage.setItem('fikiri-onboarding-completed', 'true')
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('fikiri-onboarding-completed', 'true')
+        }
         trackOnboardingComplete(user?.email || 'unknown', currentStep)
         addToast('Welcome to Fikiri! Your workspace is ready.', 'success')
         navigate('/home')
