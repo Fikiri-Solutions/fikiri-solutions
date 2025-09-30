@@ -24,14 +24,21 @@ export const Login: React.FC = () => {
   // Load saved credentials on component mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedEmail = localStorage.getItem('fikiri-remember-email')
-      const savedPassword = localStorage.getItem('fikiri-remember-password')
-      const savedRememberMe = localStorage.getItem('fikiri-remember-me')
-      
-      if (savedEmail && savedPassword && savedRememberMe === 'true') {
-        setEmail(savedEmail)
-        setPassword(savedPassword)
-        setRememberMe(true)
+      try {
+        const savedEmail = localStorage.getItem('fikiri-remember-email')
+        const savedPassword = localStorage.getItem('fikiri-remember-password')
+        const savedRememberMe = localStorage.getItem('fikiri-remember-me')
+        
+        console.log('Loading saved credentials:', { savedEmail, savedPassword: savedPassword ? '***' : null, savedRememberMe })
+        
+        if (savedEmail && savedPassword && savedRememberMe === 'true') {
+          setEmail(savedEmail)
+          setPassword(savedPassword)
+          setRememberMe(true)
+          console.log('Credentials loaded successfully')
+        }
+      } catch (error) {
+        console.error('Error loading saved credentials:', error)
       }
     }
   }, [])
@@ -95,14 +102,20 @@ export const Login: React.FC = () => {
       if (result.success) {
         // Handle remember me functionality
         if (typeof window !== 'undefined') {
-          if (rememberMe) {
-            localStorage.setItem('fikiri-remember-email', email)
-            localStorage.setItem('fikiri-remember-password', password)
-            localStorage.setItem('fikiri-remember-me', 'true')
-          } else {
-            localStorage.removeItem('fikiri-remember-email')
-            localStorage.removeItem('fikiri-remember-password')
-            localStorage.removeItem('fikiri-remember-me')
+          try {
+            if (rememberMe) {
+              localStorage.setItem('fikiri-remember-email', email)
+              localStorage.setItem('fikiri-remember-password', password)
+              localStorage.setItem('fikiri-remember-me', 'true')
+              console.log('Credentials saved for remember me')
+            } else {
+              localStorage.removeItem('fikiri-remember-email')
+              localStorage.removeItem('fikiri-remember-password')
+              localStorage.removeItem('fikiri-remember-me')
+              console.log('Credentials cleared')
+            }
+          } catch (error) {
+            console.error('Error saving credentials:', error)
           }
         }
         
@@ -414,9 +427,13 @@ export const Login: React.FC = () => {
                 </div>
 
                 <div className="text-sm">
-                  <a href="#" className="font-medium text-white hover:text-gray-200 transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/forgot-password')}
+                    className="font-medium text-white hover:text-gray-200 transition-colors"
+                  >
                     Forgot password?
-                  </a>
+                  </button>
                 </div>
               </div>
 
