@@ -43,6 +43,11 @@ export const Onboarding: React.FC = () => {
 
   const loadOnboardingStatus = async () => {
     try {
+      // Check if we're in the browser environment
+      if (typeof window === 'undefined') {
+        return
+      }
+
       // Get user ID from localStorage or session
       const userId = localStorage.getItem('fikiri-user-id')
       if (!userId) {
