@@ -25,21 +25,11 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
     const currentPath = location.pathname
     const shouldRedirect = redirectTo || getRedirectPath()
 
-    console.log('RouteGuard effect:', {
-      currentPath,
-      shouldRedirect,
-      requireAuth,
-      requireOnboarding,
-      isAuthenticated,
-      onboardingCompleted: user?.onboarding_completed,
-      isLoading
-    })
 
     // Handle authentication requirements
     if (requireAuth && !isAuthenticated) {
       // User needs to be authenticated but isn't
       if (currentPath !== '/login' && currentPath !== '/signup') {
-        console.log('RouteGuard: Redirecting to login (auth required)')
         navigate('/login')
       }
       return
@@ -49,7 +39,6 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
     if (requireOnboarding && isAuthenticated && !user?.onboarding_completed) {
       // User is authenticated but hasn't completed onboarding
       if (!currentPath.startsWith('/onboarding')) {
-        console.log('RouteGuard: Redirecting to onboarding (onboarding required)')
         navigate('/onboarding')
       }
       return
@@ -60,7 +49,6 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
       // Use getRedirectPath to determine where to send authenticated users
       const redirectPath = getRedirectPath()
       if (redirectPath !== currentPath) {
-        console.log('RouteGuard: Redirecting authenticated user from auth page to:', redirectPath)
         navigate(redirectPath)
       }
       return
@@ -68,14 +56,12 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
 
     // Handle users who haven't completed onboarding trying to access protected routes
     if (isAuthenticated && !user?.onboarding_completed && !currentPath.startsWith('/onboarding') && currentPath !== '/home') {
-      console.log('RouteGuard: Redirecting to onboarding (incomplete onboarding)')
       navigate('/onboarding')
       return
     }
 
     // Handle users who have completed onboarding trying to access onboarding pages
     if (isAuthenticated && user?.onboarding_completed && currentPath.startsWith('/onboarding')) {
-      console.log('RouteGuard: Redirecting to home (onboarding completed)')
       navigate('/home')
       return
     }
@@ -85,7 +71,6 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
         !currentPath.startsWith('/login') && 
         !currentPath.startsWith('/signup') && 
         !currentPath.startsWith('/onboarding-flow')) {
-      console.log('RouteGuard: Custom redirect to:', shouldRedirect)
       navigate(shouldRedirect)
       return
     }
