@@ -270,48 +270,46 @@ def api_login():
     email = data['email']
     password = data['password']
     
-    # For demo purposes, accept any password
-    user = security_manager.authenticate_user(email, password)
+    # Use the proper user authentication manager
+    auth_result = user_auth_manager.authenticate_user(email, password)
     
-    if user:
-        session_obj = security_manager.create_session(
-            user, 
-            request.remote_addr, 
-            request.headers.get('User-Agent', '')
-        )
-        
-        session['session_id'] = session_obj.session_id
-        session['user_id'] = user.id
-        
-        log_security_event(
-            event_type="user_login",
-            severity="info",
-            details={"user_id": user.id, "email": user.email}
-        )
-        
-        # Track business analytics
-        business_analytics.track_event('user_login', {
-            'user_id': user.id,
-            'email': user.email,
-            'login_method': 'email_password'
-        })
-        
-        return create_success_response({
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'name': user.name,
-                'role': user.role.value
-            },
-            'session_id': session_obj.session_id
-        }, "Login successful")
-    else:
+    if not auth_result or not auth_result.get('success'):
         log_security_event(
             event_type="failed_login",
             severity="warning",
             details={"email": email, "ip": request.remote_addr}
         )
         return create_error_response("Invalid credentials", 401, "INVALID_CREDENTIALS")
+    
+    user = auth_result['user']
+    
+    # Create session using the session from auth_result
+    session_data = auth_result['session']
+    session['session_id'] = session_data['session_id']
+    session['user_id'] = user.id
+    
+    log_security_event(
+        event_type="user_login",
+        severity="info",
+        details={"user_id": user.id, "email": user.email}
+    )
+    
+    # Track business analytics
+    business_analytics.track_event('user_login', {
+        'user_id': user.id,
+        'email': user.email,
+        'login_method': 'email_password'
+    })
+    
+    return create_success_response({
+        'user': {
+            'id': user.id,
+            'email': user.email,
+            'name': user.name,
+            'role': user.role
+        },
+        'session_id': session_data['session_id']
+    }, "Login successful")
 
 # Import new authentication modules
 from core.user_auth import user_auth_manager
