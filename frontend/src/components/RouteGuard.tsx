@@ -37,9 +37,8 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
     // Handle onboarding requirements
     if (requireOnboarding && isAuthenticated && !user?.onboarding_completed) {
       // User is authenticated but hasn't completed onboarding
-      const onboardingStep = user?.onboarding_step || 1
       if (!currentPath.startsWith('/onboarding')) {
-        navigate(`/onboarding/${onboardingStep}`)
+        navigate('/onboarding')
       }
       return
     }
@@ -49,16 +48,14 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
       if (user?.onboarding_completed) {
         navigate('/home')
       } else {
-        const onboardingStep = user?.onboarding_step || 1
-        navigate(`/onboarding/${onboardingStep}`)
+        navigate('/onboarding')
       }
       return
     }
 
     // Handle users who haven't completed onboarding trying to access protected routes
     if (isAuthenticated && !user?.onboarding_completed && !currentPath.startsWith('/onboarding')) {
-      const onboardingStep = user?.onboarding_step || 1
-      navigate(`/onboarding/${onboardingStep}`)
+      navigate('/onboarding')
       return
     }
 
