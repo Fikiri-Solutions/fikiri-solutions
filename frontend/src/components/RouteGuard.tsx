@@ -45,16 +45,16 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
 
     // Handle authenticated users trying to access auth pages
     if (isAuthenticated && (currentPath === '/login' || currentPath === '/signup')) {
-      if (user?.onboarding_completed) {
-        navigate('/home')
-      } else {
-        navigate('/onboarding')
+      // Use getRedirectPath to determine where to send authenticated users
+      const redirectPath = getRedirectPath()
+      if (redirectPath !== currentPath) {
+        navigate(redirectPath)
       }
       return
     }
 
     // Handle users who haven't completed onboarding trying to access protected routes
-    if (isAuthenticated && !user?.onboarding_completed && !currentPath.startsWith('/onboarding')) {
+    if (isAuthenticated && !user?.onboarding_completed && !currentPath.startsWith('/onboarding') && currentPath !== '/home') {
       navigate('/onboarding')
       return
     }
