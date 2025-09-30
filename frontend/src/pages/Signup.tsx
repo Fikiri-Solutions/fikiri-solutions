@@ -132,6 +132,7 @@ const Signup: React.FC = () => {
     }
 
     setIsLoading(true);
+    setErrors({});
     
     try {
       // Create account using auth context
@@ -152,7 +153,6 @@ const Signup: React.FC = () => {
         setErrors({ submit: result.error || 'Failed to create account. Please try again.' });
       }
     } catch (error) {
-      console.error('Signup error:', error);
       setErrors({ submit: 'Failed to create account. Please try again.' });
     } finally {
       setIsLoading(false);
@@ -160,8 +160,8 @@ const Signup: React.FC = () => {
   };
 
   const handleSocialSignup = (provider: string) => {
-    console.log(`Signing up with ${provider}`);
-    // Implement social signup logic
+    // TODO: Implement social signup logic
+    setErrors({ submit: `${provider} signup not yet implemented` });
   };
 
   return (

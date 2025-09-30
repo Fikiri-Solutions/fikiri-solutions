@@ -29,13 +29,10 @@ export const Login: React.FC = () => {
         const savedPassword = localStorage.getItem('fikiri-remember-password')
         const savedRememberMe = localStorage.getItem('fikiri-remember-me')
         
-        console.log('Loading saved credentials:', { savedEmail, savedPassword: savedPassword ? '***' : null, savedRememberMe })
-        
         if (savedEmail && savedPassword && savedRememberMe === 'true') {
           setEmail(savedEmail)
           setPassword(savedPassword)
           setRememberMe(true)
-          console.log('Credentials loaded successfully')
         }
       } catch (error) {
         console.error('Error loading saved credentials:', error)
@@ -107,12 +104,10 @@ export const Login: React.FC = () => {
               localStorage.setItem('fikiri-remember-email', email)
               localStorage.setItem('fikiri-remember-password', password)
               localStorage.setItem('fikiri-remember-me', 'true')
-              console.log('Credentials saved for remember me')
             } else {
               localStorage.removeItem('fikiri-remember-email')
               localStorage.removeItem('fikiri-remember-password')
               localStorage.removeItem('fikiri-remember-me')
-              console.log('Credentials cleared')
             }
           } catch (error) {
             console.error('Error saving credentials:', error)
