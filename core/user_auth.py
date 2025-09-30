@@ -135,6 +135,7 @@ class UserAuthManager:
             )
             
             if not user_data:
+                logger.warning(f"No user found for email: {email}")
                 return {
                     'success': False,
                     'error': 'Invalid email or password',
@@ -151,6 +152,13 @@ class UserAuthManager:
             metadata = json.loads(user_dict.get('metadata', '{}'))
             salt = metadata.get('salt', '')
             
+            # Debug logging
+            logger.info(f"Authentication attempt for {email}")
+            logger.info(f"User ID: {user_dict.get('id')}")
+            logger.info(f"Password hash length: {len(user_dict.get('password_hash', ''))}")
+            logger.info(f"Salt length: {len(salt)}")
+            logger.info(f"Metadata: {metadata}")
+            
             # Verify password
             password_hash = user_dict.get('password_hash', '')
             if not password_hash:
@@ -162,6 +170,7 @@ class UserAuthManager:
                 }
             
             if not self._verify_password(password, password_hash, salt):
+                logger.warning(f"Password verification failed for user {email}")
                 return {
                     'success': False,
                     'error': 'Invalid email or password',
