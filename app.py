@@ -505,8 +505,9 @@ def api_email_sync_status():
 # Onboarding endpoints
 @app.route('/api/onboarding/update', methods=['POST'])
 @handle_api_errors
-def api_update_onboarding(validated_data):
+def api_update_onboarding():
     """Update user onboarding progress."""
+    data = request.get_json()
     user_id = data['user_id']
     step = data['step']
     completed = data.get('completed', False)
@@ -1219,9 +1220,9 @@ def api_start_onboarding():
     else:
         return create_error_response(result['error'], 400, result['error_code'])
 
-@app.route('/api/onboarding/status', methods=['GET'])
+@app.route('/api/onboarding/job-status', methods=['GET'])
 @handle_api_errors
-def api_get_onboarding_status():
+def api_get_onboarding_job_status():
     """Get onboarding job status."""
     user_id = request.args.get('user_id')
     
@@ -1238,7 +1239,7 @@ def api_get_onboarding_status():
             'started_at': job.started_at.isoformat(),
             'completed_at': job.completed_at.isoformat() if job.completed_at else None,
             'error_message': job.error_message
-        }, "Onboarding status retrieved")
+        }, "Onboarding job status retrieved")
     else:
         return create_success_response({
             'status': 'not_started',
