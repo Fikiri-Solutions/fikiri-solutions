@@ -274,12 +274,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return '/login' // No onboarding data, start with login
     }
 
+    // Authenticated - for now, always redirect to home
+    // TODO: Re-enable onboarding flow after fixing hydration issues
+    return '/home'
+    
     // Authenticated - check onboarding status
-    if (!authState.user?.onboarding_completed) {
-      return `/onboarding/${authState.user?.onboarding_step || 1}`
-    }
+    // if (!authState.user?.onboarding_completed) {
+    //   return `/onboarding/${authState.user?.onboarding_step || 1}`
+    // }
 
-    return '/home' // Fully onboarded user
+    // return '/home' // Fully onboarded user
   }
 
   const value: AuthContextType = {
