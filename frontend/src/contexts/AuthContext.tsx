@@ -78,6 +78,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
+      // Check if we're in the browser environment
+      if (typeof window === 'undefined') {
+        setAuthState(prev => ({
+          ...prev,
+          isLoading: false
+        }))
+        return
+      }
+
       const userData = localStorage.getItem('fikiri-user')
       const userId = localStorage.getItem('fikiri-user-id')
       const onboardingData = localStorage.getItem('fikiri-onboarding-data')
@@ -138,9 +147,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (data.success) {
         const user = data.data.user
         
-        // Store user data
-        localStorage.setItem('fikiri-user', JSON.stringify(user))
-        localStorage.setItem('fikiri-user-id', user.id.toString())
+        // Store user data (only in browser)
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('fikiri-user', JSON.stringify(user))
+          localStorage.setItem('fikiri-user-id', user.id.toString())
+        }
         
         setAuthState(prev => ({
           ...prev,
@@ -194,9 +205,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (data.success) {
         const user = data.data.user
         
-        // Store user data
-        localStorage.setItem('fikiri-user', JSON.stringify(user))
-        localStorage.setItem('fikiri-user-id', user.id.toString())
+        // Store user data (only in browser)
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('fikiri-user', JSON.stringify(user))
+          localStorage.setItem('fikiri-user-id', user.id.toString())
+        }
         
         // Clear onboarding data as it's now in the user account
         clearOnboardingData()
@@ -229,7 +242,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }
 
   const updateUser = (user: User) => {
-    localStorage.setItem('fikiri-user', JSON.stringify(user))
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('fikiri-user', JSON.stringify(user))
+    }
     setAuthState(prev => ({
       ...prev,
       user
@@ -237,7 +252,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }
 
   const setOnboardingData = (data: OnboardingData) => {
-    localStorage.setItem('fikiri-onboarding-data', JSON.stringify(data))
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('fikiri-onboarding-data', JSON.stringify(data))
+    }
     setAuthState(prev => ({
       ...prev,
       onboardingData: data
@@ -245,7 +262,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }
 
   const clearOnboardingData = () => {
-    localStorage.removeItem('fikiri-onboarding-data')
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('fikiri-onboarding-data')
+    }
     setAuthState(prev => ({
       ...prev,
       onboardingData: null
@@ -253,10 +272,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }
 
   const clearAuthData = () => {
-    localStorage.removeItem('fikiri-user')
-    localStorage.removeItem('fikiri-user-id')
-    localStorage.removeItem('fikiri-onboarding-data')
-    localStorage.removeItem('fikiri-onboarding-completed')
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('fikiri-user')
+      localStorage.removeItem('fikiri-user-id')
+      localStorage.removeItem('fikiri-onboarding-data')
+      localStorage.removeItem('fikiri-onboarding-completed')
+    }
     setAuthState({
       user: null,
       isAuthenticated: false,
