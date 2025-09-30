@@ -37,27 +37,31 @@ export const CustomizationProvider: React.FC<CustomizationProviderProps> = ({ ch
 
   // Load customization from localStorage on mount
   useEffect(() => {
-    const savedCustomization = localStorage.getItem('fikiri-customization')
-    if (savedCustomization) {
-      try {
-        const parsed = JSON.parse(savedCustomization)
-        setCustomization({ ...defaultCustomization, ...parsed })
-      } catch (error) {
-        // Failed to parse saved customization
+    if (typeof window !== 'undefined') {
+      const savedCustomization = localStorage.getItem('fikiri-customization')
+      if (savedCustomization) {
+        try {
+          const parsed = JSON.parse(savedCustomization)
+          setCustomization({ ...defaultCustomization, ...parsed })
+        } catch (error) {
+          // Failed to parse saved customization
+        }
       }
     }
   }, [])
 
   // Save customization to localStorage
   useEffect(() => {
-    localStorage.setItem('fikiri-customization', JSON.stringify(customization))
-    
-    // Update CSS custom properties
-    document.documentElement.style.setProperty('--fikiri-primary', customization.accentColor)
-    
-    // Update page title if company name changed
-    if (customization.companyName && customization.companyName !== 'Fikiri Solutions') {
-      document.title = `${customization.companyName} - Dashboard`
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('fikiri-customization', JSON.stringify(customization))
+      
+      // Update CSS custom properties
+      document.documentElement.style.setProperty('--fikiri-primary', customization.accentColor)
+      
+      // Update page title if company name changed
+      if (customization.companyName && customization.companyName !== 'Fikiri Solutions') {
+        document.title = `${customization.companyName} - Dashboard`
+      }
     }
   }, [customization])
 

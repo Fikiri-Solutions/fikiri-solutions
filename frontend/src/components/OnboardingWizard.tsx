@@ -239,7 +239,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   }
 
   const handleSkip = () => {
-    if (window.confirm('Are you sure you want to skip the setup? You can always complete it later from your settings.')) {
+    if (typeof window !== 'undefined' && window.confirm('Are you sure you want to skip the setup? You can always complete it later from your settings.')) {
       handleComplete()
     }
   }

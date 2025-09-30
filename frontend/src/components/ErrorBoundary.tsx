@@ -33,7 +33,7 @@ export class ErrorBoundary extends Component<Props, State> {
         stack: error.stack,
         componentStack: errorInfo.componentStack,
         timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent,
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
         url: window.location.href,
         userId: localStorage.getItem('fikiri-user-id') || 'anonymous'
       }
@@ -96,14 +96,14 @@ export class ErrorBoundary extends Component<Props, State> {
                 </button>
                 
                 <button
-                  onClick={() => window.location.href = '/'}
+                  onClick={() => typeof window !== 'undefined' && (window.location.href = '/')}
                   className="w-full px-6 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors font-medium"
                 >
                   Go to Homepage
                 </button>
                 
                 <button
-                  onClick={() => window.location.reload()}
+                  onClick={() => typeof window !== 'undefined' && window.location.reload()}
                   className="w-full px-6 py-3 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors text-sm"
                 >
                   Refresh Page

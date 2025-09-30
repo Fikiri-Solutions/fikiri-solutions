@@ -180,7 +180,7 @@ function App() {
           <p className="text-gray-600 mb-4">Failed to initialize the application</p>
           <p className="text-sm text-gray-500">Error: {error.message}</p>
           <button 
-            onClick={() => window.location.reload()} 
+            onClick={() => typeof window !== 'undefined' && window.location.reload()} 
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           >
             Reload Page
