@@ -107,14 +107,35 @@ const LandingPage: React.FC = () => {
 
   // Simple navigation handlers without router
   const handleGetStarted = () => {
+    // Clear any existing auth state to ensure fresh onboarding flow
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('fikiri-user')
+      localStorage.removeItem('fikiri-user-id')
+      localStorage.removeItem('fikiri-onboarding-data')
+      localStorage.removeItem('fikiri-onboarding-completed')
+    }
     window.location.href = '/onboarding-flow'
   }
 
   const handleSignIn = () => {
+    // Clear any existing auth state to ensure fresh login flow
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('fikiri-user')
+      localStorage.removeItem('fikiri-user-id')
+      localStorage.removeItem('fikiri-onboarding-data')
+      localStorage.removeItem('fikiri-onboarding-completed')
+    }
     window.location.href = '/login'
   }
 
   const handleSignUp = () => {
+    // Clear any existing auth state to ensure fresh signup flow
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('fikiri-user')
+      localStorage.removeItem('fikiri-user-id')
+      localStorage.removeItem('fikiri-onboarding-data')
+      localStorage.removeItem('fikiri-onboarding-completed')
+    }
     window.location.href = '/signup'
   }
 
