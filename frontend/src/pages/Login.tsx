@@ -14,11 +14,27 @@ export const Login: React.FC = () => {
   const [emailError, setEmailError] = useState('')
   const [passwordError, setPasswordError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const [isMicrosoftLoading, setIsMicrosoftLoading] = useState(false)
   const { trackLogin } = useUserActivityTracking()
   const { login, getRedirectPath } = useAuth()
   const navigate = useNavigate()
+
+  // Load saved credentials on component mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedEmail = localStorage.getItem('fikiri-remember-email')
+      const savedPassword = localStorage.getItem('fikiri-remember-password')
+      const savedRememberMe = localStorage.getItem('fikiri-remember-me')
+      
+      if (savedEmail && savedPassword && savedRememberMe === 'true') {
+        setEmail(savedEmail)
+        setPassword(savedPassword)
+        setRememberMe(true)
+      }
+    }
+  }, [])
 
   // Track mouse position for interactive background
   useEffect(() => {
@@ -77,6 +93,19 @@ export const Login: React.FC = () => {
       const result = await login(email, password)
       
       if (result.success) {
+        // Handle remember me functionality
+        if (typeof window !== 'undefined') {
+          if (rememberMe) {
+            localStorage.setItem('fikiri-remember-email', email)
+            localStorage.setItem('fikiri-remember-password', password)
+            localStorage.setItem('fikiri-remember-me', 'true')
+          } else {
+            localStorage.removeItem('fikiri-remember-email')
+            localStorage.removeItem('fikiri-remember-password')
+            localStorage.removeItem('fikiri-remember-me')
+          }
+        }
+        
         // Track successful login
         trackLogin(email, 'email')
         
@@ -375,6 +404,8 @@ export const Login: React.FC = () => {
                     id="remember-me"
                     name="remember-me"
                     type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
                     className="h-4 w-4 text-brand-accent focus:ring-brand-accent border-gray-300 rounded bg-white/10"
                   />
                   <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-200">
