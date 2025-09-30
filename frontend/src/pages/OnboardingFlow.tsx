@@ -188,6 +188,17 @@ export const OnboardingFlow: React.FC = () => {
         
         // Set current step based on user's progress
         setCurrentStep(userData.onboarding_step || 1)
+        
+        // Populate form with existing user data
+        setFormData(prev => ({
+          ...prev,
+          businessName: userData.business_name || '',
+          businessEmail: userData.business_email || userData.email || '',
+          industry: userData.industry || '',
+          teamSize: userData.team_size || '',
+          privacyConsent: true, // Assume consent if user already exists
+          termsAccepted: true   // Assume terms accepted if user already exists
+        }))
       } else {
         throw new Error(data.error || 'Failed to load onboarding status')
       }
