@@ -97,7 +97,7 @@ function App() {
                             <>
                               <Route path="/onboarding" element={
                                 <OnboardingRoute>
-                                  <Onboarding />
+                                  <OnboardingFlow />
                                 </OnboardingRoute>
                               } />
                               <Route path="/onboarding/:step" element={
