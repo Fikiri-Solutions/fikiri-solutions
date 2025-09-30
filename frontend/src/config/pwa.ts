@@ -7,7 +7,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export const pwaConfig = VitePWA({
   registerType: 'autoUpdate',
-  includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+  includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.png'],
   manifest: {
     name: 'Fikiri Solutions - AI Email Automation',
     short_name: 'Fikiri Solutions',
