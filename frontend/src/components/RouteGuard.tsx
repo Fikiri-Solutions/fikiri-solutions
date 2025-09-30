@@ -65,8 +65,11 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
       return
     }
 
-    // Custom redirect logic
-    if (shouldRedirect && shouldRedirect !== currentPath) {
+    // Custom redirect logic - only apply if we're not on auth pages
+    if (shouldRedirect && shouldRedirect !== currentPath && 
+        !currentPath.startsWith('/login') && 
+        !currentPath.startsWith('/signup') && 
+        !currentPath.startsWith('/onboarding-flow')) {
       navigate(shouldRedirect)
       return
     }
