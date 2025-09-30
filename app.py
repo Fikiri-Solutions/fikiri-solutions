@@ -311,6 +311,132 @@ def api_login():
         'session_id': session_data['session_id']
     }, "Login successful")
 
+@app.route('/api/auth/forgot-password', methods=['POST'])
+@handle_api_errors
+def api_forgot_password():
+    """Send password reset email."""
+    data = request.get_json()
+    if not data:
+        return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
+    
+    email = data.get('email')
+    if not email:
+        return create_error_response("Email is required", 400, 'MISSING_EMAIL')
+    
+    # Check if user exists
+    user_data = db_optimizer.execute_query(
+        "SELECT id, email, name FROM users WHERE email = ? AND is_active = 1",
+        (email,)
+    )
+    
+    if not user_data:
+        # Don't reveal if user exists or not for security
+        return create_success_response(
+            {"message": "If an account with that email exists, a password reset link has been sent."},
+            "Password reset email sent"
+        )
+    
+    user = user_data[0]
+    
+    # Generate reset token (in production, use a proper token system)
+    import secrets
+    reset_token = secrets.token_urlsafe(32)
+    
+    # Store reset token in database (in production, use a separate table with expiration)
+    db_optimizer.execute_query(
+        "UPDATE users SET metadata = json_set(metadata, '$.reset_token', ?) WHERE id = ?",
+        (reset_token, user['id']),
+        fetch=False
+    )
+    
+    # In production, send actual email here
+    # For now, just log the reset link
+    reset_link = f"https://fikirisolutions.com/reset-password?token={reset_token}"
+    logger.info(f"Password reset link for {email}: {reset_link}")
+    
+    return create_success_response(
+        {"message": "If an account with that email exists, a password reset link has been sent."},
+        "Password reset email sent"
+    )
+
+@app.route('/api/auth/reset-password', methods=['POST'])
+@handle_api_errors
+def api_reset_password():
+    """Reset password using token."""
+    data = request.get_json()
+    if not data:
+        return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
+    
+    token = data.get('token')
+    new_password = data.get('password')
+    
+    if not token or not new_password:
+        return create_error_response("Token and password are required", 400, 'MISSING_FIELDS')
+    
+    if len(new_password) < 6:
+        return create_error_response("Password must be at least 6 characters", 400, 'WEAK_PASSWORD')
+    
+    # Find user with this reset token
+    user_data = db_optimizer.execute_query(
+        "SELECT id, email, metadata FROM users WHERE json_extract(metadata, '$.reset_token') = ? AND is_active = 1",
+        (token,)
+    )
+    
+    if not user_data:
+        return create_error_response("Invalid or expired reset token", 400, 'INVALID_TOKEN')
+    
+    user = user_data[0]
+    
+    # Hash new password
+    password_hash, salt = user_auth_manager._hash_password(new_password)
+    
+    # Update password and clear reset token
+    metadata = json.loads(user['metadata'] or '{}')
+    metadata['salt'] = salt
+    metadata.pop('reset_token', None)  # Remove reset token
+    
+    db_optimizer.execute_query(
+        "UPDATE users SET password_hash = ?, metadata = ? WHERE id = ?",
+        (password_hash, json.dumps(metadata), user['id']),
+        fetch=False
+    )
+    
+    # Revoke all existing sessions
+    user_auth_manager.revoke_all_user_sessions(user['id'])
+    
+    logger.info(f"Password reset successful for user {user['email']}")
+    
+    return create_success_response(
+        {"message": "Password has been reset successfully. Please log in with your new password."},
+        "Password reset successful"
+    )
+
+@app.route('/api/user/profile', methods=['PUT'])
+@handle_api_errors
+def api_update_user_profile():
+    """Update user profile information."""
+    data = request.get_json()
+    if not data:
+        return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
+    
+    user_id = data.get('user_id')
+    if not user_id:
+        return create_error_response("User ID is required", 400, 'MISSING_USER_ID')
+    
+    # Update user profile using user_auth_manager
+    result = user_auth_manager.update_user_profile(
+        user_id=user_id,
+        business_name=data.get('business_name'),
+        business_email=data.get('business_email'),
+        industry=data.get('industry'),
+        team_size=data.get('team_size')
+    )
+    
+    if result['success']:
+        return create_success_response(result['data'], "Profile updated successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
 # Import new authentication modules
 from core.user_auth import user_auth_manager
 from core.gmail_oauth import gmail_oauth_manager, gmail_sync_manager

@@ -5,6 +5,8 @@ import { SpeedInsights } from '@vercel/speed-insights/react'
 import { Dashboard } from './pages/Dashboard'
 import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
+import { ForgotPassword } from './pages/ForgotPassword'
+import { ResetPassword } from './pages/ResetPassword'
 import { TermsOfService } from './pages/TermsOfService'
 import { PrivacyPolicy } from './pages/PrivacyPolicy'
 import { Onboarding } from './pages/Onboarding'
@@ -89,6 +91,16 @@ function App() {
                           <Route path="/signup" element={
                             <AuthRoute>
                               <Signup />
+                            </AuthRoute>
+                          } />
+                          <Route path="/forgot-password" element={
+                            <AuthRoute>
+                              <ForgotPassword />
+                            </AuthRoute>
+                          } />
+                          <Route path="/reset-password" element={
+                            <AuthRoute>
+                              <ResetPassword />
                             </AuthRoute>
                           } />
                           

@@ -287,19 +287,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }
 
   const getRedirectPath = (): string => {
+    console.log('getRedirectPath called:', {
+      isAuthenticated: authState.isAuthenticated,
+      hasOnboardingData: !!authState.onboardingData,
+      onboardingCompleted: authState.user?.onboarding_completed,
+      user: authState.user
+    })
+
     if (!authState.isAuthenticated) {
       // Not authenticated - check if we have onboarding data
       if (authState.onboardingData) {
+        console.log('Redirecting to signup (has onboarding data)')
         return '/signup' // User has started onboarding, needs to create account
       }
+      console.log('Redirecting to login (no auth, no onboarding data)')
       return '/login' // No onboarding data, start with login
     }
 
     // Authenticated - check onboarding status
     if (!authState.user?.onboarding_completed) {
+      console.log('Redirecting to onboarding (authenticated but not completed)')
       return '/onboarding' // User needs to complete onboarding
     }
 
+    console.log('Redirecting to home (fully onboarded)')
     return '/home' // Fully onboarded user
   }
 
