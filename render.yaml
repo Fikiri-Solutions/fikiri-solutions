@@ -18,6 +18,30 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        value: https://fikirisolutions.com/auth/google/callback
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: FROM_EMAIL
+        value: noreply@fikirisolutions.com
+      - key: FROM_NAME
+        value: Fikiri Solutions
+      - key: GMAIL_SYNC_LIMIT
+        value: 100
+      - key: GMAIL_SYNC_DAYS
+        value: 30
     healthCheckPath: /api/health
     autoDeploy: true
     branch: main
