@@ -79,6 +79,13 @@ from core.redis_rate_limiting import init_rate_limiting, rate_limit, get_rate_li
 from core.redis_queues import get_email_queue, get_ai_queue, get_crm_queue, webhook_queue
 from core.webhook_sentry import capture_webhook_error, capture_webhook_performance
 
+# Import enhanced authentication and session management
+from core.jwt_auth import jwt_auth_manager, jwt_required, get_current_user as get_jwt_user
+from core.secure_sessions import secure_session_manager, init_secure_sessions, create_secure_session, get_current_user_id
+from core.tenant_manager import tenant_manager
+from core.idempotency_manager import idempotency_manager, idempotent
+from core.rate_limiter import enhanced_rate_limiter, rate_limit, check_api_rate_limit, check_login_rate_limit, check_signup_rate_limit
+
 # Dashboard routes will be added directly to Flask app
 
 # Import enterprise features
@@ -132,6 +139,7 @@ CORS(app, origins=[
 
 # Initialize Redis integration
 init_flask_sessions(app)
+init_secure_sessions(app)  # Enhanced secure session management
 init_rate_limiting(app)
 
 # Register versioned API blueprints
@@ -255,6 +263,7 @@ def log_response(response):
 # Add security endpoints
 @app.route('/api/auth/login', methods=['POST'])
 @handle_api_errors
+@rate_limit('login_attempts', lambda *args, **kwargs: request.remote_addr)
 def api_login():
     """User login endpoint with comprehensive validation."""
     data = request.get_json()
@@ -440,6 +449,8 @@ def api_update_user_profile():
 # Import new authentication modules
 from core.user_auth import user_auth_manager
 from core.gmail_oauth import gmail_oauth_manager, gmail_sync_manager
+from core.google_oauth import google_oauth_manager
+from core.onboarding_wizard import onboarding_wizard
 from core.privacy_manager import privacy_manager
 from core.universal_ai_assistant import universal_ai_assistant
 from core.enhanced_crm_service import enhanced_crm_service
@@ -447,14 +458,15 @@ from core.email_parser_service import email_parser_service
 from core.automation_engine import automation_engine
 from core.onboarding_orchestrator import onboarding_orchestrator
 from core.automation_safety import automation_safety_manager
-from core.rate_limiter import rate_limiter
+# from core.rate_limiter import rate_limiter  # Not used in this file
 from core.oauth_token_manager import oauth_token_manager
 
-# User registration endpoint
+# Enhanced user registration endpoint with tenant management
 @app.route('/api/auth/signup', methods=['POST'])
 @handle_api_errors
+@rate_limit('signup_attempts', lambda *args, **kwargs: request.remote_addr)
 def api_signup():
-    """User registration endpoint with comprehensive validation."""
+    """Enhanced user registration with company creation and tenant isolation."""
     data = request.get_json()
     if not data:
         return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
@@ -465,45 +477,251 @@ def api_signup():
         if field not in data or not data[field]:
             return create_error_response(f"{field} is required", 400, 'MISSING_FIELD')
     
-    result = user_auth_manager.create_user(
-        email=data['email'],
-        password=data['password'],
-        name=data['name'],
-        business_name=data.get('business_name'),
-        business_email=data.get('business_email'),
-        industry=data.get('industry'),
-        team_size=data.get('team_size')
-    )
+    # Extract company information
+    company_name = data.get('business_name') or data.get('company_name', 'My Company')
+    company_domain = data.get('business_email', data['email']).split('@')[1] if '@' in data.get('business_email', data['email']) else None
     
-    if result['success']:
+    try:
+        # Step 1: Create company/tenant
+        company_result = tenant_manager.create_company(
+            name=company_name,
+            domain=company_domain,
+            industry=data.get('industry'),
+            team_size=data.get('team_size'),
+            settings={
+                'onboarding_step': 1,
+                'created_via': 'signup',
+                'signup_data': {
+                    'email': data['email'],
+                    'name': data['name'],
+                    'industry': data.get('industry'),
+                    'team_size': data.get('team_size')
+                }
+            }
+        )
+        
+        if not company_result['success']:
+            return create_error_response(company_result['error'], 400, company_result['error_code'])
+        
+        company = company_result['company']
+        
+        # Step 2: Create user with tenant association
+        user_result = tenant_manager.create_user_with_tenant(
+            email=data['email'],
+            name=data['name'],
+            password_hash=user_auth_manager._hash_password(data['password'])[0],  # Get hash only
+            company_id=company['id'],
+            role='admin',  # First user is admin
+            metadata={
+                'onboarding_step': 1,
+                'onboarding_completed': False,
+                'signup_method': 'email_password',
+                'business_email': data.get('business_email', data['email']),
+                'industry': data.get('industry'),
+                'team_size': data.get('team_size')
+            }
+        )
+        
+        if not user_result['success']:
+            # Clean up company if user creation fails
+            tenant_manager.deactivate_company(company['id'])
+            return create_error_response(user_result['error'], 400, user_result['error_code'])
+        
+        user = user_result['user']
+        
+        # Step 3: Generate JWT tokens
+        user_data = {
+            'email': user['email'],
+            'name': user['name'],
+            'role': user['role']
+        }
+        
+        tokens = jwt_auth_manager.generate_tokens(
+            user['id'],
+            user_data,
+            device_info=request.headers.get('User-Agent'),
+            ip_address=request.remote_addr
+        )
+        
+        # Step 4: Create secure session
+        session_id, cookie_data = secure_session_manager.create_session(
+            user['id'],
+            user_data,
+            request.remote_addr,
+            request.headers.get('User-Agent')
+        )
+        
+        # Step 5: Log security event
         log_security_event(
             event_type="user_registration",
             severity="info",
-            details={"user_id": result['user'].id, "email": result['user'].email}
+            details={
+                "user_id": user['id'],
+                "email": user['email'],
+                "company_id": company['id'],
+                "tenant_id": company['tenant_id']
+            }
         )
         
-        # Track business analytics
+        # Step 6: Track business analytics
         business_analytics.track_event('user_signup', {
-            'user_id': result['user'].id,
-            'email': result['user'].email,
+            'user_id': user['id'],
+            'email': user['email'],
+            'company_id': company['id'],
+            'tenant_id': company['tenant_id'],
             'industry': data.get('industry'),
             'team_size': data.get('team_size')
         })
         
-        return create_success_response({
+        # Step 7: Queue welcome email
+        try:
+            from core.email_jobs import email_job_manager
+            email_job_manager.queue_welcome_email(
+                user['id'],
+                user['email'],
+                user['name'],
+                company['name']
+            )
+        except Exception as e:
+            logger.warning(f"Failed to queue welcome email: {e}")
+        
+        # Step 8: Prepare response
+        response_data = {
             'user': {
-                'id': result['user'].id,
-                'email': result['user'].email,
-                'name': result['user'].name,
-                'role': result['user'].role,
-                'onboarding_completed': result['user'].onboarding_completed,
-                'onboarding_step': result['user'].onboarding_step
-            }
-        }, "Account created successfully")
+                'id': user['id'],
+                'email': user['email'],
+                'name': user['name'],
+                'role': user['role'],
+                'company_id': company['id'],
+                'tenant_id': company['tenant_id'],
+                'onboarding_completed': False,
+                'onboarding_step': 1
+            },
+            'company': {
+                'id': company['id'],
+                'name': company['name'],
+                'tenant_id': company['tenant_id'],
+                'industry': company['industry'],
+                'team_size': company['team_size']
+            },
+            'tokens': tokens,
+            'session_id': session_id
+        }
+        
+        # Create response with secure cookie
+        response = make_response(create_success_response(response_data, "Account created successfully"))
+        
+        # Set secure session cookie
+        response.set_cookie(**cookie_data)
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Signup error: {e}")
+        return create_error_response("Registration failed. Please try again.", 500, "SIGNUP_ERROR")
+
+# Enhanced Google OAuth endpoints
+@app.route('/api/auth/google/connect', methods=['POST'])
+@handle_api_errors
+def api_google_connect():
+    """Generate Google OAuth authorization URL"""
+    data = request.get_json()
+    if not data:
+        return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
+    
+    user_id = data.get('user_id')
+    if not user_id:
+        return create_error_response("User ID is required", 400, 'MISSING_USER_ID')
+    
+    redirect_url = data.get('redirect_url', '/onboarding/2')
+    metadata = data.get('metadata', {})
+    
+    result = google_oauth_manager.generate_auth_url(
+        user_id=int(user_id),
+        redirect_url=redirect_url,
+        metadata=metadata
+    )
+    
+    if result['success']:
+        return create_success_response({
+            'auth_url': result['auth_url'],
+            'state': result['state'],
+            'expires_at': result['expires_at']
+        }, "Authorization URL generated")
     else:
         return create_error_response(result['error'], 400, result['error_code'])
 
-# Gmail OAuth endpoints
+@app.route('/api/auth/google/callback', methods=['GET'])
+@handle_api_errors
+def api_google_callback():
+    """Handle Google OAuth callback"""
+    code = request.args.get('code')
+    state = request.args.get('state')
+    error = request.args.get('error')
+    
+    if error:
+        return create_error_response(f"OAuth error: {error}", 400, 'OAUTH_ERROR')
+    
+    if not code or not state:
+        return create_error_response("Missing code or state parameter", 400, 'MISSING_PARAMETERS')
+    
+    result = google_oauth_manager.handle_oauth_callback(code, state)
+    
+    if result['success']:
+        # Redirect to the specified URL or default onboarding step
+        redirect_url = result.get('redirect_url', '/onboarding/2')
+        
+        # Return success response with redirect info
+        return create_success_response({
+            'user_id': result['user_id'],
+            'user_info': result['user_info'],
+            'redirect_url': redirect_url
+        }, "Google OAuth completed successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/auth/google/refresh', methods=['POST'])
+@handle_api_errors
+def api_google_refresh():
+    """Refresh Google OAuth access token"""
+    data = request.get_json()
+    if not data:
+        return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
+    
+    user_id = data.get('user_id')
+    if not user_id:
+        return create_error_response("User ID is required", 400, 'MISSING_USER_ID')
+    
+    result = google_oauth_manager.refresh_access_token(int(user_id))
+    
+    if result['success']:
+        return create_success_response({
+            'access_token': result['access_token'],
+            'expires_at': result['expires_at']
+        }, "Token refreshed successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/auth/google/revoke', methods=['POST'])
+@handle_api_errors
+def api_google_revoke():
+    """Revoke Google OAuth tokens"""
+    data = request.get_json()
+    if not data:
+        return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
+    
+    user_id = data.get('user_id')
+    if not user_id:
+        return create_error_response("User ID is required", 400, 'MISSING_USER_ID')
+    
+    success = google_oauth_manager.revoke_tokens(int(user_id))
+    
+    if success:
+        return create_success_response({}, "Tokens revoked successfully")
+    else:
+        return create_error_response("Failed to revoke tokens", 500, 'REVOKE_FAILED')
+
+# Legacy Gmail OAuth endpoints (for backward compatibility)
 @app.route('/api/auth/gmail/connect', methods=['POST'])
 @handle_api_errors
 def api_gmail_connect():
@@ -628,11 +846,119 @@ def api_email_sync_status():
             'status': 'no_sync'
         }, "No sync found")
 
-# Onboarding endpoints
+# Enhanced Onboarding Wizard endpoints
+@app.route('/api/onboarding/start', methods=['POST'])
+@handle_api_errors
+def api_start_onboarding():
+    """Start the enhanced onboarding process."""
+    data = request.get_json()
+    if not data:
+        return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
+    
+    user_id = data.get('user_id')
+    if not user_id:
+        return create_error_response("User ID is required", 400, 'MISSING_USER_ID')
+    
+    company_data = data.get('company_data', {})
+    
+    result = onboarding_wizard.start_onboarding(int(user_id), company_data)
+    
+    if result['success']:
+        return create_success_response({
+            'onboarding_id': result['onboarding_id'],
+            'current_step': result['current_step'],
+            'completed_steps': result['completed_steps'],
+            'company_data': result['company_data'],
+            'gmail_connected': result['gmail_connected'],
+            'sync_status': result['sync_status'],
+            'preview_data': result['preview_data']
+        }, "Onboarding started successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/onboarding/step', methods=['POST'])
+@handle_api_errors
+def api_complete_onboarding_step():
+    """Complete a specific onboarding step."""
+    data = request.get_json()
+    if not data:
+        return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
+    
+    user_id = data.get('user_id')
+    step = data.get('step')
+    step_data = data.get('step_data', {})
+    
+    if not user_id or not step:
+        return create_error_response("User ID and step are required", 400, 'MISSING_FIELDS')
+    
+    result = onboarding_wizard.complete_step(int(user_id), int(step), step_data)
+    
+    if result['success']:
+        return create_success_response({
+            'current_step': result['current_step'],
+            'completed_steps': result['completed_steps'],
+            'is_completed': result['is_completed'],
+            'next_action': result['next_action']
+        }, "Step completed successfully")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/onboarding/status', methods=['GET'])
+@handle_api_errors
+def api_onboarding_status():
+    """Get current onboarding status."""
+    user_id = request.args.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, 'MISSING_USER_ID')
+    
+    result = onboarding_wizard.get_onboarding_status(int(user_id))
+    
+    if result['success']:
+        return create_success_response({
+            'current_step': result['current_step'],
+            'completed_steps': result['completed_steps'],
+            'company_data': result['company_data'],
+            'gmail_connected': result['gmail_connected'],
+            'sync_status': result['sync_status'],
+            'preview_data': result['preview_data'],
+            'is_completed': result['is_completed'],
+            'created_at': result['created_at'],
+            'updated_at': result['updated_at']
+        }, "Onboarding status retrieved")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+@app.route('/api/onboarding/sync-status', methods=['GET'])
+@handle_api_errors
+def api_onboarding_sync_status():
+    """Get Gmail sync job status."""
+    user_id = request.args.get('user_id')
+    
+    if not user_id:
+        return create_error_response("User ID is required", 400, 'MISSING_USER_ID')
+    
+    result = onboarding_wizard.get_sync_job_status(int(user_id))
+    
+    if result['success']:
+        return create_success_response({
+            'job_id': result['job_id'],
+            'status': result['status'],
+            'progress': result['progress'],
+            'result': result['result'],
+            'error_message': result['error_message'],
+            'created_at': result['created_at'],
+            'started_at': result['started_at'],
+            'completed_at': result['completed_at']
+        }, "Sync status retrieved")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
+# Legacy onboarding endpoints (for backward compatibility)
 @app.route('/api/onboarding/update', methods=['POST'])
 @handle_api_errors
 def api_update_onboarding():
-    """Update user onboarding progress."""
+    """Legacy onboarding update endpoint."""
     data = request.get_json()
     user_id = data['user_id']
     step = data['step']
@@ -654,27 +980,6 @@ def api_update_onboarding():
         }, "Onboarding progress updated")
     else:
         return create_error_response(result['error'], 400, result['error_code'])
-
-@app.route('/api/onboarding/status', methods=['GET'])
-@handle_api_errors
-def api_onboarding_status():
-    """Get user onboarding status."""
-    user_id = request.args.get('user_id')
-    
-    if not user_id:
-        return create_error_response("User ID is required", 400, "MISSING_USER_ID")
-    
-    user = user_auth_manager.get_user_by_id(int(user_id))
-    
-    if not user:
-        return create_error_response("User not found", 404, "USER_NOT_FOUND")
-    
-    return create_success_response({
-        'user_id': user.id,
-        'onboarding_step': user.onboarding_step,
-        'onboarding_completed': user.onboarding_completed,
-        'gmail_connected': gmail_oauth_manager.is_gmail_connected(user.id)
-    }, "Onboarding status retrieved")
 
 # Privacy and Data Management endpoints
 @app.route('/api/privacy/settings', methods=['GET'])
@@ -1326,11 +1631,11 @@ def api_execute_automation(validated_data):
     except ValueError:
         return create_error_response("Invalid trigger type", 400, "INVALID_TRIGGER_TYPE")
 
-# Onboarding Orchestration endpoints
-@app.route('/api/onboarding/start', methods=['POST'])
+# Legacy Onboarding Orchestration endpoints (for backward compatibility)
+@app.route('/api/onboarding/orchestrator/start', methods=['POST'])
 @handle_api_errors
-def api_start_onboarding():
-    """Start the complete onboarding process."""
+def api_start_onboarding_orchestrator():
+    """Start the complete onboarding process using orchestrator."""
     data = request.get_json()
     user_id = data.get('user_id')
     
