@@ -2771,7 +2771,8 @@ def index():
             'email': '/api/email/*',
             'crm': '/api/crm/*',
             'ai': '/api/ai/*',
-            'docs': '/api/docs'
+            'docs': '/api/docs',
+            'onboarding': '/api/onboarding/*'
         },
         'frontend': 'https://fikirisolutions.com'
     })
