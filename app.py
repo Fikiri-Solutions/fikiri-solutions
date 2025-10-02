@@ -521,6 +521,28 @@ from core.automation_safety import automation_safety_manager
 from core.oauth_token_manager import oauth_token_manager
 
 # Enhanced user registration endpoint with tenant management
+@app.route('/api/test/debug', methods=['GET'])
+def debug_endpoint():
+    """Debug endpoint to test imports and dependencies"""
+    try:
+        # Test all critical components
+        imports = {}
+        imports['jwt_auth_manager'] = bool(globals().get('jwt_auth_manager'))
+        imports['secure_session_manager'] = bool(globals().get('secure_session_manager'))
+        imports['business_analytics'] = bool(globals().get('business_analytics'))
+        imports['logger'] = bool(globals().get('logger'))
+        
+        return jsonify({
+            'success': True,
+            'imports': imports,
+            'status': 'Debug info available'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/auth/signup', methods=['POST'])
 @handle_api_errors
 @rate_limit('signup_attempts', lambda *args, **kwargs: request.remote_addr)
