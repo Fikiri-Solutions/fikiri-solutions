@@ -545,6 +545,78 @@ def debug_endpoint():
             'error': str(e)
         }), 500
 
+@app.route('/api/test/signup-step', methods=['POST'])
+def test_signup_step():
+    """Test individual steps of the signup process"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+            
+        email = data.get('email', 'test@example.com')
+        password = data.get('password', 'test123')
+        name = data.get('name', 'Test User')
+        business_name = data.get('business_name', 'Test Company')
+        
+        results = {}
+        
+        # Step 1: Test user creation
+        try:
+            user_result = user_auth_manager.create_user(
+                email=email,
+                password=password,
+                name=name,
+                business_name=business_name
+            )
+            results['step1_user_creation'] = {
+                'success': user_result['success'],
+                'has_user': bool(user_result.get('user')),
+                'user_type': type(user_result.get('user')).__name__ if user_result.get('user') else 'None'
+            }
+        except Exception as e:
+            results['step1_user_creation'] = {
+                'success': False,
+                'error': str(e)
+            }
+        
+        # Step 2: Test user object conversion
+        if user_result['success']:
+            try:
+                user = user_result['user']
+                if hasattr(user, 'id'):
+                    user_dict = {
+                        'id': user.id,
+                        'email': user.email,
+                        'name': user.name,
+                        'role': getattr(user, 'role', 'user')
+                    }
+                    results['step2_object_conversion'] = {
+                        'success': True,
+                        'user_dict': user_dict
+                    }
+                else:
+                    results['step2_object_conversion'] = {
+                        'success': False,
+                        'error': 'User object has no id attribute'
+                    }
+            except Exception as e:
+                results['step2_object_conversion'] = {
+                    'success': False,
+                    'error': str(e)
+                }
+        
+        return jsonify({
+            'success': True,
+            'test_results': results
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': str(type(e).__name__) + ': ' + str(e)
+        }), 500
+
 @app.route('/api/auth/signup', methods=['POST'])
 @handle_api_errors
 @rate_limit('signup_attempts', lambda *args, **kwargs: request.remote_addr)

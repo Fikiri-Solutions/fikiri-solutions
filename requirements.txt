@@ -19,7 +19,6 @@ PyJWT>=2.8.0
 
 # Flask JWT Extension
 flask-jwt-extended>=4.5.0
-PyJWT>=2.8.0
 
 # Document Processing
 beautifulsoup4>=4.0.0
