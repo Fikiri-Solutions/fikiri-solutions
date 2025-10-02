@@ -3086,7 +3086,7 @@ def microsoft_user_profile():
         if not tokens:
             return create_error_response("Microsoft not connected", 401, 'NOT_CONNECTED')
         
-        from core.microsoft_graph import microsoft_graph_service
+        # Use microsoft_graph_service (already imported globally)
         
         # Set tokens in the service
         microsoft_graph_service.client.access_token = tokens['access_token']
@@ -3117,7 +3117,7 @@ def microsoft_emails():
         if not tokens:
             return create_error_response("Microsoft not connected", 401, 'NOT_CONNECTED')
         
-        from core.microsoft_graph import microsoft_graph_service
+        # Use microsoft_graph_service (already imported globally)
         
         # Set tokens in the service
         microsoft_graph_service.client.access_token = tokens['access_token']
@@ -3151,7 +3151,7 @@ def microsoft_send_email():
         if not tokens:
             return create_error_response("Microsoft not connected", 401, 'NOT_CONNECTED')
         
-        from core.microsoft_graph import microsoft_graph_service
+        # Use microsoft_graph_service (already imported globally)
         
         # Set tokens in the service
         microsoft_graph_service.client.access_token = tokens['access_token']
@@ -3182,7 +3182,7 @@ def microsoft_calendar():
         if not tokens:
             return create_error_response("Microsoft not connected", 401, 'NOT_CONNECTED')
         
-        from core.microsoft_graph import microsoft_graph_service
+        # Use microsoft_graph_service (already imported globally)
         
         # Set tokens in the service
         microsoft_graph_service.client.access_token = tokens['access_token']
@@ -3218,7 +3218,7 @@ def microsoft_create_event():
         if not tokens:
             return create_error_response("Microsoft not connected", 401, 'NOT_CONNECTED')
         
-        from core.microsoft_graph import microsoft_graph_service
+        # Use microsoft_graph_service (already imported globally)
         
         # Set tokens in the service
         microsoft_graph_service.client.access_token = tokens['access_token']
