@@ -50,7 +50,7 @@ except Exception as e:
     print(f"⚠️ Sentry initialization failed: {e}")
     sentry_sdk = None
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, make_response
 from flask_cors import CORS
 import json
 import os
@@ -93,7 +93,8 @@ from core.jwt_auth import jwt_auth_manager, jwt_required, get_current_user as ge
 from core.secure_sessions import secure_session_manager, init_secure_sessions, create_secure_session, get_current_user_id
 from core.tenant_manager import tenant_manager
 from core.idempotency_manager import idempotency_manager, idempotent
-from core.rate_limiter import enhanced_rate_limiter, rate_limit, check_api_rate_limit, check_login_rate_limit, check_signup_rate_limit
+from core.rate_limiter import enhanced_rate_limiter, rate_limit,
+from core.api_validation import create_success_response, create_error_response
 
 # Dashboard routes will be added directly to Flask app
 
