@@ -67,19 +67,26 @@ class FikiriLogger:
             self.logger.warning(f"Service {service} {action} {status}", extra=log_data)
     
     def log_api_request(self, endpoint: str, method: str, 
-                       status_code: int, response_time: float,
+                       status_code, response_time: float,
                        user_agent: Optional[str] = None):
         """Log API requests with performance metrics."""
+        # Convert status_code to int for safe comparison
+        try:
+            status_int = int(status_code)
+        except (ValueError, TypeError):
+            status_int = 500  # Default to error status for invalid codes
+        
         log_data = {
             "endpoint": endpoint,
             "method": method,
-            "status_code": status_code,
+            "status_code": status_int,
+            "response_status_code": status_code,  # Keep original for reference
             "response_time_ms": response_time * 1000,
             "user_agent": user_agent,
             "timestamp": datetime.now().isoformat()
         }
         
-        if status_code < 400:
+        if status_int < 400:
             self.logger.info(f"API {method} {endpoint} - {status_code}", extra=log_data)
         else:
             self.logger.warning(f"API {method} {endpoint} - {status_code}", extra=log_data)
