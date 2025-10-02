@@ -241,11 +241,14 @@ def gmail_callback():
 
             # 3) Kick off first sync (RQ)
             try:
-                from core.gmail_sync_jobs import gmail_sync_job_manager
-                job = gmail_sync_job_manager.queue_sync_job(user_id)
-                logger.info(f"✅ Queued first sync job {job.id} for user {user_id}")
+                from core.onboarding_jobs import onboarding_job_manager
+                result = onboarding_job_manager.queue_first_sync_job(user_id)
+                job_id = result.get('job_id')
+                job = type('MockJob', (), {'id': job_id}) if job_id else None
+                logger.info(f"✅ Queued first sync job {job_id} for user {user_id}")
             except Exception as e:
                 logger.warning(f"⚠️ Failed to queue sync job: {e}")
+                job = None
 
             # Clean up session state and database
             if hasattr(g, 'session_data') and g.session_data:
@@ -258,7 +261,7 @@ def gmail_callback():
                     'success': True,
                     'message': 'Google OAuth completed successfully',
                     'redirect_url': redirect_url,
-                    'job_id': job.id if 'job' in locals() else None
+                    'job_id': job.id if job and hasattr(job, 'id') else job_id
                 })
             else:
                 # For browser redirects, redirect to the frontend
