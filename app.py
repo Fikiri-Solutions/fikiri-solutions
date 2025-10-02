@@ -76,6 +76,9 @@ from core.email_service_manager import EmailServiceManager
 from core.responses_api_migration import responses_manager
 from core.client_analytics import analytics_engine
 
+# Import Microsoft Graph service
+from core.microsoft_graph import microsoft_graph_service
+
 # Import billing system
 from core.billing_api import billing_bp
 from core.fikiri_stripe_manager import FikiriStripeManager
@@ -91,7 +94,6 @@ from core.webhook_sentry import capture_webhook_error, capture_webhook_performan
 # Import enhanced authentication and session management
 from core.jwt_auth import jwt_auth_manager, jwt_required, get_current_user as get_jwt_user
 from core.secure_sessions import secure_session_manager, init_secure_sessions, create_secure_session, get_current_user_id
-from core.redis_sessions import init_flask_sessions, create_user_session, get_current_user, logout_user, require_login
 from core.tenant_manager import tenant_manager
 from core.idempotency_manager import idempotency_manager, idempotent
 from core.rate_limiter import enhanced_rate_limiter, rate_limit
@@ -124,7 +126,7 @@ from core.api_validation import (
 from core.backend_excellence import (
     APIVersion, api_version, async_manager, async_operation,
     db_pool, cache_manager, cached, background_tasks,
-    rate_limit, create_api_blueprint
+    create_api_blueprint
 )
 
 # Import database optimization
@@ -1286,7 +1288,6 @@ def api_ai_simple():
             return create_error_response("Message is required", 400, 'MISSING_MESSAGE')
         
         # Use the minimal AI assistant directly
-        from core.minimal_ai_assistant import MinimalAIEmailAssistant
         ai_assistant = MinimalAIEmailAssistant()
         
         # Generate a simple response
@@ -1315,7 +1316,7 @@ def api_dashboard_timeseries():
         
         # Mock data for now - replace with actual database queries
         import random
-        from datetime import datetime, timedelta
+        from datetime import timedelta
         
         # Generate mock timeseries data for the last 14 days
         timeseries = []
@@ -2943,8 +2944,7 @@ def microsoft_connect():
         if not user_id:
             return jsonify({'success': False, 'error': 'User ID required'})
         
-        # Import our Microsoft Graph service
-        from core.microsoft_graph import microsoft_graph_service
+        # Use our Microsoft Graph service
         
         if not microsoft_graph_service.is_configured():
             return jsonify({'success': False, 'error': 'Microsoft Graph not configured'})
@@ -2976,8 +2976,7 @@ def microsoft_callback():
         
         user_id = state.replace('user_', '')
         
-        # Import our Microsoft Graph service
-        from core.microsoft_graph import microsoft_graph_service
+        # Use our Microsoft Graph service
         
         if not microsoft_graph_service.is_configured():
             return redirect('/onboarding-flow/2?error=microsoft_provider_unavailable')
