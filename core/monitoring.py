@@ -171,17 +171,25 @@ def init_sentry(app):
         return
     
     # Configure Sentry
+    integrations = [
+        FlaskIntegration(),
+        RedisIntegration(),
+        LoggingIntegration(
+            level=logging.INFO,        # Capture info and above as breadcrumbs
+            event_level=logging.ERROR  # Send errors as events
+        )
+    ]
+    
+    # Only add SQLAlchemy integration if available
+    try:
+        from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+        integrations.append(SqlalchemyIntegration())
+    except ImportError:
+        logger.warning("SQLAlchemy integration not available for Sentry")
+    
     sentry_sdk.init(
         dsn=sentry_dsn,
-        integrations=[
-            FlaskIntegration(),
-            SqlalchemyIntegration(),
-            RedisIntegration(),
-            LoggingIntegration(
-                level=logging.INFO,        # Capture info and above as breadcrumbs
-                event_level=logging.ERROR  # Send errors as events
-            )
-        ],
+        integrations=integrations,
         environment=os.getenv('SENTRY_ENVIRONMENT', 'development'),
         release=os.getenv('SENTRY_RELEASE', '1.0.0'),
         # Add data like inputs and responses to/from LLMs and tools;

@@ -9,19 +9,44 @@ A comprehensive Gmail lead management and automation platform with AI-powered re
    pip install -r requirements.txt
    ```
 
-2. **Setup authentication:**
+2. **Configure Google OAuth:**
+   - Follow the [Google OAuth Setup Guide](docs/GOOGLE_OAUTH_SETUP.md)
+   - Configure required scopes in Google Cloud Console
+   - Set environment variables in `.env` file
+
+3. **Setup authentication:**
    ```bash
    python main_minimal.py setup
    ```
 
-3. **Start the web dashboard:**
+4. **Start the web dashboard:**
    ```bash
    python app.py
    ```
 
-4. **Access the dashboard:**
+5. **Access the dashboard:**
    - Open `http://localhost:8081` in your browser
    - Test all services through the web interface
+
+## 🔧 Configuration
+
+### Google OAuth Setup
+
+Fikiri requires Google OAuth configuration for Gmail integration. Required scopes:
+
+- **Gmail API**: `https://www.googleapis.com/auth/gmail.readonly`, `https://www.googleapis.com/auth/gmail.send`, `https://www.googleapis.com/auth/gmail.modify`
+- **User Info**: `https://www.googleapis.com/auth/userinfo.email`, `https://www.googleapis.com/auth/userinfo.profile`
+
+See [Google OAuth Setup Guide](docs/GOOGLE_OAUTH_SETUP.md) for detailed configuration steps.
+
+### Environment Variables
+
+Copy `env.template` to `.env` and configure:
+
+- `GOOGLE_CLIENT_ID` - Google OAuth client ID
+- `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
+- `GOOGLE_REDIRECT_URI` - OAuth callback URL
+- `OPENAI_API_KEY` - OpenAI API key for AI responses
 
 ## 📁 Project Structure
 

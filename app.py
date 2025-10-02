@@ -11,16 +11,25 @@ try:
     import sentry_sdk
     from sentry_sdk.integrations.flask import FlaskIntegration
     from sentry_sdk.integrations.redis import RedisIntegration
-    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+    try:
+        from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+        SQLALCHEMY_INTEGRATION_AVAILABLE = True
+    except ImportError:
+        SQLALCHEMY_INTEGRATION_AVAILABLE = False
 
     # Initialize Sentry before Flask app
+    integrations = [
+        FlaskIntegration(),
+        RedisIntegration(),
+    ]
+    
+    # Only add SQLAlchemy integration if available
+    if SQLALCHEMY_INTEGRATION_AVAILABLE:
+        integrations.append(SqlalchemyIntegration())
+    
     sentry_sdk.init(
         dsn="https://05d4170350ee081a3bfee0dda0220df6@o4510053728845824.ingest.us.sentry.io/4510053767249920",
-        integrations=[
-            FlaskIntegration(),
-            RedisIntegration(),
-            SqlalchemyIntegration(),
-        ],
+        integrations=integrations,
         # Add data like inputs and responses to/from LLMs and tools;
         # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
         send_default_pii=True,
@@ -262,14 +271,17 @@ def log_response(response):
     if hasattr(request, 'start_time'):
         response_time = time.time() - request.start_time
         
-        # Log to enterprise logging
-        log_api_request(
-            endpoint=request.endpoint or request.path,
-            method=request.method,
-            status_code=response.status_code,
-            response_time=response_time,
-            user_agent=request.headers.get('User-Agent')
-        )
+        # Log to enterprise logging - temporarily disabled to debug signup
+        try:
+            log_api_request(
+                endpoint=request.endpoint or request.path,
+                method=request.method,
+                status_code=response.status_code,
+                response_time=response_time,
+                user_agent=request.headers.get('User-Agent')
+            )
+        except Exception as e:
+            logger.warning(f"Logging failed: {e}")
         
         # Record performance metrics
         performance_monitor.record_request(
@@ -499,54 +511,19 @@ def api_signup():
         if field not in data or not data[field]:
             return create_error_response(f"{field} is required", 400, 'MISSING_FIELD')
     
-    # Extract company information
-    company_name = data.get('business_name') or data.get('company_name', 'My Company')
-    company_domain = data.get('business_email', data['email']).split('@')[1] if '@' in data.get('business_email', data['email']) else None
-    
     try:
-        # Step 1: Create company/tenant
-        company_result = tenant_manager.create_company(
-            name=company_name,
-            domain=company_domain,
-            industry=data.get('industry'),
-            team_size=data.get('team_size'),
-            settings={
-                'onboarding_step': 1,
-                'created_via': 'signup',
-                'signup_data': {
-                    'email': data['email'],
-                    'name': data['name'],
-                    'industry': data.get('industry'),
-                    'team_size': data.get('team_size')
-                }
-            }
-        )
-        
-        if not company_result['success']:
-            return create_error_response(company_result['error'], 400, company_result['error_code'])
-        
-        company = company_result['company']
-        
-        # Step 2: Create user with tenant association
-        user_result = tenant_manager.create_user_with_tenant(
+        # Use the simple user creation method first
+        user_result = user_auth_manager.create_user(
             email=data['email'],
+            password=data['password'],
             name=data['name'],
-            password_hash=user_auth_manager._hash_password(data['password'])[0],  # Get hash only
-            company_id=company['id'],
-            role='admin',  # First user is admin
-            metadata={
-                'onboarding_step': 1,
-                'onboarding_completed': False,
-                'signup_method': 'email_password',
-                'business_email': data.get('business_email', data['email']),
-                'industry': data.get('industry'),
-                'team_size': data.get('team_size')
-            }
+            business_name=data.get('business_name', ''),
+            business_email=data.get('business_email', data['email']),
+            industry=data.get('industry', ''),
+            team_size=data.get('team_size', '')
         )
         
         if not user_result['success']:
-            # Clean up company if user creation fails
-            tenant_manager.deactivate_company(company['id'])
             return create_error_response(user_result['error'], 400, user_result['error_code'])
         
         user = user_result['user']
@@ -574,57 +551,51 @@ def api_signup():
         )
         
         # Step 5: Log security event
-        log_security_event(
-            event_type="user_registration",
-            severity="info",
-            details={
-                "user_id": user['id'],
-                "email": user['email'],
-                "company_id": company['id'],
-                "tenant_id": company['tenant_id']
-            }
-        )
+        # Log security event
+        try:
+            log_security_event(
+                event_type="user_registration",
+                severity="info",
+                details={
+                    "user_id": user['id'],
+                    "email": user['email']
+                }
+            )
+        except Exception as e:
+            logger.warning(f"Security logging failed: {e}")
         
-        # Step 6: Track business analytics
-        business_analytics.track_event('user_signup', {
-            'user_id': user['id'],
-            'email': user['email'],
-            'company_id': company['id'],
-            'tenant_id': company['tenant_id'],
-            'industry': data.get('industry'),
-            'team_size': data.get('team_size')
-        })
+        # Track business analytics
+        try:
+            business_analytics.track_event('user_signup', {
+                'user_id': user['id'],
+                'email': user['email'],
+                'industry': data.get('industry'),
+                'team_size': data.get('team_size')
+            })
+        except Exception as e:
+            logger.warning(f"Analytics tracking failed: {e}")
         
-        # Step 7: Queue welcome email
+        # Queue welcome email
         try:
             from core.email_jobs import email_job_manager
             email_job_manager.queue_welcome_email(
-                user['id'],
-                user['email'],
-                user['name'],
-                company['name']
+                user_id=user['id'],
+                email=user['email'],
+                name=user['name'],
+                company_name=data.get('business_name', 'My Company')
             )
         except Exception as e:
             logger.warning(f"Failed to queue welcome email: {e}")
         
-        # Step 8: Prepare response
+        # Prepare response
         response_data = {
             'user': {
                 'id': user['id'],
                 'email': user['email'],
                 'name': user['name'],
-                'role': user['role'],
-                'company_id': company['id'],
-                'tenant_id': company['tenant_id'],
+                'role': user.get('role', 'user'),
                 'onboarding_completed': False,
                 'onboarding_step': 1
-            },
-            'company': {
-                'id': company['id'],
-                'name': company['name'],
-                'tenant_id': company['tenant_id'],
-                'industry': company['industry'],
-                'team_size': company['team_size']
             },
             'tokens': tokens,
             'session_id': session_id
@@ -633,13 +604,22 @@ def api_signup():
         # Create response with secure cookie
         response = make_response(create_success_response(response_data, "Account created successfully"))
         
-        # Set secure session cookie
-        response.set_cookie(**cookie_data)
+        # Set secure session cookie safely
+        try:
+            if cookie_data and isinstance(cookie_data, dict):
+                cookie_name = cookie_data.pop('name', 'fikiri_session')
+                response.set_cookie(cookie_name, **cookie_data)
+        except Exception as e:
+            logger.warning(f"Failed to set session cookie: {e}")
         
+        logger.info(f"✅ User registration successful: {user['email']}")
         return response
         
     except Exception as e:
         logger.error(f"Signup error: {e}")
+        logger.error(f"Signup error details: {type(e).__name__}: {str(e)}")
+        import traceback
+        logger.error(f"Signup traceback: {traceback.format_exc()}")
         return create_error_response("Registration failed. Please try again.", 500, "SIGNUP_ERROR")
 
 # Enhanced Google OAuth endpoints

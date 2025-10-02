@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,44 +6,40 @@
     <title>Fikiri Solutions - Dashboard</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .header { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-        .services { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
-        .service { background: white; padding: 20px; border-radius: 8px; }
-        .status { padding: 5px 10px; border-radius: 4px; color: white; font-size: 12px; }
-        .active { background: #10b981; }
-        .inactive { background: #ef4444; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { text-align: center; margin-bottom: 30px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚀 Fikiri Solutions - Backend Dashboard</h1>
-            <p>All services are running and ready for production!</p>
+            <h1>🚀 Fikiri Solutions</h1>
+            <p>AI-Powered Email Automation Platform</p>
         </div>
-        <div class="services">
-            <div class="service">
-                <h3>AI Assistant</h3>
-                <span class="status active">Active</span>
-                <p>AI-powered email responses and lead analysis</p>
-            </div>
-            <div class="service">
-                <h3>CRM Service</h3>
-                <span class="status active">Active</span>
-                <p>Lead management and customer relationships</p>
-            </div>
-            <div class="service">
-                <h3>Email Parser</h3>
-                <span class="status active">Active</span>
-                <p>Email processing and content extraction</p>
-            </div>
-            <div class="service">
-                <h3>Automation Engine</h3>
-                <span class="status active">Active</span>
-                <p>Automated workflows and email actions</p>
-            </div>
+        
+        <div class="status success">
+            <strong>✅ Backend Status:</strong> Running successfully
+        </div>
+        
+        <div class="status info">
+            <strong>📧 Email Services:</strong> Gmail, Microsoft 365, Mailchimp, Apple iCloud
+        </div>
+        
+        <div class="status info">
+            <strong>🤖 AI Features:</strong> Email parsing, response generation, lead scoring
+        </div>
+        
+        <div class="status info">
+            <strong>📊 CRM:</strong> Lead management, contact tracking, analytics
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <p>Visit <a href="/api/health">/api/health</a> for detailed system status</p>
         </div>
     </div>
 </body>
 </html>
-    

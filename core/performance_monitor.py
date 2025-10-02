@@ -134,8 +134,11 @@ class PerformanceMonitor:
         stats['max_time'] = max(stats['max_time'], response_time)
         stats['status_codes'][status_code] += 1
         
-        if status_code >= 400:
-            stats['error_count'] += 1
+        try:
+            if int(status_code) >= 400:
+                stats['error_count'] += 1
+        except (ValueError, TypeError):
+            stats['error_count'] += 1  # Assume error for invalid status codes
     
     def _check_performance_thresholds(self, metric: PerformanceMetric):
         """Check if performance metrics exceed thresholds"""
@@ -308,7 +311,10 @@ class PerformanceMonitor:
             min_response_time = min(response_times)
             
             # Error rate
-            error_count = sum(1 for m in recent_metrics if m.status_code >= 400)
+            try:
+                error_count = sum(1 for m in recent_metrics if int(m.status_code) >= 400)
+            except (ValueError, TypeError):
+                error_count = sum(1 for m in recent_metrics)  # Default to all as errors
             error_rate = (error_count / len(recent_metrics)) * 100
             
             # Throughput (requests per minute)
