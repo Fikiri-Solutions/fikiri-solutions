@@ -166,6 +166,7 @@ const Signup: React.FC = () => {
 
   return (
     <div 
+      id="main-content"
       className="min-h-screen bg-brand-tan dark:bg-gray-900 relative overflow-hidden"
       onMouseMove={handleMouseMove}
     >
@@ -329,7 +330,7 @@ const Signup: React.FC = () => {
               <h2 className="text-2xl font-bold text-white text-center mb-2 font-serif">
                 Create Your Account
               </h2>
-              <p className="text-gray-300 text-center text-sm font-light">
+              <p className="text-white text-center text-sm font-light opacity-80">
                 Get started with Fikiri Solutions today
               </p>
             </div>

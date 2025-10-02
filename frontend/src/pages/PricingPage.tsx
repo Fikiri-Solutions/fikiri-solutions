@@ -281,7 +281,7 @@ const PricingPage: React.FC = () => {
                 className={`px-6 py-2 rounded-md font-medium transition-all duration-300 ${
                   billingPeriod === 'monthly'
                     ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
-                    : 'text-gray-300 hover:text-white'
+                    : 'text-white hover:text-orange-200'
                 }`}
               >
                 Monthly
@@ -291,7 +291,7 @@ const PricingPage: React.FC = () => {
                 className={`px-6 py-2 rounded-md font-medium transition-all duration-300 ${
                   billingPeriod === 'yearly'
                     ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
-                    : 'text-gray-300 hover:text-white'
+                    : 'text-white hover:text-orange-200'
                 }`}
               >
                 <span>Yearly</span>
