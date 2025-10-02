@@ -26,6 +26,15 @@ gunicorn>=20.0.0
 # Redis for caching, sessions, and queues
 redis>=4.0.0
 
+# Monitoring and error tracking
+sentry-sdk[flask]>=2.35.0
+
+# System monitoring
+psutil>=5.9.0
+
+# Security and encryption
+cryptography>=41.0.0
+
 # Workflow Automation
 fastapi>=0.100.0
 uvicorn>=0.20.0
