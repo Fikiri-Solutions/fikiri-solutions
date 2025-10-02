@@ -84,13 +84,14 @@ from core.usage_tracker import UsageTracker
 # Import Redis integration
 from core.redis_cache import get_cache, cache_result
 from core.redis_sessions import init_flask_sessions, create_user_session, get_current_user, logout_user, require_login
-from core.redis_rate_limiting import init_rate_limiting, rate_limit, get_rate_limiter
+from core.redis_rate_limiting import init_rate_limiting, get_rate_limiter
 from core.redis_queues import get_email_queue, get_ai_queue, get_crm_queue, webhook_queue
 from core.webhook_sentry import capture_webhook_error, capture_webhook_performance
 
 # Import enhanced authentication and session management
 from core.jwt_auth import jwt_auth_manager, jwt_required, get_current_user as get_jwt_user
 from core.secure_sessions import secure_session_manager, init_secure_sessions, create_secure_session, get_current_user_id
+from core.redis_sessions import init_flask_sessions, create_user_session, get_current_user, logout_user, require_login
 from core.tenant_manager import tenant_manager
 from core.idempotency_manager import idempotency_manager, idempotent
 from core.rate_limiter import enhanced_rate_limiter, rate_limit
@@ -133,7 +134,7 @@ from core.database_optimization import (
 
 # Import business operations
 from core.business_operations import (
-    business_analytics, business_intelligence, legal_compliance,
+    business_intelligence, legal_compliance,
     create_business_blueprint
 )
 
@@ -143,7 +144,11 @@ from core.monitoring_backup import (
 )
 
 # Import monitoring and performance tracking
-from core.structured_logging import logger, monitor, error_tracker
+# Import logging
+import logging
+logger = logging.getLogger(__name__)
+
+from core.structured_logging import monitor, error_tracker
 from core.performance_monitor import performance_monitor
 
 # ML dependencies removed for lightweight operation
