@@ -246,7 +246,9 @@ class MonitoringSystem:
         """Monitor service health"""
         try:
             # Check API health
-            response = requests.get('http://localhost:8081/api/health', timeout=5)
+            # Use environment variable for health check URL
+            health_url = os.getenv('HEALTH_CHECK_URL', 'http://localhost:8081')
+            response = requests.get(f'{health_url}/api/health', timeout=5)
             if response.status_code == 200:
                 self.add_metric('service_status', 1)
             else:
