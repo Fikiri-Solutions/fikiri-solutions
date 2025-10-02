@@ -324,7 +324,6 @@ def log_response(response):
 # Add security endpoints
 @app.route('/api/auth/login', methods=['POST'])
 @handle_api_errors
-@rate_limit('login_attempts', lambda *args, **kwargs: request.remote_addr)
 def api_login():
     """User login endpoint with comprehensive validation."""
     data = request.get_json()
@@ -619,7 +618,6 @@ def test_signup_step():
 
 @app.route('/api/auth/signup', methods=['POST'])
 @handle_api_errors
-@rate_limit('signup_attempts', lambda *args, **kwargs: request.remote_addr)
 def api_signup():
     """Enhanced user registration with company creation and tenant isolation."""
     data = request.get_json()
