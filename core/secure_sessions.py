@@ -55,6 +55,7 @@ class SecureSessionManager:
         """Connect to Redis for session storage"""
         if not REDIS_AVAILABLE:
             logger.warning("Redis not available, using in-memory sessions")
+            self.redis_client = None
             return
         
         try:
