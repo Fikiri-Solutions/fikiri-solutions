@@ -105,7 +105,12 @@ from core.enterprise_logging import log_api_request, log_service_action, log_sec
 try:
     from core.business_operations import business_analytics
 except ImportError:
-    business_analytics = None
+    # Create a simple fallback analytics tracker
+    class SimpleBusinessAnalytics:
+        def track_event(self, event_type, properties=None):
+            logger.info(f"Business event tracked: {event_type}")
+    
+    business_analytics = SimpleBusinessAnalytics()
 from core.enterprise_security import security_manager, UserRole, Permission
 
 # Import API validation
