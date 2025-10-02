@@ -38,6 +38,11 @@ class FikiriCache:
     
     def _connect(self):
         """Connect to Redis Cloud"""
+        if not REDIS_AVAILABLE:
+            logger.warning("Redis not installed, using in-memory cache")
+            self.redis_client = None
+            return
+            
         try:
             if self.config.redis_url:
                 self.redis_client = redis.from_url(

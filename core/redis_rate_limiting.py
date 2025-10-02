@@ -46,6 +46,11 @@ class RedisRateLimiter:
     
     def _connect(self):
         """Connect to Redis"""
+        if not REDIS_AVAILABLE:
+            logger.warning("Redis not available, using in-memory rate limiting")
+            self.redis_client = None
+            return
+            
         try:
             if self.config.redis_url:
                 self.redis_client = redis.from_url(
