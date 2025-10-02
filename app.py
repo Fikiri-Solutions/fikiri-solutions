@@ -575,15 +575,26 @@ def api_signup():
         
         user = user_result['user']
         
+        # Convert user object to dict if needed
+        if hasattr(user, 'email'):
+            user_dict = {
+                'id': user.id,
+                'email': user.email,
+                'name': user.name,
+                'role': getattr(user, 'role', 'user')
+            }
+        else:
+            user_dict = user
+        
         # Step 3: Generate JWT tokens
         user_data = {
-            'email': user['email'],
-            'name': user['name'],
-            'role': user['role']
+            'email': user_dict['email'],
+            'name': user_dict['name'],
+            'role': user_dict['role']
         }
         
         tokens = jwt_auth_manager.generate_tokens(
-            user['id'],
+            user_dict['id'],
             user_data,
             device_info=request.headers.get('User-Agent'),
             ip_address=request.remote_addr
@@ -591,7 +602,7 @@ def api_signup():
         
         # Step 4: Create secure session
         session_id, cookie_data = secure_session_manager.create_session(
-            user['id'],
+            user_dict['id'],
             user_data,
             request.remote_addr,
             request.headers.get('User-Agent')
@@ -604,8 +615,8 @@ def api_signup():
                 event_type="user_registration",
                 severity="info",
                 details={
-                    "user_id": user['id'],
-                    "email": user['email']
+                    "user_id": user_dict['id'],
+                    "email": user_dict['email']
                 }
             )
         except Exception as e:
@@ -615,8 +626,8 @@ def api_signup():
         try:
             if business_analytics:
                 business_analytics.track_event('user_signup', {
-                    'user_id': user['id'],
-                    'email': user['email'],
+                    'user_id': user_dict['id'],
+                    'email': user_dict['email'],
                     'industry': data.get('industry'),
                     'team_size': data.get('team_size')
                 })
@@ -629,9 +640,9 @@ def api_signup():
         try:
             from core.email_jobs import email_job_manager
             email_job_manager.queue_welcome_email(
-                user_id=user['id'],
-                email=user['email'],
-                name=user['name'],
+                user_id=user_dict['id'],
+                email=user_dict['email'],
+                name=user_dict['name'],
                 company_name=data.get('business_name', 'My Company')
             )
         except Exception as e:
@@ -640,10 +651,10 @@ def api_signup():
         # Prepare response
         response_data = {
             'user': {
-                'id': user['id'],
-                'email': user['email'],
-                'name': user['name'],
-                'role': user.get('role', 'user'),
+                'id': user_dict['id'],
+                'email': user_dict['email'],
+                'name': user_dict['name'],
+                'role': user_dict.get('role', 'user'),
                 'onboarding_completed': False,
                 'onboarding_step': 1
             },
@@ -662,7 +673,7 @@ def api_signup():
         except Exception as e:
             logger.warning(f"Failed to set session cookie: {e}")
         
-        logger.info(f"✅ User registration successful: {user['email']}")
+        logger.info(f"✅ User registration successful: {user_dict['email']}")
         return response
         
     except Exception as e:
