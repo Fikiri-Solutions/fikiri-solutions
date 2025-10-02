@@ -63,8 +63,8 @@ class GmailOAuthManager:
     def _load_config(self):
         """Load OAuth configuration from environment"""
         import os
-        self.client_id = os.getenv('GMAIL_CLIENT_ID')
-        self.client_secret = os.getenv('GMAIL_CLIENT_SECRET')
+        self.client_id = os.getenv('GOOGLE_CLIENT_ID') or os.getenv('GMAIL_CLIENT_ID')
+        self.client_secret = os.getenv('GOOGLE_CLIENT_SECRET') or os.getenv('GMAIL_CLIENT_SECRET')
         self.redirect_uri = os.getenv('GMAIL_REDIRECT_URI', 'http://localhost:5000/auth/gmail/callback')
     
     def generate_auth_url(self, user_id: int, state: str = None) -> Dict[str, Any]:
