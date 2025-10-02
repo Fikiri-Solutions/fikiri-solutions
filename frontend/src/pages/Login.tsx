@@ -170,7 +170,7 @@ export const Login: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden fikiri-gradient-animated">
+    <div id="main-content" className="min-h-screen relative overflow-hidden fikiri-gradient-animated">
       {/* Enhanced Animated Background Elements */}
       <div className="absolute inset-0">
         {/* Floating orbs with brand colors */}
@@ -331,7 +331,7 @@ export const Login: React.FC = () => {
               <h2 className="text-2xl font-bold text-white text-center mb-2 font-serif">
                 Welcome Back
               </h2>
-              <p className="text-gray-300 text-center text-sm font-light">
+              <p className="text-white text-center text-sm font-light opacity-80">
                 Sign in to continue your automation journey
               </p>
             </div>
@@ -457,9 +457,9 @@ export const Login: React.FC = () => {
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-white/20" />
                 </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-transparent text-gray-300">Or continue with</span>
-                </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-transparent text-white opacity-70">Or continue with</span>
+                  </div>
               </div>
 
               <div className="mt-6 grid grid-cols-3 gap-3">
@@ -505,7 +505,7 @@ export const Login: React.FC = () => {
 
             {/* Features Preview */}
             <div className="mt-8 pt-6 border-t border-white/20">
-              <p className="text-xs text-gray-400 text-center mb-4">Powered by AI</p>
+              <p className="text-xs text-white opacity-60 text-center mb-4">Powered by AI</p>
               <div className="flex justify-center space-x-6">
                 <div className="flex items-center space-x-2 text-white/80">
                   <Shield className="h-4 w-4 text-brand-accent" />
