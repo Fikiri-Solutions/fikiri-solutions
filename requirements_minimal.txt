@@ -23,6 +23,9 @@ flask-socketio>=5.0.0
 flask-cors>=3.0.0
 gunicorn>=20.0.0
 
+# Redis for caching, sessions, and queues
+redis>=4.0.0
+
 # Workflow Automation
 fastapi>=0.100.0
 uvicorn>=0.20.0
