@@ -28,22 +28,35 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({ userId, onComplete }
 
   const pollSyncStatus = async () => {
     try {
-      const response = await fetch(`https://fikirisolutions.onrender.com/api/email/sync/status?user_id=${userId}`)
+      const response = await fetch(`https://fikirisolutions.onrender.com/api/onboarding/status?user_id=${userId}`)
       const data = await response.json()
       
       if (data.success) {
-        setSyncStatus(data.data)
+        const progress = data.progress
+        
+        // Transform the new progress format to match current interface
+        const syncStatus: SyncStatus = {
+          status: progress.status || 'running',
+          current_step: progress.step || 'starting',
+          progress: parseInt(progress.pct || '0'),
+          started_at: new Date().toISOString(), // Will be updated properly in backend
+          error_message: progress.error
+        }
+        
+        setSyncStatus(syncStatus)
         setIsLoading(false)
         
-        if (data.data.status === 'completed') {
+        if (progress.step === 'done' || progress.status === 'completed') {
           onComplete()
-        } else if (data.data.status === 'failed') {
-          setError(data.data.error_message || 'Sync failed')
+        } else if (progress.status === 'failed' || progress.step === 'error') {
+          setError(progress.error || 'Sync failed')
         }
+      } else {
+        throw new Error(data.error || 'Failed to get status')
       }
     } catch (error) {
       console.error('Error polling sync status:', error)
-      setError('Failed to check sync status')
+      setError(error instanceof Error ? error.message : 'Failed to check sync status')
       setIsLoading(false)
     }
   }

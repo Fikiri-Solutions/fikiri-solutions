@@ -87,8 +87,9 @@ def decrypt(s: str) -> str:
 def gmail_start():
     """Start Gmail OAuth flow with CSRF protection"""
     try:
-        # Get user_id from session (in production, validate session exists)
-        user_id = session.get("user_id")
+        # Get user_id from secure session
+        from core.secure_sessions import get_current_user_id
+        user_id = get_current_user_id()
         if not user_id:
             return jsonify({"error": "unauthorized"}), 401
 
@@ -97,8 +98,25 @@ def gmail_start():
 
         # Generate secure state parameter for CSRF protection
         state = secrets.token_urlsafe(24)
-        session["oauth_state"] = state
-        session["post_connect_redirect"] = request.args.get("redirect", "/onboarding/sync")
+        
+        # Store OAuth state in secure session data
+        from flask import g
+        if hasattr(g, 'session_data') and g.session_data:
+            g.session_data['oauth_state'] = state
+            g.session_data['post_connect_redirect'] = request.args.get("redirect", "/onboarding/sync")
+        else:
+            # Fallback to database for OAuth state storage
+            from core.database_optimization import db_optimizer
+            db_optimizer.execute_query("""
+                INSERT OR REPLACE INTO oauth_states 
+                (state, user_id, provider, redirect_url, expires_at, metadata)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                state, user_id, 'gmail', 
+                request.args.get("redirect", "/onboarding/sync"),
+                int(time.time()) + 600,  # 10 minutes
+                json.dumps({'oauth_state': state})
+            ), fetch=False)
 
         if GOOGLE_OAUTH_AVAILABLE:
             # Use google-auth-oauthlib for production-grade OAuth
@@ -148,8 +166,29 @@ def gmail_callback():
     try:
         # 1) CSRF check
         state = request.args.get("state")
-        if not state or state != session.get("oauth_state"):
-            logger.error(f"❌ State mismatch: {state} != {session.get('oauth_state')}")
+        
+        # Get expected state from secure session or database
+        expected_state = None
+        redirect_url = "/onboarding/sync"
+        
+        from flask import g
+        if hasattr(g, 'session_data') and g.session_data:
+            expected_state = g.session_data.get('oauth_state')
+            redirect_url = g.session_data.get('post_connect_redirect', "/onboarding/sync")
+        else:
+            # Fallback: check database for OAuth state
+            from core.database_optimization import db_optimizer
+            state_data = db_optimizer.execute_query("""
+                SELECT state, redirect_url FROM oauth_states 
+                WHERE state = ? AND expires_at > ?
+            """, (state, int(time.time())))
+            
+            if state_data:
+                expected_state = state_data[0]['state']
+                redirect_url = state_data[0]['redirect_url']
+        
+        if not state or state != expected_state:
+            logger.error(f"❌ State mismatch: {state} != {expected_state}")
             return jsonify({"error": "state_mismatch"}), 400
 
         code = request.args.get("code")
@@ -162,7 +201,9 @@ def gmail_callback():
         if not code:
             return jsonify({"error": "missing_code"}), 400
 
-        user_id = session.get("user_id")
+        # Get user_id from secure session
+        from core.secure_sessions import get_current_user_id
+        user_id = get_current_user_id()
         if not user_id:
             return jsonify({"error": "no_user_session"}), 400
 
@@ -206,12 +247,10 @@ def gmail_callback():
             except Exception as e:
                 logger.warning(f"⚠️ Failed to queue sync job: {e}")
 
-            # Clean up session state
-            session.pop("oauth_state", None)
-            
-            # Determine redirect URL
-            redirect_url = session.get("post_connect_redirect", "/onboarding/sync")
-            session.pop("post_connect_redirect", None)
+            # Clean up session state and database
+            if hasattr(g, 'session_data') and g.session_data:
+                g.session_data.pop("oauth_state", None)
+                g.session_data.pop("post_connect_redirect", None)
             
             # For API calls, return JSON response
             if request.headers.get('Accept', '').find('application/json') != -1:
@@ -230,7 +269,7 @@ def gmail_callback():
             return jsonify({"error": "Google OAuth libraries not available"}), 500
 
     except Exception as e:
-        logger.error(f"""❌ OAuth callback failed: {e}')
+        logger.error(f"❌ OAuth callback failed: {e}")
         return jsonify({"error": f"OAuth callback failed: {str(e)}"}), 500
 
 def upsert_gmail_tokens(user_id: int, **payload):
@@ -245,7 +284,7 @@ def upsert_gmail_tokens(user_id: int, **payload):
         )
         
         if existing:
-            # Update existing tokens
+            # Update existing tokens with encrypted storage
             db_optimizer.execute_query("""
                 UPDATE gmail_tokens 
                 SET access_token_enc = ?, refresh_token_enc = ?, 
@@ -253,14 +292,14 @@ def upsert_gmail_tokens(user_id: int, **payload):
                     updated_at = CURRENT_TIMESTAMP, is_active = TRUE
                 WHERE user_id = ?
             """, (
-                payload["access_token"],
+                payload["access_token"],  # Already encrypted by encrypt()
                 payload["refresh_token"], 
                 payload["expiry"],
                 json.dumps(payload["scopes"]),
                 user_id
             ), fetch=False)
         else:
-            # Insert new tokens
+            # Insert new tokens with encrypted storage
             db_optimizer.execute_query("""
                 INSERT INTO gmail_tokens 
                 (user_id, access_token_enc, refresh_token_enc, expiry_timestamp, 
@@ -268,7 +307,7 @@ def upsert_gmail_tokens(user_id: int, **payload):
                 VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, TRUE)
             """, (
                 user_id,
-                payload["access_token"],
+                payload["access_token"],  # Already encrypted by encrypt()
                 payload["refresh_token"],
                 payload["expiry"], 
                 json.dumps(payload["scopes"])
