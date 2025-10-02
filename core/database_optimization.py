@@ -621,7 +621,7 @@ class DatabaseOptimizer:
                     cursor.execute(query)
                 
                 if fetch:
-                    if query.strip().upper().startswith('SELECT'):
+                    if query.strip().upper().startswith(('SELECT', 'PRAGMA')):
                         result = cursor.fetchall()
                     else:
                         result = cursor.rowcount

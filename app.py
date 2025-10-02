@@ -3753,7 +3753,8 @@ def api_get_dashboard_metrics():
             try:
                 leads = services['crm'].get_all_leads()
                 active_leads = len(leads)
-            except:
+            except Exception as e:
+                logger.warning(f"CRM service error: {e}")
                 active_leads = 0
         
         # Get AI stats
@@ -3762,7 +3763,8 @@ def api_get_dashboard_metrics():
                 stats = services['ai_assistant'].get_usage_stats()
                 ai_responses = stats.get('successful_responses', 0)
                 avg_response_time = stats.get('avg_response_time', 0.0)
-            except:
+            except Exception as e:
+                logger.warning(f"AI assistant service error: {e}")
                 ai_responses = 0
                 avg_response_time = 0.0
         
@@ -3800,7 +3802,8 @@ def api_get_activity():
                         'timestamp': datetime.now().isoformat(),
                         'status': 'success'
                     })
-            except:
+            except Exception as e:
+                logger.debug(f"Analytics tracking failed: {e}")
                 pass
         
         # Add CRM activity
@@ -3815,7 +3818,8 @@ def api_get_activity():
                         'timestamp': datetime.now().isoformat(),
                         'status': 'success'
                     })
-            except:
+            except Exception as e:
+                logger.debug(f"Analytics tracking failed: {e}")
                 pass
         
         # Add Gmail activity
@@ -4245,7 +4249,7 @@ def webhook_sentry_test():
         }
         
         # Simulate webhook processing error
-        raise Exception('This is a webhook Sentry test error!')
+        raise ValueError('This is a webhook Sentry test error!')
         
     except Exception as e:
         # Capture the error in webhook Sentry
