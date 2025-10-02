@@ -185,6 +185,17 @@ class GoogleOAuthManager:
             if not token_result['success']:
                 return token_result
             
+            # Update user onboarding status
+            try:
+                from core.user_auth import user_auth_manager
+                user_auth_manager.update_user_profile(
+                    user_id=user_id,
+                    onboarding_step=2  # Gmail connected step
+                )
+            except Exception as e:
+                logger.warning(f"Failed to update onboarding status: {e}")
+                # Don't fail the OAuth callback for onboarding issues
+            
             logger.info(f"✅ Google OAuth completed for user {user_id}")
             
             return {

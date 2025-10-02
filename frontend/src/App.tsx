@@ -39,6 +39,7 @@ import { PageLoader } from './components/PageLoader'
 import { ProtectedRoute, AuthRoute, OnboardingRoute } from './components/RouteGuard'
 import { getFeatureConfig } from './config'
 import { useWarmRoutes } from './hooks/useWarmRoutes'
+import { AccessibilityProvider } from './components/AccessibilityProvider'
 
 function App() {
   try {
@@ -47,15 +48,16 @@ function App() {
 
     return (
       <ErrorBoundary>
-        <Router>
-          <ThemeProvider>
-            <CustomizationProvider>
-              <ActivityProvider>
-                <AuthProvider>
-                  <QueryProvider>
-                    <ToastProvider>
-                      <ScrollToTop />
-                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+        <AccessibilityProvider>
+          <Router>
+            <ThemeProvider>
+              <CustomizationProvider>
+                <ActivityProvider>
+                  <AuthProvider>
+                    <QueryProvider>
+                      <ToastProvider>
+                        <ScrollToTop />
+                        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
                         <Suspense fallback={<PageLoader />}>
                           <Routes>
                           {/* Public routes - no authentication required */}
@@ -181,6 +183,7 @@ function App() {
             </CustomizationProvider>
           </ThemeProvider>
         </Router>
+        </AccessibilityProvider>
       </ErrorBoundary>
     )
   } catch (error) {

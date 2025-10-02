@@ -669,14 +669,19 @@ def api_google_callback():
     
     if result['success']:
         # Redirect to the specified URL or default onboarding step
-        redirect_url = result.get('redirect_url', '/onboarding/2')
+        redirect_url = result.get('redirect_url', '/onboarding')
         
-        # Return success response with redirect info
-        return create_success_response({
-            'user_id': result['user_id'],
-            'user_info': result['user_info'],
-            'redirect_url': redirect_url
-        }, "Google OAuth completed successfully")
+        # For API calls, return JSON response
+        if request.headers.get('Accept', '').find('application/json') != -1:
+            return create_success_response({
+                'user_id': result['user_id'],
+                'user_info': result['user_info'],
+                'redirect_url': redirect_url
+            }, "Google OAuth completed successfully")
+        else:
+            # For browser redirects, redirect to the frontend
+            frontend_url = f"/{redirect_url.lstrip('/')}"
+            return redirect(frontend_url)
     else:
         return create_error_response(result['error'], 400, result['error_code'])
 
