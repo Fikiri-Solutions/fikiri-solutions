@@ -176,6 +176,14 @@ app.register_blueprint(workflow_templates_bp)
 from core.monitoring_dashboard_api import monitoring_dashboard_bp
 app.register_blueprint(monitoring_dashboard_bp)
 
+# Register OAuth blueprint (new proven patterns)
+from core.app_oauth import oauth
+app.register_blueprint(oauth)
+
+# Register Onboarding Status blueprint
+from core.app_onboarding import status_bp
+app.register_blueprint(status_bp)
+
 # Initialize SocketIO for real-time updates (disabled for now)
 # socketio = SocketIO(app, cors_allowed_origins=[
 #     'http://localhost:3000',
