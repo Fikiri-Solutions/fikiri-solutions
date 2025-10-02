@@ -100,6 +100,12 @@ from core.api_validation import create_success_response, create_error_response
 
 # Import enterprise features
 from core.enterprise_logging import log_api_request, log_service_action, log_security_event
+
+# Import business analytics
+try:
+    from core.business_operations import business_analytics
+except ImportError:
+    business_analytics = None
 from core.enterprise_security import security_manager, UserRole, Permission
 
 # Import API validation
@@ -575,12 +581,15 @@ def api_signup():
         
         # Track business analytics
         try:
-            business_analytics.track_event('user_signup', {
-                'user_id': user['id'],
-                'email': user['email'],
-                'industry': data.get('industry'),
-                'team_size': data.get('team_size')
-            })
+            if business_analytics:
+                business_analytics.track_event('user_signup', {
+                    'user_id': user['id'],
+                    'email': user['email'],
+                    'industry': data.get('industry'),
+                    'team_size': data.get('team_size')
+                })
+            else:
+                logger.info("Business analytics not available, skipping tracking")
         except Exception as e:
             logger.warning(f"Analytics tracking failed: {e}")
         
