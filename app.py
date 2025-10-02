@@ -177,12 +177,26 @@ from core.monitoring_dashboard_api import monitoring_dashboard_bp
 app.register_blueprint(monitoring_dashboard_bp)
 
 # Register OAuth blueprint (new proven patterns)
-from core.app_oauth import oauth
-app.register_blueprint(oauth)
+try:
+    from core.app_oauth import oauth
+    app.register_blueprint(oauth)
+    print("✅ Advanced OAuth blueprint registered")
+except Exception as e:
+    print(f"⚠️ Advanced OAuth failed: {e}")
+    try:
+        from core.simple_oauth import oauth_simple
+        app.register_blueprint(oauth_simple)
+        print("✅ Simple OAuth blueprint registered as fallback")
+    except Exception as e2:
+        print(f"❌ Simple OAuth also failed: {e2}")
 
 # Register Onboarding Status blueprint
-from core.app_onboarding import status_bp
-app.register_blueprint(status_bp)
+try:
+    from core.app_onboarding import status_bp
+    app.register_blueprint(status_bp)
+    print("✅ Onboarding status blueprint registered")
+except Exception as e:
+    print(f"⚠️ Onboarding status failed: {e}")
 
 # Initialize SocketIO for real-time updates (disabled for now)
 # socketio = SocketIO(app, cors_allowed_origins=[
