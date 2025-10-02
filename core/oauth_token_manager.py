@@ -293,8 +293,8 @@ class OAuthTokenManager:
     def _refresh_gmail_token(self, user_id: int, refresh_token: str) -> Dict[str, Any]:
         """Refresh Gmail OAuth token"""
         try:
-            client_id = os.getenv('GMAIL_CLIENT_ID')
-            client_secret = os.getenv('GMAIL_CLIENT_SECRET')
+            client_id = os.getenv('GOOGLE_CLIENT_ID') or os.getenv('GMAIL_CLIENT_ID')
+            client_secret = os.getenv('GOOGLE_CLIENT_SECRET') or os.getenv('GMAIL_CLIENT_SECRET')
             
             if not client_id or not client_secret:
                 raise Exception("Gmail OAuth credentials not configured")
