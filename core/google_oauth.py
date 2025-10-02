@@ -482,7 +482,8 @@ class GoogleOAuthManager:
                             data={'token': token_record['access_token']},
                             timeout=10
                         )
-                    except:
+                    except Exception as e:
+                        logger.warning(f"Token revocation failed: {e}")
                         pass  # Continue even if revocation fails
             
             # Mark tokens as inactive in database

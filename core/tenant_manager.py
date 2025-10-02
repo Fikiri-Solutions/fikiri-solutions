@@ -78,17 +78,20 @@ class TenantManager:
             try:
                 # Check if tenant_id column exists before adding
                 columns = db_optimizer.execute_query("PRAGMA table_info(users)")
-                column_names = [col[1] for col in columns] if columns else []
-                
-                if 'tenant_id' not in column_names:
-                    db_optimizer.execute_query("""
-                        ALTER TABLE users ADD COLUMN tenant_id TEXT
-                    """, fetch=False)
-                
-                if 'company_id' not in column_names:
-                    db_optimizer.execute_query("""
-                        ALTER TABLE users ADD COLUMN company_id INTEGER
-                    """, fetch=False)
+                if columns:
+                    column_names = [col[1] for col in columns]
+                    
+                    if 'tenant_id' not in column_names:
+                        db_optimizer.execute_query("""
+                            ALTER TABLE users ADD COLUMN tenant_id TEXT
+                        """, fetch=False)
+                    
+                    if 'company_id' not in column_names:
+                        db_optimizer.execute_query("""
+                            ALTER TABLE users ADD COLUMN company_id INTEGER
+                        """, fetch=False)
+                else:
+                    logger.warning("Could not get column information for users table")
             except Exception as e:
                 logger.warning(f"Could not update users table: {e}")
             

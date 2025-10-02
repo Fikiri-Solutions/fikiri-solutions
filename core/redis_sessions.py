@@ -86,7 +86,8 @@ class RedisSessionManager:
         try:
             self.redis_client.ping()
             return True
-        except:
+        except Exception as e:
+            logger.debug(f"Redis ping failed: {e}")
             return False
     
     def create_session(self, user_id: str, user_data: Dict[str, Any]) -> str:
