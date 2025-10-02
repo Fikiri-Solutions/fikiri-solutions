@@ -250,6 +250,14 @@ def initialize_services():
         services['feature_flags'] = get_feature_flags()
         services['email_manager'] = EmailServiceManager()
         
+        # Initialize health monitoring
+        try:
+            from core.monitoring import init_health_monitoring
+            init_health_monitoring(app)
+            print("✅ Health monitoring initialized")
+        except Exception as e:
+            print(f"⚠️ Health monitoring initialization failed: {e}")
+        
         print("✅ All services initialized successfully")
         return True
     except Exception as e:

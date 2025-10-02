@@ -34,12 +34,13 @@ class MinimalConfig:
         self.debug = False
         self.dry_run = False
         
-        # Redis settings
+        # Redis settings with connection pooling
         self.redis_host = "localhost"
         self.redis_port = 6379
         self.redis_password = None
         self.redis_db = 0
         self.redis_url = None
+        self.redis_max_connections = 10  # Limit Redis connections
         
         # Load from environment
         self._load_from_env()
