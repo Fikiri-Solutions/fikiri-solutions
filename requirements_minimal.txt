@@ -35,6 +35,7 @@ psutil>=5.9.0
 
 # Security and encryption
 cryptography>=41.0.0
+PyJWT>=2.8.0
 
 # Workflow Automation
 fastapi>=0.100.0
