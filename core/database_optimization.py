@@ -83,16 +83,20 @@ class DatabaseOptimizer:
             )
         """)
         
-        # Gmail OAuth tokens table
+        # Gmail OAuth tokens table (supporting both encrypted and plain storage)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS gmail_tokens (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
                 access_token TEXT NOT NULL,
                 refresh_token TEXT,
+                access_token_enc TEXT,  -- Encrypted version
+                refresh_token_enc TEXT, -- Encrypted version
                 token_type TEXT DEFAULT 'Bearer',
                 expires_at TIMESTAMP,
-                scope TEXT,  -- OAuth scopes granted
+                expiry_timestamp INTEGER,  -- Unix timestamp version
+                scope TEXT,  -- OAuth scopes granted (JSON string)
+                scopes_json TEXT,  -- OAuth scopes granted (JSON string) for encrypted tokens
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 is_active BOOLEAN DEFAULT 1,

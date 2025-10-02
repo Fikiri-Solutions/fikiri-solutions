@@ -86,15 +86,14 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
 
-      const response = await fetch('https://fikirisolutions.onrender.com/api/auth/gmail/connect', {
-        method: 'POST',
+      // Use new proven OAuth endpoint - GET request with redirect parameter
+      const redirectUri = '/onboarding-flow/sync'  // Will show sync progress step
+      const response = await fetch(`https://fikirisolutions.onrender.com/api/oauth/gmail/start?redirect=${encodeURIComponent(redirectUri)}`, {
+        method: 'GET',
+        credentials: 'include', // Include session cookies for CSRF protection
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          user_id: userId,
-          redirect_uri: window.location.origin + '/onboarding-flow/2'
-        }),
         signal: controller.signal
       })
 
@@ -106,14 +105,15 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
 
       const data = await response.json()
       
-      if (data.success && data.auth_url) {
+      // New OAuth endpoint returns { url: "https://accounts.google.com/..." }
+      if (data.url) {
         // Security: Validate the auth URL
-        if (!data.auth_url.startsWith('https://accounts.google.com/')) {
+        if (!data.url.startsWith('https://accounts.google.com/')) {
           throw new Error('Invalid authentication URL')
         }
 
         // Redirect to Google OAuth
-        window.location.href = data.auth_url
+        window.location.href = data.url
         addToast('Redirecting to Gmail authentication...', 'info')
       } else {
         throw new Error(data.error || 'Failed to initiate Gmail connection')
