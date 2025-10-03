@@ -110,12 +110,12 @@ function App() {
                             <>
                               <Route path="/onboarding" element={
                                 <OnboardingRoute>
-                                  <OnboardingFlow />
+                                  <Onboarding />
                                 </OnboardingRoute>
                               } />
                               <Route path="/onboarding/:step" element={
                                 <OnboardingRoute>
-                                  <OnboardingFlow />
+                                  <Onboarding />
                                 </OnboardingRoute>
                               } />
                             </>
