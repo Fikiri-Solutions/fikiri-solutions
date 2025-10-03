@@ -220,10 +220,10 @@ def register_blueprints():
     
     # Extracted route blueprints (already have url_prefix defined in blueprint)
     app.register_blueprint(auth_bp)
-    app.register_blueprint(business_bp)
-    app.register_blueprint(test_bp)
-    app.register_blueprint(user_bp)
-    app.register_blueprint(monitoring_bp)
+    app.register_blueprint(business_bp, name="routes_business")
+    app.register_blueprint(test_bp, name="routes_test")
+    app.register_blueprint(user_bp, name="routes_user")
+    app.register_blueprint(monitoring_bp, name="routes_monitoring")
 
 # Health check endpoint
 @app.route('/health')
