@@ -94,6 +94,7 @@ from core.webhook_sentry import capture_webhook_error, capture_webhook_performan
 # Import enhanced authentication and session management
 from core.jwt_auth import jwt_auth_manager, jwt_required, get_current_user as get_jwt_user
 from core.secure_sessions import secure_session_manager, init_secure_sessions, create_secure_session, get_current_user_id
+from core.app_onboarding import bp as onboarding_bp
 from core.tenant_manager import tenant_manager
 from core.idempotency_manager import idempotency_manager, idempotent
 from core.rate_limiter import enhanced_rate_limiter, rate_limit
@@ -176,6 +177,9 @@ app.register_blueprint(create_api_blueprint('v2'))
 
 # Register business operations blueprint
 app.register_blueprint(create_business_blueprint())
+
+# Register onboarding blueprint
+app.register_blueprint(onboarding_bp)
 
 # Register billing blueprint
 app.register_blueprint(billing_bp)
