@@ -11,24 +11,7 @@ from datetime import datetime
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 
-# Sentry integration (optional)
-try:
-    import sentry_sdk
-    from sentry_sdk.integrations.flask import FlaskIntegration
-    from sentry_sdk.integrations.redis import RedisIntegration
-    
-    sentry_sdk.init(
-        dsn="https://05d4170350ee081a3bfee0dda0220df6@o4510053728845824.ingest.us.sentry.io/4510053767249920",
-        integrations=[FlaskIntegration(), RedisIntegration()],
-        send_default_pii=True,
-        traces_sample_rate=1.0,
-        enable_logs=True,
-        environment=os.getenv('FLASK_ENV', 'production'),
-        release=os.getenv('GITHUB_SHA', 'unknown'),
-    )
-    print("✅ Sentry initialized successfully")
-except ImportError:
-    print("⚠️ Sentry SDK not available")
+# Sentry integration handled by core/monitoring.py
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -53,9 +36,9 @@ from core.jwt_auth import jwt_auth_manager
 from core.secure_sessions import secure_session_manager, init_secure_sessions
 from core.idempotency_manager import idempotency_manager
 from core.rate_limiter import enhanced_rate_limiter
-from core.api_validation import create_api_blueprint, create_business_blueprint
+# Removed unused imports: create_api_blueprint, create_business_blueprint
 from core.enterprise_logging import log_api_request, log_api_request
-from core.monitoring import init_health_monitoring
+from core.monitoring import init_health_monitoring, init_sentry
 from core.business_operations import business_intelligence, legal_compliance
 from core.structured_logging import monitor, error_tracker
 from core.performance_monitor import performance_monitor
@@ -102,6 +85,13 @@ def initialize_services():
             print("✅ Health monitoring initialized")
         except Exception as e:
             print(f"⚠️ Health monitoring initialization failed: {e}")
+        
+        # Initialize Sentry
+        try:
+            init_sentry(app)
+            print("✅ Sentry initialized")
+        except Exception as e:
+            print(f"⚠️ Sentry initialization failed: {e}")
         
         print("✅ All services initialized successfully")
         return True
@@ -171,9 +161,6 @@ def register_blueprints():
     """Register all application blueprints"""
     
     # Core feature blueprints
-    app.register_blueprint(create_api_blueprint('v1'))
-    app.register_blueprint(create_api_blueprint('v2'))
-    app.register_blueprint(create_business_blueprint())
     app.register_blueprint(onboarding_bp)
     app.register_blueprint(billing_bp)
     app.register_blueprint(webhook_bp)
