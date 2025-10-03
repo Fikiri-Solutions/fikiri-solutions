@@ -138,13 +138,13 @@ def api_signup():
         user = user_result['user']
 
         user_data = {
-            'email': user['email'],
-            'name': user['name'],
-            'role': user['role']
+            'email': user.email,
+            'name': user.name,
+            'role': user.role
         }
 
         tokens = jwt_auth_manager.generate_tokens(
-            user['id'],
+            user.id,
             user_data,
             device_info=request.headers.get('User-Agent'),
             ip_address=request.remote_addr

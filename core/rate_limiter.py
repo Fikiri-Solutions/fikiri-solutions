@@ -463,6 +463,8 @@ enhanced_rate_limiter = EnhancedRateLimiter()
 def rate_limit(limit_name: str, identifier_func: Callable = None):
     """Decorator to apply rate limiting to functions"""
     def decorator(func):
+        from functools import wraps
+        @wraps(func)
         def wrapper(*args, **kwargs):
             # Generate identifier
             if identifier_func:
