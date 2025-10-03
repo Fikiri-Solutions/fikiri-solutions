@@ -212,15 +212,9 @@ app.register_blueprint(monitoring_dashboard_bp)
 try:
     from core.app_oauth import oauth
     app.register_blueprint(oauth)
-    print("✅ Advanced OAuth blueprint registered")
+    print("✅ OAuth blueprint registered")
 except Exception as e:
-    print(f"⚠️ Advanced OAuth failed: {e}")
-    try:
-        from core.simple_oauth import oauth_simple
-        app.register_blueprint(oauth_simple)
-        print("✅ Simple OAuth blueprint registered as fallback")
-    except Exception as e2:
-        print(f"❌ Simple OAuth also failed: {e2}")
+    print(f"❌ OAuth blueprint failed: {e}")
 
 # Onboarding blueprint already registered above
 
@@ -508,13 +502,11 @@ def api_update_user_profile():
 from core.user_auth import user_auth_manager
 from core.gmail_oauth import gmail_oauth_manager, gmail_sync_manager
 from core.google_oauth import google_oauth_manager
-from core.onboarding_wizard import onboarding_wizard
 from core.privacy_manager import privacy_manager
 from core.universal_ai_assistant import universal_ai_assistant
 from core.enhanced_crm_service import enhanced_crm_service
 from core.email_parser_service import email_parser_service
 from core.automation_engine import automation_engine
-from core.onboarding_orchestrator import onboarding_orchestrator
 from core.automation_safety import automation_safety_manager
 # from core.rate_limiter import rate_limiter  # Not used in this file
 from core.oauth_token_manager import oauth_token_manager

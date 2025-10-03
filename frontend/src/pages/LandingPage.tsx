@@ -16,6 +16,7 @@ import {
 import FikiriLogo from '@/components/FikiriLogo'
 import SimpleAnimatedBackground from '@/components/SimpleAnimatedBackground'
 import DemoVideoModal from '@/components/DemoVideoModal'
+import LogoTicker from '@/components/LogoTicker'
 
 const LandingPage: React.FC = () => {
   // State for mobile menu and demo video
@@ -479,15 +480,8 @@ const LandingPage: React.FC = () => {
             transition={{ duration: 0.8 }}
             className="text-center"
           >
-            <p className="text-white mb-8">Powered by industry-leading technology</p>
-            <div className="flex flex-wrap justify-center items-center gap-8 opacity-80">
-              <div className="text-2xl font-bold text-white">OpenAI</div>
-              <div className="text-2xl font-bold text-white">Google</div>
-              <div className="text-2xl font-bold text-white">Redis</div>
-              <div className="text-2xl font-bold text-white">Shopify</div>
-              <div className="text-2xl font-bold text-white">Microsoft</div>
-              <div className="text-2xl font-bold text-white">Stripe</div>
-            </div>
+            <p className="text-white mb-8 font-medium text-lg">Powered by industry-leading technology</p>
+            <LogoTicker speed={25} className="max-w-4xl mx-auto" />
           </motion.div>
         </div>
       </section>
