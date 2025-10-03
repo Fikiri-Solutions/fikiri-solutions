@@ -6,7 +6,9 @@ REST endpoints for system monitoring and alerts
 from flask import Blueprint, request, jsonify
 import logging
 from typing import Dict, Any
-from core.monitoring_dashboard_system import monitoring_dashboard_system
+# Monitoring dashboard system - disabled as part of cleanup
+# from core.monitoring_dashboard_system import monitoring_dashboard_system
+monitoring_dashboard_system = None
 # from core.enterprise_logging import log_api_request
 
 logger = logging.getLogger(__name__)

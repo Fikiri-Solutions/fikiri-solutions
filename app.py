@@ -141,10 +141,7 @@ from core.business_operations import (
     create_business_blueprint
 )
 
-# Import monitoring and backup systems
-from core.monitoring_backup import (
-    monitoring_system, backup_manager, Alert
-)
+# Import monitoring systems (consolidated)
 
 # Import monitoring and performance tracking
 # Import logging
@@ -500,8 +497,13 @@ def api_update_user_profile():
 
 # Import new authentication modules
 from core.user_auth import user_auth_manager
-from core.gmail_oauth import gmail_oauth_manager, gmail_sync_manager
-from core.google_oauth import google_oauth_manager
+# Gmail OAuth functionality - disabled pending OAuth refactor
+# from core.gmail_oauth import gmail_oauth_manager, gmail_sync_manager
+gmail_oauth_manager = None
+gmail_sync_manager = None
+# Google OAuth functionality - disabled pending OAuth refactor
+# from core.google_oauth import google_oauth_manager
+google_oauth_manager = None
 from core.privacy_manager import privacy_manager
 from core.universal_ai_assistant import universal_ai_assistant
 from core.enhanced_crm_service import enhanced_crm_service

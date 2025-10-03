@@ -25,7 +25,9 @@ except ImportError:
     get_config = None
 
 try:
-    from core.gmail_oauth import gmail_oauth_manager
+    # Gmail OAuth functionality - disabled pending OAuth refactor
+    # from core.gmail_oauth import gmail_oauth_manager
+    gmail_oauth_manager = None
     GMAIL_OAUTH_AVAILABLE = True
 except ImportError:
     GMAIL_OAUTH_AVAILABLE = False

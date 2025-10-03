@@ -10,7 +10,9 @@ from dataclasses import dataclass
 from datetime import datetime
 import requests
 from core.minimal_config import get_config
-from core.gmail_oauth import gmail_oauth_manager
+# Gmail OAuth functionality - disabled pending OAuth refactor
+# from core.gmail_oauth import gmail_oauth_manager
+gmail_oauth_manager = None
 from core.database_optimization import db_optimizer
 
 logger = logging.getLogger(__name__)

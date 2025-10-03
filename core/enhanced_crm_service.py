@@ -9,7 +9,10 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from core.database_optimization import db_optimizer
-from core.gmail_oauth import gmail_oauth_manager, gmail_sync_manager
+# Gmail OAuth functionality - disabled pending OAuth refactor
+# from core.gmail_oauth import gmail_oauth_manager, gmail_sync_manager
+gmail_oauth_manager = None
+gmail_sync_manager = None
 
 logger = logging.getLogger(__name__)
 
