@@ -11,8 +11,8 @@ from datetime import datetime
 # Import user management modules
 from core.user_auth import user_auth_manager
 from core.api_validation import handle_api_errors, create_success_response, create_error_response
-from core.secure_sessions import get_current_user_id, get_current_user
-from核心.automation_safety import automation_safety_manager
+from core.secure_sessions import get_current_user_id
+from core.automation_safety import automation_safety_manager
 from core.database_optimization import db_optimizer
 
 logger = logging.getLogger(__name__)
@@ -187,11 +187,11 @@ def get_dashboard_data():
             dashboard_data['quick_stats']['gmail_connected'] = False
 
         # Get user onboarding status
-        user = get_current_user()
+        user_profile = user_auth_manager.get_user_profile(user_id)
         dashboard_data['user_info'] = {
-            'name': user.get('name', 'User'),
-            'onboarding_completed': user.get('onboarding_completed', False),
-            'onboarding_step': user.get('onboarding_step', 1)
+            'name': user_profile.get('name', 'User'),
+            'onboarding_completed': user_profile.get('onboarding_completed', False),
+            'onboarding_step': user_profile.get('onboarding_step', 1)
         }
 
         return create_success_response(dashboard_data, 'Dashboard data retrieved successfully')
@@ -213,8 +213,8 @@ def export_user_data():
         export_data = {
             'export_timestamp': datetime.now().isoformat(),
             'user_data': {},
-            'export_status':<｜tool▁call▁begin｜>
-}
+            'export_status': 'success'
+        }
 
         try:
             # Get user profile
