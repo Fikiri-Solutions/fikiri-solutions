@@ -23,6 +23,9 @@ flask-socketio>=5.0.0
 flask-cors>=3.0.0
 gunicorn>=20.0.0
 
+# Database and ORM
+SQLAlchemy>=2.0.0
+
 # Redis for caching, sessions, and queues
 redis>=4.0.0
 rq>=2.0.0
