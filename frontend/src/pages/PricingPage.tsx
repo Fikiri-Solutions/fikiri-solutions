@@ -263,7 +263,7 @@ const PricingPage: React.FC = () => {
             }}>
               Plans for businesses of any size
             </h1>
-            <p className="text-xl text-white/80 mb-8">
+            <p className="text-xl text-gray-200 mb-8">
               Get all the Fikiri Solutions features — pay for what you use
             </p>
           </motion.div>
@@ -331,14 +331,14 @@ const PricingPage: React.FC = () => {
                   <h3 className="text-2xl font-bold text-white mb-2">{tier.name}</h3>
                   <div className="flex items-center justify-center mb-4">
                     <span className="text-4xl font-bold text-white">${tier.price}</span>
-                    <span className="text-white/80 ml-2">{tier.period}</span>
+                    <span className="text-gray-300 ml-2">{tier.period}</span>
                   </div>
-                  <p className="text-white/90 text-sm">{tier.description}</p>
+                  <p className="text-white text-sm">{tier.description}</p>
                 </div>
 
                 <ul className="space-y-3 mb-8">
                   {tier.features.map((feature, featureIndex) => (
-                    <li key={featureIndex} className="flex items-center text-white/90">
+                    <li key={featureIndex} className="flex items-center text-gray-100">
                       <Check className="w-5 h-5 text-green-400 mr-3 flex-shrink-0" />
                       <span className="text-sm">{feature}</span>
                     </li>
@@ -380,7 +380,7 @@ const PricingPage: React.FC = () => {
             }}>
               Industry-Specific Solutions
             </h2>
-            <p className="text-xl text-white/80 max-w-2xl mx-auto">
+            <p className="text-xl text-gray-200 max-w-2xl mx-auto">
               Tailored automation for your specific industry needs
             </p>
           </motion.div>
@@ -405,7 +405,7 @@ const PricingPage: React.FC = () => {
 
                 <ul className="space-y-2">
                   {industry.features.map((feature, featureIndex) => (
-                    <li key={featureIndex} className="flex items-center text-white/90 text-sm">
+                    <li key={featureIndex} className="flex items-center text-gray-100 text-sm">
                       <Check className="w-4 h-4 text-green-400 mr-2 flex-shrink-0" />
                       {feature}
                     </li>
@@ -464,26 +464,26 @@ const PricingPage: React.FC = () => {
                       </tr>
                       {category.features.map((feature, featureIndex) => (
                         <tr key={featureIndex} className="border-b border-gray-700/50">
-                          <td className="p-4 text-white/90">{feature.name}</td>
-                          <td className="p-4 text-center text-white/90">
+                          <td className="p-4 text-gray-100">{feature.name}</td>
+                          <td className="p-4 text-center text-gray-100">
                             {typeof feature.starter === 'boolean' 
                               ? (feature.starter ? <Check className="w-5 h-5 text-green-400 mx-auto" /> : '—')
                               : feature.starter
                             }
                           </td>
-                          <td className="p-4 text-center text-white/90">
+                          <td className="p-4 text-center text-gray-100">
                             {typeof feature.growth === 'boolean' 
                               ? (feature.growth ? <Check className="w-5 h-5 text-green-400 mx-auto" /> : '—')
                               : feature.growth
                             }
                           </td>
-                          <td className="p-4 text-center text-white/90">
+                          <td className="p-4 text-center text-gray-100">
                             {typeof feature.business === 'boolean' 
                               ? (feature.business ? <Check className="w-5 h-5 text-green-400 mx-auto" /> : '—')
                               : feature.business
                             }
                           </td>
-                          <td className="p-4 text-center text-white/90">
+                          <td className="p-4 text-center text-gray-100">
                             {typeof feature.enterprise === 'boolean' 
                               ? (feature.enterprise ? <Check className="w-5 h-5 text-green-400 mx-auto" /> : '—')
                               : feature.enterprise
@@ -534,7 +534,7 @@ const PricingPage: React.FC = () => {
             ].map((faq, index) => (
               <div key={index} className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700">
                 <h3 className="text-lg font-semibold text-white mb-3">{faq.question}</h3>
-                <p className="text-white/90">{faq.answer}</p>
+                <p className="text-gray-100">{faq.answer}</p>
               </div>
             ))}
           </div>
@@ -551,7 +551,7 @@ const PricingPage: React.FC = () => {
           }}>
             Ready to start automating?
           </h2>
-          <p className="text-xl text-white/80 mb-8">
+          <p className="text-xl text-gray-200 mb-8">
             Get started with a free trial. No credit card required.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -577,7 +577,7 @@ const PricingPage: React.FC = () => {
       {/* Footer */}
       <footer className="relative z-10 py-12 px-4 sm:px-6 lg:px-8 border-t border-gray-800">
         <div className="max-w-7xl mx-auto text-center">
-          <p className="text-white/80">&copy; 2024 Fikiri Solutions. All rights reserved.</p>
+          <p className="text-gray-300">&copy; 2024 Fikiri Solutions. All rights reserved.</p>
         </div>
       </footer>
     </div>
