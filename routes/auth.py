@@ -44,8 +44,7 @@ def api_login():
             email=data['email'],
             password=data['password'],
             ip_address=request.remote_addr,
-            user_agent=request.headers.get('User-Agent'),
-            require_email_verification=False  # Optionally made stricter
+            user_agent=request.headers.get('User-Agent')
         )
 
         if not auth_result['success']:
