@@ -10,7 +10,6 @@ import { ResetPassword } from './pages/ResetPassword'
 import { TermsOfService } from './pages/TermsOfService'
 import { PrivacyPolicy } from './pages/PrivacyPolicy'
 import { Onboarding } from './pages/Onboarding'
-import { OnboardingFlow } from './pages/OnboardingFlow'
 import { Services } from './pages/Services'
 import { CRM } from './pages/CRM'
 import { AIAssistant } from './pages/AIAssistant'
@@ -24,7 +23,6 @@ import { Layout } from './components/Layout'
 import { IndustryAutomation } from './components/IndustryAutomation'
 import { About } from './pages/About'
 import { PrivacySettings } from './components/PrivacySettings'
-import { PublicOnboardingFlow } from './pages/PublicOnboardingFlow'
 import LandingPage from './pages/LandingPage'
 import PricingPage from './pages/PricingPage'
 import { QueryProvider } from './providers/QueryProvider'
@@ -74,12 +72,12 @@ function App() {
                           {/* Pre-authentication onboarding flow */}
                           <Route path="/onboarding-flow" element={
                             <AuthRoute>
-                              <PublicOnboardingFlow />
+                              <Onboarding />
                             </AuthRoute>
                           } />
                           <Route path="/onboarding-flow/:step" element={
                             <AuthRoute>
-                              <PublicOnboardingFlow />
+                              <Onboarding />
                             </AuthRoute>
                           } />
                           

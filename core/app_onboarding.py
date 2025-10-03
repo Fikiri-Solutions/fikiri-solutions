@@ -4,7 +4,7 @@ Onboarding endpoint for saving user onboarding information
 import logging
 from flask import Blueprint, request, jsonify
 from core.secure_sessions import get_current_user_id
-from core.db_optimization import get_db_optimizer
+from core.database_optimization import get_db_optimizer
 from core.api_validation import create_success_response, create_error_response, handle_api_errors
 
 # Initialize logger
