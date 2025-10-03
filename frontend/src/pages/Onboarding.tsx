@@ -56,7 +56,13 @@ export const Onboarding: React.FC = () => {
       }
 
       // Load onboarding status
-      const response = await fetch(`https://fikirisolutions.onrender.com/api/onboarding/status?user_id=${userId}`)
+      const token = localStorage.getItem('fikiri-token')
+      const response = await fetch(`https://fikirisolutions.onrender.com/api/onboarding/status?user_id=${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
       const data = await response.json()
       
       if (data.success) {
@@ -73,9 +79,11 @@ export const Onboarding: React.FC = () => {
     if (!user) return
 
     try {
+      const token = localStorage.getItem('fikiri-token')
       const response = await fetch('https://fikirisolutions.onrender.com/api/onboarding/update', {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

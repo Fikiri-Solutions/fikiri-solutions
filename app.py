@@ -1047,6 +1047,11 @@ def api_complete_onboarding_step():
 @handle_api_errors
 def api_onboarding_status():
     """Get current onboarding status."""
+    # Verify authentication
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+    
     user_id = request.args.get('user_id')
     
     if not user_id:
@@ -1094,11 +1099,51 @@ def api_onboarding_sync_status():
     else:
         return create_error_response(result['error'], 400, result['error_code'])
 
+@app.route('/api/user/onboarding-step', methods=['PUT'])
+@handle_api_errors
+def api_update_user_onboarding_step():
+    """Update user's onboarding step."""
+    # Verify authentication
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+    
+    data = request.get_json()
+    if not data:
+        return create_error_response("Request body cannot be empty")
+
+    user_id = data.get('user_id')
+    onboarding_step = data.get('onboarding_step')
+    
+    if not user_id or onboarding_step is None:
+        return create_error_response("User ID and onboarding step are required")
+    
+    result = user_auth_manager.update_user_profile(
+        user_id,
+        onboarding_step=onboarding_step
+    )
+    
+    if result['success']:
+        return create_success_response({
+            'user': {
+                'id': result['user'].id,
+                'onboarding_step': result['user'].onboarding_step,
+                'onboarding_completed': result['user'].onboarding_completed
+            }
+        }, "Onboarding step updated")
+    else:
+        return create_error_response(result['error'], 400, result['error_code'])
+
 # Legacy onboarding endpoints (for backward compatibility)
 @app.route('/api/onboarding/update', methods=['POST'])
 @handle_api_errors
 def api_update_onboarding():
     """Legacy onboarding update endpoint."""
+    # Verify authentication
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+    
     data = request.get_json()
     user_id = data['user_id']
     step = data['step']

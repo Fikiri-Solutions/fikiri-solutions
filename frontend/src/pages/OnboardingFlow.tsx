@@ -367,9 +367,11 @@ export const OnboardingFlow: React.FC = () => {
     if (!user) return
 
     try {
+      const token = localStorage.getItem('fikiri-token')
       const response = await fetch('https://fikirisolutions.onrender.com/api/onboarding/start', {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -396,9 +398,11 @@ export const OnboardingFlow: React.FC = () => {
     if (!user) return
 
     try {
+      const token = localStorage.getItem('fikiri-token')
       await fetch('https://fikirisolutions.onrender.com/api/user/onboarding-step', {
         method: 'PUT',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
