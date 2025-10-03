@@ -54,27 +54,13 @@ class RedisSessionManager:
             return
             
         try:
-            if self.config.redis_url:
-                self.redis_client = redis.from_url(
-                    self.config.redis_url,
-                    decode_responses=True,
-                    socket_connect_timeout=5,
-                    socket_timeout=5
-                )
-            else:
-                self.redis_client = redis.Redis(
-                    host=self.config.redis_host,
-                    port=self.config.redis_port,
-                    password=self.config.redis_password,
-                    db=self.config.redis_db,
-                    decode_responses=True,
-                    socket_connect_timeout=5,
-                    socket_timeout=5
-                )
+            # Use centralized Redis connection pool
+            from core.redis_pool import get_redis_client
+            self.redis_client = get_redis_client()
             
-            self.redis_client.ping()
-            logger.info("✅ Redis session manager connected")
-            
+            if self.redis_client:
+                self.redis_client.ping()
+                logger.info("✅ Redis session manager connected via pool")
         except Exception as e:
             logger.error(f"❌ Redis session connection failed: {e}")
             self.redis_client = None

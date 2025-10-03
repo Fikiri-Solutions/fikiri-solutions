@@ -247,9 +247,14 @@ class MonitoringSystem:
         """Monitor service health"""
         try:
             # Check API health
-            # Use environment variable for health check URL  
-            health_url = os.getenv('HEALTH_CHECK_URL', 'http://localhost:5000')
-            response = requests.get(f'{health_url}/health', timeout=5)
+            # Use environment variable for health check URL, check if we're in production
+            base_url = os.getenv('HEALTH_CHECK_URL')
+            if not base_url:
+                # Don't perform health checks in production to avoid localhost errors
+                if os.getenv('FLASK_ENV') == 'production':
+                    return
+                base_url = 'http://localhost:5000'
+            response = requests.get(f'{base_url}/health', timeout=5)
             if response.status_code == 200:
                 self.add_metric('service_status', 1)
             else:

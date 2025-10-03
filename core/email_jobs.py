@@ -72,20 +72,13 @@ class EmailJobManager:
             return
         
         try:
-            redis_url = os.getenv('REDIS_URL')
-            if redis_url:
-                self.redis_client = redis.from_url(redis_url, decode_responses=True)
-            else:
-                self.redis_client = redis.Redis(
-                    host=os.getenv('REDIS_HOST', 'localhost'),
-                    port=int(os.getenv('REDIS_PORT', 6379)),
-                    password=os.getenv('REDIS_PASSWORD'),
-                    db=int(os.getenv('REDIS_DB', 0)),
-                    decode_responses=True
-                )
+            # Use centralized Redis connection pool
+            from core.redis_pool import get_redis_client
+            self.redis_client = get_redis_client()
             
-            self.redis_client.ping()
-            logger.info("✅ Email job Redis connection established")
+            if self.redis_client:
+                self.redis_client.ping()
+                logger.info("✅ Email job Redis connection established via pool")
             
         except Exception as e:
             logger.error(f"❌ Email job Redis connection failed: {e}")
