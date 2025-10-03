@@ -151,7 +151,7 @@ def api_signup():
         )
 
         session_id, cookie_data = secure_session_manager.create_session(
-            user['id'],
+            user.id,
             user_data,
             request.remote_addr,
             request.headers.get('User-Agent')
@@ -162,8 +162,8 @@ def api_signup():
                 event_type="user_registration",
                 severity="info",
                 details={
-                    "user_id": user['id'],
-                    "email": user['email']
+                    "user_id": user.id,
+                    "email": user.email
                 }
             )
         except Exception as e:
@@ -171,8 +171,8 @@ def api_signup():
 
         try:
             business_analytics.track_event('user_signup', {
-                'user_id': user['id'],
-                'email': user['email'],
+                'user_id': user.id,
+                'email': user.email,
                 'industry': data.get('industry'),
                 'team_size': data.get('team_size')
             })
@@ -181,9 +181,9 @@ def api_signup():
 
         try:
             email_job_manager.queue_welcome_email(
-                user_id=user['id'],
-                email=user['email'],
-                name=user['name'],
+                user_id=user.id,
+                email=user.email,
+                name=user.name,
                 company_name=data.get('business_name', 'My Company')
             )
         except Exception as e:
@@ -191,10 +191,10 @@ def api_signup():
 
         response_data = {
             'user': {
-                'id': user['id'],
-                'email': user['email'],
-                'name': user['name'],
-                'role': user.get('role', 'user'),
+                'id': user.id,
+                'email': user.email,
+                'name': user.name,
+                'role': user.role,
                 'onboarding_completed': False,
                 'onboarding_step': 1
             },
@@ -212,7 +212,7 @@ def api_signup():
         except Exception as e:
             logger.warning(f"Failed to set session cookie: {e}")
         
-        logger.info(f"✅ User registration successful: {user['email']}")
+        logger.info(f"✅ User registration successful: {user.email}")
         return response
         
     except Exception as e:
