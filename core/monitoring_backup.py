@@ -258,21 +258,20 @@ class MonitoringSystem:
     def _monitor_service_health(self):
         """Monitor service health"""
         try:
-            # Check API health
-            # Use environment variable for health check URL, check if we're in production
-            base_url = os.getenv('HEALTH_CHECK_URL')
-            if not base_url:
-                # Don't perform health checks in production to avoid localhost errors
-                if os.getenv('FLASK_ENV') == 'production':
-                    return
-                base_url = 'http://localhost:5000'
-            # Only perform health check if we have a valid URL
-            if base_url:
-                response = requests.get(f'{base_url}/health', timeout=5)
-                if response.status_code == 200:
-                    self.add_metric('service_status', 1)
-                else:
-                    self.add_metric('service_status', 0)
+            # Only perform health monitoring if explicitly configured
+            health_url = os.getenv('HEALTH_CHECK_URL')
+            
+            # Skip health monitoring if no URL configured (cleaner for local dev)
+            if not health_url:
+                logger.debug("Health check URL not configured, skipping monitoring")
+                return
+            
+            # Perform health check with configured URL
+            response = requests.get(f'{health_url}/health', timeout=5)
+            if response.status_code == 200:
+                self.add_metric('service_status', 1)
+            else:
+                self.add_metric('service_status', 0)
                 
         except Exception as e:
             logger.error(f"Service health monitoring error: {e}")
