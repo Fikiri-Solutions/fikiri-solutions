@@ -324,6 +324,103 @@ class UserAuthManager:
                 'error_code': 'UPDATE_ERROR'
             }
     
+    def request_password_reset(self, email: str) -> Dict[str, Any]:
+        """Request password reset for user"""
+        try:
+            # Check if user exists
+            user_data = db_optimizer.execute_query(
+                "SELECT id, email, name FROM users WHERE email = ? AND is_active = 1",
+                (email,)
+            )
+            
+            if not user_data:
+                # Always return success to prevent email enumeration
+                return {
+                    'success': True,
+                    'message': 'If an account exists, a reset link has been sent'
+                }
+            
+            user = user_data[0]
+            
+            # Generate reset token
+            reset_token = secrets.token_urlsafe(32)
+            
+            # Store reset token in user metadata
+            metadata = json.loads(user.get('metadata', '{}'))
+            metadata['reset_token'] = reset_token
+            metadata['reset_token_expires'] = int(time.time()) + 3600  # 1 hour
+            
+            db_optimizer.execute_query(
+                "UPDATE users SET metadata = ? WHERE id = ?",
+                (json.dumps(metadata), user['id']),
+                fetch=False
+            )
+            
+            # Queue password reset email
+            from core.email_jobs import email_job_manager
+            email_job_manager.queue_password_reset_email(
+                email=email,
+                reset_token=reset_token,
+                name=user.get('name', 'User')
+            )
+            
+            logger.info(f"Password reset requested for {email}")
+            
+            return {
+                'success': True,
+                'message': 'If an account exists, a reset link has been sent'
+            }
+            
+        except Exception as e:
+            logger.error(f"Error requesting password reset: {e}")
+            return {
+                'success': False,
+                'error': 'Failed to process password reset request',
+                'error_code': 'PASSWORD_RESET_ERROR'
+            }
+    
+    def reset_user_password(self, user_id: int, new_password: str) -> Dict[str, Any]:
+        """Reset user password with new password"""
+        try:
+            # Hash new password
+            new_password_hash, new_salt = self._hash_password(new_password)
+            
+            # Update password and salt in metadata
+            user_data = db_optimizer.execute_query(
+                "SELECT metadata FROM users WHERE id = ?",
+                (user_id,)
+            )[0]
+            
+            metadata = json.loads(user_data['metadata'] or '{}')
+            metadata['salt'] = new_salt
+            # Remove reset token
+            metadata.pop('reset_token', None)
+            metadata.pop('reset_token_expires', None)
+            
+            db_optimizer.execute_query(
+                "UPDATE users SET password_hash = ?, metadata = ? WHERE id = ?",
+                (new_password_hash, json.dumps(metadata), user_id),
+                fetch=False
+            )
+            
+            # Revoke all existing sessions
+            self.revoke_all_user_sessions(user_id)
+            
+            logger.info(f"Password reset completed for user {user_id}")
+            
+            return {
+                'success': True,
+                'message': 'Password reset successfully'
+            }
+            
+        except Exception as e:
+            logger.error(f"Error resetting password: {e}")
+            return {
+                'success': False,
+                'error': 'Failed to reset password',
+                'error_code': 'PASSWORD_RESET_ERROR'
+            }
+
     def change_password(self, user_id: int, current_password: str, 
                        new_password: str) -> Dict[str, Any]:
         """Change user password"""
