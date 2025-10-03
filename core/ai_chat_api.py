@@ -130,3 +130,4 @@ def ai_status():
     except Exception as e:
         logger.error(f"AI status error: {e}")
         return create_error_response("Failed to get AI status", 500, "AI_STATUS_ERROR")
+# Force deployment
