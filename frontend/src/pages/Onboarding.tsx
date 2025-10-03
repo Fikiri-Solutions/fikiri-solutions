@@ -86,16 +86,23 @@ export const Onboarding: React.FC = () => {
   };
 
   const skipStep = () => {
-    console.log('Skip button clicked');
-    toast.info('Skipping onboarding...');
+    console.log('Skip button clicked!');
+    console.log('User object:', user);
+    console.log('User ID:', user?.id);
     
-    // Check if user is authenticated
-    if (user?.id) {
-      // Authenticated user - go to dashboard  
-      navigate('/dashboard');
-    } else {
-      // Unauthenticated user - go to login to create account
-      navigate('/login');
+    try {
+      toast.info('Skipping onboarding...');
+      
+      // Check if user is authenticated
+      if (user?.id) {
+        console.log('User is authenticated, navigating to dashboard');
+        navigate('/dashboard');
+      } else {
+        console.log('User is not authenticated, navigating to login');
+        navigate('/login');
+      }
+    } catch (error) {
+      console.error('Error in skipStep:', error);
     }
   };
 
