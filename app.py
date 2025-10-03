@@ -225,7 +225,7 @@ def register_blueprints():
     app.register_blueprint(user_bp, name="routes_user")
     app.register_blueprint(monitoring_bp, name="routes_monitoring")
 
-# Health check endpoint
+# Health check endpoints
 @app.route('/health')
 def health_check():
     """Simple health check"""
@@ -243,6 +243,18 @@ def health_check():
             'health': '/api/health'
         },
         "frontend": "https://fikirisolutions.com"
+    })
+
+@app.route('/api/health')
+def api_health_check():
+    """API health check endpoint for Render"""
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'version': '1.0.0',
+        'message': 'Fikiri Solutions API is running',
+        'service': 'fikiri-backend',
+        'environment': os.getenv('FLASK_ENV', 'production')
     })
 
 # Main endpoint
