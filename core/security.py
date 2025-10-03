@@ -41,7 +41,8 @@ def init_security(app: Flask):
     limiter = Limiter(
         key_func=get_remote_address,
         storage_uri=redis_url,
-        default_limits=["1000 per hour", "100 per minute"]
+        default_limits=["1000 per hour", "100 per minute"],
+        exempt_when=lambda: request.endpoint in ['health_check', 'api_health_check']
     )
     limiter.init_app(app)
     
