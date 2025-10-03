@@ -274,8 +274,9 @@ class MonitoringSystem:
                 self.add_metric('service_status', 0)
                 
         except Exception as e:
+            # Only log error if monitoring was actually attempted
             logger.error(f"Service health monitoring error: {e}")
-            self.add_metric('service_status', 0)
+            # Don't add metrics when monitoring is disabled
     
     def _cleanup_old_alerts(self):
         """Clean up old alerts"""
