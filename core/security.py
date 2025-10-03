@@ -37,13 +37,13 @@ def init_security(app: Flask):
     redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/1')
     redis_client = redis.from_url(redis_url, decode_responses=True)
     
-    # Initialize rate limiter
+    # Initialize rate limiter (fixed - use single initialization style)
     limiter = Limiter(
-        app,
         key_func=get_remote_address,
         storage_uri=redis_url,
         default_limits=["1000 per hour", "100 per minute"]
     )
+    limiter.init_app(app)
     
     # Configure CORS
     cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')
