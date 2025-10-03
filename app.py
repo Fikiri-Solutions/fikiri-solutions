@@ -222,13 +222,7 @@ except Exception as e:
     except Exception as e2:
         print(f"❌ Simple OAuth also failed: {e2}")
 
-# Register Onboarding Status blueprint
-try:
-    from core.app_onboarding import status_bp
-    app.register_blueprint(status_bp)
-    print("✅ Onboarding status blueprint registered")
-except Exception as e:
-    print(f"⚠️ Onboarding status failed: {e}")
+# Onboarding blueprint already registered above
 
 # Initialize SocketIO for real-time updates (disabled for now)
 # socketio = SocketIO(app, cors_allowed_origins=[
