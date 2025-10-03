@@ -16,7 +16,18 @@ from flask_cors import CORS
 # Initialize Flask app
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
-CORS(app, resources={r"/api/*": {"origins": ["https://fikirisolutions.com"]}})
+
+# Enhanced CORS configuration (from original app.py)
+CORS(app, 
+     resources={r"/api/*": {"origins": [
+         "https://fikirisolutions.com",
+         "http://localhost:3000"
+     ]}},
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+     allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
+     supports_credentials=True,
+     max_age=3600
+)
 
 # Core imports
 from core.minimal_config import get_config
@@ -36,6 +47,8 @@ from core.jwt_auth import jwt_auth_manager
 from core.secure_sessions import secure_session_manager, init_secure_sessions
 from core.idempotency_manager import idempotency_manager
 from core.rate_limiter import enhanced_rate_limiter
+from core.redis_sessions import init_flask_sessions
+from core.security import init_security
 from core.backend_excellence import create_api_blueprint
 from core.business_operations import create_business_blueprint
 from core.enterprise_logging import log_api_request, log_api_request
@@ -53,7 +66,13 @@ from core.docs_forms_api import docs_forms_bp
 from core.chatbot_smart_faq_api import chatbot_bp
 from core.workflow_templates_api import workflow_templates_bp
 from core.monitoring_dashboard_api import monitoring_dashboard_bp
-from core.app_oauth import oauth
+
+# OAuth blueprint (conditional import)
+try:
+    from core.app_oauth import oauth
+except ImportError:
+    logger.warning("OAuth blueprint not available")
+    oauth = None
 
 # Route blueprints (extracted modules)
 from routes import auth_bp, business_bp, test_bp, user_bp, monitoring_bp
@@ -80,6 +99,27 @@ def initialize_services():
         services['feature_flags'] = get_feature_flags()
         services['email_manager'] = EmailServiceManager()
         
+        # Initialize session management (CRITICAL - was missing!)
+        try:
+            init_flask_sessions(app)  # Initialize Redis-backed sessions
+            logger.info("✅ Redis sessions initialized")
+        except Exception as e:
+            logger.error(f"❌ Redis sessions initialization failed: {e}")
+        
+        try:
+            if init_secure_sessions:  # Check if function exists
+                init_secure_sessions(app)  # Initialize enhanced secure sessions
+                logger.info("✅ Secure sessions initialized")
+        except Exception as e:
+            logger.error(f"❌ Secure sessions initialization failed: {e}")
+        
+        # Initialize rate limiting (CRITICAL - was missing!)
+        try:
+            init_security(app)  # This includes rate limiting
+            logger.info("✅ Security and rate limiting initialized")
+        except Exception as e:
+            logger.error(f"❌ Security initialization failed: {e}")
+        
         # Initialize health monitoring
         try:
             init_health_monitoring(app)
@@ -99,9 +139,6 @@ def initialize_services():
     except Exception as e:
         print(f"❌ Error initializing services: {e}")
         return False
-
-# Initialize secure sessions
-@init_secure_sessions(app)
 
 # Request logging middleware
 @app.before_request
@@ -181,12 +218,12 @@ def register_blueprints():
     except Exception as e:
         print(f"❌ OAuth blueprint failed: {e}")
     
-    # Extracted route blueprints
-    app.register_blueprint(auth_bp, url_prefix="/api")
-    app.register_blueprint(business_bp, url_prefix="/api")
-    app.register_blueprint(test_bp, url_prefix="/api")
-    app.register_blueprint(user_bp, url_prefix="/api")
-    app.register_blueprint(monitoring_bp, url_prefix="/api")
+    # Extracted route blueprints (already have url_prefix defined in blueprint)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(business_bp)
+    app.register_blueprint(test_bp)
+    app.register_blueprint(user_bp)
+    app.register_blueprint(monitoring_bp)
 
 # Health check endpoint
 @app.route('/health')
