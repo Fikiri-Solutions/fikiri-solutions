@@ -121,17 +121,18 @@ class DatabaseOptimizer:
             )
         """)
         
-        # OAuth states table for CSRF protection
+        # Onboarding info table
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS oauth_states (
+            CREATE TABLE IF NOT EXISTS onboarding_info (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                state TEXT UNIQUE NOT NULL,
-                user_id INTEGER,
-                provider TEXT DEFAULT 'gmail',
-                redirect_url TEXT,
-                expires_at INTEGER,
-                metadata TEXT,  -- JSON object for additional state data
+                user_id INTEGER NOT NULL,
+                name TEXT,
+                company TEXT,
+                industry TEXT,
+                team_size TEXT,
+                goals TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
             )
         """)
