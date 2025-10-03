@@ -95,6 +95,22 @@ class ApiClient {
     // Add request interceptor for logging
     this.client.interceptors.request.use(
       (config) => {
+        // Add JWT token to requests if available
+        if (typeof window !== 'undefined') {
+          const userData = localStorage.getItem('fikiri-user')
+          if (userData) {
+            try {
+              const user = JSON.parse(userData)
+              // Get token from user data or separate storage
+              const token = localStorage.getItem('fikiri-token') || user.token
+              if (token) {
+                config.headers.Authorization = `Bearer ${token}`
+              }
+            } catch (e) {
+              // Ignore parsing errors
+            }
+        }
+        
         // API request logged
         return config
       },
