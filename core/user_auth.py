@@ -191,9 +191,23 @@ class UserAuthManager:
             
             logger.info(f"User authenticated successfully: {email}")
             
+            # Generate JWT tokens
+            try:
+                from core.jwt_auth import jwt_auth_manager
+                jwt_tokens = jwt_auth_manager.generate_tokens(
+                    user_dict['id'],
+                    user_dict,
+                    device_info=user_agent,
+                    ip_address=ip_address
+                )
+            except Exception as e:
+                logger.error(f"JWT token generation failed: {e}")
+                jwt_tokens = None
+            
             return {
                 'success': True,
                 'user': self._format_user_profile(user),
+                'tokens': jwt_tokens,
                 'session': session_result,
                 'message': 'Login successful'
             }

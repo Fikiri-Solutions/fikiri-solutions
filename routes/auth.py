@@ -50,12 +50,20 @@ def api_login():
         if not auth_result['success']:
             return create_error_response(auth_result['error'], 401, auth_result['error_code'])
 
-        user_data = auth_result['user']
+        user_profile = auth_result['user']
         jwt_tokens = auth_result['tokens']
+
+        # Convert UserProfile to dict for session creation
+        user_data = {
+            'id': user_profile.id,
+            'email': user_profile.email,
+            'name': user_profile.name,
+            'role': user_profile.role
+        }
 
         # Create secure session
         session_id, cookie_data = secure_session_manager.create_session(
-            user_data['id'],
+            user_profile.id,
             user_data,
             request.remote_addr,
             request.headers.get('User-Agent')
@@ -66,8 +74,8 @@ def api_login():
             event_type="user_login",
             severity="info",
             details={
-                "user_id": user_data['id'],
-                "email": user_data['email'],
+                "user_id": user_profile.id,
+                "email": user_profile.email,
                 "ip_address": request.remote_addr,
                 "user_agent": request.headers.get('User-Agent')
             }
@@ -75,32 +83,32 @@ def api_login():
 
         # Track login analytics
         business_analytics.track_event('user_login', {
-            'user_id': user_data['id'],
-            'email': user_data['email'],
+            'user_id': user_profile.id,
+            'email': user_profile.email,
             'login_method': 'email_password'
         })
 
         # Create response with secure cookie
         response_data = {
             'user': {
-                'id': user_data['id'],
-                'email': user_data['email'],
-                'name': user_data['name'],
-                'role': user_data.get('role', 'user'),
-                'onboarding_completed': user_data.get('onboarding_completed', False),
-                'onboarding_step': user_data.get('onboarding_step', 1),
+                'id': user_profile.id,
+                'email': user_profile.email,
+                'name': user_profile.name,
+                'role': user_profile.role,
+                'onboarding_completed': user_profile.onboarding_completed,
+                'onboarding_step': user_profile.onboarding_step,
                 'last_login': datetime.now().isoformat()
             },
             'tokens': jwt_tokens, 
             'session_id': session_id
         }
 
-        response = jsonify(create_success_response(response_data, "Login successful"))
+        response, status_code = create_success_response(response_data, "Login successful")
         
         # Set secure session cookie
         response.set_cookie(**cookie_data)
         
-        return response
+        return response, status_code
 
     except Exception as e:
         logger.error(f"Login error: {e}")
