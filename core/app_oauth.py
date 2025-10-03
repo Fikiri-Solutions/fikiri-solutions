@@ -87,11 +87,14 @@ def decrypt(s: str) -> str:
 def gmail_start():
     """Start Gmail OAuth flow with CSRF protection"""
     try:
-        # Get user_id from secure session
+        # Get user_id from secure session (optional for onboarding)
         from core.secure_sessions import get_current_user_id
         user_id = get_current_user_id()
+        
+        # Allow bypass for onboarding flow - user_id will be handled in callback
         if not user_id:
-            return jsonify({"error": "unauthorized"}), 401
+            logger.info("🔗 OAuth start without authenticated user (onboarding flow)")
+            user_id = None
 
         if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
             return jsonify({"error": "OAuth not configured"}), 500
@@ -112,10 +115,10 @@ def gmail_start():
                 (state, user_id, provider, redirect_url, expires_at, metadata)
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (
-                state, user_id, 'gmail', 
-                request.args.get("redirect", "/onboarding/sync"),
+                state, user_id or 0, 'gmail', 
+                request.args.get("redirect", "/onboarding"),
                 int(time.time()) + 600,  # 10 minutes
-                json.dumps({'oauth_state': state})
+                json.dumps({'oauth_state': state, 'onboarding': user_id is None})
             ), fetch=False)
 
         if GOOGLE_OAUTH_AVAILABLE:

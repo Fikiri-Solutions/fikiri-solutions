@@ -35,8 +35,20 @@ export const Onboarding: React.FC = () => {
   };
 
   const handleGoogleAuth = () => {
-    // Redirect to Google OAuth
-    window.location.href = 'https://fikirisolutions.onrender.com/api/oauth/gmail/start';
+    // Redirect to Google OAuth - use simple endpoint that doesn't require authentication
+    fetch('https://fikirisolutions.onrender.com/api/oauth/gmail/start')
+      .then(response => response.json())
+      .then(data => {
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          toast.error(data.error || 'Failed to connect to Google OAuth');
+        }
+      })
+      .catch(error => {
+        console.error('OAuth error:', error);
+        toast.error('Failed to connect to Google OAuth');
+      });
   };
 
   const handleSubmit = async () => {
