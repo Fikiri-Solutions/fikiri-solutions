@@ -126,13 +126,13 @@ def log_response(response):
         
         # Log to enterprise logging
         try:
-        log_api_request(
-            endpoint=request.endpoint or request.path,
-            method=request.method,
-            status_code=response.status_code,
-            response_time=response_time,
-            user_agent=request.headers.get('User-Agent')
-        )
+            log_api_request(
+                endpoint=request.endpoint or request.path,
+                method=request.method,
+                status_code=response.status_code,
+                response_time=response_time,
+                user_agent=request.headers.get('User-Agent')
+            )
         except Exception as e:
             logger.warning(f"Logging failed: {e}")
         
@@ -150,7 +150,7 @@ def log_response(response):
 @app.errorhandler(404)
 def not_found(error):
     """Handle 404 errors"""
-        return jsonify({
+    return jsonify({
         'success': False,
         'error': 'Endpoint not found',
         'code': 'NOT_FOUND'
@@ -160,11 +160,11 @@ def not_found(error):
 def internal_error(error):
     """Handle 500 errors"""
     logger.error(f"Internal server error: {error}")
-        return jsonify({
-            'success': False,
+    return jsonify({
+        'success': False,
         'error': 'Internal server error',
         'code': 'INTERNAL_ERROR'
-        }), 500
+    }), 500
 
 # Register blueprints
 def register_blueprints():
@@ -201,10 +201,10 @@ def register_blueprints():
 @app.route('/health')
 def health_check():
     """Simple health check"""
-                    return jsonify({
+    return jsonify({
         'status': 'running',
-            'timestamp': datetime.now().isoformat(),
-            'version': '1.0.0',
+        'timestamp': datetime.now().isoformat(),
+        'version': '1.0.0',
         'message': 'Fikiri Solutions API',
         'endpoints': {
             'auth': '/api/auth/*',
@@ -238,7 +238,7 @@ def dashboard():
 # Initialize services and register blueprints
 if initialize_services():
     register_blueprints()
-        else:
+else:
     logger.error("Failed to initialize services")
 
 if __name__ == '__main__':
