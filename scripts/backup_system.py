@@ -206,8 +206,7 @@ class BackupManager:
                 'logs/',
                 'uploads/',
                 'config.json',
-                'requirements.txt',
-                'requirements_minimal.txt'
+                'requirements.txt'
             ]
             
             # Create tar.gz archive

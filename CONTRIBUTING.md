@@ -69,7 +69,6 @@ venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
-pip install -r requirements_minimal.txt
 
 # Initialize database
 python -c "from core.database import init_db; init_db()"
