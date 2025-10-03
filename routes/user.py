@@ -6,12 +6,14 @@ Extracted from app.py for better maintainability
 
 from flask import Blueprint, request, jsonify
 import logging
+import json
 from datetime import datetime
 
 # Import user management modules
 from core.user_auth import user_auth_manager
 from core.api_validation import handle_api_errors, create_success_response, create_error_response
 from core.secure_sessions import get_current_user_id
+from core.jwt_auth import jwt_required, get_current_user
 from core.automation_safety import automation_safety_manager
 from core.database_optimization import db_optimizer
 
@@ -19,6 +21,58 @@ logger = logging.getLogger(__name__)
 
 # Create user blueprint
 user_bp = Blueprint("user", __name__, url_prefix="/api")
+
+@user_bp.route('/user/profile', methods=['GET'])
+@handle_api_errors
+@jwt_required
+def get_user_profile():
+    """Get user profile information"""
+    try:
+        # Get user from JWT token
+        user_data = get_current_user()
+        if not user_data:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+        
+        user_id = user_data['user_id']
+        
+        # Get user profile directly from database
+        user_data_db = db_optimizer.execute_query(
+            "SELECT * FROM users WHERE id = ? AND is_active = 1",
+            (user_id,)
+        )
+        
+        if not user_data_db:
+            return create_error_response("User not found", 404, 'USER_NOT_FOUND')
+        
+        user = user_data_db[0]
+        # Handle SQLite Row objects by converting to dict
+        if hasattr(user, 'keys'):
+            user_dict = dict(user)
+        else:
+            user_dict = user
+        
+        metadata = json.loads(user_dict.get('metadata', '{}'))
+        
+        return create_success_response({
+            'user': {
+                'id': user_dict.get('id'),
+                'email': user_dict.get('email'),
+                'name': user_dict.get('name'),
+                'role': user_dict.get('role', 'user'),
+                'onboarding_completed': user_dict.get('onboarding_completed', False),
+                'onboarding_step': user_dict.get('onboarding_step', 0),
+                'business_name': user_dict.get('business_name'),
+                'business_email': user_dict.get('business_email'),
+                'industry': user_dict.get('industry'),
+                'team_size': user_dict.get('team_size'),
+                'created_at': user_dict.get('created_at'),
+                'last_login': user_dict.get('last_login')
+            }
+        }, "User profile retrieved")
+        
+    except Exception as e:
+        logger.error(f"Get user profile error: {e}")
+        return create_error_response("Failed to get user profile", 500, 'PROFILE_ERROR')
 
 @user_bp.route('/user/profile', methods=['PUT'])
 @handle_api_errors

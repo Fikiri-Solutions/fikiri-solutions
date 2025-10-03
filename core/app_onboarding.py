@@ -4,6 +4,7 @@ Onboarding endpoint for saving user onboarding information
 import logging
 from flask import Blueprint, request, jsonify
 from core.secure_sessions import get_current_user_id
+from core.jwt_auth import jwt_required, get_current_user
 from core.database_optimization import db_optimizer
 from core.api_validation import create_success_response, create_error_response, handle_api_errors
 
@@ -15,13 +16,16 @@ bp = Blueprint("onboarding", __name__)
 
 @bp.route("/api/onboarding", methods=["POST"])
 @handle_api_errors
+@jwt_required
 def save_onboarding():
     """Save user onboarding information"""
     try:
-        # Get user ID from session/auth
-        user_id = get_current_user_id()
-        if not user_id:
+        # Get user from JWT token
+        user_data = get_current_user()
+        if not user_data:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+        
+        user_id = user_data['user_id']
 
         # Parse request data
         data = request.get_json()
@@ -92,13 +96,16 @@ def save_onboarding():
 
 @bp.route("/api/onboarding/status", methods=["GET"])
 @handle_api_errors
+@jwt_required
 def get_onboarding_status():
     """Get current onboarding status for a user"""
     try:
-        # Get user ID from session/auth
-        user_id = get_current_user_id()
-        if not user_id:
+        # Get user from JWT token
+        user_data = get_current_user()
+        if not user_data:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+        
+        user_id = user_data['user_id']
 
         # Use global database optimizer
 
@@ -120,20 +127,31 @@ def get_onboarding_status():
         
         if user_result and len(user_result) > 0:
             user_profile = user_result[0]
-            onboarding_completed = user_profile.get('onboarding_completed', 0)
+            # Handle SQLite Row objects by converting to dict
+            if hasattr(user_profile, 'keys'):
+                user_dict = dict(user_profile)
+            else:
+                user_dict = user_profile
+                
+            onboarding_completed = user_dict.get('onboarding_completed', 0)
             
             if result and len(result) > 0:
                 onboarding_data = result[0]
+                # Handle SQLite Row objects by converting to dict
+                if hasattr(onboarding_data, 'keys'):
+                    onboarding_dict = dict(onboarding_data)
+                else:
+                    onboarding_dict = onboarding_data
                 return create_success_response({
                     'completed': bool(onboarding_completed),
-                    'data': onboarding_data,
-                    'step': user_profile.get('onboarding_step', 0)
+                    'data': onboarding_dict,
+                    'step': user_dict.get('onboarding_step', 0)
                 }, "Onboarding status retrieved")
             else:
                 return create_success_response({
                     'completed': False,
                     'data': None,
-                    'step': user_profile.get('onboarding_step', 0)
+                    'step': user_dict.get('onboarding_step', 0)
                 }, "No onboarding data found")
         else:
             return create_error_response("User not found", 404, 'USER_NOT_FOUND')
@@ -143,14 +161,17 @@ def get_onboarding_status():
         return create_error_response("Failed to get onboarding status", 500, 'STATUS_ERROR')
 
 @bp.route("/api/onboarding/resume", methods=["GET"])
-@handle_api_errors  
+@handle_api_errors
+@jwt_required
 def resume_onboarding():
     """Resume onboarding from where user left off"""
     try:
-        # Get user ID from session/auth
-        user_id = get_current_user_id()
-        if not user_id:
+        # Get user from JWT token
+        user_data = get_current_user()
+        if not user_data:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+        
+        user_id = user_data['user_id']
 
         # Use global database optimizer
 
@@ -164,7 +185,13 @@ def resume_onboarding():
         
         if user_result and len(user_result) > 0:
             user_profile = user_result[0]
-            onboarding_completed = user_profile.get('onboarding_completed', 0)
+            # Handle SQLite Row objects by converting to dict
+            if hasattr(user_profile, 'keys'):
+                user_dict = dict(user_profile)
+            else:
+                user_dict = user_profile
+                
+            onboarding_completed = user_dict.get('onboarding_completed', 0)
             
             if onboarding_completed:
                 return create_success_response({
@@ -172,7 +199,7 @@ def resume_onboarding():
                     'redirect_to': '/dashboard'
                 }, "Onboarding already completed")
             else:
-                step = user_profile.get('onboarding_step', 1)
+                step = user_dict.get('onboarding_step', 1)
                 return create_success_response({
                     'completed': False,
                     'recommended_step': step,
