@@ -97,7 +97,8 @@ class MonitoringSystem:
                 'metric': 'service_status',
                 'threshold': 0,
                 'severity': 'critical',
-                'message': 'Service is down'
+                'message': 'Service is down',
+                'condition': 'less_than'  # Service is down when value < threshold
             }
         }
     
@@ -127,7 +128,18 @@ class MonitoringSystem:
         """Check if metric triggers any alert rules"""
         for rule_name, rule in self.alert_rules.items():
             if rule['metric'] == metric_name:
-                if value > rule['threshold']:
+                # Check condition based on rule type
+                condition = rule.get('condition', 'greater_than')
+                
+                if condition == 'greater_than' and value > rule['threshold']:
+                    self._trigger_alert(
+                        rule_name,
+                        rule['severity'],
+                        rule['message'],
+                        f"{metric_name}={value}",
+                        tags
+                    )
+                elif condition == 'less_than' and value < rule['threshold']:
                     self._trigger_alert(
                         rule_name,
                         rule['severity'],
