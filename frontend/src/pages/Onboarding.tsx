@@ -86,7 +86,17 @@ export const Onboarding: React.FC = () => {
   };
 
   const skipStep = () => {
-    navigate('/dashboard');
+    console.log('Skip button clicked');
+    toast.info('Skipping onboarding...');
+    
+    // Check if user is authenticated
+    if (user?.id) {
+      // Authenticated user - go to dashboard  
+      navigate('/dashboard');
+    } else {
+      // Unauthenticated user - go to login to create account
+      navigate('/login');
+    }
   };
 
         return (
@@ -205,6 +215,16 @@ export const Onboarding: React.FC = () => {
                   </svg>
                 )}
                 {loading ? 'Saving...' : 'Finish Setup'}
+              </button>
+            </div>
+            
+            {/* Skip option on Step 2 */}
+            <div className="mt-6 text-center">
+              <button
+                onClick={skipStep}
+                className="text-sm text-gray-500 hover:text-gray-700 underline"
+              >
+                Skip for now
               </button>
             </div>
           </div>
