@@ -66,6 +66,7 @@ from core.docs_forms_api import docs_forms_bp
 from core.chatbot_smart_faq_api import chatbot_bp
 from core.workflow_templates_api import workflow_templates_bp
 from core.monitoring_dashboard_api import monitoring_dashboard_bp
+from core.ai_chat_api import ai_bp
 
 # OAuth blueprint (conditional import)
 try:
@@ -210,6 +211,7 @@ def register_blueprints():
     app.register_blueprint(chatbot_bp)
     app.register_blueprint(workflow_templates_bp)
     app.register_blueprint(monitoring_dashboard_bp)
+    app.register_blueprint(ai_bp)
     
     # OAuth blueprint
     try:
