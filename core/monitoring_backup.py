@@ -254,11 +254,13 @@ class MonitoringSystem:
                 if os.getenv('FLASK_ENV') == 'production':
                     return
                 base_url = 'http://localhost:5000'
-            response = requests.get(f'{base_url}/health', timeout=5)
-            if response.status_code == 200:
-                self.add_metric('service_status', 1)
-            else:
-                self.add_metric('service_status', 0)
+            # Only perform health check if we have a valid URL
+            if base_url:
+                response = requests.get(f'{base_url}/health', timeout=5)
+                if response.status_code == 200:
+                    self.add_metric('service_status', 1)
+                else:
+                    self.add_metric('service_status', 0)
                 
         except Exception as e:
             logger.error(f"Service health monitoring error: {e}")
