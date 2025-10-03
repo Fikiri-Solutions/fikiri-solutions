@@ -202,7 +202,7 @@ def api_signup():
             'session_id': session_id
         }
 
-        response = jsonify(create_success_response(response_data, "Account created successfully"))
+        response = create_success_response(response_data, "Account created successfully")
         
         # Set secure session cookie safely
         try:
