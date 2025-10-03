@@ -247,6 +247,10 @@ def init_rate_limiting(app):
         if request.endpoint and request.endpoint.startswith('static'):
             return
         
+        # Skip rate limiting for health check endpoints
+        if request.path == '/api/health' or request.path == '/health':
+            return
+        
         # Get rate limit configuration
         rate_limit_config = get_rate_limit_config(request.endpoint)
         
