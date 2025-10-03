@@ -217,8 +217,8 @@ class MonitoringSystem:
                     # Monitor system metrics
                     self._monitor_system_metrics()
                     
-                    # Monitor service health
-                    self._monitor_service_health()
+                    # Monitor service health (temporarily disabled)
+                    # self._monitor_service_health()
                     
                     # Clean up old alerts
                     self._cleanup_old_alerts()
