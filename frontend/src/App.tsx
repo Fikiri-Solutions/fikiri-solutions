@@ -55,8 +55,8 @@ function App() {
                 <AuthProvider>
                   <QueryProvider>
                     <ToastProvider>
-                        <ScrollToTop />
-                        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                      <ScrollToTop />
+                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
                         <Suspense fallback={<PageLoader />}>
                           <Routes>
                           {/* Public routes - no authentication required */}
