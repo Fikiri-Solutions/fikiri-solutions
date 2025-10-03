@@ -146,11 +146,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (data.success) {
         const user = data.data.user
+        const tokens = data.data.tokens
         
-        // Store user data (only in browser)
+        // Store user data and tokens (only in browser)
         if (typeof window !== 'undefined') {
           localStorage.setItem('fikiri-user', JSON.stringify(user))
           localStorage.setItem('fikiri-user-id', user.id.toString())
+          if (tokens && tokens.access_token) {
+            localStorage.setItem('fikiri-token', tokens.access_token)
+          }
         }
         
         setAuthState(prev => ({
