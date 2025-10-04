@@ -224,7 +224,12 @@ class MinimalCRMService:
         try:
             # Store all leads in Redis
             for lead in self.leads:
-                self.redis_client.hset(f"fikiri:lead:{lead.id}", mapping=lead.to_dict())
+                lead_dict = lead.to_dict()
+                # Convert lists to JSON strings for Redis compatibility
+                for key, value in lead_dict.items():
+                    if isinstance(value, list):
+                        lead_dict[key] = json.dumps(value)
+                self.redis_client.hset(f"fikiri:lead:{lead.id}", mapping=lead_dict)
             
             # Store lead IDs for quick access
             lead_ids = [lead.id for lead in self.leads]
