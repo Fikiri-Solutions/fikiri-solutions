@@ -13,6 +13,7 @@ from core.api_validation import handle_api_errors, create_success_response, crea
 from core.universal_ai_assistant import UniversalAIAssistant
 from core.minimal_ai_assistant import MinimalAIEmailAssistant
 from core.secure_sessions import get_current_user_id
+from core.jwt_auth import jwt_required, get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -24,15 +25,22 @@ universal_ai = UniversalAIAssistant()
 
 @ai_bp.route('/chat', methods=['POST'])
 @handle_api_errors
+@jwt_required
 def ai_chat():
     """AI chat endpoint for frontend interactions"""
     try:
+        # Get user from JWT token
+        user_data = get_current_user()
+        if not user_data:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+        
+        user_id = user_data['user_id']
+        
         data = request.get_json()
         if not data:
             return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
         
         message = data.get('message', '')
-        user_id = data.get('user_id')
         context = data.get('context', {})
         
         if not message:

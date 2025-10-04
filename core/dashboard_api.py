@@ -12,6 +12,7 @@ from flask import Blueprint, request, jsonify
 from core.api_validation import handle_api_errors, create_success_response, create_error_response
 from core.secure_sessions import get_current_user_id
 from core.database_optimization import db_optimizer
+from core.jwt_auth import jwt_required, get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -20,24 +21,27 @@ dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api/dashboard')
 
 @dashboard_bp.route('/metrics', methods=['GET'])
 @handle_api_errors
+@jwt_required
 def get_dashboard_metrics():
     """Get dashboard metrics for authenticated user"""
     try:
-        # Get user ID from session
-        user_id = get_current_user_id()
-        if not user_id:
+        # Get user from JWT token
+        user_data = get_current_user()
+        if not user_data:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
         
+        user_id = user_data['user_id']
+        
         # Get user data
-        user_data = db_optimizer.execute_query(
+        user_data_db = db_optimizer.execute_query(
             "SELECT * FROM users WHERE id = ? AND is_active = 1",
             (user_id,)
         )
         
-        if not user_data:
+        if not user_data_db:
             return create_error_response("User not found", 404, 'USER_NOT_FOUND')
         
-        user = user_data[0]
+        user = user_data_db[0]
         
         # Get leads count
         leads_data = db_optimizer.execute_query(
