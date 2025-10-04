@@ -20,6 +20,9 @@ export default defineConfig({
   },
   build: {
     // Bundle optimization
+    outDir: 'dist',
+    assetsDir: 'assets', // ensure chunk files live in /assets
+    manifest: true,
     rollupOptions: {
       output: {
         manualChunks: {
