@@ -314,12 +314,12 @@ class MinimalAIEmailAssistant:
             # OpenAI version compatibility
             if hasattr(self.client, 'chat'):
                 # OpenAI >= 1.0.0
-            response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=150,
-                temperature=0.1
-            )
+                response = self.client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=150,
+                    temperature=0.1
+                )
                 result_text = response.choices[0].message.content
                 tokens_used = response.usage.total_tokens if response.usage else 0
             else:
@@ -372,12 +372,12 @@ class MinimalAIEmailAssistant:
             # OpenAI version compatibility
             if hasattr(self.client, 'chat'):
                 # OpenAI >= 1.0.0
-            response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=150,
-                temperature=0.3
-            )
+                response = self.client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=150,
+                    temperature=0.3
+                )
                 summary = response.choices[0].message.content.strip()
                 tokens_used = response.usage.total_tokens if response.usage else 0
             else:
