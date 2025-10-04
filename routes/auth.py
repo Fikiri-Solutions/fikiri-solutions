@@ -298,3 +298,46 @@ def api_reset_password():
     except Exception as e:
         logger.error(f"Password reset error: {e}")
         return create_error_response("Password reset failed", 500, "RESET_ERROR")
+
+@auth_bp.route('/refresh', methods=['POST'])
+@handle_api_errors
+def refresh_token():
+    """Refresh JWT access token"""
+    try:
+        # Get current token from Authorization header
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return create_error_response("Authorization header missing or invalid", 401, 'MISSING_AUTH_HEADER')
+        
+        # Extract token
+        token = auth_header.split(' ')[1]
+        
+        # Verify current token
+        from core.jwt_auth import jwt_auth_manager
+        payload = jwt_auth_manager.verify_access_token(token)
+        
+        if not payload:
+            return create_error_response("Invalid or expired token", 401, 'INVALID_TOKEN')
+        
+        # Generate new tokens
+        user_id = payload['user_id']
+        user_data = payload.get('user_data', {})
+        
+        new_tokens = jwt_auth_manager.generate_tokens(
+            user_id=user_id,
+            user_data=user_data,
+            device_info=request.headers.get('User-Agent'),
+            ip_address=request.remote_addr
+        )
+        
+        if new_tokens:
+            return create_success_response({
+                'tokens': new_tokens,
+                'user_id': user_id
+            }, "Token refreshed successfully")
+        else:
+            return create_error_response("Failed to generate new token", 500, 'TOKEN_GENERATION_ERROR')
+            
+    except Exception as e:
+        logger.error(f"Token refresh error: {e}")
+        return create_error_response("Failed to refresh token", 500, 'REFRESH_ERROR')

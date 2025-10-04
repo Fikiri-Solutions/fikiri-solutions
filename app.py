@@ -101,6 +101,13 @@ def initialize_services():
         services['feature_flags'] = get_feature_flags()
         services['email_manager'] = EmailServiceManager()
         
+        # Initialize JWT authentication (CRITICAL - was missing!)
+        try:
+            jwt_auth_manager._initialize_tables()  # Initialize JWT tables
+            logger.info("✅ JWT authentication initialized")
+        except Exception as e:
+            logger.error(f"❌ JWT authentication initialization failed: {e}")
+        
         # Initialize session management (CRITICAL - was missing!)
         try:
             init_flask_sessions(app)  # Initialize Redis-backed sessions
