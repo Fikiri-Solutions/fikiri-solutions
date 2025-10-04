@@ -43,6 +43,24 @@ def safe_json(obj):
     except TypeError:
         return str(obj)
 
+def safe_json_serialize(obj):
+    """Safely convert DB rows or complex objects to JSON-serializable data."""
+    try:
+        # Convert sqlite3.Row or SQLAlchemy Row to dict
+        if isinstance(obj, sqlite3.Row):
+            return dict(obj)
+        elif hasattr(obj, "_mapping"):  # for SQLAlchemy Row
+            return dict(obj._mapping)
+        elif isinstance(obj, (list, tuple)):
+            return [safe_json_serialize(o) for o in obj]
+        elif isinstance(obj, dict):
+            return {k: safe_json_serialize(v) for k, v in obj.items()}
+        else:
+            return obj
+    except Exception as e:
+        logger.warning("⚠️ Auto-converted non-serializable DB result to dict")
+        return str(obj)
+
 @dataclass
 class QueryMetrics:
     """Database query performance metrics"""
@@ -824,6 +842,9 @@ class DatabaseOptimizer:
                 if fetch:
                     if query.strip().upper().startswith(('SELECT', 'PRAGMA')):
                         result = cursor.fetchall()
+                        # Convert sqlite3.Row objects to dictionaries for JSON compatibility
+                        if result and isinstance(result[0], sqlite3.Row):
+                            result = [dict(row) for row in result]
                     else:
                         result = cursor.rowcount
                 else:
@@ -1039,7 +1060,7 @@ class DatabaseOptimizer:
         # Store migration in system config
         self.execute_query(
             "INSERT OR REPLACE INTO system_config (key, value) VALUES (?, ?)",
-            (f"migration_{version}", json.dumps(migration, default=safe_json))
+            (f"migration_{version}", json.dumps(safe_json_serialize(migration), default=str))
         )
         
         logger.info(f"Migration {version} created: {description}")
@@ -1078,10 +1099,10 @@ class DatabaseOptimizer:
             # Mark as applied
             self.execute_query(
                 "INSERT OR REPLACE INTO system_config (key, value) VALUES (?, ?)",
-                (f"applied_migration_{version}", json.dumps({
+                (f"applied_migration_{version}", json.dumps(safe_json_serialize({
                     'applied_at': datetime.now(timezone.utc).isoformat(),
                     'version': version
-                }, default=safe_json))
+                }), default=str))
             )
             
             logger.info(f"Migration {version} applied successfully")
