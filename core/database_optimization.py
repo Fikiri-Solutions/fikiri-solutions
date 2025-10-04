@@ -33,6 +33,16 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+def safe_json(obj):
+    """Convert unsupported types to JSON-friendly values."""
+    if isinstance(obj, sqlite3.Row):
+        return dict(obj)
+    try:
+        json.dumps(obj)
+        return obj
+    except TypeError:
+        return str(obj)
+
 @dataclass
 class QueryMetrics:
     """Database query performance metrics"""
@@ -1029,7 +1039,7 @@ class DatabaseOptimizer:
         # Store migration in system config
         self.execute_query(
             "INSERT OR REPLACE INTO system_config (key, value) VALUES (?, ?)",
-            (f"migration_{version}", json.dumps(migration))
+            (f"migration_{version}", json.dumps(migration, default=safe_json))
         )
         
         logger.info(f"Migration {version} created: {description}")
@@ -1071,7 +1081,7 @@ class DatabaseOptimizer:
                 (f"applied_migration_{version}", json.dumps({
                     'applied_at': datetime.now(timezone.utc).isoformat(),
                     'version': version
-                }))
+                }, default=safe_json))
             )
             
             logger.info(f"Migration {version} applied successfully")
