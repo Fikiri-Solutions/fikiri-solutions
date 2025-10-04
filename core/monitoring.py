@@ -641,8 +641,16 @@ class PerformanceMonitor:
             
             # Load existing metrics
             if metrics_file.exists():
-                with open(metrics_file, 'r') as f:
-                    all_metrics = json.load(f)
+                try:
+                    with open(metrics_file, 'r') as f:
+                        content = f.read().strip()
+                        if content:  # Guard against empty files
+                            all_metrics = json.loads(content)
+                        else:
+                            all_metrics = []
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.warning(f"Corrupted performance metrics file: {metrics_file}. Starting fresh.")
+                    all_metrics = []
             else:
                 all_metrics = []
             

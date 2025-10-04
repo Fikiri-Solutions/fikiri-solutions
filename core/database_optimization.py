@@ -791,6 +791,12 @@ class DatabaseOptimizer:
                     if isinstance(param, list):
                         # Convert list to JSON string for SQLite compatibility
                         param = json.dumps(param)
+                    elif hasattr(param, 'keys') and hasattr(param, 'values'):
+                        # Handle sqlite3.Row objects by converting to dict
+                        try:
+                            param = dict(param)
+                        except Exception:
+                            param = str(param)
                     elif isinstance(param, str) and param.startswith('{') and param.endswith('}'):
                         if not self.validate_json(param):
                             raise ValueError(f"Invalid JSON parameter: {param}")
@@ -1111,6 +1117,16 @@ class DatabaseOptimizer:
         except Exception as e:
             logger.error(f"Metrics cleanup failed: {e}")
             return 0
+    
+    def table_exists(self, table_name: str) -> bool:
+        """Check if a table exists in the database"""
+        try:
+            q = f"SELECT name FROM sqlite_master WHERE type='table' AND name=?;"
+            res = self.execute_query(q, (table_name,))
+            return bool(res)
+        except Exception as e:
+            logger.warning(f"Could not check if table {table_name} exists: {e}")
+            return False
 
 # Global database optimizer instance
 db_optimizer = DatabaseOptimizer()
