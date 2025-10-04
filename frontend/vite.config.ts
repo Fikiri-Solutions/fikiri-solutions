@@ -9,6 +9,8 @@ import { resolve } from 'path'
 import { pwaConfig } from './src/config/pwa'
 
 export default defineConfig({
+  // Ensure proper asset paths for deployment
+  base: './',
   plugins: [react(), pwaConfig],
   resolve: {
     alias: {

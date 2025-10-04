@@ -13,7 +13,8 @@ class WebSocketService {
   private maxReconnectAttempts = 5
 
   constructor() {
-    this.connect()
+    // Disabled for now - backend doesn't support WebSocket yet
+    // this.connect()
   }
 
   private connect() {
@@ -22,7 +23,7 @@ class WebSocketService {
       const wsUrl = config.apiUrl.replace('/api', '')
       
       this.socket = io(wsUrl, {
-        transports: ['websocket', 'polling'],
+        transports: ['polling'], // Use polling only until WebSocket support is added to backend
         timeout: 20000,
         reconnection: true,
         reconnectionAttempts: this.maxReconnectAttempts,
