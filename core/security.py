@@ -5,8 +5,20 @@ Production-ready security headers, rate limiting, and CORS
 
 import os
 import time
+import logging
 from functools import wraps
 from typing import Dict, Any, Optional
+
+# Optional ProxyFix import
+try:
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    PROXY_FIX_AVAILABLE = True
+except ImportError:
+    PROXY_FIX_AVAILABLE = False
+    ProxyFix = None
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 # Optional imports with fallbacks
 try:
@@ -14,7 +26,6 @@ try:
     from flask_cors import CORS
     from flask_limiter import Limiter
     from flask_limiter.util import get_remote_address
-    from werkzeug.middleware.proxy_fix import ProxyFix
     FLASK_AVAILABLE = True
 except ImportError:
     FLASK_AVAILABLE = False
@@ -31,7 +42,12 @@ def init_security(app: Flask):
     """Initialize security middleware and configurations"""
     
     # Trust proxy headers (for rate limiting behind reverse proxy)
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
+    # ProxyFix for production deployments behind reverse proxy
+    if PROXY_FIX_AVAILABLE:
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
+        logger.info("✅ ProxyFix middleware enabled")
+    else:
+        logger.warning("⚠️ ProxyFix not available - install werkzeug for production deployments")
     
     # Initialize Redis for rate limiting
     redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/1')
