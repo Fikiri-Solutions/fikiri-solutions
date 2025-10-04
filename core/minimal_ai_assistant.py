@@ -1,43 +1,121 @@
 #!/usr/bin/env python3
 """
 Fikiri Solutions - AI Email Assistant
-Lightweight AI-powered email responses using OpenAI API.
+Lightweight AI-powered email responses with production enhancements.
 """
 
 import os
 import json
+import logging
+import asyncio
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 class MinimalAIEmailAssistant:
-    """Minimal AI email assistant - lightweight version."""
+    """Minimal AI email assistant with production enhancements."""
     
-    def __init__(self, api_key: Optional[str] = None):
-        """Initialize AI email assistant."""
+    def __init__(self, api_key: Optional[str] = None, services: Dict[str, Any] = None):
+        """Initialize AI email assistant with enhanced features."""
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.client = None
         self.enabled = bool(self.api_key)
+        self.services = services or {}
+        
+        # Redis client for analytics
+        self.redis_client = None
+        self._initialize_redis()
+        
+        # CRM service for auto-lead capture
+        self.crm_service = None
+        self._initialize_crm()
         
         if self.enabled:
             try:
                 import openai
-                self.client = openai.OpenAI(api_key=self.api_key)
-                print("✅ OpenAI client initialized")
+                
+                # OpenAI version compatibility
+                if hasattr(openai, 'OpenAI'):
+                    # OpenAI >= 1.0.0
+                    self.client = openai.OpenAI(api_key=self.api_key)
+                    logger.info("✅ OpenAI client initialized (v1.0+)")
+                else:
+                    # Legacy OpenAI < 1.0.0
+                    openai.api_key = self.api_key
+                    self.client = openai
+                    logger.info("✅ OpenAI client initialized (legacy v0.x)")
+                
             except ImportError:
-                print("⚠️  OpenAI not installed. Run: pip install openai")
+                logger.warning("⚠️ OpenAI not installed. Run: pip install openai")
                 self.enabled = False
             except Exception as e:
-                print(f"⚠️  OpenAI initialization failed: {e}")
+                logger.error(f"⚠️ OpenAI initialization failed: {e}")
                 self.enabled = False
         else:
-            print("⚠️  No OpenAI API key found. Set OPENAI_API_KEY environment variable")
+            logger.warning("⚠️ No OpenAI API key found. Set OPENAI_API_KEY environment variable")
+    
+    def _initialize_redis(self):
+        """Initialize Redis client for analytics."""
+        try:
+            import redis
+            redis_url = os.getenv('REDIS_URL')
+            if redis_url:
+                self.redis_client = redis.from_url(redis_url, decode_responses=True)
+            else:
+                self.redis_client = redis.Redis(
+                    host=os.getenv('REDIS_HOST', 'localhost'),
+                    port=int(os.getenv('REDIS_PORT', 6379)),
+                    password=os.getenv('REDIS_PASSWORD'),
+                    db=int(os.getenv('REDIS_DB', 0)),
+                    decode_responses=True
+                )
+            self.redis_client.ping()
+            logger.info("✅ Redis initialized for AI analytics")
+        except Exception as e:
+            logger.info(f"ℹ️ Redis not available for AI analytics: {e}")
+            self.redis_client = None
+    
+    def _initialize_crm(self):
+        """Initialize CRM service for auto-lead capture."""
+        try:
+            if 'crm' in self.services:
+                self.crm_service = self.services['crm']
+                logger.info("✅ CRM service initialized for auto-lead capture")
+            else:
+                logger.info("ℹ️ CRM service not available for auto-lead capture")
+        except Exception as e:
+            logger.warning(f"CRM initialization failed: {e}")
     
     def is_enabled(self) -> bool:
         """Check if AI assistant is enabled."""
         return self.enabled and self.client is not None
     
+    def _track_ai_usage(self, operation: str, success: bool, tokens_used: int = 0):
+        """Track AI usage for analytics."""
+        if not self.redis_client:
+            return
+        
+        try:
+            timestamp = datetime.now(timezone.utc).isoformat()
+            usage_data = {
+                'operation': operation,
+                'success': success,
+                'tokens_used': tokens_used,
+                'timestamp': timestamp
+            }
+            
+            # Store in Redis with TTL
+            self.redis_client.lpush("fikiri:ai:usage", json.dumps(usage_data))
+            self.redis_client.ltrim("fikiri:ai:usage", 0, 999)  # Keep last 1000 records
+            self.redis_client.expire("fikiri:ai:usage", 86400 * 7)  # 7 days TTL
+            
+        except Exception as e:
+            logger.warning(f"Failed to track AI usage: {e}")
+    
     def classify_email_intent(self, email_content: str, subject: str = "") -> Dict[str, Any]:
-        """Classify email intent using AI."""
+        """Classify email intent using AI with enhanced tracking."""
         if not self.is_enabled():
             return self._fallback_classification(email_content, subject)
         
@@ -62,23 +140,91 @@ class MinimalAIEmailAssistant:
             }}
             """
             
-            response = self.client.chat.completions.create(
+            # OpenAI version compatibility
+            if hasattr(self.client, 'chat'):
+                # OpenAI >= 1.0.0
+                response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=200,
                 temperature=0.1
             )
+                result_text = response.choices[0].message.content
+                tokens_used = response.usage.total_tokens if response.usage else 0
+            else:
+                # Legacy OpenAI < 1.0.0
+                response = self.client.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=200,
+                    temperature=0.1
+                )
+                result_text = response.choices[0].message.content
+                tokens_used = response.usage.total_tokens if response.usage else 0
             
-            result = json.loads(response.choices[0].message.content)
-            # Debug output removed
+            result = json.loads(result_text)
+            
+            # Track usage
+            self._track_ai_usage("classify_intent", True, tokens_used)
+            
+            # Auto-lead capture for lead inquiries
+            if result.get("intent") == "lead_inquiry" and self.crm_service:
+                self._auto_capture_lead(email_content, subject)
+            
+            logger.info(f"✅ Email classified as: {result.get('intent')}")
             return result
             
         except Exception as e:
-            print(f"❌ AI classification failed: {e}")
+            logger.error(f"❌ AI classification failed: {e}")
+            self._track_ai_usage("classify_intent", False)
             return self._fallback_classification(email_content, subject)
     
+    def _auto_capture_lead(self, email_content: str, subject: str):
+        """Automatically capture lead information."""
+        try:
+            # Extract basic info from email
+            sender_email = self._extract_email_from_content(email_content)
+            sender_name = self._extract_name_from_content(email_content)
+            
+            if sender_email:
+                # Create lead in CRM
+                lead = self.crm_service.add_lead(
+                    email=sender_email,
+                    name=sender_name,
+                    source="ai_classification",
+                    metadata={
+                        "ai_classified": True,
+                        "email_subject": subject,
+                        "classification_timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                )
+                
+                # Add note about AI classification
+                self.crm_service.add_note(lead.id, f"Auto-captured from AI classification: {subject}")
+                
+                logger.info(f"✅ Auto-captured lead: {sender_email}")
+                
+        except Exception as e:
+            logger.error(f"❌ Auto-lead capture failed: {e}")
+    
+    def _extract_email_from_content(self, content: str) -> Optional[str]:
+        """Extract email address from content."""
+        import re
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        matches = re.findall(email_pattern, content)
+        return matches[0] if matches else None
+    
+    def _extract_name_from_content(self, content: str) -> str:
+        """Extract name from content."""
+        # Simple name extraction - could be enhanced with AI
+        lines = content.split('\n')
+        for line in lines[:5]:  # Check first 5 lines
+            if 'from:' in line.lower() or 'name:' in line.lower():
+                return line.split(':')[1].strip() if ':' in line else ""
+        return ""
+    
     def generate_response(self, email_content: str, sender_name: str, subject: str, intent: str = "general") -> str:
-        """Generate AI-powered email response."""
+        """Generate AI-powered email response with enhanced features."""
         if not self.is_enabled():
             return self._fallback_response(sender_name, subject)
         
@@ -110,23 +256,41 @@ class MinimalAIEmailAssistant:
             Don't include signature - that will be added separately.
             """
             
-            response = self.client.chat.completions.create(
+            # OpenAI version compatibility
+            if hasattr(self.client, 'chat'):
+                # OpenAI >= 1.0.0
+                response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=300,
                 temperature=0.7
             )
+                generated_response = response.choices[0].message.content.strip()
+                tokens_used = response.usage.total_tokens if response.usage else 0
+            else:
+                # Legacy OpenAI < 1.0.0
+                response = self.client.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=300,
+                    temperature=0.7
+                )
+                generated_response = response.choices[0].message.content.strip()
+                tokens_used = response.usage.total_tokens if response.usage else 0
             
-            generated_response = response.choices[0].message.content.strip()
-            print(f"✅ AI response generated for {sender_name}")
+            # Track usage
+            self._track_ai_usage("generate_response", True, tokens_used)
+            
+            logger.info(f"✅ AI response generated for {sender_name}")
             return generated_response
             
         except Exception as e:
-            print(f"❌ AI response generation failed: {e}")
+            logger.error(f"❌ AI response generation failed: {e}")
+            self._track_ai_usage("generate_response", False)
             return self._fallback_response(sender_name, subject)
     
     def extract_contact_info(self, email_content: str) -> Dict[str, Any]:
-        """Extract contact information from email."""
+        """Extract contact information from email with enhanced tracking."""
         if not self.is_enabled():
             return self._fallback_contact_extraction(email_content)
         
@@ -147,23 +311,43 @@ class MinimalAIEmailAssistant:
             }}
             """
             
+            # OpenAI version compatibility
+            if hasattr(self.client, 'chat'):
+                # OpenAI >= 1.0.0
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=150,
                 temperature=0.1
             )
+                result_text = response.choices[0].message.content
+                tokens_used = response.usage.total_tokens if response.usage else 0
+            else:
+                # Legacy OpenAI < 1.0.0
+                response = self.client.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=150,
+                    temperature=0.1
+                )
+                result_text = response.choices[0].message.content
+                tokens_used = response.usage.total_tokens if response.usage else 0
             
-            result = json.loads(response.choices[0].message.content)
-            print(f"✅ Contact info extracted")
+            result = json.loads(result_text)
+            
+            # Track usage
+            self._track_ai_usage("extract_contact", True, tokens_used)
+            
+            logger.info(f"✅ Contact info extracted")
             return result
             
         except Exception as e:
-            print(f"❌ Contact extraction failed: {e}")
+            logger.error(f"❌ Contact extraction failed: {e}")
+            self._track_ai_usage("extract_contact", False)
             return self._fallback_contact_extraction(email_content)
     
     def summarize_email_thread(self, emails: List[Dict[str, Any]]) -> str:
-        """Summarize an email thread."""
+        """Summarize an email thread with enhanced tracking."""
         if not self.is_enabled() or len(emails) < 2:
             return "Email thread summary not available"
         
@@ -185,473 +369,235 @@ class MinimalAIEmailAssistant:
             - Next steps or action items
             """
             
+            # OpenAI version compatibility
+            if hasattr(self.client, 'chat'):
+                # OpenAI >= 1.0.0
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=150,
                 temperature=0.3
             )
+                summary = response.choices[0].message.content.strip()
+                tokens_used = response.usage.total_tokens if response.usage else 0
+            else:
+                # Legacy OpenAI < 1.0.0
+                response = self.client.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=150,
+                    temperature=0.3
+                )
+                summary = response.choices[0].message.content.strip()
+                tokens_used = response.usage.total_tokens if response.usage else 0
             
-            summary = response.choices[0].message.content.strip()
-            print(f"✅ Email thread summarized")
+            # Track usage
+            self._track_ai_usage("summarize_thread", True, tokens_used)
+            
+            logger.info(f"✅ Email thread summarized")
             return summary
             
         except Exception as e:
-            print(f"❌ Thread summarization failed: {e}")
+            logger.error(f"❌ Thread summarization failed: {e}")
+            self._track_ai_usage("summarize_thread", False)
             return "Email thread summary not available"
     
-    def _fallback_classification(self, email_content: str, subject: str) -> Dict[str, Any]:
-        """Fallback classification without AI."""
-        content_lower = (email_content + " " + subject).lower()
+    async def generate_response_async(self, email_content: str, sender_name: str, subject: str, intent: str = "general") -> str:
+        """Async version of generate_response for FastAPI compatibility."""
+        # Run the synchronous method in a thread pool
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.generate_response, email_content, sender_name, subject, intent)
+    
+    async def classify_email_intent_async(self, email_content: str, subject: str = "") -> Dict[str, Any]:
+        """Async version of classify_email_intent for FastAPI compatibility."""
+        # Run the synchronous method in a thread pool
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.classify_email_intent, email_content, subject)
+    
+    def get_ai_stats(self) -> Dict[str, Any]:
+        """Get AI usage statistics."""
+        stats = {
+            "enabled": self.is_enabled(),
+            "openai_version": "unknown",
+            "redis_available": self.redis_client is not None,
+            "crm_integration": self.crm_service is not None,
+            "total_operations": 0,
+            "successful_operations": 0,
+            "total_tokens": 0
+        }
         
-        if any(word in content_lower for word in ["support", "help", "issue", "problem", "bug"]):
-            return {"intent": "support_request", "confidence": 0.8, "urgency": "medium", "suggested_action": "escalate_to_support"}
-        elif any(word in content_lower for word in ["quote", "price", "cost", "service", "product"]):
-            return {"intent": "lead_inquiry", "confidence": 0.8, "urgency": "high", "suggested_action": "send_to_sales"}
-        elif any(word in content_lower for word in ["complaint", "angry", "disappointed", "terrible"]):
-            return {"intent": "complaint", "confidence": 0.7, "urgency": "high", "suggested_action": "escalate_to_manager"}
+        # Get OpenAI version
+        try:
+            import openai
+            if hasattr(openai, 'OpenAI'):
+                stats["openai_version"] = "1.0+"
+            else:
+                stats["openai_version"] = "0.x"
+        except ImportError:
+            stats["openai_version"] = "not_installed"
+        
+        # Get usage stats from Redis
+        if self.redis_client:
+            try:
+                usage_records = self.redis_client.lrange("fikiri:ai:usage", 0, -1)
+                stats["total_operations"] = len(usage_records)
+                
+                successful_count = 0
+                total_tokens = 0
+                
+                for record in usage_records:
+                    try:
+                        data = json.loads(record)
+                        if data.get("success"):
+                            successful_count += 1
+                        total_tokens += data.get("tokens_used", 0)
+                    except:
+                        continue
+                
+                stats["successful_operations"] = successful_count
+                stats["total_tokens"] = total_tokens
+                
+            except Exception as e:
+                logger.warning(f"Failed to get AI stats from Redis: {e}")
+        
+        return stats
+    
+    def _load_business_context(self) -> Dict[str, str]:
+        """Load business context from file or use defaults."""
+        try:
+            business_file = Path("data/business_profile.json")
+            if business_file.exists():
+                with open(business_file, 'r') as f:
+                    context = json.load(f)
+                    logger.info("✅ Business context loaded from file")
+                    return context
+        except Exception as e:
+            logger.warning(f"Failed to load business context: {e}")
+        
+        # Default business context
+        return {
+            "company_name": "Fikiri Solutions",
+            "services": "Gmail automation and lead management",
+            "tone": "professional and helpful"
+        }
+    
+    def _fallback_classification(self, email_content: str, subject: str) -> Dict[str, Any]:
+        """Fallback classification when AI is not available."""
+        content_lower = email_content.lower()
+        subject_lower = subject.lower()
+        
+        # Simple keyword-based classification
+        if any(word in content_lower for word in ['price', 'cost', 'quote', 'buy', 'purchase', 'interested']):
+            return {
+                "intent": "lead_inquiry",
+                "confidence": 0.7,
+                "urgency": "medium",
+                "suggested_action": "send_pricing_info"
+            }
+        elif any(word in content_lower for word in ['help', 'support', 'issue', 'problem', 'bug']):
+            return {
+                "intent": "support_request",
+                "confidence": 0.8,
+                "urgency": "high",
+                "suggested_action": "escalate_to_support"
+            }
+        elif any(word in content_lower for word in ['complaint', 'angry', 'upset', 'disappointed']):
+            return {
+                "intent": "complaint",
+                "confidence": 0.9,
+                "urgency": "high",
+                "suggested_action": "escalate_to_manager"
+            }
         else:
-            return {"intent": "general_info", "confidence": 0.6, "urgency": "low", "suggested_action": "standard_response"}
+            return {
+                "intent": "general_info",
+                "confidence": 0.6,
+                "urgency": "low",
+                "suggested_action": "send_general_info"
+            }
     
     def _fallback_response(self, sender_name: str, subject: str) -> str:
-        """Fallback response without AI."""
-        return f"""Hi {sender_name},
+        """Fallback response when AI is not available."""
+        return f"""Dear {sender_name},
 
 Thank you for your email regarding "{subject}".
 
-I have received your message and will get back to you as soon as possible.
+We have received your message and will review it carefully. Our team will get back to you within 24 hours with a detailed response.
+
+If this is an urgent matter, please don't hesitate to call us directly.
 
 Best regards,
 Fikiri Solutions Team"""
     
     def _fallback_contact_extraction(self, email_content: str) -> Dict[str, Any]:
-        """Fallback contact extraction without AI."""
+        """Fallback contact extraction when AI is not available."""
         import re
         
-        # Simple regex patterns
-        phone_pattern = r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b'
-        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        # Simple regex-based extraction
+        phone_pattern = r'(\+?1?[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})'
+        phone_match = re.search(phone_pattern, email_content)
+        
         website_pattern = r'https?://[^\s]+'
+        website_match = re.search(website_pattern, email_content)
         
         return {
-            "phone": re.search(phone_pattern, email_content).group() if re.search(phone_pattern, email_content) else None,
+            "phone": phone_match.group(0) if phone_match else None,
             "company": None,
-            "website": re.search(website_pattern, email_content).group() if re.search(website_pattern, email_content) else None,
+            "website": website_match.group(0) if website_match else None,
             "location": None,
             "budget": None,
             "timeline": None
         }
     
-    def _load_business_context(self) -> Dict[str, Any]:
-        """Load business context from config."""
-        try:
-            with open("data/business_profile.json", "r") as f:
-                return json.load(f)
-        except:
-            return {
-                "company_name": "Fikiri Solutions",
-                "services": "Gmail automation and lead management",
-                "tone": "professional and helpful"
-            }
-    
-    def get_usage_stats(self) -> Dict[str, Any]:
-        """Get AI usage statistics."""
-        return {
-            "enabled": self.is_enabled(),
-            "api_key_configured": bool(self.api_key),
-            "client_initialized": self.client is not None
-        }
-    
-    def generate_chat_response(self, user_message: str, conversation_history: List[Dict] = None) -> Dict[str, Any]:
-        """Generate AI response for chat interface with advanced features."""
-        try:
-            # Import advanced features
-            from core.advanced_sentiment_analyzer import get_sentiment_analyzer
-            from core.multi_language_support import get_multi_language_support
-            from core.advanced_email_templates import get_email_templates
-            from core.email_scheduling_system import get_email_scheduler
-            from core.advanced_analytics_system import get_analytics_system
-            
-            # Initialize advanced components
-            sentiment_analyzer = get_sentiment_analyzer()
-            multi_lang_support = get_multi_language_support()
-            email_templates = get_email_templates()
-            email_scheduler = get_email_scheduler()
-            analytics_system = get_analytics_system()
-            
-            # Analyze sentiment
-            sentiment_result = sentiment_analyzer.analyze_sentiment(user_message) if sentiment_analyzer else None
-            
-            # Detect language
-            lang_result = multi_lang_support.detect_language(user_message) if multi_lang_support else None
-            
-            # Generate AI response with advanced context
-            if self.is_enabled():
-                try:
-                    # Enhanced AI response with sentiment and language context
-                    ai_response = self._generate_advanced_ai_response(
-                        user_message, 
-                        conversation_history,
-                        sentiment_result,
-                        lang_result
-                    )
-                    
-                    # Track analytics
-                    if analytics_system:
-                        analytics_system.track_metric(
-                            "ai_response_generated", 1, "count", "operational",
-                            {"sentiment": sentiment_result.sentiment if sentiment_result else "unknown",
-                             "language": lang_result.language_code if lang_result else "en"}
-                        )
-                    
-                    return {
-                        "response": ai_response,
-                        "action_taken": "ai_response",
-                        "success": True,
-                        "ai_generated": True,
-                        "sentiment_analysis": {
-                            "sentiment": sentiment_result.sentiment if sentiment_result else "neutral",
-                            "confidence": sentiment_result.confidence if sentiment_result else 0.5,
-                            "urgency": sentiment_result.urgency if sentiment_result else "low",
-                            "response_tone": sentiment_result.response_tone if sentiment_result else "professional"
-                        } if sentiment_result else None,
-                        "language_detection": {
-                            "language": lang_result.language if lang_result else "english",
-                            "language_code": lang_result.language_code if lang_result else "en",
-                            "confidence": lang_result.confidence if lang_result else 0.5,
-                            "is_supported": lang_result.is_supported if lang_result else True
-                        } if lang_result else None,
-                        "classification": {
-                            "intent": "general_inquiry",
-                            "confidence": 0.8,
-                            "urgency": sentiment_result.urgency if sentiment_result else "normal",
-                            "suggested_action": "ai_response"
-                        }
-                    }
-                    
-                except Exception as e:
-                    print(f"Advanced AI response generation failed: {e}")
-                    # Fallback to basic AI response
-                    ai_response = self._generate_ai_response(user_message, conversation_history)
-                    return {
-                        "response": ai_response,
-                        "action_taken": "ai_response_fallback",
-                        "success": True,
-                        "ai_generated": True,
-                        "classification": {
-                            "intent": "general_inquiry",
-                            "confidence": 0.7,
-                            "urgency": "normal",
-                            "suggested_action": "ai_response"
-                        }
-                    }
-            else:
-                # Fallback response
-                return {
-                    "response": self._enhanced_fallback_response(user_message),
-                    "action_taken": "fallback_response",
-                    "success": True,
-                    "classification": {
-                        "intent": "general_inquiry",
-                        "confidence": 0.6,
-                        "urgency": "normal",
-                        "suggested_action": "provide_information"
-                    }
-                }
-                
-        except ImportError as e:
-            print(f"❌ Failed to import advanced features: {e}")
-            return {
-                "response": self._enhanced_fallback_response(user_message),
-                "action_taken": "fallback_response",
-                "success": True,
-                "classification": {
-                    "intent": "general_inquiry",
-                    "confidence": 0.6,
-                    "urgency": "normal",
-                    "suggested_action": "provide_information"
-                }
-            }
-        except Exception as e:
-            print(f"❌ Advanced chat response generation failed: {e}")
-            return {
-                "response": self._enhanced_fallback_response(user_message),
-                "action_taken": "error_fallback",
-                "success": False,
-                "classification": {
-                    "intent": "general_inquiry",
-                    "confidence": 0.6,
-                    "urgency": "normal",
-                    "suggested_action": "provide_information"
-                }
-            }
-    
-    def _generate_advanced_ai_response(self, user_message: str, conversation_history: List[Dict] = None,
-                                      sentiment_result=None, lang_result=None) -> str:
-        """Generate advanced AI response with sentiment and language context."""
-        if not self.is_enabled():
-            return self._enhanced_fallback_response(user_message)
-        
-        try:
-            # Build conversation context
-            messages = []
-            
-            # Enhanced system context with advanced features
-            system_context = """You are Fikiri Solutions AI Assistant, powered by ChatGPT 3.5 Turbo. You are an expert business automation consultant specializing in:
-
-- Email automation and intelligent responses
-- Lead management and CRM optimization  
-- Business process automation
-- Customer communication strategies
-- Data analysis and insights
-- Multi-language support and translation
-- Sentiment analysis and customer mood detection
-- Advanced email templates and scheduling
-- Performance analytics and insights
-
-Guidelines:
-- Be helpful, professional, and conversational
-- Provide specific, actionable advice
-- When users ask about data/numbers, guide them to set up integrations
-- Always suggest concrete next steps
-- Use emojis sparingly but effectively
-- Keep responses concise but comprehensive
-- If asked about technical capabilities, explain what Fikiri Solutions can do
-- Adapt your tone based on customer sentiment and urgency
-- Support multiple languages when needed
-
-You are the primary AI interface - handle ALL user queries with intelligence and expertise."""
-            
-            # Add sentiment and language context
-            if sentiment_result:
-                system_context += f"\n\nCurrent customer sentiment: {sentiment_result.sentiment} (confidence: {sentiment_result.confidence:.2f})"
-                system_context += f"\nUrgency level: {sentiment_result.urgency}"
-                system_context += f"\nRecommended response tone: {sentiment_result.response_tone}"
-            
-            if lang_result:
-                system_context += f"\n\nDetected language: {lang_result.language} ({lang_result.language_code})"
-                system_context += f"\nLanguage confidence: {lang_result.confidence:.2f}"
-                system_context += f"\nTranslation available: {lang_result.translation_available}"
-            
-            messages.append({"role": "system", "content": system_context})
-            
-            # Add conversation history
-            if conversation_history:
-                for msg in conversation_history[-6:]:  # Last 6 messages for context
-                    messages.append({
-                        "role": "user" if msg.get('type') == 'user' else "assistant",
-                        "content": msg.get('content', '')
-                    })
-            
-            # Add current user message
-            messages.append({
-                "role": "user",
-                "content": user_message
-            })
-            
-            # Call ChatGPT 3.5 Turbo with optimized parameters
-            response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=messages,
-                max_tokens=600,  # Increased for more comprehensive responses
-                temperature=0.7,  # Balanced creativity and consistency
-                top_p=0.9,
-                frequency_penalty=0.1,
-                presence_penalty=0.1
-            )
-            
-            generated_response = response.choices[0].message.content.strip()
-            print(f"✅ Advanced AI response generated")
-            return generated_response
-            
-        except Exception as e:
-            print(f"❌ Advanced ChatGPT 3.5 Turbo API call failed: {e}")
-            return self._enhanced_fallback_response(user_message)
-    
-    def _generate_ai_response(self, user_message: str, conversation_history: List[Dict] = None) -> str:
-        """Generate AI response using OpenAI API."""
-        if not self.is_enabled():
-            return self._enhanced_fallback_response(user_message)
-        
-        try:
-            # Build conversation context
-            messages = []
-            
-            # Enhanced system context for ChatGPT 3.5 Turbo
-            messages.append({
-                "role": "system", 
-                "content": """You are Fikiri Solutions AI Assistant, powered by ChatGPT 3.5 Turbo. You are an expert business automation consultant specializing in:
-
-- Email automation and intelligent responses
-- Lead management and CRM optimization  
-- Business process automation
-- Customer communication strategies
-- Data analysis and insights
-
-Guidelines:
-- Be helpful, professional, and conversational
-- Provide specific, actionable advice
-- When users ask about data/numbers, guide them to set up integrations
-- Always suggest concrete next steps
-- Use emojis sparingly but effectively
-- Keep responses concise but comprehensive
-- If asked about technical capabilities, explain what Fikiri Solutions can do
-
-You are the primary AI interface - handle ALL user queries with intelligence and expertise."""
-            })
-            
-            # Add conversation history
-            if conversation_history:
-                for msg in conversation_history[-6:]:  # Last 6 messages for context
-                    messages.append({
-                        "role": "user" if msg.get('type') == 'user' else "assistant",
-                        "content": msg.get('content', '')
-                    })
-            
-            # Add current user message
-            messages.append({
-                "role": "user",
-                "content": user_message
-            })
-            
-            # Call ChatGPT 3.5 Turbo with optimized parameters
-            response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=messages,
-                max_tokens=500,  # Increased for more comprehensive responses
-                temperature=0.7,  # Balanced creativity and consistency
-                top_p=0.9,
-                frequency_penalty=0.1,
-                presence_penalty=0.1
-            )
-            
-            generated_response = response.choices[0].message.content.strip()
-            print(f"✅ AI response generated")
-            return generated_response
-            
-        except Exception as e:
-            print(f"❌ ChatGPT 3.5 Turbo API call failed: {e}")
-            print(f"❌ API Key configured: {bool(self.api_key)}")
-            print(f"❌ API Key length: {len(self.api_key) if self.api_key else 0}")
-            return self._enhanced_fallback_response(user_message)
-    
-    def _enhanced_fallback_response(self, user_message: str) -> str:
-        """Enhanced fallback response with system integration."""
-        message_lower = user_message.lower()
-        
-        # Email-related queries
-        if any(word in message_lower for word in ["email", "emails", "inbox", "message", "messages", "received", "unread"]):
-            if "how many" in message_lower or "count" in message_lower:
-                return "I can help you check your email count! To get the exact number of emails in your inbox, I need to connect to your email service. Please set up your Gmail or Outlook integration in the Services section, and I'll be able to show you real-time email statistics."
-            elif "last" in message_lower or "recent" in message_lower:
-                return "I'd be happy to show you your most recent emails! To access your latest messages, I need to connect to your email service (Gmail, Outlook, etc.). Please set up your email integration in the Services section."
-            else:
-                return "I can help you manage your emails! To access your inbox, I need to connect to your email service. Please set up your Gmail or Outlook integration in the Services section."
-        
-        # Lead/Customer queries - try to get real data
-        elif any(word in message_lower for word in ["lead", "leads", "customer", "customers", "client", "clients", "prospect", "prospects"]):
-            if "how many" in message_lower or "count" in message_lower:
-                # Try to get actual lead count from CRM if available
-                try:
-                    from core.minimal_crm_service import MinimalCRMService
-                    crm = MinimalCRMService()
-                    leads = crm.get_all_leads()
-                    lead_count = len(leads)
-                    return f"Great question! I can see you currently have {lead_count} leads in your CRM system. You can view and manage all your leads in the CRM section. I can also help automate lead scoring and follow-ups once your email integration is set up."
-                except:
-                    return "I can help you check your lead count! To get the exact number of leads in your CRM, please visit the CRM section. I can also help automate lead scoring and follow-ups once your email integration is set up."
-            elif "last" in message_lower or "recent" in message_lower:
-                return "I can help you find your most recent leads! Check out the CRM section to view and manage your contacts. I can also help automate lead scoring and follow-ups."
-            else:
-                return "I can help you manage leads and customers! Check out the CRM section to view and manage your contacts. I can also help automate lead scoring and follow-ups."
-        
-        # Service/System queries
-        elif any(word in message_lower for word in ["service", "services", "system", "status", "working", "down"]):
-            return "I can help you check your service status! Visit the Services section to see the status of all your integrations (Gmail, Outlook, AI Assistant, CRM). You can also test each service to ensure everything is working properly."
-        
-        # Help/Support queries
-        elif any(word in message_lower for word in ["help", "support", "assistance", "how to", "how do i"]):
-            return "I'm here to help! I can assist with email automation, lead management, customer communication, and business process optimization. What specific area would you like help with? You can also check the Services section to set up integrations."
-        
-        # Greeting queries
-        elif any(word in message_lower for word in ["hello", "hi", "hey", "good morning", "good afternoon", "good evening"]):
-            return "Hello! I'm your Fikiri Solutions AI Assistant. I can help you with email automation, lead management, and customer communication. To get started, you can set up your email integration in the Services section."
-        
-        # Default response with more context
-        else:
-            return "I'm Fikiri Solutions AI Assistant! I can help you with email automation, lead management, and customer communication. To provide more specific assistance, please set up your email integration in the Services section. How can I assist you today?"
-    
-    def _fallback_chat_response(self, user_message: str) -> str:
-        """Enhanced fallback chat response without AI."""
-        message_lower = user_message.lower()
-        
-        # Email-related queries
-        if any(word in message_lower for word in ["email", "emails", "inbox", "message", "messages", "received", "unread"]):
-            if "how many" in message_lower or "count" in message_lower:
-                return "I can help you check your email count! To get the exact number of emails in your inbox, I need to connect to your email service. Please set up your Gmail or Outlook integration in the Services section, and I'll be able to show you real-time email statistics."
-            elif "last" in message_lower or "recent" in message_lower:
-                return "I'd be happy to show you your most recent emails! To access your latest messages, I need to connect to your email service (Gmail, Outlook, etc.). Please set up your email integration in the Services section."
-            else:
-                return "I can help you manage your emails! To access your inbox, I need to connect to your email service. Please set up your Gmail or Outlook integration in the Services section."
-        
-        # Lead/Customer queries
-        elif any(word in message_lower for word in ["lead", "leads", "customer", "customers", "client", "clients", "prospect", "prospects"]):
-            if "how many" in message_lower or "count" in message_lower:
-                return "I can help you check your lead count! To get the exact number of leads in your CRM, please visit the CRM section. I can also help automate lead scoring and follow-ups once your email integration is set up."
-            elif "last" in message_lower or "recent" in message_lower:
-                return "I can help you find your most recent leads! Check out the CRM section to view and manage your contacts. I can also help automate lead scoring and follow-ups."
-            else:
-                return "I can help you manage leads and customers! Check out the CRM section to view and manage your contacts. I can also help automate lead scoring and follow-ups."
-        
-        # Service/System queries
-        elif any(word in message_lower for word in ["service", "services", "system", "status", "working", "down"]):
-            return "I can help you check your service status! Visit the Services section to see the status of all your integrations (Gmail, Outlook, AI Assistant, CRM). You can also test each service to ensure everything is working properly."
-        
-        # Help/Support queries
-        elif any(word in message_lower for word in ["help", "support", "assistance", "how to", "how do i"]):
-            return "I'm here to help! I can assist with email automation, lead management, customer communication, and business process optimization. What specific area would you like help with? You can also check the Services section to set up integrations."
-        
-        # Greeting queries
-        elif any(word in message_lower for word in ["hello", "hi", "hey", "good morning", "good afternoon", "good evening"]):
-            return "Hello! I'm your Fikiri Solutions AI Assistant. I can help you with email automation, lead management, and customer communication. To get started, you can set up your email integration in the Services section."
-        
-        # Default response with more context
-        else:
-            return "I'm Fikiri Solutions AI Assistant! I can help you with email automation, lead management, and customer communication. To provide more specific assistance, please set up your email integration in the Services section. How can I assist you today?"
-
-def create_ai_assistant(api_key: Optional[str] = None) -> MinimalAIEmailAssistant:
-    """Create and return an AI email assistant instance."""
-    return MinimalAIEmailAssistant(api_key)
+def create_ai_assistant(api_key: Optional[str] = None, services: Dict[str, Any] = None) -> MinimalAIEmailAssistant:
+    """Create and return an AI assistant instance."""
+    return MinimalAIEmailAssistant(api_key, services)
 
 if __name__ == "__main__":
-    # Test the AI email assistant
-    print("🧪 Testing Minimal AI Email Assistant")
-    print("=" * 50)
+    # Test the AI assistant
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
     
-    assistant = MinimalAIEmailAssistant()
+    logger.info("🧪 Testing Enhanced AI Email Assistant")
+    logger.info("=" * 50)
     
-    print(f"✅ AI Assistant enabled: {assistant.is_enabled()}")
+    # Test with mock services
+    mock_services = {
+        'crm': type('MockCRM', (), {
+            'add_lead': lambda self, **kwargs: type('MockLead', (), {'id': 'test123'})(),
+            'add_note': lambda self, lead_id, note: True
+        })()
+    }
+    
+    ai = MinimalAIEmailAssistant(services=mock_services)
     
     # Test classification
-    print("\nTesting email classification...")
-    sample_email = "Hi, I'm interested in your services. Can you send me a quote for your premium package?"
-    classification = assistant.classify_email_intent(sample_email, "Quote Request")
-    print(f"✅ Classification: {classification['intent']} (confidence: {classification['confidence']})")
+    logger.info("Testing email classification...")
+    test_email = """
+    Hi there,
+    
+    I'm interested in your Gmail automation services. Could you please send me pricing information?
+    
+    Best regards,
+    John Doe
+    john.doe@example.com
+    """
+    
+    classification = ai.classify_email_intent(test_email, "Inquiry about services")
+    logger.info(f"✅ Classification: {classification}")
     
     # Test response generation
-    print("\nTesting response generation...")
-    response = assistant.generate_response(sample_email, "John Doe", "Quote Request", classification['intent'])
-    print(f"✅ Response generated: {response[:100]}...")
+    logger.info("Testing response generation...")
+    response = ai.generate_response(test_email, "John Doe", "Inquiry about services", "lead_inquiry")
+    logger.info(f"✅ Response generated: {len(response)} characters")
     
     # Test contact extraction
-    print("\nTesting contact extraction...")
-    contact_info = assistant.extract_contact_info("My phone is 555-123-4567 and I work at ABC Corp")
-    print(f"✅ Contact info: {contact_info}")
+    logger.info("Testing contact extraction...")
+    contact_info = ai.extract_contact_info(test_email)
+    logger.info(f"✅ Contact info: {contact_info}")
     
     # Test stats
-    print("\nTesting stats...")
-    stats = assistant.get_usage_stats()
-    print(f"✅ Stats: {stats}")
+    logger.info("Testing AI stats...")
+    stats = ai.get_ai_stats()
+    logger.info(f"✅ AI Stats: {stats}")
     
-    print("\n🎉 All AI assistant tests completed!")
-
+    logger.info("🎉 All AI assistant tests completed!")

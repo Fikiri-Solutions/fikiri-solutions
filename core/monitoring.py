@@ -1,14 +1,18 @@
 """
 Production Monitoring and Alerting System
-Sentry integration with Slack/Email notifications
+Sentry integration with Slack/Email notifications - Production Ready
 """
 
 import os
 import logging
 import requests
 import json
-from datetime import datetime
+import uuid
+import time
+import threading
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
+from pathlib import Path
 
 # Optional imports with fallbacks
 try:
@@ -23,7 +27,7 @@ except ImportError:
     print("Warning: sentry-sdk not available. Install with: pip install sentry-sdk[flask]")
 
 try:
-    from flask import Flask, request, g
+    from flask import Flask, request, g, jsonify
     FLASK_AVAILABLE = True
 except ImportError:
     FLASK_AVAILABLE = False
@@ -81,12 +85,12 @@ class AlertManager:
                         },
                         {
                             "title": "Timestamp",
-                            "value": datetime.utcnow().isoformat(),
+                            "value": datetime.now(timezone.utc).isoformat(),
                             "short": True
                         }
                     ],
                     "footer": "Fikiri Solutions Monitoring",
-                    "ts": int(datetime.utcnow().timestamp())
+                    "ts": int(datetime.now(timezone.utc).timestamp())
                 }
             ]
         }
@@ -112,27 +116,147 @@ class AlertManager:
             logger.error(f"Failed to send Slack alert: {e}")
     
     def send_email_alert(self, subject: str, message: str, level: str = 'error'):
-        """Send alert via email"""
+        """Send alert via email with enhanced implementation"""
         if not self.admin_email:
             logger.warning("Admin email not configured")
             return
             
-        # This would integrate with your email service
-        # For now, we'll log the email content
-        email_content = f"""
-        Subject: {subject}
-        To: {self.admin_email}
-        From: alerts@fikirisolutions.com
-        
-        {message}
-        
-        Environment: {self.environment}
-        Timestamp: {datetime.utcnow().isoformat()}
-        """
-        
-        logger.info(f"Email alert: {email_content}")
-        
-        # TODO: Integrate with actual email service (SendGrid, SES, etc.)
+        # Enhanced email implementation
+        try:
+            # Try to use SendGrid if available
+            sendgrid_api_key = os.getenv('SENDGRID_API_KEY')
+            if sendgrid_api_key:
+                self._send_via_sendgrid(subject, message, level)
+                return
+            
+            # Try to use AWS SES if available
+            aws_access_key = os.getenv('AWS_ACCESS_KEY_ID')
+            if aws_access_key:
+                self._send_via_ses(subject, message, level)
+                return
+            
+            # Fallback to SMTP
+            smtp_server = os.getenv('SMTP_SERVER')
+            if smtp_server:
+                self._send_via_smtp(subject, message, level)
+                return
+            
+            # Final fallback - log email content
+            email_content = f"""
+            Subject: {subject}
+            To: {self.admin_email}
+            From: alerts@fikirisolutions.com
+            
+            {message}
+            
+            Environment: {self.environment}
+            Timestamp: {datetime.now(timezone.utc).isoformat()}
+            """
+            
+            logger.info(f"Email alert (logged): {email_content}")
+            
+        except Exception as e:
+            logger.error(f"Failed to send email alert: {e}")
+    
+    def _send_via_sendgrid(self, subject: str, message: str, level: str):
+        """Send email via SendGrid"""
+        try:
+            import sendgrid
+            from sendgrid.helpers.mail import Mail
+            
+            sg = sendgrid.SendGridAPIClient(api_key=os.getenv('SENDGRID_API_KEY'))
+            
+            email_content = f"""
+            {message}
+            
+            Environment: {self.environment}
+            Timestamp: {datetime.now(timezone.utc).isoformat()}
+            """
+            
+            mail = Mail(
+                from_email='alerts@fikirisolutions.com',
+                to_emails=self.admin_email,
+                subject=f"[{level.upper()}] {subject}",
+                html_content=email_content
+            )
+            
+            response = sg.send(mail)
+            logger.info(f"Email sent via SendGrid: {response.status_code}")
+            
+        except ImportError:
+            logger.warning("SendGrid not available")
+        except Exception as e:
+            logger.error(f"SendGrid email failed: {e}")
+    
+    def _send_via_ses(self, subject: str, message: str, level: str):
+        """Send email via AWS SES"""
+        try:
+            import boto3
+            
+            ses_client = boto3.client('ses')
+            
+            email_content = f"""
+            {message}
+            
+            Environment: {self.environment}
+            Timestamp: {datetime.now(timezone.utc).isoformat()}
+            """
+            
+            response = ses_client.send_email(
+                Source='alerts@fikirisolutions.com',
+                Destination={'ToAddresses': [self.admin_email]},
+                Message={
+                    'Subject': {'Data': f"[{level.upper()}] {subject}"},
+                    'Body': {'Text': {'Data': email_content}}
+                }
+            )
+            
+            logger.info(f"Email sent via SES: {response['MessageId']}")
+            
+        except ImportError:
+            logger.warning("boto3 not available")
+        except Exception as e:
+            logger.error(f"SES email failed: {e}")
+    
+    def _send_via_smtp(self, subject: str, message: str, level: str):
+        """Send email via SMTP"""
+        try:
+            import smtplib
+            from email.mime.text import MIMEText
+            from email.mime.multipart import MIMEMultipart
+            
+            smtp_server = os.getenv('SMTP_SERVER')
+            smtp_port = int(os.getenv('SMTP_PORT', '587'))
+            smtp_username = os.getenv('SMTP_USERNAME')
+            smtp_password = os.getenv('SMTP_PASSWORD')
+            
+            msg = MIMEMultipart()
+            msg['From'] = 'alerts@fikirisolutions.com'
+            msg['To'] = self.admin_email
+            msg['Subject'] = f"[{level.upper()}] {subject}"
+            
+            email_content = f"""
+            {message}
+            
+            Environment: {self.environment}
+            Timestamp: {datetime.now(timezone.utc).isoformat()}
+            """
+            
+            msg.attach(MIMEText(email_content, 'plain'))
+            
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.starttls()
+            if smtp_username and smtp_password:
+                server.login(smtp_username, smtp_password)
+            
+            text = msg.as_string()
+            server.sendmail('alerts@fikirisolutions.com', self.admin_email, text)
+            server.quit()
+            
+            logger.info("Email sent via SMTP")
+            
+        except Exception as e:
+            logger.error(f"SMTP email failed: {e}")
     
     def alert_error(self, message: str, context: Optional[Dict[str, Any]] = None):
         """Send error alert"""
@@ -187,6 +311,11 @@ def init_sentry(app):
     except ImportError:
         logger.warning("SQLAlchemy integration not available for Sentry")
     
+    # Configure enable_logs based on environment
+    enable_logs = os.getenv('SENTRY_ENABLE_LOGS', 'true').lower() == 'true'
+    if os.getenv('SENTRY_ENVIRONMENT', 'development') == 'production':
+        enable_logs = False  # Disable in production to avoid double-logging
+    
     sentry_sdk.init(
         dsn=sentry_dsn,
         integrations=integrations,
@@ -198,7 +327,7 @@ def init_sentry(app):
         # Performance monitoring - full tracing for comprehensive monitoring
         traces_sample_rate=1.0,  # 100% of transactions for performance monitoring
         # Enable logs to be sent to Sentry
-        enable_logs=True,
+        enable_logs=enable_logs,
         before_send=before_send_filter,
         before_send_transaction=before_send_transaction_filter
     )
@@ -215,21 +344,24 @@ def init_sentry(app):
     logger.error("Something went wrong - this will be sent to Sentry")
 
 def before_send_filter(event, hint):
-    """Filter events before sending to Sentry"""
+    """Filter events before sending to Sentry with enhanced safety"""
     
     # Add custom context
     event['tags']['service'] = 'fikiri-solutions'
     event['tags']['component'] = 'backend'
     
-    # Add request context if available
-    if request:
-        event['extra']['request_id'] = getattr(g, 'request_id', None)
-        event['extra']['user_id'] = getattr(g, 'user_id', None)
-        event['extra']['endpoint'] = request.endpoint
-        event['extra']['method'] = request.method
-        event['extra']['url'] = request.url
-        event['extra']['user_agent'] = request.headers.get('User-Agent')
-        event['extra']['ip_address'] = request.remote_addr
+    # Add request context if available and safe
+    if FLASK_AVAILABLE and request:
+        try:
+            event['extra']['request_id'] = getattr(g, 'request_id', None)
+            event['extra']['user_id'] = getattr(g, 'user_id', None)
+            event['extra']['endpoint'] = request.endpoint
+            event['extra']['method'] = request.method
+            event['extra']['url'] = request.url
+            event['extra']['user_agent'] = request.headers.get('User-Agent')
+            event['extra']['ip_address'] = request.remote_addr
+        except Exception as e:
+            logger.warning(f"Failed to add request context to Sentry event: {e}")
     
     # Send alert for critical errors
     if event.get('level') == 'error':
@@ -252,23 +384,28 @@ def before_send_transaction_filter(event, hint):
     return event
 
 class HealthMonitor:
-    """Monitor application health and send alerts"""
+    """Monitor application health and send alerts with enhanced features"""
     
     def __init__(self):
         self.alert_manager = alert_manager
         self.health_checks = {}
         self.last_health_check = None
+        self.health_history = []
+        self.max_history = 100  # Keep last 100 health checks
         
     def register_health_check(self, name: str, check_func):
         """Register a health check function"""
         self.health_checks[name] = check_func
     
     def run_health_checks(self) -> Dict[str, Any]:
-        """Run all registered health checks"""
+        """Run all registered health checks with enhanced features"""
         results = {
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'overall_status': 'healthy',
-            'checks': {}
+            'checks': {},
+            'uptime_seconds': self._get_uptime(),
+            'version': os.getenv('APP_VERSION', '1.0.0'),
+            'environment': os.getenv('SENTRY_ENVIRONMENT', 'development')
         }
         
         for name, check_func in self.health_checks.items():
@@ -292,34 +429,90 @@ class HealthMonitor:
                 )
         
         self.last_health_check = results
+        
+        # Store in history
+        self.health_history.append(results)
+        if len(self.health_history) > self.max_history:
+            self.health_history = self.health_history[-self.max_history:]
+        
         return results
     
-    def check_database(self) -> Dict[str, Any]:
-        """Check database connectivity"""
+    def _get_uptime(self) -> float:
+        """Get application uptime in seconds"""
         try:
-            # This would check your actual database
-            # For now, return a mock result
+            # Try to read from uptime file
+            uptime_file = Path('data/uptime.txt')
+            if uptime_file.exists():
+                with open(uptime_file, 'r') as f:
+                    start_time = float(f.read().strip())
+                return time.time() - start_time
+            else:
+                # Create uptime file
+                uptime_file.parent.mkdir(exist_ok=True)
+                with open(uptime_file, 'w') as f:
+                    f.write(str(time.time()))
+                return 0.0
+        except Exception:
+            return 0.0
+    
+    def check_database(self) -> Dict[str, Any]:
+        """Check database connectivity with enhanced checks"""
+        try:
+            # Try to import and check database optimizer
+            from core.database_optimization import db_optimizer
+            
+            start_time = time.time()
+            
+            # Simple query to test connectivity
+            result = db_optimizer.execute_query("SELECT 1", fetch=True)
+            
+            response_time = (time.time() - start_time) * 1000
+            
             return {
                 'connected': True,
-                'response_time_ms': 5
+                'response_time_ms': round(response_time, 2),
+                'database_type': getattr(db_optimizer, 'db_type', 'unknown'),
+                'test_query_success': True
             }
         except Exception as e:
             raise Exception(f"Database check failed: {e}")
     
     def check_redis(self) -> Dict[str, Any]:
-        """Check Redis connectivity"""
+        """Check Redis connectivity with enhanced checks"""
         try:
-            # This would check your actual Redis connection
-            # For now, return a mock result
+            import redis
+            
+            redis_url = os.getenv('REDIS_URL')
+            if redis_url:
+                client = redis.from_url(redis_url, decode_responses=True)
+            else:
+                client = redis.Redis(
+                    host=os.getenv('REDIS_HOST', 'localhost'),
+                    port=int(os.getenv('REDIS_PORT', 6379)),
+                    password=os.getenv('REDIS_PASSWORD'),
+                    db=int(os.getenv('REDIS_DB', 0)),
+                    decode_responses=True
+                )
+            
+            start_time = time.time()
+            client.ping()
+            response_time = (time.time() - start_time) * 1000
+            
+            # Get Redis info
+            info = client.info()
+            
             return {
                 'connected': True,
-                'response_time_ms': 2
+                'response_time_ms': round(response_time, 2),
+                'redis_version': info.get('redis_version', 'unknown'),
+                'used_memory_mb': round(info.get('used_memory', 0) / 1024 / 1024, 2),
+                'connected_clients': info.get('connected_clients', 0)
             }
         except Exception as e:
             raise Exception(f"Redis check failed: {e}")
     
     def check_external_services(self) -> Dict[str, Any]:
-        """Check external service connectivity"""
+        """Check external service connectivity with enhanced timeout handling"""
         services = {
             'gmail_api': 'https://gmail.googleapis.com',
             'openai_api': 'https://api.openai.com',
@@ -329,15 +522,30 @@ class HealthMonitor:
         results = {}
         for service, url in services.items():
             try:
-                response = requests.get(url, timeout=5)
+                # Use shorter timeout for health checks
+                response = requests.get(url, timeout=3)
                 results[service] = {
                     'status': 'healthy',
-                    'response_time_ms': response.elapsed.total_seconds() * 1000
+                    'response_time_ms': round(response.elapsed.total_seconds() * 1000, 2),
+                    'status_code': response.status_code
+                }
+            except requests.exceptions.Timeout:
+                results[service] = {
+                    'status': 'timeout',
+                    'error': 'Request timeout (>3s)',
+                    'response_time_ms': 3000
+                }
+            except requests.exceptions.ConnectionError:
+                results[service] = {
+                    'status': 'connection_error',
+                    'error': 'Connection failed',
+                    'response_time_ms': None
                 }
             except Exception as e:
                 results[service] = {
                     'status': 'unhealthy',
-                    'error': str(e)
+                    'error': str(e),
+                    'response_time_ms': None
                 }
         
         return results
@@ -346,28 +554,34 @@ class HealthMonitor:
 health_monitor = HealthMonitor()
 
 def init_health_monitoring(app: Flask):
-    """Initialize health monitoring"""
+    """Initialize health monitoring with enhanced features"""
     
     # Register health checks
     health_monitor.register_health_check('database', health_monitor.check_database)
     health_monitor.register_health_check('redis', health_monitor.check_redis)
     health_monitor.register_health_check('external_services', health_monitor.check_external_services)
     
-    # Add health check endpoint
+    # Add health check endpoint with proper JSON response
     @app.route('/health')
     def health_check():
         """Health check endpoint for external monitoring"""
-        return health_monitor.run_health_checks()
+        results = health_monitor.run_health_checks()
+        return jsonify(results)
     
     @app.route('/health/detailed')
     def detailed_health_check():
-        """Detailed health check endpoint"""
-        return health_monitor.run_health_checks()
+        """Detailed health check endpoint with history"""
+        results = health_monitor.run_health_checks()
+        
+        # Add health history
+        results['health_history'] = health_monitor.health_history[-10:]  # Last 10 checks
+        
+        return jsonify(results)
     
     logger.info("Health monitoring initialized")
 
 class PerformanceMonitor:
-    """Monitor application performance and send alerts"""
+    """Monitor application performance and send alerts with persistence"""
     
     def __init__(self):
         self.alert_manager = alert_manager
@@ -377,9 +591,22 @@ class PerformanceMonitor:
             'cpu_usage_percent': 80,   # 80%
             'error_rate_percent': 5     # 5%
         }
+        self.performance_history = []
+        self.max_history = 1000  # Keep last 1000 performance records
     
     def check_performance(self, metrics: Dict[str, Any]):
         """Check performance metrics and send alerts if thresholds exceeded"""
+        
+        # Add timestamp to metrics
+        metrics['timestamp'] = datetime.now(timezone.utc).isoformat()
+        
+        # Store in history
+        self.performance_history.append(metrics)
+        if len(self.performance_history) > self.max_history:
+            self.performance_history = self.performance_history[-self.max_history:]
+        
+        # Persist to file
+        self._persist_performance_metrics(metrics)
         
         alerts = []
         
@@ -405,12 +632,71 @@ class PerformanceMonitor:
                 f"Performance issues detected: {', '.join(alerts)}",
                 metrics
             )
+    
+    def _persist_performance_metrics(self, metrics: Dict[str, Any]):
+        """Persist performance metrics to file"""
+        try:
+            metrics_file = Path('data/performance_metrics.json')
+            metrics_file.parent.mkdir(exist_ok=True)
+            
+            # Load existing metrics
+            if metrics_file.exists():
+                with open(metrics_file, 'r') as f:
+                    all_metrics = json.load(f)
+            else:
+                all_metrics = []
+            
+            # Add new metrics
+            all_metrics.append(metrics)
+            
+            # Keep only last 1000 records
+            if len(all_metrics) > 1000:
+                all_metrics = all_metrics[-1000:]
+            
+            # Save back to file
+            with open(metrics_file, 'w') as f:
+                json.dump(all_metrics, f, indent=2)
+                
+        except Exception as e:
+            logger.warning(f"Failed to persist performance metrics: {e}")
+    
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """Get performance statistics"""
+        if not self.performance_history:
+            return {'error': 'No performance data available'}
+        
+        response_times = [m.get('response_time_ms', 0) for m in self.performance_history if 'response_time_ms' in m]
+        
+        if response_times:
+            return {
+                'total_requests': len(self.performance_history),
+                'avg_response_time_ms': round(sum(response_times) / len(response_times), 2),
+                'max_response_time_ms': max(response_times),
+                'min_response_time_ms': min(response_times),
+                'threshold_exceeded_count': len([t for t in response_times if t > self.performance_thresholds['response_time_ms']])
+            }
+        else:
+            return {'error': 'No response time data available'}
 
 # Global performance monitor instance
 performance_monitor = PerformanceMonitor()
 
+def periodic_health_check():
+    """Periodic health check job for uptime monitoring"""
+    while True:
+        try:
+            results = health_monitor.run_health_checks()
+            if results['overall_status'] != 'healthy':
+                alert_manager.alert_warning("Background health check issue", results)
+            
+            # Sleep for 5 minutes
+            time.sleep(300)
+        except Exception as e:
+            logger.error(f"Periodic health check failed: {e}")
+            time.sleep(60)  # Sleep for 1 minute on error
+
 def init_monitoring(app: Flask):
-    """Initialize all monitoring systems"""
+    """Initialize all monitoring systems with enhanced features"""
     
     # Initialize Sentry
     init_sentry(app)
@@ -441,12 +727,24 @@ def init_monitoring(app: Flask):
             performance_monitor.check_performance({
                 'response_time_ms': response_time,
                 'status_code': response.status_code,
-                'endpoint': request.endpoint
+                'endpoint': request.endpoint,
+                'request_id': getattr(g, 'request_id', None)
             })
         
         return response
     
-    logger.info("Monitoring system initialized")
+    # Start periodic health check in background thread
+    health_check_thread = threading.Thread(target=periodic_health_check, daemon=True)
+    health_check_thread.start()
+    
+    # Add performance stats endpoint
+    @app.route('/performance/stats')
+    def performance_stats():
+        """Get performance statistics"""
+        stats = performance_monitor.get_performance_stats()
+        return jsonify(stats)
+    
+    logger.info("Monitoring system initialized with enhanced features")
 
 # Utility functions for manual alerts
 def alert_deployment_success(version: str, environment: str):
