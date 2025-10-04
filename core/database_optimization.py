@@ -825,6 +825,10 @@ class DatabaseOptimizer:
         """Record query performance metrics with persistence"""
         import hashlib
         
+        # Prevent recursive logging - if this is a metrics query, skip persistence
+        if "query_performance_log" in query.lower() or "metrics" in query.lower():
+            return
+        
         # Create query hash for deduplication
         query_hash = hashlib.md5(query.encode()).hexdigest()
         

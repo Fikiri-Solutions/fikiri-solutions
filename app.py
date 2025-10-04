@@ -62,6 +62,15 @@ from core.idempotency_manager import idempotency_manager
 from core.rate_limiter import enhanced_rate_limiter
 from core.redis_sessions import init_flask_sessions
 from core.security import init_security
+
+# Optional limiter import for health check exemptions
+try:
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+    LIMITER_AVAILABLE = True
+except ImportError:
+    LIMITER_AVAILABLE = False
+    Limiter = None
 from core.backend_excellence import create_api_blueprint
 from core.business_operations import create_business_blueprint
 from core.enterprise_logging import log_api_request
@@ -278,6 +287,15 @@ def setup_routes(app):
             'service': 'fikiri-backend',
             'environment': os.getenv('FLASK_ENV', 'production')
         })
+    
+    # Apply limiter exemptions to health check routes
+    if LIMITER_AVAILABLE:
+        try:
+            limiter = Limiter(key_func=get_remote_address, default_limits=["200 per hour"])
+            limiter.exempt(health_summary)
+            limiter.exempt(api_health_check)
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to exempt health check routes from rate limiting: {e}")
 
     # Main endpoint
     @app.route('/')

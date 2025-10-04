@@ -107,11 +107,20 @@ class JWTAuthManager:
             
             # Add device_id column if it doesn't exist (schema migration)
             try:
-                db_optimizer.execute_query("""
-                    ALTER TABLE refresh_tokens ADD COLUMN device_id TEXT
-                """, fetch=False)
-                logger.info("✅ Added device_id column to refresh_tokens")
-            except Exception:
+                # Check if device_id column already exists
+                existing_columns = db_optimizer.execute_query("""
+                    PRAGMA table_info(refresh_tokens)
+                """)
+                column_names = [col[1] for col in existing_columns] if existing_columns else []
+                
+                if "device_id" not in column_names:
+                    db_optimizer.execute_query("""
+                        ALTER TABLE refresh_tokens ADD COLUMN device_id TEXT
+                    """, fetch=False)
+                    logger.info("✅ Added device_id column to refresh_tokens")
+                else:
+                    logger.info("ℹ️ device_id column already exists in refresh_tokens")
+            except Exception as e:
                 # Column already exists, ignore
                 pass
             
