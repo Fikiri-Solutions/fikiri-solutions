@@ -121,40 +121,19 @@ def gmail_start():
                 json.dumps({'oauth_state': state, 'onboarding': user_id is None})
             ), fetch=False)
 
-        if GOOGLE_OAUTH_AVAILABLE:
-            # Use google-auth-oauthlib for production-grade OAuth
-            flow = Flow.from_client_config(
-                {
-                    "web": {
-                        "client_id": GOOGLE_CLIENT_ID,
-                        "client_secret": GOOGLE_CLIENT_SECRET,
-                        "redirect_uris": [GOOGLE_REDIRECT_URI],
-                        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                        "token_uri": "https://oauth2.googleapis.com/token"
-                    }
-                },
-                scopes=SCOPES,
-            )
-            flow.redirect_uri = GOOGLE_REDIRECT_URI
-            auth_url, _ = flow.authorization_url(
-                access_type="offline",     # refresh token
-                include_granted_scopes="true",
-                prompt="consent",          # ensure refresh token the first time
-                state=state                # CSRF + navigate post callback
-            )
-        else:
-            # Fallback manual URL construction
-            params = {
-                'client_id': GOOGLE_CLIENT_ID,
-                'redirect_uri': GOOGLE_REDIRECT_URI,
-                'scope': ' '.join(SCOPES),
-                'response_type': 'code',
-                'access_type': 'offline',
-                'include_granted_scopes': 'true',
-                'prompt': 'consent',
-                'state': state
-            }
-            auth_url = f"https://accounts.google.com/o/oauth2/auth/chooser?{urlencode(params)}"
+        # Use manual URL construction for full control over OAuth parameters
+        # This ensures we send exactly what Google expects
+        params = {
+            'client_id': GOOGLE_CLIENT_ID,
+            'redirect_uri': GOOGLE_REDIRECT_URI,
+            'scope': ' '.join(SCOPES),
+            'response_type': 'code',
+            'access_type': 'offline',
+            'include_granted_scopes': 'true',  # Must be lowercase string 'true'
+            'prompt': 'consent',
+            'state': state
+        }
+        auth_url = f"https://accounts.google.com/o/oauth2/auth?{urlencode(params)}"
 
         logger.info(f"✅ Generated OAuth URL for user {user_id}")
         return jsonify({"url": auth_url})
@@ -212,67 +191,72 @@ def gmail_callback():
 
         logger.info(f"✅ Valid OAuth callback for user {user_id}")
 
-        if GOOGLE_OAUTH_AVAILABLE:
-            # Use google-auth-oauthlib for token exchange
-            flow = Flow.from_client_config(
-                {
-                    "web": {
-                        "client_id": GOOGLE_CLIENT_ID,
-                        "client_secret": GOOGLE_CLIENT_SECRET,
-                        "redirect_uris": [GOOGLE_REDIRECT_URI],
-                        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                        "token_uri": "https://oauth2.googleapis.com/token"
-                    }
-                },
-                scopes=SCOPES
-            )
-            flow.redirect_uri = GOOGLE_REDIRECT_URI
-            flow.fetch_token(code=code)
-            creds = flow.credentials  # google.oauth2.credentials.Credentials
+        # Use manual token exchange for full control
+        import requests
+        
+        token_data = {
+            'client_id': GOOGLE_CLIENT_ID,
+            'client_secret': GOOGLE_CLIENT_SECRET,
+            'code': code,
+            'grant_type': 'authorization_code',
+            'redirect_uri': GOOGLE_REDIRECT_URI
+        }
+        
+        response = requests.post('https://oauth2.googleapis.com/token', data=token_data)
+        token_response = response.json()
+        
+        if 'error' in token_response:
+            logger.error(f"❌ Token exchange failed: {token_response['error']}")
+            return jsonify({"error": f"Token exchange failed: {token_response['error']}"}), 400
+        
+        # Extract tokens from response
+        access_token = token_response.get('access_token')
+        refresh_token = token_response.get('refresh_token')
+        expires_in = token_response.get('expires_in', 3600)
+        
+        # Calculate expiry timestamp
+        expiry_timestamp = int(time.time()) + expires_in
+        
+        # 2) Persist encrypted tokens
+        payload = {
+            "access_token": encrypt(access_token),
+            "refresh_token": encrypt(refresh_token or ""),
+            "expiry": expiry_timestamp,
+            "scopes": SCOPES,
+            "tenant": "gmail"
+        }
+        
+        # Store tokens in database using our existing system
+        upsert_gmail_tokens(user_id=user_id, **payload)
 
-            # 2) Persist encrypted tokens
-            payload = {
-                "access_token": encrypt(creds.token),
-                "refresh_token": encrypt(creds.refresh_token or ""),
-                "expiry": int(creds.expiry.timestamp()) if creds.expiry else 0,
-                "scopes": creds.scopes,
-                "tenant": "gmail"
-            }
-            
-            # Store tokens in database using our existing system
-            upsert_gmail_tokens(user_id=user_id, **payload)
+        # 3) Kick off first sync (RQ)
+        try:
+            from core.onboarding_jobs import onboarding_job_manager
+            result = onboarding_job_manager.queue_first_sync_job(user_id)
+            job_id = result.get('job_id')
+            job = type('MockJob', (), {'id': job_id}) if job_id else None
+            logger.info(f"✅ Queued first sync job {job_id} for user {user_id}")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to queue sync job: {e}")
+            job = None
 
-            # 3) Kick off first sync (RQ)
-            try:
-                from core.onboarding_jobs import onboarding_job_manager
-                result = onboarding_job_manager.queue_first_sync_job(user_id)
-                job_id = result.get('job_id')
-                job = type('MockJob', (), {'id': job_id}) if job_id else None
-                logger.info(f"✅ Queued first sync job {job_id} for user {user_id}")
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to queue sync job: {e}")
-                job = None
-
-            # Clean up session state and database
-            if hasattr(g, 'session_data') and g.session_data:
-                g.session_data.pop("oauth_state", None)
-                g.session_data.pop("post_connect_redirect", None)
-            
-            # For API calls, return JSON response
-            if request.headers.get('Accept', '').find('application/json') != -1:
-                return jsonify({
-                    'success': True,
-                    'message': 'Google OAuth completed successfully',
-                    'redirect_url': redirect_url,
-                    'job_id': job.id if job and hasattr(job, 'id') else job_id
-                })
-            else:
-                # For browser redirects, redirect to the frontend
-                frontend_url = f"/{redirect_url.lstrip('/')}"
-                return redirect(frontend_url)
-
+        # Clean up session state and database
+        if hasattr(g, 'session_data') and g.session_data:
+            g.session_data.pop("oauth_state", None)
+            g.session_data.pop("post_connect_redirect", None)
+        
+        # For API calls, return JSON response
+        if request.headers.get('Accept', '').find('application/json') != -1:
+            return jsonify({
+                'success': True,
+                'message': 'Google OAuth completed successfully',
+                'redirect_url': redirect_url,
+                'job_id': job.id if job and hasattr(job, 'id') else job_id
+            })
         else:
-            return jsonify({"error": "Google OAuth libraries not available"}), 500
+            # For browser redirects, redirect to the frontend
+            frontend_url = f"/{redirect_url.lstrip('/')}"
+            return redirect(frontend_url)
 
     except Exception as e:
         logger.error(f"❌ OAuth callback failed: {e}")
