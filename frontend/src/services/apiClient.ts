@@ -109,6 +109,7 @@ class ApiClient {
             } catch (e) {
               // Ignore parsing errors
             }
+          }
         }
         
         // API request logged
