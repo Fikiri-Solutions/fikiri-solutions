@@ -42,20 +42,41 @@ def get_dashboard_metrics():
             return create_error_response("User not found", 404, 'USER_NOT_FOUND')
         
         user = user_data_db[0]
+        # Handle SQLite Row objects by converting to dict
+        if hasattr(user, 'keys'):
+            user_dict = dict(user)
+        else:
+            user_dict = user if isinstance(user, dict) else {}
         
         # Get leads count
         leads_data = db_optimizer.execute_query(
             "SELECT COUNT(*) as count FROM leads WHERE user_id = ?",
             (user_id,)
         )
-        leads_count = leads_data[0]['count'] if leads_data else 0
+        leads_count = 0
+        if leads_data and len(leads_data) > 0:
+            lead_row = leads_data[0]
+            # Handle SQLite Row objects by converting to dict
+            if hasattr(lead_row, 'keys'):
+                lead_dict = dict(lead_row)
+                leads_count = lead_dict.get('count', 0)
+            else:
+                leads_count = lead_row.get('count', 0) if isinstance(lead_row, dict) else 0
         
         # Get recent leads (last 7 days)
         recent_leads_data = db_optimizer.execute_query(
             "SELECT COUNT(*) as count FROM leads WHERE user_id = ? AND created_at >= datetime('now', '-7 days')",
             (user_id,)
         )
-        recent_leads = recent_leads_data[0]['count'] if recent_leads_data else 0
+        recent_leads = 0
+        if recent_leads_data and len(recent_leads_data) > 0:
+            recent_row = recent_leads_data[0]
+            # Handle SQLite Row objects by converting to dict
+            if hasattr(recent_row, 'keys'):
+                recent_dict = dict(recent_row)
+                recent_leads = recent_dict.get('count', 0)
+            else:
+                recent_leads = recent_row.get('count', 0) if isinstance(recent_row, dict) else 0
         
         # Get email activity (mock data for now)
         email_activity = {
@@ -81,18 +102,26 @@ def get_dashboard_metrics():
                 "SELECT COUNT(*) as count FROM oauth_tokens WHERE user_id = ? AND provider = 'gmail' AND expires_at > datetime('now')",
                 (user_id,)
             )
-            gmail_connected = oauth_data[0]['count'] > 0 if oauth_data else False
+            if oauth_data and len(oauth_data) > 0:
+                oauth_row = oauth_data[0]
+                # Handle SQLite Row objects by converting to dict
+                if hasattr(oauth_row, 'keys'):
+                    oauth_dict = dict(oauth_row)
+                    gmail_connected = oauth_dict.get('count', 0) > 0
+                else:
+                    gmail_connected = oauth_row.get('count', 0) > 0 if isinstance(oauth_row, dict) else False
         except Exception as e:
             logger.warning(f"Could not check Gmail connection: {e}")
+            gmail_connected = False
         
         # Compile metrics
         metrics_data = {
             'user': {
-                'id': user['id'],
-                'name': user['name'],
-                'email': user['email'],
-                'onboarding_completed': user.get('onboarding_completed', False),
-                'onboarding_step': user.get('onboarding_step', 1)
+                'id': user_dict.get('id'),
+                'name': user_dict.get('name'),
+                'email': user_dict.get('email'),
+                'onboarding_completed': user_dict.get('onboarding_completed', False),
+                'onboarding_step': user_dict.get('onboarding_step', 1)
             },
             'leads': {
                 'total': leads_count,
@@ -118,7 +147,9 @@ def get_dashboard_metrics():
         
     except Exception as e:
         logger.error(f"Dashboard metrics error: {e}")
-        return create_error_response("Failed to get dashboard metrics", 500, "DASHBOARD_ERROR")
+        import traceback
+        logger.error(f"Dashboard metrics traceback: {traceback.format_exc()}")
+        return create_error_response(f"Failed to get dashboard metrics: {str(e)}", 500, "DASHBOARD_ERROR")
 
 @dashboard_bp.route('/activity', methods=['GET'])
 @handle_api_errors
