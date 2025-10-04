@@ -641,6 +641,11 @@ class DatabaseOptimizer:
         
         for index_name, table_name, columns in indexes:
             try:
+                # Check if table exists before creating index
+                if table_name == 'metrics_daily' and not self.table_exists('metrics_daily'):
+                    logger.info(f"ℹ️ Skipping index {index_name} - table {table_name} doesn't exist")
+                    continue
+                    
                 columns_str = ", ".join(columns)
                 cursor.execute(f"""
                     CREATE INDEX IF NOT EXISTS {index_name} 
@@ -779,12 +784,18 @@ class DatabaseOptimizer:
         start_time = time.time()
         
         try:
-            # Validate JSON parameters if present
+            # Validate JSON parameters if present and convert lists to JSON
             if params:
+                converted_params = []
                 for param in params:
-                    if isinstance(param, str) and param.startswith('{') and param.endswith('}'):
+                    if isinstance(param, list):
+                        # Convert list to JSON string for SQLite compatibility
+                        param = json.dumps(param)
+                    elif isinstance(param, str) and param.startswith('{') and param.endswith('}'):
                         if not self.validate_json(param):
                             raise ValueError(f"Invalid JSON parameter: {param}")
+                    converted_params.append(param)
+                params = tuple(converted_params)
             
             with self.get_connection() as conn:
                 cursor = conn.cursor()

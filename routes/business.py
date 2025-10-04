@@ -22,7 +22,7 @@ from core.user_auth import user_auth_manager
 logger = logging.getLogger(__name__)
 
 # Create business blueprint
-business_bp = Blueprint("business", __name__, url_prefix="/api")
+business_bp = Blueprint("business_routes", __name__, url_prefix="/api")
 
 # CRM Routes
 @business_bp.route('/crm/leads', methods=['GET'])
