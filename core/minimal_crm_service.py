@@ -225,10 +225,12 @@ class MinimalCRMService:
             # Store all leads in Redis
             for lead in self.leads:
                 lead_dict = lead.to_dict()
-                # Convert lists to JSON strings for Redis compatibility
+                # Convert lists and None values for Redis compatibility
                 for key, value in lead_dict.items():
                     if isinstance(value, list):
                         lead_dict[key] = json.dumps(value)
+                    elif value is None:
+                        lead_dict[key] = ""  # Replace None with empty string
                 self.redis_client.hset(f"fikiri:lead:{lead.id}", mapping=lead_dict)
             
             # Store lead IDs for quick access
