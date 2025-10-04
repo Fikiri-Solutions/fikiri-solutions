@@ -203,6 +203,28 @@ def internal_error(error):
         'code': 'INTERNAL_ERROR'
     }), 500
 
+@app.route('/api/test/init-db', methods=['POST'])
+def init_database():
+    """Manually initialize database tables"""
+    try:
+        from core.database_optimization import db_optimizer
+        
+        # Force database initialization
+        db_optimizer._initialize_tables()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Database tables initialized successfully',
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Database initialization error: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Database initialization failed: {str(e)}',
+            'code': 'DB_INIT_ERROR'
+        }), 500
+
 # Register blueprints
 def register_blueprints():
     """Register all application blueprints"""
