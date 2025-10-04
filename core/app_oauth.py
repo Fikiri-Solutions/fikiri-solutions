@@ -138,7 +138,7 @@ def gmail_start():
             flow.redirect_uri = GOOGLE_REDIRECT_URI
             auth_url, _ = flow.authorization_url(
                 access_type="offline",     # refresh token
-                include_granted_scopes=True,
+                include_granted_scopes="true",
                 prompt="consent",          # ensure refresh token the first time
                 state=state                # CSRF + navigate post callback
             )
