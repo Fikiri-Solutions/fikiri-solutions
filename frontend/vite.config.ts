@@ -9,8 +9,8 @@ import { resolve } from 'path'
 import { pwaConfig } from './src/config/pwa'
 
 export default defineConfig({
-  // Ensure proper asset paths for deployment
-  base: './',
+  // Ensure absolute paths for Vercel custom domain deployment
+  base: '/',
   plugins: [react(), pwaConfig],
   resolve: {
     alias: {
