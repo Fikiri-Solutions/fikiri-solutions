@@ -7,11 +7,29 @@ import sqlite3
 import json
 import time
 import logging
-from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import dataclass
-from datetime import datetime
+import os
 import threading
+from typing import Dict, List, Any, Optional, Tuple, Union
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from contextlib import contextmanager
+
+# Optional encryption support
+try:
+    from cryptography.fernet import Fernet
+    ENCRYPTION_AVAILABLE = True
+except ImportError:
+    ENCRYPTION_AVAILABLE = False
+    Fernet = None
+
+# Optional PostgreSQL support
+try:
+    import psycopg2
+    import psycopg2.pool
+    POSTGRES_AVAILABLE = True
+except ImportError:
+    POSTGRES_AVAILABLE = False
+    psycopg2 = None
 
 logger = logging.getLogger(__name__)
 
@@ -35,14 +53,39 @@ class IndexInfo:
     size_bytes: int
 
 class DatabaseOptimizer:
-    """Database optimization and performance monitoring"""
+    """Database optimization and performance monitoring with enterprise features"""
     
-    def __init__(self, db_path: str = "data/fikiri.db"):
+    def __init__(self, db_path: str = "data/fikiri.db", db_type: str = "sqlite"):
         self.db_path = db_path
+        self.db_type = db_type.lower()
         self.query_metrics: List[QueryMetrics] = []
         self.max_metrics = 10000
         self.lock = threading.Lock()
+        
+        # Connection pooling for PostgreSQL
+        self.connection_pool = None
+        
+        # Encryption support
+        self.cipher = None
+        self._initialize_encryption()
+        
+        # Initialize database
         self._initialize_database()
+    
+    def _initialize_encryption(self):
+        """Initialize encryption for sensitive data"""
+        encryption_key = os.getenv('ENCRYPTION_KEY')
+        if encryption_key and ENCRYPTION_AVAILABLE:
+            try:
+                self.cipher = Fernet(encryption_key.encode())
+                logger.info("✅ Database encryption initialized")
+            except Exception as e:
+                logger.error(f"❌ Encryption initialization failed: {e}")
+                self.cipher = None
+        elif encryption_key and not ENCRYPTION_AVAILABLE:
+            logger.warning("⚠️ ENCRYPTION_KEY set but cryptography not available")
+        else:
+            logger.info("ℹ️ Database encryption disabled (no ENCRYPTION_KEY)")
     
     def _initialize_database(self):
         """Initialize database with optimized schema"""
@@ -54,8 +97,45 @@ class DatabaseOptimizer:
             self._create_indexes(cursor)
             self._create_views(cursor)
             
+            # Create metrics persistence table
+            self._create_metrics_table(cursor)
+            
             conn.commit()
             logger.info("Database initialized with optimized schema")
+    
+    def _create_metrics_table(self, cursor):
+        """Create table for persistent query performance metrics"""
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS query_performance_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                query_hash TEXT NOT NULL,
+                query_text TEXT NOT NULL,
+                execution_time REAL NOT NULL,
+                rows_affected INTEGER NOT NULL,
+                success BOOLEAN NOT NULL,
+                error_message TEXT,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                user_id INTEGER,
+                endpoint TEXT,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
+            )
+        """)
+        
+        # Create indexes for metrics table
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_query_performance_timestamp 
+            ON query_performance_log (timestamp)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_query_performance_query_hash 
+            ON query_performance_log (query_hash)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_query_performance_execution_time 
+            ON query_performance_log (execution_time)
+        """)
     
     def _create_optimized_tables(self, cursor):
         """Create tables with optimized structure"""
@@ -67,6 +147,7 @@ class DatabaseOptimizer:
                 email TEXT NOT NULL UNIQUE,
                 name TEXT NOT NULL,
                 password_hash TEXT NOT NULL,
+                password_hash_enc TEXT,  -- Encrypted version
                 role TEXT DEFAULT 'user',
                 business_name TEXT,
                 business_email TEXT,
@@ -426,21 +507,39 @@ class DatabaseOptimizer:
             )
         """)
         
-        # Metrics daily table
+        # Email actions log table
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS metrics_daily (
+            CREATE TABLE IF NOT EXISTS email_actions_log (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                day DATE NOT NULL,  -- YYYY-MM-DD format
-                emails_processed INTEGER DEFAULT 0,
-                leads_created INTEGER DEFAULT 0,
-                automations_run INTEGER DEFAULT 0,
-                automation_errors INTEGER DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-                UNIQUE(user_id, day)
+                user_id INTEGER,
+                action_type TEXT NOT NULL,
+                message_id TEXT NOT NULL,
+                success BOOLEAN NOT NULL,
+                details TEXT,  -- JSON object
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
             )
+        """)
+        
+        # Create indexes for email actions log
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_email_actions_user_id 
+            ON email_actions_log (user_id)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_email_actions_timestamp 
+            ON email_actions_log (timestamp)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_email_actions_action_type 
+            ON email_actions_log (action_type)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_email_actions_success 
+            ON email_actions_log (success)
         """)
     
     def _create_indexes(self, cursor):
@@ -509,125 +608,128 @@ class DatabaseOptimizer:
             ("idx_insights_user_id", "email_insights", ["user_id"]),
             ("idx_insights_email_id", "email_insights", ["email_id"]),
             ("idx_insights_type", "email_insights", ["insight_type"]),
-            ("idx_insights_created_at", "email_insights", ["created_at"]),
+            ("idx_insights_confidence", "email_insights", ["confidence"]),
             
             # Feature flags indexes
             ("idx_feature_flags_name", "feature_flags", ["feature_name"]),
             ("idx_feature_flags_enabled", "feature_flags", ["enabled"]),
             
             # User feature access indexes
-            ("idx_user_features_user_id", "user_feature_access", ["user_id"]),
-            ("idx_user_features_feature", "user_feature_access", ["feature_name"]),
-            ("idx_user_features_access", "user_feature_access", ["has_access"]),
+            ("idx_user_feature_access_user_id", "user_feature_access", ["user_id"]),
+            ("idx_user_feature_access_feature", "user_feature_access", ["feature_name"]),
+            ("idx_user_feature_access_has_access", "user_feature_access", ["has_access"]),
             
             # Analytics events indexes
             ("idx_analytics_user_id", "analytics_events", ["user_id"]),
             ("idx_analytics_event_type", "analytics_events", ["event_type"]),
             ("idx_analytics_created_at", "analytics_events", ["created_at"]),
-            ("idx_analytics_session", "analytics_events", ["session_id"]),
             
             # Onboarding jobs indexes
-            ("idx_onboarding_user_id", "onboarding_jobs", ["user_id"]),
-            ("idx_onboarding_status", "onboarding_jobs", ["status"]),
-            ("idx_onboarding_started_at", "onboarding_jobs", ["started_at"]),
+            ("idx_onboarding_jobs_user_id", "onboarding_jobs", ["user_id"]),
+            ("idx_onboarding_jobs_status", "onboarding_jobs", ["status"]),
+            ("idx_onboarding_jobs_started", "onboarding_jobs", ["started_at"]),
             
             # Metrics daily indexes
-            ("idx_metrics_user_id", "metrics_daily", ["user_id"]),
-            ("idx_metrics_day", "metrics_daily", ["day"]),
-            ("idx_metrics_user_day", "metrics_daily", ["user_id", "day"]),
-            
-            # Leads table indexes
-            ("idx_leads_user_id", "leads", ["user_id"]),
-            ("idx_leads_email", "leads", ["email"]),
-            ("idx_leads_stage", "leads", ["stage"]),
-            ("idx_leads_source", "leads", ["source"]),
-            ("idx_leads_created_at", "leads", ["created_at"]),
-            ("idx_leads_score", "leads", ["score"]),
-            ("idx_leads_company", "leads", ["company"]),
-            
-            # Composite indexes for common queries
-            ("idx_leads_user_stage", "leads", ["user_id", "stage"]),
-            ("idx_leads_user_source", "leads", ["user_id", "source"]),
-            ("idx_leads_stage_source", "leads", ["stage", "source"]),
-            ("idx_leads_created_stage", "leads", ["created_at", "stage"]),
-            
-            # Activities table indexes
-            ("idx_activities_lead_id", "lead_activities", ["lead_id"]),
-            ("idx_activities_type", "lead_activities", ["activity_type"]),
-            ("idx_activities_timestamp", "lead_activities", ["timestamp"]),
-            ("idx_activities_lead_timestamp", "lead_activities", ["lead_id", "timestamp"]),
-            
-            # Email templates indexes
-            ("idx_templates_type", "email_templates", ["template_type"]),
-            ("idx_templates_industry", "email_templates", ["industry"]),
-            ("idx_templates_active", "email_templates", ["is_active"]),
+            ("idx_metrics_daily_user_id", "metrics_daily", ["user_id"]),
+            ("idx_metrics_daily_day", "metrics_daily", ["day"]),
             
             # Performance metrics indexes
-            ("idx_perf_endpoint", "performance_metrics", ["endpoint"]),
-            ("idx_perf_timestamp", "performance_metrics", ["timestamp"]),
-            ("idx_perf_status", "performance_metrics", ["status_code"]),
-            ("idx_perf_endpoint_timestamp", "performance_metrics", ["endpoint", "timestamp"]),
+            ("idx_performance_endpoint", "performance_metrics", ["endpoint"]),
+            ("idx_performance_timestamp", "performance_metrics", ["timestamp"]),
+            ("idx_performance_response_time", "performance_metrics", ["response_time"]),
         ]
         
         for index_name, table_name, columns in indexes:
             try:
+                columns_str = ", ".join(columns)
                 cursor.execute(f"""
                     CREATE INDEX IF NOT EXISTS {index_name} 
-                    ON {table_name} ({', '.join(columns)})
+                    ON {table_name} ({columns_str})
                 """)
             except Exception as e:
-                logger.warning(f"Failed to create index {index_name}: {e}")
+                logger.warning(f"Could not create index {index_name}: {e}")
     
     def _create_views(self, cursor):
         """Create optimized views for common queries"""
         
-        # Lead summary view
+        # Active users view
         cursor.execute("""
-            CREATE VIEW IF NOT EXISTS lead_summary AS
-            SELECT 
-                l.id,
-                l.email,
-                l.name,
-                l.company,
-                l.stage,
-                l.source,
-                l.score,
-                l.created_at,
-                l.last_contact,
-                COUNT(a.id) as activity_count,
-                MAX(a.timestamp) as last_activity
-            FROM leads l
-            LEFT JOIN lead_activities a ON l.id = a.lead_id
-            GROUP BY l.id, l.email, l.name, l.company, l.stage, l.source, l.score, l.created_at, l.last_contact
+            CREATE VIEW IF NOT EXISTS active_users AS
+            SELECT id, email, name, role, business_name, created_at, last_login
+            FROM users 
+            WHERE is_active = 1
         """)
         
-        # Performance summary view
+        # Recent leads view
         cursor.execute("""
-            CREATE VIEW IF NOT EXISTS performance_summary AS
-            SELECT 
-                endpoint,
-                method,
-                COUNT(*) as request_count,
-                AVG(response_time) as avg_response_time,
-                MIN(response_time) as min_response_time,
-                MAX(response_time) as max_response_time,
-                COUNT(CASE WHEN status_code >= 400 THEN 1 END) as error_count
-            FROM performance_metrics
-            WHERE timestamp >= datetime('now', '-24 hours')
-            GROUP BY endpoint, method
+            CREATE VIEW IF NOT EXISTS recent_leads AS
+            SELECT l.*, u.name as user_name, u.email as user_email
+            FROM leads l
+            JOIN users u ON l.user_id = u.id
+            WHERE l.created_at >= datetime('now', '-30 days')
+            ORDER BY l.created_at DESC
         """)
+        
+        # Automation performance view
+        cursor.execute("""
+            CREATE VIEW IF NOT EXISTS automation_performance AS
+            SELECT 
+                ar.id,
+                ar.name,
+                ar.user_id,
+                ar.execution_count,
+                ar.success_count,
+                ar.error_count,
+                CASE 
+                    WHEN ar.execution_count > 0 
+                    THEN (ar.success_count * 100.0 / ar.execution_count)
+                    ELSE 0 
+                END as success_rate,
+                ar.last_executed
+            FROM automation_rules ar
+            WHERE ar.status = 'active'
+        """)
+    
+    def _initialize_postgres_pool(self):
+        """Initialize PostgreSQL connection pool"""
+        if not POSTGRES_AVAILABLE:
+            logger.warning("PostgreSQL not available")
+            return
+        
+        try:
+            self.connection_pool = psycopg2.pool.SimpleConnectionPool(
+                minconn=1,
+                maxconn=5,
+                host=os.getenv('POSTGRES_HOST', 'localhost'),
+                port=os.getenv('POSTGRES_PORT', 5432),
+                database=os.getenv('POSTGRES_DB', 'fikiri'),
+                user=os.getenv('POSTGRES_USER', 'postgres'),
+                password=os.getenv('POSTGRES_PASSWORD', '')
+            )
+            logger.info("✅ PostgreSQL connection pool initialized")
+        except Exception as e:
+            logger.error(f"❌ PostgreSQL pool initialization failed: {e}")
+            self.connection_pool = None
     
     @contextmanager
     def get_connection(self):
-        """Get database connection with proper error handling"""
+        """Get database connection with proper error handling and thread safety"""
         conn = None
         try:
-            conn = sqlite3.connect(self.db_path, timeout=30.0)
-            conn.row_factory = sqlite3.Row  # Enable dict-like access
-            conn.execute("PRAGMA journal_mode=WAL")  # Enable WAL mode for better concurrency
-            conn.execute("PRAGMA synchronous=NORMAL")  # Balance safety and performance
-            conn.execute("PRAGMA cache_size=10000")  # Increase cache size
-            conn.execute("PRAGMA temp_store=MEMORY")  # Store temp tables in memory
+            if self.db_type == "postgresql" and self.connection_pool:
+                conn = self.connection_pool.getconn()
+            else:
+                # SQLite connection with thread safety
+                conn = sqlite3.connect(self.db_path, timeout=30.0)
+                conn.row_factory = sqlite3.Row  # Enable dict-like access
+                
+                # Optimized PRAGMAs for production
+                conn.execute("PRAGMA journal_mode=WAL")  # Enable WAL mode for better concurrency
+                conn.execute("PRAGMA synchronous=NORMAL")  # Balance safety and performance
+                conn.execute("PRAGMA cache_size=10000")  # Increase cache size
+                conn.execute("PRAGMA temp_store=MEMORY")  # Store temp tables in memory
+                conn.execute("PRAGMA busy_timeout = 5000")  # Wait up to 5s for locks
+            
             yield conn
         except Exception as e:
             if conn:
@@ -636,13 +738,54 @@ class DatabaseOptimizer:
             raise
         finally:
             if conn:
-                conn.close()
+                if self.db_type == "postgresql" and self.connection_pool:
+                    self.connection_pool.putconn(conn)
+                else:
+                    conn.close()
     
-    def execute_query(self, query: str, params: Tuple = None, fetch: bool = True) -> Any:
-        """Execute a query with performance monitoring"""
+    def encrypt_sensitive_data(self, data: str) -> str:
+        """Encrypt sensitive data using Fernet encryption"""
+        if not self.cipher:
+            return data
+        
+        try:
+            return self.cipher.encrypt(data.encode()).decode()
+        except Exception as e:
+            logger.error(f"Encryption failed: {e}")
+            return data
+    
+    def decrypt_sensitive_data(self, encrypted_data: str) -> str:
+        """Decrypt sensitive data using Fernet encryption"""
+        if not self.cipher:
+            return encrypted_data
+        
+        try:
+            return self.cipher.decrypt(encrypted_data.encode()).decode()
+        except Exception as e:
+            logger.error(f"Decryption failed: {e}")
+            return encrypted_data
+    
+    def validate_json(self, json_string: str) -> bool:
+        """Validate JSON string before inserting"""
+        try:
+            json.loads(json_string)
+            return True
+        except (json.JSONDecodeError, TypeError):
+            return False
+    
+    def execute_query(self, query: str, params: Tuple = None, fetch: bool = True, 
+                     user_id: int = None, endpoint: str = None) -> Any:
+        """Execute a query with performance monitoring and JSON validation"""
         start_time = time.time()
         
         try:
+            # Validate JSON parameters if present
+            if params:
+                for param in params:
+                    if isinstance(param, str) and param.startswith('{') and param.endswith('}'):
+                        if not self.validate_json(param):
+                            raise ValueError(f"Invalid JSON parameter: {param}")
+            
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
@@ -664,38 +807,65 @@ class DatabaseOptimizer:
                 execution_time = time.time() - start_time
                 
                 # Record metrics
-                self._record_query_metrics(query, execution_time, result, True)
+                self._record_query_metrics(query, execution_time, result, True, 
+                                         user_id=user_id, endpoint=endpoint)
                 
                 return result
                 
         except Exception as e:
             execution_time = time.time() - start_time
-            self._record_query_metrics(query, execution_time, 0, False, str(e))
+            self._record_query_metrics(query, execution_time, 0, False, str(e),
+                                     user_id=user_id, endpoint=endpoint)
             logger.error(f"Query execution error: {e}")
             raise
     
     def _record_query_metrics(self, query: str, execution_time: float, 
-                            rows_affected: int, success: bool, error: str = None):
-        """Record query performance metrics"""
+                            rows_affected: int, success: bool, error: str = None,
+                            user_id: int = None, endpoint: str = None):
+        """Record query performance metrics with persistence"""
+        import hashlib
+        
+        # Create query hash for deduplication
+        query_hash = hashlib.md5(query.encode()).hexdigest()
+        
         with self.lock:
             metric = QueryMetrics(
                 query=query[:100],  # Truncate long queries
                 execution_time=execution_time,
                 rows_affected=rows_affected,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),  # Use UTC
                 success=success,
                 error=error
             )
             
             self.query_metrics.append(metric)
             
-            # Keep only recent metrics
+            # Keep only recent metrics in memory
             if len(self.query_metrics) > self.max_metrics:
                 self.query_metrics = self.query_metrics[-self.max_metrics:]
+        
+        # Persist metrics to database
+        try:
+            self.execute_query("""
+                INSERT INTO query_performance_log 
+                (query_hash, query_text, execution_time, rows_affected, success, error_message, user_id, endpoint)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                query_hash,
+                query[:500],  # Truncate for storage
+                execution_time,
+                rows_affected,
+                success,
+                error,
+                user_id,
+                endpoint
+            ), fetch=False)
+        except Exception as e:
+            logger.warning(f"Failed to persist query metrics: {e}")
     
     def get_query_performance(self, hours: int = 24) -> Dict[str, Any]:
         """Get query performance analysis"""
-        cutoff_time = datetime.now().timestamp() - (hours * 3600)
+        cutoff_time = datetime.now(timezone.utc).timestamp() - (hours * 3600)
         
         recent_metrics = [
             m for m in self.query_metrics 
@@ -718,30 +888,19 @@ class DatabaseOptimizer:
         for m in recent_metrics:
             query_counts[m.query] = query_counts.get(m.query, 0) + 1
         
-        most_frequent = sorted(query_counts.items(), key=lambda x: x[1], reverse=True)[:10]
-        
         return {
             'total_queries': len(recent_metrics),
             'successful_queries': len(successful_queries),
             'failed_queries': len(failed_queries),
             'success_rate': len(successful_queries) / len(recent_metrics) * 100,
-            'avg_execution_time': sum(execution_times) / len(execution_times),
+            'average_execution_time': sum(execution_times) / len(execution_times),
             'max_execution_time': max(execution_times),
-            'min_execution_time': min(execution_times),
-            'slow_queries_count': len(slow_queries),
-            'most_frequent_queries': most_frequent,
-            'slow_queries': [
-                {
-                    'query': m.query,
-                    'execution_time': m.execution_time,
-                    'timestamp': m.timestamp.isoformat()
-                }
-                for m in slow_queries[:10]
-            ]
+            'slow_queries': len(slow_queries),
+            'most_frequent_queries': sorted(query_counts.items(), key=lambda x: x[1], reverse=True)[:10]
         }
     
     def optimize_database(self) -> Dict[str, Any]:
-        """Run database optimization tasks"""
+        """Run database optimization tasks with improved size query"""
         optimization_results = {}
         
         with self.get_connection() as conn:
@@ -755,10 +914,16 @@ class DatabaseOptimizer:
             cursor.execute("VACUUM")
             optimization_results['vacuum'] = 'Completed'
             
-            # Get database size
-            cursor.execute("SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()")
-            size_result = cursor.fetchone()
-            optimization_results['database_size_bytes'] = size_result[0] if size_result else 0
+            # Get database size with improved compatibility
+            try:
+                cursor.execute("PRAGMA page_count")
+                page_count = cursor.fetchone()[0]
+                cursor.execute("PRAGMA page_size")
+                page_size = cursor.fetchone()[0]
+                optimization_results['database_size_bytes'] = page_count * page_size
+            except Exception as e:
+                logger.warning(f"Could not get database size: {e}")
+                optimization_results['database_size_bytes'] = 0
             
             # Get index information
             cursor.execute("""
@@ -815,21 +980,29 @@ class DatabaseOptimizer:
                 except Exception as e:
                     logger.warning(f"Could not get count for table {table_name}: {e}")
             
-            # Database file size
-            cursor.execute("SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()")
-            size_result = cursor.fetchone()
-            stats['database_size_bytes'] = size_result[0] if size_result else 0
+            # Database file size with improved compatibility
+            try:
+                cursor.execute("PRAGMA page_count")
+                page_count = cursor.fetchone()[0]
+                cursor.execute("PRAGMA page_size")
+                page_size = cursor.fetchone()[0]
+                stats['database_size_bytes'] = page_count * page_size
+            except Exception as e:
+                logger.warning(f"Could not get database size: {e}")
+                stats['database_size_bytes'] = 0
         
         return stats
     
-    def create_migration(self, version: str, description: str, up_sql: str, down_sql: str = None):
-        """Create a database migration"""
+    def create_migration(self, version: str, description: str, up_sql: str, 
+                       down_sql: str = None, depends_on: str = None):
+        """Create a database migration with dependency support"""
         migration = {
             'version': version,
             'description': description,
             'up_sql': up_sql,
             'down_sql': down_sql,
-            'created_at': datetime.now().isoformat()
+            'depends_on': depends_on,
+            'created_at': datetime.now(timezone.utc).isoformat()  # Use UTC
         }
         
         # Store migration in system config
@@ -842,8 +1015,9 @@ class DatabaseOptimizer:
         return migration
     
     def run_migration(self, version: str) -> bool:
-        """Run a specific migration"""
+        """Run a specific migration with dependency checking"""
         try:
+            # Get migration
             migration_data = self.execute_query(
                 "SELECT value FROM system_config WHERE key = ?",
                 (f"migration_{version}",)
@@ -855,113 +1029,73 @@ class DatabaseOptimizer:
             
             migration = json.loads(migration_data[0]['value'])
             
-            # Execute migration SQL
+            # Check dependencies
+            if migration.get('depends_on'):
+                depends_on = migration['depends_on']
+                dependency_check = self.execute_query(
+                    "SELECT value FROM system_config WHERE key = ?",
+                    (f"migration_{depends_on}",)
+                )
+                
+                if not dependency_check:
+                    logger.error(f"Dependency migration {depends_on} not found")
+                    return False
+            
+            # Run migration
             self.execute_query(migration['up_sql'], fetch=False)
             
             # Mark as applied
             self.execute_query(
                 "INSERT OR REPLACE INTO system_config (key, value) VALUES (?, ?)",
-                (f"migration_{version}_applied", datetime.now().isoformat())
+                (f"applied_migration_{version}", json.dumps({
+                    'applied_at': datetime.now(timezone.utc).isoformat(),
+                    'version': version
+                }))
             )
             
             logger.info(f"Migration {version} applied successfully")
             return True
             
         except Exception as e:
-            logger.error(f"Failed to run migration {version}: {e}")
+            logger.error(f"Migration {version} failed: {e}")
             return False
+    
+    def get_applied_migrations(self) -> List[Dict[str, Any]]:
+        """Get list of applied migrations"""
+        try:
+            migrations = self.execute_query(
+                "SELECT key, value FROM system_config WHERE key LIKE 'applied_migration_%'"
+            )
+            
+            return [
+                {
+                    'version': key.replace('applied_migration_', ''),
+                    'applied_at': json.loads(value)['applied_at']
+                }
+                for key, value in migrations
+            ]
+        except Exception as e:
+            logger.error(f"Failed to get applied migrations: {e}")
+            return []
+    
+    def cleanup_old_metrics(self, days: int = 30):
+        """Clean up old query performance metrics"""
+        try:
+            cutoff_date = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+            cutoff_date = cutoff_date.replace(day=cutoff_date.day - days)
+            
+            deleted_count = self.execute_query(
+                "DELETE FROM query_performance_log WHERE timestamp < ?",
+                (cutoff_date.isoformat(),),
+                fetch=False
+            )
+            
+            logger.info(f"Cleaned up {deleted_count} old metrics records")
+            return deleted_count
+            
+        except Exception as e:
+            logger.error(f"Metrics cleanup failed: {e}")
+            return 0
 
 # Global database optimizer instance
 db_optimizer = DatabaseOptimizer()
-
-# ============================================================================
-# MIGRATION SYSTEM
-# ============================================================================
-
-class MigrationManager:
-    """Manage database migrations"""
-    
-    def __init__(self, db_optimizer: DatabaseOptimizer):
-        self.db_optimizer = db_optimizer
-        self.migrations: List[Dict[str, Any]] = []
-        self._load_migrations()
-    
-    def _load_migrations(self):
-        """Load all available migrations"""
-        try:
-            migrations_data = self.db_optimizer.execute_query(
-                "SELECT key, value FROM system_config WHERE key LIKE 'migration_%' AND key NOT LIKE '%_applied'"
-            )
-            
-            for migration_row in migrations_data:
-                migration = json.loads(migration_row['value'])
-                self.migrations.append(migration)
-            
-            # Sort by version
-            self.migrations.sort(key=lambda x: x['version'])
-            
-        except Exception as e:
-            logger.error(f"Failed to load migrations: {e}")
-    
-    def create_migration(self, version: str, description: str, up_sql: str, down_sql: str = None):
-        """Create a new migration"""
-        return self.db_optimizer.create_migration(version, description, up_sql, down_sql)
-    
-    def run_all_pending_migrations(self) -> List[str]:
-        """Run all pending migrations"""
-        applied_migrations = []
-        
-        for migration in self.migrations:
-            version = migration['version']
-            
-            # Check if already applied
-            applied_check = self.db_optimizer.execute_query(
-                "SELECT value FROM system_config WHERE key = ?",
-                (f"migration_{version}_applied",)
-            )
-            
-            if not applied_check:
-                if self.db_optimizer.run_migration(version):
-                    applied_migrations.append(version)
-        
-        return applied_migrations
-    
-    def get_migration_status(self) -> Dict[str, Any]:
-        """Get status of all migrations"""
-        status = {
-            'total_migrations': len(self.migrations),
-            'applied_migrations': [],
-            'pending_migrations': []
-        }
-        
-        for migration in self.migrations:
-            version = migration['version']
-            
-            applied_check = self.db_optimizer.execute_query(
-                "SELECT value FROM system_config WHERE key = ?",
-                (f"migration_{version}_applied",)
-            )
-            
-            if applied_check:
-                status['applied_migrations'].append({
-                    'version': version,
-                    'description': migration['description'],
-                    'applied_at': applied_check[0]['value']
-                })
-            else:
-                status['pending_migrations'].append({
-                    'version': version,
-                    'description': migration['description']
-                })
-        
-        return status
-
-# Global migration manager
-migration_manager = MigrationManager(db_optimizer)
-
-# Export the database optimization system
-__all__ = [
-    'DatabaseOptimizer', 'db_optimizer', 'MigrationManager', 'migration_manager',
-    'QueryMetrics', 'IndexInfo'
-]
-

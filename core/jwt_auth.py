@@ -40,13 +40,23 @@ class JWTAuthManager:
     """JWT authentication with refresh token rotation and Redis session management"""
     
     def __init__(self):
-        self.secret_key = os.getenv('JWT_SECRET_KEY', secrets.token_urlsafe(32))
+        # Fixed secret key with proper warning
+        self.secret_key = os.getenv('JWT_SECRET_KEY')
+        if not self.secret_key:
+            self.secret_key = secrets.token_urlsafe(32)
+            logger.warning("⚠️ JWT_SECRET_KEY not set — generating ephemeral key (tokens will reset on restart)")
+        
         self.algorithm = 'HS256'
-        self.access_token_expiry = 15 * 60  # 15 minutes
-        self.refresh_token_expiry = 7 * 24 * 60 * 60  # 7 days
+        
+        # Configurable token expiries via environment variables
+        self.access_token_expiry = int(os.getenv("JWT_ACCESS_EXPIRY", 15 * 60))  # 15 minutes default
+        self.refresh_token_expiry = int(os.getenv("JWT_REFRESH_EXPIRY", 7 * 24 * 60 * 60))  # 7 days default
+        
         self.redis_client = None
         self.session_prefix = "fikiri:jwt:session:"
         self.refresh_prefix = "fikiri:jwt:refresh:"
+        self.blacklist_prefix = "fikiri:jwt:blacklist:"
+        
         self._connect_redis()
         self._initialize_tables()
     
@@ -77,7 +87,7 @@ class JWTAuthManager:
             self.redis_client = None
     
     def _initialize_tables(self):
-        """Initialize database tables for JWT management"""
+        """Initialize database tables for JWT management with DB integrity"""
         try:
             # Create refresh tokens table
             db_optimizer.execute_query("""
@@ -90,11 +100,22 @@ class JWTAuthManager:
                     is_revoked BOOLEAN DEFAULT FALSE,
                     device_info TEXT,
                     ip_address TEXT,
+                    device_id TEXT,
                     FOREIGN KEY (user_id) REFERENCES users (id)
                 )
             """, fetch=False)
             
-            # Create index for faster lookups
+            # Add device_id column if it doesn't exist (schema migration)
+            try:
+                db_optimizer.execute_query("""
+                    ALTER TABLE refresh_tokens ADD COLUMN device_id TEXT
+                """, fetch=False)
+                logger.info("✅ Added device_id column to refresh_tokens")
+            except Exception:
+                # Column already exists, ignore
+                pass
+            
+            # Create indexes for faster lookups
             db_optimizer.execute_query("""
                 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id 
                 ON refresh_tokens (user_id)
@@ -105,6 +126,12 @@ class JWTAuthManager:
                 ON refresh_tokens (token_hash)
             """, fetch=False)
             
+            # Add expiry index for cleanup automation
+            db_optimizer.execute_query("""
+                CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires 
+                ON refresh_tokens (expires_at)
+            """, fetch=False)
+            
             logger.info("✅ JWT tables initialized")
             
         except Exception as e:
@@ -112,21 +139,25 @@ class JWTAuthManager:
     
     def generate_tokens(self, user_id: int, user_data: Dict[str, Any], 
                        device_info: str = None, ip_address: str = None) -> Dict[str, Any]:
-        """Generate access and refresh tokens"""
+        """Generate access and refresh tokens with multi-device support"""
         if not JWT_AVAILABLE:
             raise Exception("JWT library not available")
         
         try:
             current_time = datetime.utcnow()
             
-            # Access token payload
+            # Generate unique device ID for multi-device support
+            device_id = secrets.token_hex(4)
+            
+            # Access token payload with Unix timestamps
             access_payload = {
                 'user_id': user_id,
                 'email': user_data.get('email'),
                 'role': user_data.get('role', 'user'),
                 'type': 'access',
-                'iat': current_time,
-                'exp': current_time + timedelta(seconds=self.access_token_expiry)
+                'jti': secrets.token_urlsafe(16),  # JWT ID for blacklisting
+                'iat': int(current_time.timestamp()),
+                'exp': int((current_time + timedelta(seconds=self.access_token_expiry)).timestamp())
             }
             
             # Generate access token
@@ -136,44 +167,47 @@ class JWTAuthManager:
             refresh_token = secrets.token_urlsafe(32)
             refresh_token_hash = self._hash_token(refresh_token)
             
-            # Store refresh token in database
+            # Store refresh token in database with device ID
             refresh_expires = current_time + timedelta(seconds=self.refresh_token_expiry)
             db_optimizer.execute_query("""
                 INSERT INTO refresh_tokens 
-                (user_id, token_hash, expires_at, device_info, ip_address)
-                VALUES (?, ?, ?, ?, ?)
+                (user_id, token_hash, expires_at, device_info, ip_address, device_id)
+                VALUES (?, ?, ?, ?, ?, ?)
             """, (
                 user_id, 
                 refresh_token_hash, 
                 refresh_expires.isoformat(),
                 device_info,
-                ip_address
+                ip_address,
+                device_id
             ), fetch=False)
             
-            # Store session in Redis if available
+            # Store session in Redis with device-specific key
             if self.redis_client:
                 session_data = {
                     'user_id': user_id,
                     'user_data': user_data,
                     'access_token': access_token,
+                    'device_id': device_id,
                     'created_at': current_time.isoformat(),
                     'last_accessed': current_time.isoformat()
                 }
                 
-                session_key = f"{self.session_prefix}{user_id}"
+                session_key = f"{self.session_prefix}{user_id}:{device_id}"
                 self.redis_client.setex(
                     session_key, 
                     self.access_token_expiry, 
                     json.dumps(session_data)
                 )
             
-            logger.info(f"✅ Generated tokens for user {user_id}")
+            logger.info(f"✅ Generated tokens for user {user_id} (device: {device_id})")
             
             return {
                 'access_token': access_token,
                 'refresh_token': refresh_token,
                 'expires_in': self.access_token_expiry,
-                'token_type': 'Bearer'
+                'token_type': 'Bearer',
+                'device_id': device_id
             }
             
         except Exception as e:
@@ -181,9 +215,9 @@ class JWTAuthManager:
             raise
     
     def verify_access_token(self, token: str) -> Optional[Dict[str, Any]]:
-        """Verify and decode access token"""
+        """Verify and decode access token with blacklist checking"""
         if not JWT_AVAILABLE:
-            return None
+            return {"error": "jwt_unavailable"}
         
         try:
             # Remove Bearer prefix if present
@@ -192,9 +226,15 @@ class JWTAuthManager:
             
             payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
             
+            # Check if token is blacklisted
+            jti = payload.get('jti')
+            if jti and self.is_token_blacklisted(jti):
+                logger.warning("Token is blacklisted")
+                return {"error": "blacklisted"}
+            
             # Verify token type
             if payload.get('type') != 'access':
-                return None
+                return {"error": "invalid_type"}
             
             # Check if user still exists and is active
             user_data = db_optimizer.execute_query(
@@ -203,11 +243,12 @@ class JWTAuthManager:
             )
             
             if not user_data:
-                return None
+                return {"error": "user_inactive"}
             
             # Update Redis session if available
             if self.redis_client:
-                session_key = f"{self.session_prefix}{payload['user_id']}"
+                device_id = payload.get('device_id', 'default')
+                session_key = f"{self.session_prefix}{payload['user_id']}:{device_id}"
                 session_data = self.redis_client.get(session_key)
                 if session_data:
                     data = json.loads(session_data)
@@ -222,13 +263,13 @@ class JWTAuthManager:
             
         except ExpiredSignatureError:
             logger.warning("Access token expired")
-            return None
+            return {"error": "expired"}
         except InvalidTokenError:
             logger.warning("Invalid access token")
-            return None
+            return {"error": "invalid"}
         except Exception as e:
             logger.error(f"❌ Token verification failed: {e}")
-            return None
+            return {"error": "verification_failed"}
     
     def refresh_access_token(self, refresh_token: str) -> Optional[Dict[str, Any]]:
         """Refresh access token using refresh token"""
@@ -308,10 +349,12 @@ class JWTAuthManager:
                 WHERE user_id = ?
             """, (user_id,), fetch=False)
             
-            # Clear Redis session
+            # Clear Redis sessions for all devices
             if self.redis_client:
-                session_key = f"{self.session_prefix}{user_id}"
-                self.redis_client.delete(session_key)
+                pattern = f"{self.session_prefix}{user_id}:*"
+                keys = self.redis_client.keys(pattern)
+                if keys:
+                    self.redis_client.delete(*keys)
             
             logger.info(f"✅ All tokens revoked for user {user_id}")
             return True
@@ -320,13 +363,22 @@ class JWTAuthManager:
             logger.error(f"❌ Token revocation failed: {e}")
             return False
     
-    def get_user_session(self, user_id: int) -> Optional[Dict[str, Any]]:
-        """Get user session from Redis"""
+    def get_user_session(self, user_id: int, device_id: str = None) -> Optional[Dict[str, Any]]:
+        """Get user session from Redis with device support"""
         if not self.redis_client:
             return None
         
         try:
-            session_key = f"{self.session_prefix}{user_id}"
+            if device_id:
+                session_key = f"{self.session_prefix}{user_id}:{device_id}"
+            else:
+                # Get any active session for the user
+                pattern = f"{self.session_prefix}{user_id}:*"
+                keys = self.redis_client.keys(pattern)
+                if not keys:
+                    return None
+                session_key = keys[0]  # Use first available session
+            
             session_data = self.redis_client.get(session_key)
             
             if session_data:
@@ -337,6 +389,65 @@ class JWTAuthManager:
         except Exception as e:
             logger.error(f"❌ Session retrieval failed: {e}")
             return None
+    
+    def is_token_blacklisted(self, jti: str) -> bool:
+        """Check if token is blacklisted via Redis"""
+        if not self.redis_client:
+            return False
+        
+        try:
+            blacklist_key = f"{self.blacklist_prefix}{jti}"
+            return self.redis_client.exists(blacklist_key)
+        except Exception as e:
+            logger.error(f"❌ Blacklist check failed: {e}")
+            return False
+    
+    def blacklist_token(self, jti: str, expires_at: datetime = None) -> bool:
+        """Add token to blacklist"""
+        if not self.redis_client:
+            return False
+        
+        try:
+            blacklist_key = f"{self.blacklist_prefix}{jti}"
+            
+            if expires_at:
+                # Set expiration for blacklist entry
+                ttl = int((expires_at - datetime.utcnow()).total_seconds())
+                if ttl > 0:
+                    self.redis_client.setex(blacklist_key, ttl, "blacklisted")
+                else:
+                    return True  # Token already expired
+            else:
+                # Set with default TTL (access token expiry)
+                self.redis_client.setex(blacklist_key, self.access_token_expiry, "blacklisted")
+            
+            logger.info(f"✅ Token blacklisted: {jti}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Token blacklisting failed: {e}")
+            return False
+    
+    def logout_user(self, access_token: str) -> bool:
+        """Logout user by blacklisting access token"""
+        try:
+            # Decode token to get JTI
+            if access_token.startswith('Bearer '):
+                access_token = access_token[7:]
+            
+            payload = jwt.decode(access_token, self.secret_key, algorithms=[self.algorithm], options={"verify_exp": False})
+            jti = payload.get('jti')
+            
+            if jti:
+                # Blacklist the access token
+                expires_at = datetime.fromtimestamp(payload.get('exp', 0))
+                return self.blacklist_token(jti, expires_at)
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"❌ Logout failed: {e}")
+            return False
     
     def _hash_token(self, token: str) -> str:
         """Hash token for secure storage"""
@@ -359,7 +470,7 @@ class JWTAuthManager:
 # Global JWT manager
 jwt_auth_manager = JWTAuthManager()
 
-# Decorator for JWT authentication
+# Decorator for JWT authentication with rate limiting support
 def jwt_required(f):
     """Decorator to require JWT authentication"""
     @wraps(f)
@@ -378,6 +489,33 @@ def jwt_required(f):
         # Verify token
         token = auth_header.split(' ')[1]
         payload = jwt_auth_manager.verify_access_token(token)
+        
+        if isinstance(payload, dict) and 'error' in payload:
+            error_code = payload['error']
+            if error_code == 'expired':
+                return jsonify({
+                    'success': False,
+                    'error': 'Token expired',
+                    'error_code': 'TOKEN_EXPIRED'
+                }), 401
+            elif error_code == 'blacklisted':
+                return jsonify({
+                    'success': False,
+                    'error': 'Token has been revoked',
+                    'error_code': 'TOKEN_REVOKED'
+                }), 401
+            elif error_code == 'user_inactive':
+                return jsonify({
+                    'success': False,
+                    'error': 'User account is inactive',
+                    'error_code': 'USER_INACTIVE'
+                }), 401
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Invalid token',
+                    'error_code': 'INVALID_TOKEN'
+                }), 401
         
         if not payload:
             return jsonify({

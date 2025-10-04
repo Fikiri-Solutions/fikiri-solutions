@@ -6,17 +6,24 @@ Lightweight authentication without heavy Google API dependencies.
 
 import os
 import json
-import pickle
+import logging
 from pathlib import Path
 from typing import Optional, Dict, Any
+from datetime import datetime, timedelta
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 class MinimalAuthenticator:
     """Minimal authentication handler - lightweight version."""
     
-    def __init__(self, credentials_path: str = "auth/credentials.json", token_path: str = "auth/token.pkl"):
-        """Initialize minimal authenticator."""
-        self.credentials_path = credentials_path
-        self.token_path = token_path
+    def __init__(self, credentials_path: str = None, token_path: str = None):
+        """Initialize minimal authenticator with environment isolation."""
+        # Environment isolation for token files
+        env_suffix = os.getenv("FLASK_ENV", "dev")
+        
+        self.credentials_path = credentials_path or "auth/credentials.json"
+        self.token_path = token_path or f"auth/token_{env_suffix}.json"
         self.credentials = None
         self.token = None
     
@@ -24,7 +31,7 @@ class MinimalAuthenticator:
         """Check if credentials file exists and is valid."""
         creds_file = Path(self.credentials_path)
         if not creds_file.exists():
-            print(f"❌ Credentials file not found: {self.credentials_path}")
+            logger.error(f"❌ Credentials file not found: {self.credentials_path}")
             return False
         
         try:
@@ -33,14 +40,14 @@ class MinimalAuthenticator:
             
             # Basic validation
             if "installed" not in creds_data and "web" not in creds_data:
-                print("❌ Invalid credentials file format")
+                logger.warning("❌ Invalid credentials file format")
                 return False
             
-            print("✅ Credentials file found and valid")
+            logger.info("✅ Credentials file found and valid")
             return True
             
         except Exception as e:
-            print(f"❌ Error reading credentials file: {e}")
+            logger.error(f"❌ Error reading credentials file: {e}")
             return False
     
     def check_token_file(self, verbose: bool = False) -> bool:
@@ -48,45 +55,45 @@ class MinimalAuthenticator:
         token_file = Path(self.token_path)
         if token_file.exists():
             if verbose:
-                print("✅ Token file found")
+                logger.info("✅ Token file found")
             return True
         else:
             if verbose:
-                print("❌ Token file not found - authentication needed")
+                logger.info("❌ Token file not found - authentication needed")
             return False
     
     def load_token(self) -> Optional[Dict[str, Any]]:
-        """Load token from file."""
+        """Load token from JSON file."""
         token_file = Path(self.token_path)
         if not token_file.exists():
             return None
         
         try:
-            with open(token_file, 'rb') as f:
-                token = pickle.load(f)
-            print("✅ Token loaded successfully")
+            with open(token_file, 'r') as f:
+                token = json.load(f)
+            logger.info("✅ Token loaded successfully")
             return token
         except Exception as e:
-            print(f"❌ Error loading token: {e}")
+            logger.error(f"❌ Error loading token: {e}")
             return None
     
     def save_token(self, token: Dict[str, Any]) -> bool:
-        """Save token to file."""
+        """Save token to JSON file."""
         try:
             # Ensure auth directory exists
             auth_dir = Path(self.token_path).parent
             auth_dir.mkdir(exist_ok=True)
             
-            with open(self.token_path, 'wb') as f:
-                pickle.dump(token, f)
-            print("✅ Token saved successfully")
+            with open(self.token_path, 'w') as f:
+                json.dump(token, f, indent=2)
+            logger.info("✅ Token saved successfully")
             return True
         except Exception as e:
-            print(f"❌ Error saving token: {e}")
+            logger.error(f"❌ Error saving token: {e}")
             return False
     
     def is_authenticated(self) -> bool:
-        """Check if user is authenticated."""
+        """Check if user is authenticated with token expiration handling."""
         if not self.check_credentials_file():
             return False
         
@@ -98,22 +105,48 @@ class MinimalAuthenticator:
         try:
             # If it's a Google Credentials object, check for valid attributes
             if hasattr(token, 'token') and hasattr(token, 'refresh_token'):
-                print("✅ Authentication valid")
+                logger.info("✅ Authentication valid")
                 return True
-            # If it's a dictionary, check for required fields
+            # If it's a dictionary, check for required fields and expiration
             elif isinstance(token, dict):
                 required_fields = ['token', 'refresh_token', 'token_uri', 'client_id', 'client_secret']
                 if all(field in token for field in required_fields):
-                    print("✅ Authentication valid")
+                    # Check token expiration
+                    expiry = token.get('expiry')
+                    if expiry:
+                        try:
+                            expiry_dt = datetime.fromisoformat(expiry)
+                            if expiry_dt < datetime.utcnow():
+                                logger.warning("⚠️ Token expired")
+                                return False
+                        except ValueError:
+                            logger.warning("⚠️ Invalid token expiry format")
+                    
+                    logger.info("✅ Authentication valid")
                     return True
             else:
-                print("❌ Invalid token format")
+                logger.error("❌ Invalid token format")
                 return False
         except Exception as e:
-            print(f"❌ Error validating token: {e}")
+            logger.error(f"❌ Error validating token: {e}")
             return False
         
         return False
+    
+    def clear_token(self) -> bool:
+        """Clear stored token to trigger re-authentication."""
+        token_file = Path(self.token_path)
+        if token_file.exists():
+            try:
+                token_file.unlink()
+                logger.info("🧹 Token cleared — new authentication required.")
+                return True
+            except Exception as e:
+                logger.error(f"❌ Error clearing token: {e}")
+                return False
+        else:
+            logger.info("ℹ️ No token file to clear")
+            return True
     
     def get_auth_status(self) -> Dict[str, Any]:
         """Get comprehensive authentication status."""
@@ -121,7 +154,9 @@ class MinimalAuthenticator:
             "credentials_file_exists": self.check_credentials_file(),
             "token_file_exists": self.check_token_file(),
             "is_authenticated": False,
-            "needs_setup": False
+            "needs_setup": False,
+            "token_path": self.token_path,
+            "environment": os.getenv("FLASK_ENV", "dev")
         }
         
         if status["credentials_file_exists"] and status["token_file_exists"]:
@@ -157,22 +192,22 @@ class MinimalAuthenticator:
         try:
             with open(template_file, 'w') as f:
                 json.dump(template_data, f, indent=2)
-            print(f"✅ Template credentials created at {self.credentials_path}")
-            print("📝 Please edit the file with your actual Gmail API credentials")
+            logger.info(f"✅ Template credentials created at {self.credentials_path}")
+            logger.info("📝 Please edit the file with your actual Gmail API credentials")
             return True
         except Exception as e:
-            print(f"❌ Error creating template: {e}")
+            logger.error(f"❌ Error creating template: {e}")
             return False
 
-def authenticate_gmail(credentials_path: str = "auth/credentials.json", token_path: str = "auth/token.pkl") -> bool:
-    """Simple authentication check function."""
+def authenticate_gmail(credentials_path: str = None, token_path: str = None) -> bool:
+    """Simple authentication check function with environment isolation."""
     auth = MinimalAuthenticator(credentials_path, token_path)
     return auth.is_authenticated()
 
 def setup_auth() -> bool:
     """Setup authentication - create template and check status."""
-    print("🔐 Fikiri Solutions - Authentication Setup")
-    print("=" * 50)
+    logger.info("🔐 Fikiri Solutions - Authentication Setup")
+    logger.info("=" * 50)
     
     auth = MinimalAuthenticator()
     
@@ -180,26 +215,26 @@ def setup_auth() -> bool:
     status = auth.get_auth_status()
     
     if status["is_authenticated"]:
-        print("✅ Authentication is already set up!")
+        logger.info("✅ Authentication is already set up!")
         return True
     
     if not status["credentials_file_exists"]:
-        print("📝 Creating credentials template...")
+        logger.info("📝 Creating credentials template...")
         if auth.create_template_credentials():
-            print("\n📋 Next steps:")
-            print("1. Go to Google Cloud Console")
-            print("2. Create a new project or select existing one")
-            print("3. Enable Gmail API")
-            print("4. Create OAuth 2.0 credentials")
-            print("5. Download credentials and replace the template file")
-            print("6. Run authentication again")
+            logger.info("\n📋 Next steps:")
+            logger.info("1. Go to Google Cloud Console")
+            logger.info("2. Create a new project or select existing one")
+            logger.info("3. Enable Gmail API")
+            logger.info("4. Create OAuth 2.0 credentials")
+            logger.info("5. Download credentials and replace the template file")
+            logger.info("6. Run authentication again")
         return False
     
     if not status["token_file_exists"]:
-        print("🔑 Ready for authentication!")
-        print("📋 Next steps:")
-        print("1. Make sure your credentials.json is properly configured")
-        print("2. Run the authentication process")
+        logger.info("🔑 Ready for authentication!")
+        logger.info("📋 Next steps:")
+        logger.info("1. Make sure your credentials.json is properly configured")
+        logger.info("2. Run the authentication process")
         return False
     
     return False

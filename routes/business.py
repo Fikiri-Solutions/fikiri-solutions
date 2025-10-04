@@ -17,7 +17,6 @@ from core.automation_engine import automation_engine
 from core.automation_safety import automation_safety_manager
 from core.oauth_token_manager import oauth_token_manager
 from core.secure_sessions import get_current_user_id
-from core.jwt_auth import jwt_required, get_current_user
 from core.user_auth import user_auth_manager
 
 logger = logging.getLogger(__name__)
@@ -28,22 +27,15 @@ business_bp = Blueprint("business", __name__, url_prefix="/api")
 # CRM Routes
 @business_bp.route('/crm/leads', methods=['GET'])
 @handle_api_errors
-@jwt_required
 def get_leads():
     """Get all leads for authenticated user"""
     try:
-        # Get user from JWT token
-        user_data = get_current_user()
-        if not user_data:
+        user_id = get_current_user_id()
+        if not user_id:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
-        
-        user_id = user_data['user_id']
-        leads_result = enhanced_crm_service.get_leads_summary(user_id)
-        
-        if leads_result['success']:
-            return create_success_response({'leads': leads_result['data']['leads']}, 'Leads retrieved successfully')
-        else:
-            return create_error_response("Failed to retrieve leads", 500, 'CRM_ERROR')
+
+        leads = enhanced_crm_service.get_leads(user_id)
+        return create_success_response({'leads': leads}, 'Leads retrieved successfully')
         
     except Exception as e:
         logger.error(f"Get leads error: {e}")
