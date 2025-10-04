@@ -19,6 +19,70 @@ logger = logging.getLogger(__name__)
 # Create Blueprint
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api/dashboard')
 
+@dashboard_bp.route('/debug', methods=['GET'])
+@handle_api_errors
+@jwt_required
+def debug_dashboard():
+    """Debug endpoint to identify dashboard issues"""
+    try:
+        # Get user from JWT token
+        user_data = get_current_user()
+        if not user_data:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+        
+        user_id = user_data['user_id']
+        
+        debug_info = {
+            'user_id': user_id,
+            'user_data': user_data,
+            'database_connected': True,
+            'queries_tested': []
+        }
+        
+        # Test basic database query
+        try:
+            user_data_db = db_optimizer.execute_query(
+                "SELECT * FROM users WHERE id = ? AND is_active = 1",
+                (user_id,)
+            )
+            debug_info['queries_tested'].append({
+                'query': 'users',
+                'result_count': len(user_data_db) if user_data_db else 0,
+                'success': True
+            })
+        except Exception as e:
+            debug_info['queries_tested'].append({
+                'query': 'users',
+                'error': str(e),
+                'success': False
+            })
+        
+        # Test leads query
+        try:
+            leads_data = db_optimizer.execute_query(
+                "SELECT COUNT(*) as count FROM leads WHERE user_id = ?",
+                (user_id,)
+            )
+            debug_info['queries_tested'].append({
+                'query': 'leads_count',
+                'result_count': len(leads_data) if leads_data else 0,
+                'success': True
+            })
+        except Exception as e:
+            debug_info['queries_tested'].append({
+                'query': 'leads_count',
+                'error': str(e),
+                'success': False
+            })
+        
+        return create_success_response(debug_info, "Debug information retrieved")
+        
+    except Exception as e:
+        logger.error(f"Debug dashboard error: {e}")
+        import traceback
+        logger.error(f"Debug dashboard traceback: {traceback.format_exc()}")
+        return create_error_response(f"Debug failed: {str(e)}", 500, "DEBUG_ERROR")
+
 @dashboard_bp.route('/metrics', methods=['GET'])
 @handle_api_errors
 @jwt_required
