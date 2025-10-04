@@ -54,13 +54,17 @@ def init_security(app: Flask):
     redis_client = redis.from_url(redis_url, decode_responses=True)
     
     # Initialize rate limiter (fixed - use single initialization style)
-    limiter = Limiter(
-        key_func=get_remote_address,
-        storage_uri=redis_url,
-        default_limits=["1000 per hour", "100 per minute"],
-        exempt_when=lambda: request.endpoint in ['health_check', 'api_health_check']
-    )
-    limiter.init_app(app)
+    if FLASK_AVAILABLE:
+        limiter = Limiter(
+            key_func=get_remote_address,
+            storage_uri=redis_url,
+            default_limits=["1000 per hour", "100 per minute"],
+            exempt_when=lambda: request.endpoint in ['health_check', 'api_health_check']
+        )
+        limiter.init_app(app)
+        logger.info("✅ Rate limiter initialized")
+    else:
+        logger.warning("⚠️ Flask-Limiter not available - rate limiting disabled")
     
     # Configure CORS
     cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')
