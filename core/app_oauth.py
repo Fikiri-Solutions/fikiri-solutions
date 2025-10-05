@@ -40,10 +40,8 @@ oauth = Blueprint("oauth", __name__, url_prefix="/api/oauth")
 # Configuration
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://fikirisolutions.com/api/oauth/gmail/callback")
-# Force correct redirect URI for custom domain
-if "fikirisolutions.onrender.com" in os.getenv("GOOGLE_REDIRECT_URI", ""):
-    GOOGLE_REDIRECT_URI = "https://fikirisolutions.com/api/oauth/gmail/callback"
+# Force correct redirect URI for custom domain - hardcoded to fix environment variable issue
+GOOGLE_REDIRECT_URI = "https://fikirisolutions.com/api/oauth/gmail/callback"
 FERNET_KEY = os.getenv("FERNET_KEY")
 
 # Initialize encryption if available
