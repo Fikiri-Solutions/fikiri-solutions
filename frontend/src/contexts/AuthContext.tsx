@@ -142,6 +142,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         body: JSON.stringify({ email, password })
       })
 
+      // Handle rate limiting specifically
+      if (response.status === 429) {
+        return { 
+          success: false, 
+          error: 'Too many login attempts. Please wait a few minutes and try again.' 
+        }
+      }
+
       const data = await response.json()
 
       if (data.success) {
