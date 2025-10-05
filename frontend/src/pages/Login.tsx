@@ -121,7 +121,12 @@ export const Login: React.FC = () => {
         const redirectPath = getRedirectPath()
         navigate(redirectPath)
       } else {
-        setError(result.error || 'Login failed. Please try again.')
+        // Handle specific error types
+        if (result.error?.includes('429') || result.error?.includes('rate limit')) {
+          setError('Too many login attempts. Please wait a few minutes and try again.')
+        } else {
+          setError(result.error || 'Login failed. Please try again.')
+        }
       }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Login failed. Please try again.')
