@@ -27,7 +27,7 @@ services:
       - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: GOOGLE_REDIRECT_URI
-        value: https://fikirisolutions.onrender.com/api/oauth/gmail/callback
+        value: https://fikirisolutions.com/api/oauth/gmail/callback
       - key: FERNET_KEY
         generateValue: true
       - key: SMTP_USERNAME
