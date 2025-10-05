@@ -341,3 +341,26 @@ def refresh_token():
     except Exception as e:
         logger.error(f"Token refresh error: {e}")
         return create_error_response("Failed to refresh token", 500, 'REFRESH_ERROR')
+
+@auth_bp.route('/reset-rate-limit', methods=['POST'])
+def reset_rate_limit():
+    """Reset rate limit for development/testing purposes"""
+    try:
+        from core.rate_limiter import enhanced_rate_limiter
+        
+        # Get IP address
+        ip_address = request.remote_addr
+        
+        # Reset login attempts rate limit
+        enhanced_rate_limiter.reset_rate_limit('login_attempts', ip_address, ip_address)
+        
+        logger.info(f"Rate limit reset for IP: {ip_address}")
+        
+        return create_success_response("Rate limit reset successfully", {
+            'ip_address': ip_address,
+            'reset_time': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Rate limit reset error: {e}")
+        return create_error_response("Rate limit reset failed", 500, 'RATE_LIMIT_RESET_ERROR')
