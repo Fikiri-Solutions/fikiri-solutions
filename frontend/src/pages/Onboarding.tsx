@@ -89,20 +89,19 @@ export const Onboarding: React.FC = () => {
     console.log('Skip button clicked!');
     console.log('User object:', user);
     console.log('User ID:', user?.id);
+    console.log('Is authenticated:', !!user);
     
     try {
       toast.info('Skipping onboarding...');
       
-      // Check if user is authenticated
-      if (user?.id) {
-        console.log('User is authenticated, navigating to dashboard');
-        navigate('/dashboard');
-      } else {
-        console.log('User is not authenticated, navigating to login');
-        navigate('/login');
-      }
+      // Always navigate to login for now - this is the safest approach
+      // The login page will handle redirecting authenticated users appropriately
+      console.log('Navigating to login page');
+      navigate('/login');
     } catch (error) {
       console.error('Error in skipStep:', error);
+      // Fallback navigation
+      navigate('/login');
     }
   };
 
