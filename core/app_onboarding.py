@@ -59,18 +59,27 @@ def save_onboarding():
         """
         db_optimizer.execute_query(create_table_sql)
 
-        # Save or update onboarding info
+        # Safe serializer for database values
+        def safe_to_str(value):
+            if isinstance(value, (dict, list)):
+                import json
+                return json.dumps(value)
+            if value is None:
+                return ""
+            return str(value)
+        
+        # Sanitize all incoming values
+        sanitized_name = safe_to_str(name)
+        sanitized_company = safe_to_str(company)
+        sanitized_industry = safe_to_str(industry)
+        
+        # Save or update onboarding info (SQLite compatible)
         upsert_sql = """
-        INSERT INTO onboarding_info (user_id, name, company, industry)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT (user_id) DO UPDATE SET
-            name = excluded.name,
-            company = excluded.company,
-            industry = excluded.industry,
-            updated_at = CURRENT_TIMESTAMP
+        INSERT OR REPLACE INTO onboarding_info (user_id, name, company, industry, updated_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
         """
         
-        db_optimizer.execute_query(upsert_sql, (user_id, name, company, industry))
+        db_optimizer.execute_query(upsert_sql, (user_id, sanitized_name, sanitized_company, sanitized_industry))
 
         # Also update user profile with onboarding completion
         update_user_sql = """
@@ -91,7 +100,8 @@ def save_onboarding():
         }, "Onboarding completed successfully")
 
     except Exception as e:
-        logger.error(f"Error saving onboarding data: {e}")
+        logger.error(f"❌ Failed to save onboarding data: {e}")
+        logger.error(f"User ID: {user_id}, Data: {data}")
         return create_error_response("Failed to save onboarding data", 500, 'SAVE_ERROR')
 
 @bp.route("/api/onboarding/status", methods=["GET"])
