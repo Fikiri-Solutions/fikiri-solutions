@@ -21,7 +21,7 @@ services:
       - key: OPENAI_API_KEY
         sync: false
       - key: JWT_SECRET_KEY
-        generateValue: true
+        value: e4fb233d952a00851553309b7327c3ee9c70402889ae70dcdc39192cb1ed93c9
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
@@ -29,7 +29,7 @@ services:
       - key: GOOGLE_REDIRECT_URI
         value: https://fikirisolutions.com/api/oauth/gmail/callback
       - key: FERNET_KEY
-        generateValue: true
+        value: 538a8e692587a6e8e3c887744a1820b773d0710f938374042e45045379f659f7
       - key: SMTP_USERNAME
         sync: false
       - key: SMTP_PASSWORD

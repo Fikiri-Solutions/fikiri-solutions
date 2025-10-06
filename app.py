@@ -108,6 +108,16 @@ def create_app():
     app = Flask(__name__)
     app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
     
+    # Initialize database tables on startup
+    try:
+        from core.database_init import init_database
+        if init_database():
+            logger.info("✅ Database initialization completed")
+        else:
+            logger.error("❌ Database initialization failed")
+    except Exception as e:
+        logger.error(f"❌ Database initialization error: {e}")
+    
     # Enhanced CORS configuration
     CORS(app, 
          resources={r"/api/*": {"origins": [
