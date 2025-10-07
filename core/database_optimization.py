@@ -883,6 +883,10 @@ class DatabaseOptimizer:
         if "query_performance_log" in query.lower() or "metrics" in query.lower():
             return
         
+        # Skip performance logging on auth-related queries to avoid overhead
+        if "users" in query.lower() and ("password" in query.lower() or "session" in query.lower()):
+            return
+        
         # Create query hash for deduplication
         query_hash = hashlib.md5(query.encode()).hexdigest()
         
