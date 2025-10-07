@@ -2,15 +2,33 @@
 Database initialization module for Fikiri Solutions
 Ensures all required tables exist on startup
 """
+import os
 import logging
 from core.database_optimization import db_optimizer
 
 logger = logging.getLogger(__name__)
 
+PERSISTENT_DB_PATH = "/opt/render/project/data/fikiri.db"
+
+def ensure_persistent_storage():
+    """Ensure the persistent Render storage path exists"""
+    try:
+        os.makedirs(os.path.dirname(PERSISTENT_DB_PATH), exist_ok=True)
+        if not os.path.exists(PERSISTENT_DB_PATH):
+            logger.info(f"📁 Creating new persistent database at {PERSISTENT_DB_PATH}")
+            open(PERSISTENT_DB_PATH, "a").close()
+        else:
+            logger.info("✅ Persistent database file confirmed.")
+    except Exception as e:
+        logger.error(f"❌ Failed to ensure persistent storage: {e}")
+
 def init_database():
     """Initialize all required database tables"""
     try:
         logger.info("🔧 Initializing database tables...")
+
+        # Ensure persistent path
+        ensure_persistent_storage()
         
         # Users table with consistent schema
         db_optimizer.execute_query("""
@@ -31,6 +49,21 @@ def init_database():
             onboarding_step INTEGER DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # 🔹 Add user_sessions (missing table)
+        db_optimizer.execute_query("""
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            session_id TEXT UNIQUE NOT NULL,
+            ip_address TEXT,
+            user_agent TEXT,
+            is_valid INTEGER DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            expires_at DATETIME,
+            FOREIGN KEY (user_id) REFERENCES users(id)
         );
         """)
         
@@ -108,9 +141,20 @@ def init_database():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
         """)
-        
-        # Create indexes for performance
+
+        # Optional triggers for automatic updated_at
+        db_optimizer.execute_query("""
+        CREATE TRIGGER IF NOT EXISTS trg_users_updated
+        AFTER UPDATE ON users
+        FOR EACH ROW
+        BEGIN
+            UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+        END;
+        """)
+
+        # Performance indexes
         db_optimizer.execute_query("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);")
+        db_optimizer.execute_query("CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);")
         db_optimizer.execute_query("CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);")
         db_optimizer.execute_query("CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires ON refresh_tokens(expires_at);")
         db_optimizer.execute_query("CREATE INDEX IF NOT EXISTS idx_query_performance_created ON query_performance_log(created_at);")
@@ -126,19 +170,19 @@ def check_database_health():
     """Check if all required tables exist"""
     try:
         required_tables = [
-            'users', 'onboarding_info', 'query_performance_log', 
-            'refresh_tokens', 'email_actions_log', 'ml_scoring_log', 'ml_feedback_log'
+            'users', 'user_sessions', 'onboarding_info',
+            'query_performance_log', 'refresh_tokens',
+            'email_actions_log', 'ml_scoring_log', 'ml_feedback_log'
         ]
-        
         for table in required_tables:
-            result = db_optimizer.execute_query(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table}';")
+            result = db_optimizer.execute_query(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?;", (table,)
+            )
             if not result:
-                logger.warning(f"⚠️ Table {table} does not exist")
+                logger.warning(f"⚠️ Table {table} missing.")
                 return False
-        
-        logger.info("✅ All required tables exist")
+        logger.info("✅ All required tables verified.")
         return True
-        
     except Exception as e:
         logger.error(f"❌ Database health check failed: {e}")
         return False

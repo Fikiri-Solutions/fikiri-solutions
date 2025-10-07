@@ -212,7 +212,9 @@ def handle_api_errors(f):
             }), e.status_code
         
         except Exception as e:
-            logger.error(f"Unexpected error: {str(e)}")
+            import traceback
+            logger.error(f"Unhandled API error in {f.__name__}: {e}")
+            logger.error(traceback.format_exc())
             return jsonify({
                 'success': False,
                 'error': 'Internal server error',
