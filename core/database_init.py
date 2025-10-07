@@ -12,7 +12,7 @@ def init_database():
     try:
         logger.info("🔧 Initializing database tables...")
         
-        # Users table
+        # Users table with consistent schema
         db_optimizer.execute_query("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -24,6 +24,9 @@ def init_database():
             business_email TEXT,
             industry TEXT,
             team_size TEXT,
+            metadata TEXT,
+            is_active INTEGER DEFAULT 1,
+            email_verified INTEGER DEFAULT 0,
             onboarding_completed BOOLEAN DEFAULT 0,
             onboarding_step INTEGER DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
