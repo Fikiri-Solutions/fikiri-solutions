@@ -58,9 +58,28 @@ class UserAuthManager:
         return password_hash.hex(), salt
     
     def _verify_password(self, password: str, stored_hash: str, salt: str) -> bool:
-        """Verify password against stored hash"""
-        password_hash, _ = self._hash_password(password, salt)
-        return password_hash == stored_hash
+        """Verify password safely; tolerate missing or malformed salt."""
+        try:
+            if not salt:
+                logger.warning("No salt found; regenerating PBKDF2 with blank salt.")
+                salt = ''
+            candidate_hash, _ = self._hash_password(password, salt)
+            # Constant-time compare to avoid subtle mismatch
+            return secrets.compare_digest(candidate_hash, stored_hash)
+        except Exception as e:
+            logger.error(f"Password verification error: {e}")
+            return False
+    
+    def _verify_legacy_password(self, password: str, stored_hash: str) -> bool:
+        """Support legacy plaintext or simple SHA-256 hashes for migrated users."""
+        try:
+            import hashlib
+            # In case early dev builds stored plain or SHA256 only
+            simple_hash = hashlib.sha256(password.encode()).hexdigest()
+            return secrets.compare_digest(simple_hash, stored_hash)
+        except Exception as e:
+            logger.error(f"Legacy password verification error: {e}")
+            return False
     
     def create_user(self, email: str, password: str, name: str, 
                    business_name: str = None, business_email: str = None,
@@ -82,6 +101,11 @@ class UserAuthManager:
             
             # Hash password
             password_hash, salt = self._hash_password(password)
+            
+            # Ensure salt always exists
+            if not salt:
+                salt = secrets.token_hex(self.salt_length)
+                logger.warning(f"Generated new salt for user {email}")
             
             # Create user record - we need to get the lastrowid, so let's do this manually
             try:
@@ -170,12 +194,16 @@ class UserAuthManager:
                 }
             
             if not self._verify_password(password, password_hash, salt):
-                logger.warning(f"Password verification failed for user {email}")
-                return {
-                    'success': False,
-                    'error': 'Invalid email or password',
-                    'error_code': 'INVALID_CREDENTIALS'
-                }
+                # Try legacy password verification as fallback
+                if not self._verify_legacy_password(password, password_hash):
+                    logger.warning(f"Password verification failed for user {email}")
+                    return {
+                        'success': False,
+                        'error': 'Invalid email or password',
+                        'error_code': 'INVALID_CREDENTIALS'
+                    }
+                else:
+                    logger.info(f"Legacy password verification succeeded for user {email}")
             
             # Create session
             session_result = self._create_session(
