@@ -50,20 +50,27 @@ def api_login():
         if not auth_result['success']:
             return create_error_response(auth_result['error'], 401, auth_result['error_code'])
 
-        user_profile = auth_result['user']
-        jwt_tokens = auth_result['tokens']
+        user_obj = auth_result['user']
+        jwt_tokens = auth_result.get('tokens')
 
-        # Convert UserProfile to dict for session creation
+        # Normalize regardless of dataclass or dict
+        if hasattr(user_obj, '__dict__'):
+            user_dict = user_obj.__dict__
+        elif isinstance(user_obj, dict):
+            user_dict = user_obj
+        else:
+            raise TypeError("Unexpected user object type returned from user_auth_manager")
+
         user_data = {
-            'id': user_profile.id,
-            'email': user_profile.email,
-            'name': user_profile.name,
-            'role': user_profile.role
+            'id': user_dict.get('id'),
+            'email': user_dict.get('email'),
+            'name': user_dict.get('name'),
+            'role': user_dict.get('role', 'user')
         }
 
         # Create secure session
         session_id, cookie_data = secure_session_manager.create_session(
-            user_profile.id,
+            user_data['id'],
             user_data,
             request.remote_addr,
             request.headers.get('User-Agent')
@@ -74,8 +81,8 @@ def api_login():
             event_type="user_login",
             severity="info",
             details={
-                "user_id": user_profile.id,
-                "email": user_profile.email,
+                "user_id": user_data['id'],
+                "email": user_data['email'],
                 "ip_address": request.remote_addr,
                 "user_agent": request.headers.get('User-Agent')
             }
@@ -83,26 +90,30 @@ def api_login():
 
         # Track login analytics
         business_analytics.track_event('user_login', {
-            'user_id': user_profile.id,
-            'email': user_profile.email,
+            'user_id': user_data['id'],
+            'email': user_data['email'],
             'login_method': 'email_password'
         })
 
         # Create response with secure cookie
         response_data = {
             'user': {
-                'id': user_profile.id,
-                'email': user_profile.email,
-                'name': user_profile.name,
-                'role': user_profile.role,
-                'onboarding_completed': user_profile.onboarding_completed,
-                'onboarding_step': user_profile.onboarding_step,
+                'id': user_data['id'],
+                'email': user_data['email'],
+                'name': user_data['name'],
+                'role': user_data['role'],
+                'onboarding_completed': user_dict.get('onboarding_completed', False),
+                'onboarding_step': user_dict.get('onboarding_step', 1),
                 'last_login': datetime.now().isoformat()
             },
             'tokens': jwt_tokens, 
             'session_id': session_id
         }
 
+        # Add defensive logging before response
+        logger.info(f"✅ Login success for {user_data['email']}")
+        logger.debug(f"Session created: {session_id}, Tokens: {bool(jwt_tokens)}")
+        
         response, status_code = create_success_response(response_data, "Login successful")
         
         # Set secure session cookie
@@ -142,23 +153,25 @@ def api_signup():
         if not user_result['success']:
             return create_error_response(user_result['error'], 400, user_result['error_code'])
 
-        user = user_result['user']
+        user_obj = user_result['user']
+        user_dict = user_obj.__dict__ if hasattr(user_obj, '__dict__') else user_obj
 
         user_data = {
-            'email': user.email,
-            'name': user.name,
-            'role': user.role
+            'id': user_dict.get('id'),
+            'email': user_dict.get('email'),
+            'name': user_dict.get('name'),
+            'role': user_dict.get('role', 'user')
         }
 
         tokens = jwt_auth_manager.generate_tokens(
-            user.id,
+            user_data['id'],
             user_data,
             device_info=request.headers.get('User-Agent'),
             ip_address=request.remote_addr
         )
 
         session_id, cookie_data = secure_session_manager.create_session(
-            user.id,
+            user_data['id'],
             user_data,
             request.remote_addr,
             request.headers.get('User-Agent')
@@ -198,10 +211,10 @@ def api_signup():
 
         response_data = {
             'user': {
-                'id': user.id,
-                'email': user.email,
-                'name': user.name,
-                'role': user.role,
+                'id': user_data['id'],
+                'email': user_data['email'],
+                'name': user_data['name'],
+                'role': user_data['role'],
                 'onboarding_completed': False,
                 'onboarding_step': 1
             },
@@ -219,7 +232,7 @@ def api_signup():
         except Exception as e:
             logger.warning(f"Failed to set session cookie: {e}")
         
-        logger.info(f"✅ User registration successful: {user.email}")
+        logger.info(f"✅ User registration successful: {user_data['email']}")
         return response
         
     except Exception as e:
