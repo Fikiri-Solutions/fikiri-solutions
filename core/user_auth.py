@@ -58,13 +58,29 @@ class UserAuthManager:
         return password_hash.hex(), salt
     
     def _verify_password(self, password: str, stored_hash: str, salt: str) -> bool:
-        """Verify password safely; tolerate missing or malformed salt."""
+        """Verify password safely, handling serialization edge cases."""
         try:
             if not salt:
                 logger.warning("No salt found; regenerating PBKDF2 with blank salt.")
                 salt = ''
+            
+            # Handle JSON-encoded or array-wrapped salts
+            if isinstance(salt, (list, dict)):
+                salt = next(iter(salt.values() if isinstance(salt, dict) else salt), '')
+            
+            if isinstance(salt, str):
+                salt = salt.strip()
+                # Handle strings like '["abc"]' or '[abc]'
+                if salt.startswith('[') and salt.endswith(']'):
+                    salt = salt.strip('[]').replace('"', '').replace("'", "")
+            
+            # Only allow hex or ASCII salts
+            try:
+                bytes.fromhex(salt)
+            except ValueError:
+                salt = salt.encode('utf-8').hex()
+            
             candidate_hash, _ = self._hash_password(password, salt)
-            # Constant-time compare to avoid subtle mismatch
             return secrets.compare_digest(candidate_hash, stored_hash)
         except Exception as e:
             logger.error(f"Password verification error: {e}")
@@ -118,7 +134,7 @@ class UserAuthManager:
                             onboarding_completed, onboarding_step) 
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (email, name, password_hash, business_name, business_email,
-                         industry, team_size, json.dumps({'salt': salt}), 'user', True, False, False, 1)
+                         industry, team_size, json.dumps({'salt': str(salt)}), 'user', True, False, False, 1)
                     )
                     user_id = cursor.lastrowid
                     conn.commit()
@@ -434,7 +450,7 @@ class UserAuthManager:
             )[0]
             
             metadata = json.loads(user_data['metadata'] or '{}')
-            metadata['salt'] = new_salt
+            metadata['salt'] = str(new_salt)
             # Remove reset token
             metadata.pop('reset_token', None)
             metadata.pop('reset_token_expires', None)
@@ -488,7 +504,7 @@ class UserAuthManager:
             new_password_hash, new_salt = self._hash_password(new_password)
             
             # Update password and salt
-            metadata['salt'] = new_salt
+            metadata['salt'] = str(new_salt)
             db_optimizer.execute_query(
                 "UPDATE users SET password_hash = ?, metadata = ? WHERE id = ?",
                 (new_password_hash, json.dumps(metadata), user_id),
