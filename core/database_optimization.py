@@ -90,6 +90,9 @@ class DatabaseOptimizer:
                 db_path = "/opt/render/project/data/fikiri.db"
             else:
                 db_path = "data/fikiri.db"
+        
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self.db_path = db_path
         self.db_type = db_type.lower()
         self.query_metrics: List[QueryMetrics] = []
