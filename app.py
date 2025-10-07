@@ -108,15 +108,34 @@ def create_app():
     app = Flask(__name__)
     app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
     
-    # Initialize database tables on startup
+    # 🔧 Database sanity check and initialization
     try:
-        from core.database_init import init_database
+        from core.database_init import init_database, check_database_health
+        from core.database_optimization import db_optimizer
+        
+        print("🔍 Checking database connectivity...")
+        try:
+            print(f"Database path: {db_optimizer.db_path}")
+            result = db_optimizer.execute_query("SELECT name FROM sqlite_master WHERE type='table';")
+            print(f"Existing tables: {[r['name'] for r in result]}")
+        except Exception as e:
+            print(f"❌ Database connection failed: {e}")
+        
+        print("⚙️ Running init_database() ...")
         if init_database():
-            logger.info("✅ Database initialization completed")
+            print("✅ Database initialized.")
         else:
-            logger.error("❌ Database initialization failed")
+            print("❌ Database initialization failed")
+        
+        print("🏥 Running database health check ...")
+        if check_database_health():
+            print("✅ Health check completed.")
+        else:
+            print("❌ Health check failed")
+            
     except Exception as e:
-        logger.error(f"❌ Database initialization error: {e}")
+        print(f"❌ Database startup error: {e}")
+        logger.error(f"❌ Database startup error: {e}")
     
     # Enhanced CORS configuration
     CORS(app, 
