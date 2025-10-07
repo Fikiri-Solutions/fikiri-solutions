@@ -5,6 +5,10 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn --workers 2 --bind 0.0.0.0:$PORT app:app
     plan: starter
+    disk:
+      name: fikiri-data
+      mountPath: /opt/render/project/data
+      sizeGB: 1
     envVars:
       - key: FLASK_ENV
         value: production

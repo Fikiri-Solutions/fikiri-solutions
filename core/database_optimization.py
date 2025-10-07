@@ -83,7 +83,13 @@ class IndexInfo:
 class DatabaseOptimizer:
     """Database optimization and performance monitoring with enterprise features"""
     
-    def __init__(self, db_path: str = "data/fikiri.db", db_type: str = "sqlite"):
+    def __init__(self, db_path: str = None, db_type: str = "sqlite"):
+        # Use persistent storage on Render, fallback to local for development
+        if db_path is None:
+            if os.path.exists("/opt/render/project/data"):
+                db_path = "/opt/render/project/data/fikiri.db"
+            else:
+                db_path = "data/fikiri.db"
         self.db_path = db_path
         self.db_type = db_type.lower()
         self.query_metrics: List[QueryMetrics] = []
