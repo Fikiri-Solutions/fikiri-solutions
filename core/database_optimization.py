@@ -819,36 +819,80 @@ class DatabaseOptimizer:
             self.connection_pool = None
     
     @contextmanager
-    def get_connection(self):
-        """Get database connection with proper error handling and thread safety"""
+    def get_connection(self, retries=3):
+        """Get database connection with retry logic and corruption prevention"""
         conn = None
-        try:
-            if self.db_type == "postgresql" and self.connection_pool:
-                conn = self.connection_pool.getconn()
-            else:
-                # SQLite connection with thread safety
-                conn = sqlite3.connect(self.db_path, timeout=30.0)
-                conn.row_factory = sqlite3.Row  # Enable dict-like access
-                
-                # Optimized PRAGMAs for production
-                conn.execute("PRAGMA journal_mode=WAL")  # Enable WAL mode for better concurrency
-                conn.execute("PRAGMA synchronous=NORMAL")  # Balance safety and performance
-                conn.execute("PRAGMA cache_size=10000")  # Increase cache size
-                conn.execute("PRAGMA temp_store=MEMORY")  # Store temp tables in memory
-                conn.execute("PRAGMA busy_timeout = 5000")  # Wait up to 5s for locks
-            
-            yield conn
-        except Exception as e:
-            if conn:
-                conn.rollback()
-            logger.error(f"Database connection error: {e}")
-            raise
-        finally:
-            if conn:
+        last_error = None
+        
+        for attempt in range(retries):
+            try:
                 if self.db_type == "postgresql" and self.connection_pool:
-                    self.connection_pool.putconn(conn)
+                    conn = self.connection_pool.getconn()
                 else:
-                    conn.close()
+                    # SQLite connection with corruption prevention
+                    conn = sqlite3.connect(self.db_path, timeout=30.0)
+                    conn.row_factory = sqlite3.Row  # Enable dict-like access
+                    
+                    # Production-safe PRAGMAs to prevent corruption
+                    conn.execute("PRAGMA journal_mode=DELETE")  # Use DELETE mode for stability
+                    conn.execute("PRAGMA synchronous=FULL")  # Maximum safety to prevent corruption
+                    conn.execute("PRAGMA cache_size=2000")  # Smaller cache to reduce memory pressure
+                    conn.execute("PRAGMA temp_store=MEMORY")  # Store temp tables in memory
+                    conn.execute("PRAGMA busy_timeout = 10000")  # Longer timeout for locks
+                    conn.execute("PRAGMA foreign_keys=ON")  # Enable foreign key constraints
+                    
+                    # Check integrity on connection
+                    integrity_result = conn.execute("PRAGMA integrity_check").fetchone()
+                    if integrity_result and integrity_result[0] != 'ok':
+                        logger.error(f"Database integrity check failed: {integrity_result[0]}")
+                        conn.close()
+                        conn = None
+                        raise sqlite3.DatabaseError("Database integrity check failed")
+                
+                yield conn
+                return  # Success, exit retry loop
+                
+            except (sqlite3.DatabaseError, sqlite3.OperationalError) as e:
+                last_error = e
+                if conn:
+                    try:
+                        conn.close()
+                    except:
+                        pass
+                    conn = None
+                
+                if "database disk image is malformed" in str(e):
+                    logger.error(f"Database corruption detected on attempt {attempt + 1}: {e}")
+                    if attempt < retries - 1:
+                        logger.info("Attempting database repair...")
+                        self._repair_database()
+                        continue
+                    else:
+                        logger.error("All repair attempts failed")
+                        break
+                elif attempt < retries - 1:
+                    logger.warning(f"Database connection failed on attempt {attempt + 1}: {e}")
+                    time.sleep(0.1 * (attempt + 1))  # Exponential backoff
+                    continue
+                else:
+                    break
+            except Exception as e:
+                last_error = e
+                if conn:
+                    try:
+                        conn.rollback()
+                        conn.close()
+                    except:
+                        pass
+                    conn = None
+                break
+        
+        # If we get here, all attempts failed
+        if last_error:
+            logger.error(f"Database connection failed after {retries} attempts: {last_error}")
+            raise last_error
+        else:
+            raise sqlite3.DatabaseError("Database connection failed after all retry attempts")
     
     def encrypt_sensitive_data(self, data: str) -> str:
         """Encrypt sensitive data using Fernet encryption"""
@@ -953,6 +997,19 @@ class DatabaseOptimizer:
         
         # Skip performance logging on auth-related queries to avoid overhead
         if "users" in query.lower() and ("password" in query.lower() or "session" in query.lower()):
+            return
+        
+        # Skip performance logging for fast queries to reduce database load
+        if execution_time < 0.01:  # Skip queries faster than 10ms
+            return
+        
+        # Only log every 10th query to reduce database load
+        if hasattr(self, '_query_count'):
+            self._query_count += 1
+        else:
+            self._query_count = 1
+        
+        if self._query_count % 10 != 0:
             return
         
         # Create query hash for deduplication
