@@ -300,6 +300,11 @@ def get_dashboard_services():
         logger.error(f"Dashboard services error: {e}")
         return create_error_response("Failed to get service status", 500, "SERVICES_ERROR")
 
+@dashboard_bp.route('/test', methods=['GET'])
+def test_dashboard():
+    """Simple test endpoint"""
+    return jsonify({'success': True, 'message': 'Dashboard blueprint is working'})
+
 @dashboard_bp.route('/kpi', methods=['GET'])
 @handle_api_errors
 def get_dashboard_kpi():
