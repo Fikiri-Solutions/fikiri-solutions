@@ -343,6 +343,49 @@ def setup_routes(app):
     def dashboard():
         """Serve dashboard page"""
         return render_template('dashboard.html')
+    
+    # Direct dashboard API routes for testing
+    @app.route('/api/dashboard/test-direct', methods=['GET'])
+    def test_dashboard_direct():
+        """Direct test endpoint for dashboard"""
+        return jsonify({'success': True, 'message': 'Direct dashboard route is working'})
+    
+    @app.route('/api/dashboard/metrics-direct', methods=['GET'])
+    def dashboard_metrics_direct():
+        """Direct dashboard metrics endpoint"""
+        try:
+            metrics_data = {
+                'success': True,
+                'data': {
+                    'user': {
+                        'id': 1,
+                        'name': 'Demo User',
+                        'email': 'demo@example.com',
+                        'onboarding_completed': True,
+                        'onboarding_step': -1
+                    },
+                    'leads': {
+                        'total': 45,
+                        'new_today': 5,
+                        'converted': 12,
+                        'pending': 28
+                    },
+                    'emails': {
+                        'processed_today': 125,
+                        'replied': 89,
+                        'pending': 36
+                    },
+                    'automation': {
+                        'active_rules': 8,
+                        'emails_sent': 234,
+                        'success_rate': 94.5
+                    }
+                },
+                'message': 'Dashboard metrics retrieved successfully'
+            }
+            return jsonify(metrics_data)
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
 
 # Register blueprints
 def register_blueprints(app):
