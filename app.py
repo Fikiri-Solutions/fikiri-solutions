@@ -432,6 +432,11 @@ def dashboard_metrics_direct():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/test-simple', methods=['GET'])
+def test_simple():
+    """Simple test endpoint"""
+    return jsonify({'success': True, 'message': 'Simple test endpoint working'})
+
 @app.route('/api/ai-response', methods=['POST'])
 def ai_response_direct():
     """Direct AI response endpoint for frontend"""
