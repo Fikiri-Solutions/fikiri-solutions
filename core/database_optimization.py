@@ -99,15 +99,65 @@ class DatabaseOptimizer:
         self.max_metrics = 10000
         self.lock = threading.Lock()
         
+        # Check database integrity on startup
+        self._check_and_repair_database()
+        
         # Connection pooling for PostgreSQL
         self.connection_pool = None
+    
+    def _check_and_repair_database(self):
+        """Check database integrity and repair if corrupted"""
+        try:
+            if not os.path.exists(self.db_path):
+                logger.info(f"📁 Database file doesn't exist, will be created: {self.db_path}")
+                return
+            
+            # Test database integrity
+            conn = sqlite3.connect(self.db_path)
+            try:
+                result = conn.execute("PRAGMA integrity_check").fetchone()
+                if result and result[0] == 'ok':
+                    logger.info("✅ Database integrity check passed")
+                else:
+                    logger.warning(f"⚠️ Database integrity issues detected: {result}")
+                    self._repair_database()
+            finally:
+                conn.close()
+                
+        except Exception as e:
+            logger.error(f"❌ Database integrity check failed: {e}")
+            self._repair_database()
+    
+    def _repair_database(self):
+        """Repair corrupted database by recreating it"""
+        try:
+            logger.warning("🔧 Attempting to repair corrupted database...")
+            
+            # Backup corrupted database
+            backup_path = f"{self.db_path}.corrupted.{int(time.time())}"
+            if os.path.exists(self.db_path):
+                os.rename(self.db_path, backup_path)
+                logger.info(f"📦 Backed up corrupted database to: {backup_path}")
+            
+            # Recreate database with fresh schema
+            logger.info("🔄 Recreating database with fresh schema...")
+            self._initialize_database()
+            logger.info("✅ Database repair completed successfully")
+            
+        except Exception as e:
+            logger.error(f"❌ Database repair failed: {e}")
+            # If repair fails, try to continue with a fresh database
+            try:
+                if os.path.exists(self.db_path):
+                    os.remove(self.db_path)
+                self._initialize_database()
+                logger.info("✅ Fresh database created as fallback")
+            except Exception as e2:
+                logger.error(f"❌ Complete database recovery failed: {e2}")
         
-        # Encryption support
+        # Initialize encryption support
         self.cipher = None
         self._initialize_encryption()
-        
-        # Initialize database
-        self._initialize_database()
     
     def _initialize_encryption(self):
         """Initialize encryption for sensitive data"""
