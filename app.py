@@ -386,6 +386,38 @@ def setup_routes(app):
             return jsonify(metrics_data)
         except Exception as e:
             return jsonify({'success': False, 'error': str(e)}), 500
+    
+    # Direct AI response endpoint for testing
+    @app.route('/api/ai-response', methods=['POST'])
+    def ai_response_direct():
+        """Direct AI response endpoint for frontend"""
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({'success': False, 'error': 'Request body cannot be empty'}), 400
+            
+            message = data.get('message', '')
+            if not message:
+                return jsonify({'success': False, 'error': 'Message is required'}), 400
+            
+            # Simple AI response logic
+            response_data = {
+                'success': True,
+                'data': {
+                    'response': f"I understand you said: '{message}'. This is a demo response from the Fikiri AI assistant. The full AI system will be available once authentication is fully configured.",
+                    'confidence': 0.85,
+                    'intent': 'general_inquiry',
+                    'suggested_actions': [
+                        'Connect your Gmail account',
+                        'Set up email automation rules',
+                        'View your dashboard analytics'
+                    ]
+                },
+                'message': 'AI response generated successfully'
+            }
+            return jsonify(response_data)
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
 
 # Register blueprints
 def register_blueprints(app):
