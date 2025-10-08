@@ -437,6 +437,27 @@ def test_simple():
     """Simple test endpoint"""
     return jsonify({'success': True, 'message': 'Simple test endpoint working'})
 
+@app.route('/api/repair-database', methods=['POST'])
+def repair_database():
+    """Force database repair endpoint"""
+    try:
+        from core.database_optimization import db_optimizer
+        logger.info("🔧 Forcing database repair...")
+        
+        # Force database repair
+        db_optimizer._repair_database()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Database repair completed successfully'
+        })
+    except Exception as e:
+        logger.error(f"❌ Database repair failed: {e}")
+        return jsonify({
+            'success': False, 
+            'error': str(e)
+        }), 500
+
 @app.route('/api/ai-response', methods=['POST'])
 def ai_response_direct():
     """Direct AI response endpoint for frontend"""
