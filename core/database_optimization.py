@@ -133,11 +133,20 @@ class DatabaseOptimizer:
         try:
             logger.warning("🔧 Attempting to repair corrupted database...")
             
-            # Backup corrupted database
-            backup_path = f"{self.db_path}.corrupted.{int(time.time())}"
+            # Force remove corrupted database
             if os.path.exists(self.db_path):
-                os.rename(self.db_path, backup_path)
-                logger.info(f"📦 Backed up corrupted database to: {backup_path}")
+                backup_path = f"{self.db_path}.corrupted.{int(time.time())}"
+                try:
+                    os.rename(self.db_path, backup_path)
+                    logger.info(f"📦 Backed up corrupted database to: {backup_path}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not backup corrupted database: {e}")
+                    # Force delete if rename fails
+                    try:
+                        os.remove(self.db_path)
+                        logger.info("🗑️ Force deleted corrupted database")
+                    except Exception as e2:
+                        logger.error(f"❌ Could not delete corrupted database: {e2}")
             
             # Recreate database with fresh schema
             logger.info("🔄 Recreating database with fresh schema...")
@@ -154,6 +163,12 @@ class DatabaseOptimizer:
                 logger.info("✅ Fresh database created as fallback")
             except Exception as e2:
                 logger.error(f"❌ Complete database recovery failed: {e2}")
+                # Last resort: create empty database file
+                try:
+                    open(self.db_path, 'a').close()
+                    logger.info("🆘 Created empty database file as last resort")
+                except Exception as e3:
+                    logger.error(f"❌ Complete database recovery failed: {e3}")
         
         # Initialize encryption support
         self.cipher = None
