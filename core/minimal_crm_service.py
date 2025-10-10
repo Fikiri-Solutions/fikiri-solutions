@@ -231,6 +231,8 @@ class MinimalCRMService:
                         lead_dict[key] = json.dumps(value)
                     elif value is None:
                         lead_dict[key] = ""  # Replace None with empty string
+                    elif isinstance(value, dict):
+                        lead_dict[key] = json.dumps(value)  # Serialize dicts
                 self.redis_client.hset(f"fikiri:lead:{lead.id}", mapping=lead_dict)
             
             # Store lead IDs for quick access

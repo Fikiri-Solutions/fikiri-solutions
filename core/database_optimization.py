@@ -218,8 +218,7 @@ class DatabaseOptimizer:
                 error_message TEXT,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 user_id INTEGER,
-                endpoint TEXT,
-                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
+                endpoint TEXT
             )
         """)
         
