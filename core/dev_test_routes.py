@@ -6,7 +6,7 @@ These routes should only be available in development mode.
 from flask import Blueprint, jsonify, request
 import json
 import os
-from core.redis_cache import RedisCache
+from core.redis_cache import FikiriCache
 
 # Create blueprint for dev tests
 dev_tests_bp = Blueprint('dev_tests', __name__, url_prefix='/api/dev')
@@ -18,7 +18,7 @@ def redis_serialization_test():
         return jsonify({"error": "Not available in production"}), 403
     
     try:
-        redis_cache = RedisCache()
+        redis_cache = FikiriCache()
         if not redis_cache.redis_client:
             return jsonify({"error": "Redis not available"}), 503
         
