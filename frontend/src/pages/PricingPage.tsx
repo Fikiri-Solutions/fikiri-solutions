@@ -464,26 +464,26 @@ const PricingPage: React.FC = () => {
                       </tr>
                       {category.features.map((feature, featureIndex) => (
                         <tr key={featureIndex} className="border-b border-gray-700/50">
-                          <td className="p-4 text-gray-100">{feature.name}</td>
-                          <td className="p-4 text-center text-gray-100">
+                          <td className="p-4 text-white">{feature.name}</td>
+                          <td className="p-4 text-center text-white">
                             {typeof feature.starter === 'boolean' 
                               ? (feature.starter ? <Check className="w-5 h-5 text-green-400 mx-auto" /> : '—')
                               : feature.starter
                             }
                           </td>
-                          <td className="p-4 text-center text-gray-100">
+                          <td className="p-4 text-center text-white">
                             {typeof feature.growth === 'boolean' 
                               ? (feature.growth ? <Check className="w-5 h-5 text-green-400 mx-auto" /> : '—')
                               : feature.growth
                             }
                           </td>
-                          <td className="p-4 text-center text-gray-100">
+                          <td className="p-4 text-center text-white">
                             {typeof feature.business === 'boolean' 
                               ? (feature.business ? <Check className="w-5 h-5 text-green-400 mx-auto" /> : '—')
                               : feature.business
                             }
                           </td>
-                          <td className="p-4 text-center text-gray-100">
+                          <td className="p-4 text-center text-white">
                             {typeof feature.enterprise === 'boolean' 
                               ? (feature.enterprise ? <Check className="w-5 h-5 text-green-400 mx-auto" /> : '—')
                               : feature.enterprise
