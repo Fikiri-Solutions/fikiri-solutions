@@ -1046,23 +1046,25 @@ class DatabaseOptimizer:
         
         # Persist metrics to database using direct connection to avoid recursion
         try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO query_performance_log 
-                    (query_hash, query_text, execution_time, rows_affected, success, error_message, user_id, endpoint)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    query_hash,
-                    query[:500],  # Truncate for storage
-                    execution_time,
-                    rows_affected,
-                    success,
-                    error,
-                    user_id,
-                    endpoint
-                ))
-                conn.commit()
+            import sqlite3
+            conn = sqlite3.connect(self.db_path, timeout=30.0)
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO query_performance_log 
+                (query_hash, query_text, execution_time, rows_affected, success, error_message, user_id, endpoint)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                query_hash,
+                query[:500],  # Truncate for storage
+                execution_time,
+                rows_affected,
+                success,
+                error,
+                user_id,
+                endpoint
+            ))
+            conn.commit()
+            conn.close()
         except Exception as e:
             logger.warning(f"Failed to persist query metrics: {e}")
     

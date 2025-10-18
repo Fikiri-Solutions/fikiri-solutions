@@ -126,4 +126,5 @@ const PrivacyPolicy: React.FC = () => {
   );
 };
 
+export { PrivacyPolicy };
 export default PrivacyPolicy;
