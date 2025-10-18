@@ -99,8 +99,15 @@ class DatabaseOptimizer:
         self.max_metrics = 10000
         self.lock = threading.Lock()
         
+        # Initialize ready flag to prevent race conditions
+        self._ready = False
+        
         # Check database integrity on startup
         self._check_and_repair_database()
+        
+        # Initialize database schema
+        self._initialize_database()
+        self._ready = True
         
         # Connection pooling for PostgreSQL
         self.connection_pool = None
@@ -971,16 +978,19 @@ class DatabaseOptimizer:
                 
                 execution_time = time.time() - start_time
                 
-                # Record metrics
-                self._record_query_metrics(query, execution_time, result, True, 
-                                         user_id=user_id, endpoint=endpoint)
+                # Record metrics only if ready
+                if self._ready:
+                    self._record_query_metrics(query, execution_time, result, True, 
+                                             user_id=user_id, endpoint=endpoint)
                 
                 return result
                 
         except Exception as e:
             execution_time = time.time() - start_time
-            self._record_query_metrics(query, execution_time, 0, False, str(e),
-                                     user_id=user_id, endpoint=endpoint)
+            # Only record metrics on error if ready
+            if self._ready:
+                self._record_query_metrics(query, execution_time, 0, False, str(e),
+                                         user_id=user_id, endpoint=endpoint)
             logger.error(f"Query execution error: {e}")
             raise
     
@@ -988,6 +998,10 @@ class DatabaseOptimizer:
                             rows_affected: int, success: bool, error: str = None,
                             user_id: int = None, endpoint: str = None):
         """Record query performance metrics with persistence"""
+        # Don't record metrics if not ready or if this is a metrics query
+        if not self._ready:
+            return
+            
         import hashlib
         
         # Prevent recursive logging - if this is a metrics query, skip persistence

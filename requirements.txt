@@ -50,6 +50,9 @@ click>=8.0
 # PyTorch removed for lightweight operation
 # ML dependencies removed for lightweight operation
 
+# NumPy compatibility - pin to 1.x to avoid conflicts with scikit-learn
+numpy<2.0
+
 # Database and Caching
 SQLAlchemy>=2.0.0
 redis>=4.0.0
