@@ -6,7 +6,7 @@ These routes should only be available in development mode.
 from flask import Blueprint, jsonify, request
 import json
 import os
-from core.redis_cache import get_redis_client
+from core.redis_cache import RedisCache
 
 # Create blueprint for dev tests
 dev_tests_bp = Blueprint('dev_tests', __name__, url_prefix='/api/dev')
@@ -18,8 +18,8 @@ def redis_serialization_test():
         return jsonify({"error": "Not available in production"}), 403
     
     try:
-        redis_client = get_redis_client()
-        if not redis_client:
+        redis_cache = RedisCache()
+        if not redis_cache.redis_client:
             return jsonify({"error": "Redis not available"}), 503
         
         # Test data with various types
@@ -36,10 +36,10 @@ def redis_serialization_test():
         }
         
         # Write using json.dumps (correct way)
-        redis_client.setex("dev_test:serialization", 60, json.dumps(test_data))
+        redis_cache.redis_client.setex("dev_test:serialization", 60, json.dumps(test_data))
         
         # Read back and verify
-        retrieved_data = redis_client.get("dev_test:serialization")
+        retrieved_data = redis_cache.redis_client.get("dev_test:serialization")
         if retrieved_data:
             parsed_data = json.loads(retrieved_data)
             
