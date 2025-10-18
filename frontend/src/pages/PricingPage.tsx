@@ -340,7 +340,7 @@ const PricingPage: React.FC = () => {
                   {tier.features.map((feature, featureIndex) => (
                     <li key={featureIndex} className="flex items-center text-white">
                       <Check className="w-5 h-5 text-green-400 mr-3 flex-shrink-0" />
-                      <span className="text-sm">{feature}</span>
+                      <span className="text-sm text-white !text-white" style={{ color: 'white' }}>{feature}</span>
                     </li>
                   ))}
                 </ul>
