@@ -54,6 +54,7 @@ def init_security(app: Flask):
     redis_client = redis.from_url(redis_url, decode_responses=True)
     
     # Initialize rate limiter (fixed - use single initialization style)
+    limiter = None
     if FLASK_AVAILABLE:
         limiter = Limiter(
             key_func=get_remote_address,
