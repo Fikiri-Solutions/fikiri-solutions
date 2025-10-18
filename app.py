@@ -90,6 +90,10 @@ from core.monitoring_dashboard_api import monitoring_dashboard_bp
 from core.ai_chat_api import ai_bp
 from core.dashboard_api import dashboard_bp
 
+# Dev test routes (development only)
+if os.getenv('FLASK_ENV') == 'development':
+    from core.dev_test_routes import dev_tests_bp
+
 # OAuth blueprint (conditional import)
 try:
     from core.app_oauth import oauth
@@ -369,6 +373,10 @@ def register_blueprints(app):
         (user_bp, 'routes_user'),
         (monitoring_bp, 'routes_monitoring')
     ]
+    
+    # Add dev test blueprint in development
+    if os.getenv('FLASK_ENV') == 'development':
+        blueprints.append((dev_tests_bp, 'dev_tests'))
     
     # Register blueprints with error handling
     for bp, name in blueprints:

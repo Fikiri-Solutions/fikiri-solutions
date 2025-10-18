@@ -1044,22 +1044,25 @@ class DatabaseOptimizer:
             if len(self.query_metrics) > self.max_metrics:
                 self.query_metrics = self.query_metrics[-self.max_metrics:]
         
-        # Persist metrics to database
+        # Persist metrics to database using direct connection to avoid recursion
         try:
-            self.execute_query("""
-                INSERT INTO query_performance_log 
-                (query_hash, query_text, execution_time, rows_affected, success, error_message, user_id, endpoint)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                query_hash,
-                query[:500],  # Truncate for storage
-                execution_time,
-                rows_affected,
-                success,
-                error,
-                user_id,
-                endpoint
-            ), fetch=False)
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO query_performance_log 
+                    (query_hash, query_text, execution_time, rows_affected, success, error_message, user_id, endpoint)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    query_hash,
+                    query[:500],  # Truncate for storage
+                    execution_time,
+                    rows_affected,
+                    success,
+                    error,
+                    user_id,
+                    endpoint
+                ))
+                conn.commit()
         except Exception as e:
             logger.warning(f"Failed to persist query metrics: {e}")
     
