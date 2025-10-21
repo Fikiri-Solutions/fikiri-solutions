@@ -56,7 +56,7 @@ from core.feature_flags import get_feature_flags
 from core.email_service_manager import EmailServiceManager
 
 # Enhanced services
-from core.jwt_auth import jwt_auth_manager
+from core.jwt_auth import get_jwt_manager
 from core.secure_sessions import secure_session_manager, init_secure_sessions
 from core.idempotency_manager import idempotency_manager
 from core.rate_limiter import enhanced_rate_limiter
@@ -193,7 +193,8 @@ def initialize_services(app):
         services['email_manager'] = EmailServiceManager()
 
         # ✅ Security / session layers
-        jwt_auth_manager._initialize_tables()
+        jwt_manager = get_jwt_manager()
+        jwt_manager._initialize_tables()
         init_flask_sessions(app)
         if callable(init_secure_sessions):
             init_secure_sessions(app)

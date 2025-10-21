@@ -1047,8 +1047,23 @@ class DatabaseOptimizer:
         # Persist metrics to database using direct connection to avoid recursion
         try:
             import sqlite3
+            import json
             conn = sqlite3.connect(self.db_path, timeout=30.0)
             cursor = conn.cursor()
+            
+            # Serialize complex data types
+            serialized_error = error
+            if isinstance(error, (list, dict)):
+                serialized_error = json.dumps(error)
+            
+            serialized_user_id = user_id
+            if isinstance(user_id, (list, dict)):
+                serialized_user_id = json.dumps(user_id)
+            
+            serialized_endpoint = endpoint
+            if isinstance(endpoint, (list, dict)):
+                serialized_endpoint = json.dumps(endpoint)
+            
             cursor.execute("""
                 INSERT INTO query_performance_log 
                 (query_hash, query_text, execution_time, rows_affected, success, error_message, user_id, endpoint)
@@ -1059,9 +1074,9 @@ class DatabaseOptimizer:
                 execution_time,
                 rows_affected,
                 success,
-                error,
-                user_id,
-                endpoint
+                serialized_error,
+                serialized_user_id,
+                serialized_endpoint
             ))
             conn.commit()
             conn.close()
