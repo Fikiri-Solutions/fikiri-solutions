@@ -14,6 +14,18 @@ export const Onboarding: React.FC = () => {
     company: '',
     industry: ''
   });
+  
+  // A/B Testing Hook
+  const [variant, setVariant] = useState<'A' | 'B'>(() => {
+    // Persist variant across sessions
+    const savedVariant = localStorage.getItem('fikiri-onboarding-variant');
+    if (savedVariant && (savedVariant === 'A' || savedVariant === 'B')) {
+      return savedVariant as 'A' | 'B';
+    }
+    const newVariant = Math.random() < 0.5 ? 'A' : 'B';
+    localStorage.setItem('fikiri-onboarding-variant', newVariant);
+    return newVariant;
+  });
 
   useEffect(() => {
     // Check URL parameters for step
@@ -92,6 +104,8 @@ export const Onboarding: React.FC = () => {
 
       if (response.ok) {
         toast.success('Onboarding completed!');
+        // Set flag to show welcome banner
+        localStorage.setItem('fikiri-onboarding-just-completed', 'true');
         navigate('/dashboard');
       } else {
         const error = await response.json();
@@ -234,7 +248,7 @@ export const Onboarding: React.FC = () => {
                 disabled={!formData.name || !formData.company}
                 className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors duration-200"
               >
-                Next
+                {variant === 'A' ? 'Next' : 'Continue'}
               </button>
             </div>
             
@@ -348,7 +362,7 @@ export const Onboarding: React.FC = () => {
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                 )}
-                {loading ? 'Completing Setup...' : 'Complete Setup'}
+                {loading ? 'Completing Setup...' : (variant === 'A' ? 'Complete Setup' : 'Finish & Launch')}
               </button>
             </div>
           </div>

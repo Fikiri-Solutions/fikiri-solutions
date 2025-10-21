@@ -164,8 +164,85 @@ else
     exit 1
 fi
 
-# Test 9: Frontend (if running locally)
-echo -e "${YELLOW}9. Testing Frontend...${NC}"
+# Test 9: Onboarding Consistency Check
+echo -e "${YELLOW}9. Testing Onboarding Consistency...${NC}"
+CONSISTENCY_TEST=$(python3 -c "
+from core.user_auth import user_auth_manager
+from core.database_optimization import db_optimizer
+import json
+
+try:
+    # Create a test user
+    result = user_auth_manager.create_user(
+        email='consistencytest@example.com',
+        password='testpass123',
+        name='Consistency Test User',
+        business_name='Consistency Test Company',
+        business_email='consistencytest@example.com',
+        industry='Technology',
+        team_size='1-10'
+    )
+    
+    user_id = result['user'].id
+    print('SUCCESS: Test user created')
+    
+    # Login to get token
+    auth_result = user_auth_manager.authenticate_user(
+        email='consistencytest@example.com',
+        password='testpass123'
+    )
+    
+    if auth_result['success']:
+        print('SUCCESS: User authentication successful')
+        
+        # Test onboarding completion
+        onboarding_data = {
+            'name': 'Consistency Test User',
+            'company': 'Consistency Test Company',
+            'industry': 'Technology'
+        }
+        
+        # Save onboarding data
+        upsert_sql = '''
+        INSERT OR REPLACE INTO onboarding_info (user_id, name, company, industry, updated_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        '''
+        db_optimizer.execute_query(upsert_sql, (user_id, onboarding_data['name'], onboarding_data['company'], onboarding_data['industry']))
+        
+        # Update user completion status
+        update_user_sql = '''
+        UPDATE users 
+        SET onboarding_completed = 1, onboarding_step = -1, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        '''
+        db_optimizer.execute_query(update_user_sql, (user_id,))
+        
+        # Verify consistency
+        user_check = db_optimizer.execute_query('SELECT onboarding_completed FROM users WHERE id = ?', (user_id,))
+        onboarding_check = db_optimizer.execute_query('SELECT COUNT(*) as count FROM onboarding_info WHERE user_id = ?', (user_id,))
+        
+        if user_check[0]['onboarding_completed'] == 1 and onboarding_check[0]['count'] == 1:
+            print('SUCCESS: Onboarding consistency check passed')
+        else:
+            print('ERROR: Onboarding consistency check failed')
+            
+    else:
+        print('ERROR: User authentication failed')
+        
+except Exception as e:
+    print(f'ERROR: {e}')
+")
+
+if echo "$CONSISTENCY_TEST" | grep -q "SUCCESS.*consistency check passed"; then
+    echo -e "${GREEN}✅ Onboarding consistency check passed${NC}"
+else
+    echo -e "${RED}❌ Onboarding consistency check failed${NC}"
+    echo "Error: $CONSISTENCY_TEST"
+    exit 1
+fi
+
+# Test 10: Frontend (if running locally)
+echo -e "${YELLOW}10. Testing Frontend...${NC}"
 if curl -fsSL "http://localhost:5173/" -o /dev/null 2>/dev/null; then
     echo -e "${GREEN}✅ Frontend serving successfully${NC}"
 else
@@ -185,6 +262,7 @@ echo "✅ Cookie Security"
 echo "✅ CORS Configuration"
 echo "✅ Database Connection"
 echo "✅ Redis Connection"
+echo "✅ Onboarding Consistency"
 echo "✅ Frontend (if running)"
 
 # Cleanup
