@@ -20,7 +20,7 @@ export const Login: React.FC = () => {
   const [isMicrosoftLoading, setIsMicrosoftLoading] = useState(false)
   const [isPending, startTransition] = useTransition()
   const { trackLogin } = useUserActivityTracking()
-  const { login, setError, clearError } = useAuthActions()
+  const { login, setError: setAuthError, clearError } = useAuthActions()
   const navigate = useNavigate()
 
   // Load saved credentials on component mount
@@ -134,11 +134,11 @@ export const Login: React.FC = () => {
       } catch (error: any) {
         // Handle specific error types
         if (error.message?.includes('429') || error.message?.includes('rate limit')) {
-          setError('Too many login attempts. Please wait a few minutes and try again.')
+          setAuthError('Too many login attempts. Please wait a few minutes and try again.')
         } else if (error.message?.includes('Unauthorized')) {
-          setError('Invalid email or password. Please try again.')
+          setAuthError('Invalid email or password. Please try again.')
         } else {
-          setError(error.message || 'Login failed. Please try again.')
+          setAuthError(error.message || 'Login failed. Please try again.')
         }
       }
     })
@@ -541,5 +541,4 @@ export const Login: React.FC = () => {
       </div>
     </div>
   )
-}
 }
