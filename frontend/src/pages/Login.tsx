@@ -96,7 +96,8 @@ export const Login: React.FC = () => {
       return
     }
     
-    startTransition(async () => {
+    startTransition(() => {
+      const performLogin = async () => {
       try {
         // Attempt login using new auth API
         const result = await authApi.login(email, password)
@@ -141,6 +142,9 @@ export const Login: React.FC = () => {
           setAuthError(error.message || 'Login failed. Please try again.')
         }
       }
+    }
+    
+    performLogin()
     })
   }
 
