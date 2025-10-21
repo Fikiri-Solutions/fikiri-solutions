@@ -95,7 +95,7 @@ def api_login():
             'login_method': 'email_password'
         })
 
-        # Create response with secure cookie
+        # Create response with secure cookie and onboarding state
         response_data = {
             'user': {
                 'id': user_data['id'],
@@ -106,8 +106,9 @@ def api_login():
                 'onboarding_step': user_dict.get('onboarding_step', 1),
                 'last_login': datetime.now().isoformat()
             },
-            'tokens': jwt_tokens, 
-            'session_id': session_id
+            'access_token': jwt_tokens['access_token'] if jwt_tokens else None,
+            'expires_in': jwt_tokens['expires_in'] if jwt_tokens else None,
+            'token_type': 'Bearer'
         }
 
         # Add defensive logging before response
@@ -377,3 +378,64 @@ def reset_rate_limit():
     except Exception as e:
         logger.error(f"Rate limit reset error: {e}")
         return create_error_response("Rate limit reset failed", 500, 'RATE_LIMIT_RESET_ERROR')
+
+@auth_bp.route('/whoami', methods=['GET'])
+@handle_api_errors
+def api_whoami():
+    """Debug endpoint to check authentication state"""
+    try:
+        # Check session cookie
+        session_id = request.cookies.get('fikiri_session')
+        session_data = None
+        
+        if session_id:
+            from core.secure_sessions import secure_session_manager
+            session_data = secure_session_manager.get_session(session_id)
+        
+        # Check Authorization header
+        auth_header = request.headers.get('Authorization')
+        token_data = None
+        
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+            from core.jwt_auth import get_jwt_manager
+            jwt_manager = get_jwt_manager()
+            token_data = jwt_manager.verify_access_token(token)
+        
+        # Get user data if authenticated
+        user_data = None
+        if session_data:
+            user_data = session_data.get('user_data', {})
+        elif token_data and 'error' not in token_data:
+            # Get user from database
+            user_id = token_data.get('user_id')
+            if user_id:
+                from core.database_optimization import db_optimizer
+                users = db_optimizer.execute_query(
+                    "SELECT id, email, name, role, onboarding_completed, onboarding_step FROM users WHERE id = ?",
+                    (user_id,)
+                )
+                if users:
+                    user_data = users[0]
+        
+        response_data = {
+            'authenticated': bool(user_data),
+            'user': user_data,
+            'session_exists': bool(session_data),
+            'token_valid': bool(token_data and 'error' not in token_data),
+            'cookies': {
+                'fikiri_session': bool(session_id),
+                'fikiri_refresh_token': bool(request.cookies.get('fikiri_refresh_token'))
+            },
+            'headers': {
+                'authorization': bool(auth_header),
+                'origin': request.headers.get('Origin'),
+                'user_agent': request.headers.get('User-Agent')
+            }
+        }
+        
+        return create_success_response(response_data, "Authentication state")
+        
+    except Exception as e:
+        logger.error(f"Whoami error: {e}")
+        return create_error_response("Debug check failed", 500, "DEBUG_ERROR")
