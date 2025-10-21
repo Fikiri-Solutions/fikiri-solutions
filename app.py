@@ -141,16 +141,19 @@ def create_app():
         print(f"❌ Database startup error: {e}")
         logger.error(f"❌ Database startup error: {e}")
     
-    # Enhanced CORS configuration
+    # Enhanced CORS configuration for cookie-based auth
     CORS(app, 
          resources={r"/api/*": {"origins": [
              "https://fikirisolutions.com",
-             "http://localhost:3000"
+             "https://www.fikirisolutions.com", 
+             "http://localhost:3000",
+             "http://127.0.0.1:3000"
          ]}},
-         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-         allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
+         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+         allow_headers=['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRFToken'],
          supports_credentials=True,
-         max_age=3600
+         max_age=3600,
+         vary_header=True
     )
     
     # Setup request logging

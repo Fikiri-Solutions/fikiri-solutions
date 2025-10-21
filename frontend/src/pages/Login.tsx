@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useTransition } from 'react'
 import { Mail, Lock, ArrowRight, Zap, Shield, Rocket, Github, Chrome, UserPlus, Eye, EyeOff, Building2 } from 'lucide-react'
 import { useUserActivityTracking } from '../contexts/ActivityContext'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth, useAuthActions } from '../store/auth'
+import { authApi } from '../lib/api'
 import { FikiriLogo } from '../components/FikiriLogo'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
@@ -17,8 +18,9 @@ export const Login: React.FC = () => {
   const [rememberMe, setRememberMe] = useState(false)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const [isMicrosoftLoading, setIsMicrosoftLoading] = useState(false)
+  const [isPending, startTransition] = useTransition()
   const { trackLogin } = useUserActivityTracking()
-  const { login, getRedirectPath } = useAuth()
+  const { login, setError, clearError } = useAuthActions()
   const navigate = useNavigate()
 
   // Load saved credentials on component mount
@@ -76,27 +78,32 @@ export const Login: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
-    setError('')
+    clearError()
     
-    try {
-      // Validate inputs
-      if (!email || !password) {
-        throw new Error('Please enter both email and password')
-      }
-      
-      if (!validateEmail(email)) {
-        throw new Error('Please enter a valid email address')
-      }
-      
-      if (password.length < 6) {
-        throw new Error('Password must be at least 6 characters')
-      }
-      
-      // Attempt login using auth context
-      const result = await login(email, password)
-      
-      if (result.success) {
+    // Validate inputs
+    if (!email || !password) {
+      setError('Please enter both email and password')
+      return
+    }
+    
+    if (!validateEmail(email)) {
+      setError('Please enter a valid email address')
+      return
+    }
+    
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters')
+      return
+    }
+    
+    startTransition(async () => {
+      try {
+        // Attempt login using new auth API
+        const result = await authApi.login(email, password)
+        
+        // Update auth state
+        login(result.user, result.access_token)
+        
         // Handle remember me functionality
         if (typeof window !== 'undefined') {
           try {
@@ -117,22 +124,24 @@ export const Login: React.FC = () => {
         // Track successful login
         trackLogin(email, 'email')
         
-        // Get the appropriate redirect path based on user state
-        const redirectPath = getRedirectPath()
-        navigate(redirectPath)
-      } else {
-        // Handle specific error types
-        if (result.error?.includes('429') || result.error?.includes('rate limit')) {
-          setError('Too many login attempts. Please wait a few minutes and try again.')
+        // Navigate based on onboarding state
+        if (result.user.onboarding_completed) {
+          navigate('/dashboard')
         } else {
-          setError(result.error || 'Login failed. Please try again.')
+          navigate('/onboarding')
+        }
+        
+      } catch (error: any) {
+        // Handle specific error types
+        if (error.message?.includes('429') || error.message?.includes('rate limit')) {
+          setError('Too many login attempts. Please wait a few minutes and try again.')
+        } else if (error.message?.includes('Unauthorized')) {
+          setError('Invalid email or password. Please try again.')
+        } else {
+          setError(error.message || 'Login failed. Please try again.')
         }
       }
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Login failed. Please try again.')
-    } finally {
-      setIsLoading(false)
-    }
+    })
   }
 
   const handleMicrosoftLogin = async () => {
@@ -439,10 +448,10 @@ export const Login: React.FC = () => {
 
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isPending}
                 className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-brand-primary to-brand-secondary hover:from-brand-secondary hover:to-brand-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105"
               >
-                {isLoading ? (
+                {isPending ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                     Signing in...
@@ -532,4 +541,5 @@ export const Login: React.FC = () => {
       </div>
     </div>
   )
+}
 }

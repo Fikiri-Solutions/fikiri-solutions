@@ -44,10 +44,10 @@ class SecureSessionManager:
         self.session_prefix = "fikiri:secure:session:"
         self.session_ttl = 24 * 60 * 60  # 24 hours
         self.cookie_name = "fikiri_session"
-        self.cookie_secure = os.getenv('FLASK_ENV') == 'production'
+        self.cookie_secure = True  # Always secure for production
         self.cookie_httponly = True
-        self.cookie_samesite = 'Strict'
-        self.cookie_domain = os.getenv('SESSION_COOKIE_DOMAIN')
+        self.cookie_samesite = 'None'  # Allow cross-site for SPA
+        self.cookie_domain = os.getenv('SESSION_COOKIE_DOMAIN', '.fikirisolutions.com')
         self._connect_redis()
         self._initialize_tables()
     
