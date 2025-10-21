@@ -111,6 +111,7 @@ def update_user_profile():
 
 @user_bp.route('/user/onboarding-step', methods=['PUT'])
 @handle_api_errors
+@jwt_required
 def update_onboarding_step():
     """Update user onboarding step"""
     try:
