@@ -1,0 +1,55 @@
+name: Smoke Test Authentication System
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Set up environment variables
+      run: |
+        cp env.template .env
+        echo "JWT_SECRET_KEY=xbppiUtMLEy-edconosX09sfeaeGwMhmhCxFabteQtw" >> .env
+        echo "FERNET_KEY=2HJ-fbPvowR0BFd7MR2nXO4REdtRtBoz4Bb-HFTl4aU=" >> .env
+        echo "REDIS_URL=redis://default:fz0wvU6lk68C67y2bMwSrjGC38g3Dh6H@redis-19575.c17.us-east-1-4.ec2.redns.redis-cloud.com:19575" >> .env
+        
+    - name: Start Flask application
+      run: |
+        python app.py &
+        sleep 10
+        echo "Flask app started"
+        
+    - name: Run smoke tests
+      run: |
+        chmod +x scripts/smoke_test.sh
+        ./scripts/smoke_test.sh
+        
+    - name: Test frontend compilation
+      run: |
+        cd frontend
+        npm install
+        npm run build
+        
+    - name: Cleanup
+      if: always()
+      run: |
+        pkill -f "python app.py" || true
