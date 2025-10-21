@@ -153,7 +153,7 @@ class JWTAuthManager:
             raise Exception("JWT library not available")
         
         try:
-            current_time = datetime.utcnow()
+            current_time = datetime.now()
             
             # Generate unique device ID for multi-device support
             device_id = secrets.token_hex(4)
@@ -261,7 +261,7 @@ class JWTAuthManager:
                 session_data = self.redis_client.get(session_key)
                 if session_data:
                     data = json.loads(session_data)
-                    data['last_accessed'] = datetime.utcnow().isoformat()
+                    data['last_accessed'] = datetime.now().isoformat()
                     self.redis_client.setex(
                         session_key, 
                         self.access_token_expiry, 
@@ -476,8 +476,15 @@ class JWTAuthManager:
         except Exception as e:
             logger.error(f"❌ Token cleanup failed: {e}")
 
-# Global JWT manager
-jwt_auth_manager = JWTAuthManager()
+# Global JWT manager - lazy loaded
+jwt_auth_manager = None
+
+def get_jwt_manager():
+    """Get or create JWT manager instance"""
+    global jwt_auth_manager
+    if jwt_auth_manager is None:
+        jwt_auth_manager = JWTAuthManager()
+    return jwt_auth_manager
 
 # Decorator for JWT authentication with rate limiting support
 def jwt_required(f):
@@ -497,7 +504,7 @@ def jwt_required(f):
         
         # Verify token
         token = auth_header.split(' ')[1]
-        payload = jwt_auth_manager.verify_access_token(token)
+        payload = get_jwt_manager().verify_access_token(token)
         
         if isinstance(payload, dict) and 'error' in payload:
             error_code = payload['error']

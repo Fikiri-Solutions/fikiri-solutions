@@ -237,8 +237,8 @@ class UserAuthManager:
             
             # Generate JWT tokens
             try:
-                from core.jwt_auth import jwt_auth_manager
-                jwt_tokens = jwt_auth_manager.generate_tokens(
+                from core.jwt_auth import get_jwt_manager
+                jwt_tokens = get_jwt_manager().generate_tokens(
                     user_dict['id'],
                     user_dict,
                     device_info=user_agent,
