@@ -49,7 +49,7 @@ class JWTAuthManager:
         self.algorithm = 'HS256'
         
         # Configurable token expiries via environment variables
-        self.access_token_expiry = int(os.getenv("JWT_ACCESS_EXPIRY", 15 * 60))  # 15 minutes default
+        self.access_token_expiry = int(os.getenv("JWT_ACCESS_EXPIRY", 30 * 60))  # 30 minutes default (extended from 15)
         self.refresh_token_expiry = int(os.getenv("JWT_REFRESH_EXPIRY", 7 * 24 * 60 * 60))  # 7 days default
         
         self.redis_client = None
