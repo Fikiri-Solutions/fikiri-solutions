@@ -217,21 +217,50 @@ class OAuthTokenManager:
             
             row = result[0]
             
+            # Handle both dict and tuple result formats
+            if isinstance(row, dict):
+                access_token_encrypted = row.get('access_token_encrypted') or row.get(list(row.keys())[0])
+                refresh_token_encrypted = row.get('refresh_token_encrypted') or (row.get(list(row.keys())[1]) if len(row) > 1 else None)
+                token_type = row.get('token_type') or row.get(list(row.keys())[2]) if len(row) > 2 else 'Bearer'
+                expires_at = row.get('expires_at') or (row.get(list(row.keys())[3]) if len(row) > 3 else None)
+                scope = row.get('scope') or (row.get(list(row.keys())[4]) if len(row) > 4 else None)
+                is_active = bool(row.get('is_active') or (row.get(list(row.keys())[5]) if len(row) > 5 else True))
+                last_refresh_at = row.get('last_refresh_at') or (row.get(list(row.keys())[6]) if len(row) > 6 else None)
+                refresh_count = row.get('refresh_count') or (row.get(list(row.keys())[7]) if len(row) > 7 else 0)
+            else:
+                # Tuple format
+                access_token_encrypted = row[0]
+                refresh_token_encrypted = row[1] if len(row) > 1 else None
+                token_type = row[2] if len(row) > 2 else 'Bearer'
+                expires_at = row[3] if len(row) > 3 else None
+                scope = row[4] if len(row) > 4 else None
+                is_active = bool(row[5]) if len(row) > 5 else True
+                last_refresh_at = row[6] if len(row) > 6 else None
+                refresh_count = row[7] if len(row) > 7 else 0
+            
             # Decrypt tokens
-            access_token = self.decrypt_token(row[0])
-            refresh_token = self.decrypt_token(row[1]) if row[1] else None
+            try:
+                access_token = self.decrypt_token(access_token_encrypted) if access_token_encrypted else None
+                refresh_token = self.decrypt_token(refresh_token_encrypted) if refresh_token_encrypted else None
+            except Exception as e:
+                logger.error(f"Failed to decrypt tokens: {e}")
+                return {
+                    'success': False,
+                    'error': f'Token decryption failed: {str(e)}',
+                    'error_code': 'TOKEN_DECRYPT_FAILED'
+                }
             
             return {
                 'success': True,
                 'data': {
                     'access_token': access_token,
                     'refresh_token': refresh_token,
-                    'token_type': row[2],
-                    'expires_at': row[3],
-                    'scope': row[4],
-                    'is_active': bool(row[5]),
-                    'last_refresh_at': row[6],
-                    'refresh_count': row[7]
+                    'token_type': token_type,
+                    'expires_at': expires_at,
+                    'scope': scope,
+                    'is_active': is_active,
+                    'last_refresh_at': last_refresh_at,
+                    'refresh_count': refresh_count
                 }
             }
             
@@ -509,20 +538,31 @@ class OAuthTokenManager:
             
             # Check if token is expired
             is_expired = False
-            if tokens['expires_at']:
-                expires_at = datetime.fromisoformat(tokens['expires_at'])
-                is_expired = datetime.now() >= expires_at
+            if tokens.get('expires_at'):
+                try:
+                    expires_at = datetime.fromisoformat(tokens['expires_at'])
+                    is_expired = datetime.now() >= expires_at
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Failed to parse expires_at: {e}")
+                    is_expired = False
             
             # Get recent failure count
             recent_failures = self.db_optimizer.execute_query(
                 """
-                SELECT COUNT(*) FROM oauth_refresh_failures 
+                SELECT COUNT(*) as failure_count FROM oauth_refresh_failures 
                 WHERE user_id = ? AND service = ? 
                 AND created_at > datetime('now', '-1 hour')
                 """,
                 (user_id, service)
             )
-            failure_count = recent_failures[0][0] if recent_failures else 0
+            # Handle both tuple and dict result formats
+            if recent_failures:
+                if isinstance(recent_failures[0], dict):
+                    failure_count = recent_failures[0].get('failure_count', 0) or recent_failures[0].get('COUNT(*)', 0) or 0
+                else:
+                    failure_count = recent_failures[0][0] if isinstance(recent_failures[0], (tuple, list)) else 0
+            else:
+                failure_count = 0
             
             # Determine status
             if is_expired:
@@ -543,8 +583,8 @@ class OAuthTokenManager:
                     'last_refresh_at': tokens['last_refresh_at'],
                     'refresh_count': tokens['refresh_count'],
                     'recent_failures': failure_count,
-                    'scope': tokens['scope'],
-                    'token_hash': self._hash_token(tokens['access_token'])  # For debugging
+                    'scope': tokens.get('scope', []),
+                    'token_hash': self._hash_token(tokens.get('access_token', '')) if tokens.get('access_token') else None  # For debugging
                 }
             }
             

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -18,63 +18,136 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
   const { isAuthenticated, user, isLoading, getRedirectPath } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const hasRedirected = useRef(false) // Prevent redirect loops
+  const lastPathname = useRef(location.pathname) // Track pathname changes
 
   useEffect(() => {
-    if (isLoading) return // Wait for auth state to load
+    // Reset redirect flag when pathname actually changes (user navigated)
+    if (lastPathname.current !== location.pathname) {
+      hasRedirected.current = false
+      lastPathname.current = location.pathname
+    }
+    
+    if (isLoading) {
+      return // Wait for auth state to load
+    }
 
     const currentPath = location.pathname
-    const shouldRedirect = redirectTo || getRedirectPath()
-
+    
+    // Debug logging for login/dashboard routes
+    if (process.env.NODE_ENV === 'development' && (currentPath === '/login' || currentPath === '/dashboard')) {
+      console.log('[RouteGuard]', { 
+        currentPath, 
+        isAuthenticated, 
+        isLoading, 
+        hasRedirected: hasRedirected.current,
+        userEmail: user?.email,
+        onboarding_completed: user?.onboarding_completed,
+        requireAuth,
+        requireOnboarding
+      })
+    }
 
     // Handle authentication requirements
-    if (requireAuth && !isAuthenticated) {
+    // Don't redirect /inbox to login - it handles its own auth state
+    if (requireAuth && !isAuthenticated && !hasRedirected.current && currentPath !== '/inbox') {
       // User needs to be authenticated but isn't
-      if (currentPath !== '/login' && currentPath !== '/signup') {
-        navigate('/login')
+      // Only redirect if not already on an auth page or /inbox
+      if (currentPath !== '/login' && currentPath !== '/signup' && !currentPath.startsWith('/onboarding-flow')) {
+        hasRedirected.current = true
+        navigate('/login', { replace: true })
       }
       return
     }
 
-    // Handle onboarding requirements
-    if (requireOnboarding && isAuthenticated && !user?.onboarding_completed) {
+    // Handle onboarding requirements (only for authenticated users)
+    if (requireOnboarding && isAuthenticated && !user?.onboarding_completed && !hasRedirected.current) {
       // User is authenticated but hasn't completed onboarding
-      if (!currentPath.startsWith('/onboarding')) {
-        navigate('/onboarding')
+      if (!currentPath.startsWith('/onboarding') && currentPath !== '/onboarding-flow') {
+        // Preserve redirect parameter if present
+        const urlParams = new URLSearchParams(location.search)
+        const redirectParam = urlParams.get('redirect')
+        const safeRedirect = redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')
+          ? redirectParam
+          : currentPath // Use current path as redirect if no explicit redirect param
+        hasRedirected.current = true
+        navigate(`/onboarding?redirect=${encodeURIComponent(safeRedirect)}`, { replace: true })
       }
       return
     }
 
     // Handle authenticated users trying to access auth pages
-    if (isAuthenticated && (currentPath === '/login' || currentPath === '/signup')) {
-      // Use getRedirectPath to determine where to send authenticated users
-      const redirectPath = getRedirectPath()
-      if (redirectPath !== currentPath) {
-        navigate(redirectPath)
+    // Only redirect if they're actually authenticated (not just loading)
+    // BUT: Allow access to login/signup if localStorage was cleared (user wants to log in as different account)
+    if (isAuthenticated && !isLoading && user && !hasRedirected.current && (currentPath === '/login' || currentPath === '/signup')) {
+      // Check if localStorage has auth data - if not, user cleared it intentionally, allow access
+      const hasLocalStorageAuth = typeof window !== 'undefined' && (
+        localStorage.getItem('fikiri-user') || 
+        localStorage.getItem('fikiri-user-id') ||
+        localStorage.getItem('fikiri-auth')
+      )
+      
+      // If localStorage was cleared, allow access to login/signup (user wants to switch accounts)
+      if (!hasLocalStorageAuth) {
+        return // Allow access to login/signup
       }
+      
+      const urlParams = new URLSearchParams(location.search)
+      const redirectParam = urlParams.get('redirect')
+      
+      // If there's a redirect param, login component will handle it with window.location
+      // Don't interfere - just return and let login component do its thing
+      if (redirectParam && currentPath === '/login') {
+        return // Login component handles navigation
+      }
+      
+      // No redirect param - standard redirect logic
+      // If user hasn't completed onboarding, redirect to onboarding
+      if (!user?.onboarding_completed) {
+        hasRedirected.current = true
+        navigate('/onboarding', { replace: true })
+        return
+      }
+      
+      // User has completed onboarding - redirect to dashboard
+      hasRedirected.current = true
+      navigate('/dashboard', { replace: true })
       return
     }
 
     // Handle users who haven't completed onboarding trying to access protected routes
-    if (isAuthenticated && !user?.onboarding_completed && !currentPath.startsWith('/onboarding') && currentPath !== '/home') {
-      navigate('/onboarding')
+    // Only apply this if the route actually requires onboarding
+    if (requireOnboarding && isAuthenticated && !user?.onboarding_completed && 
+        !currentPath.startsWith('/onboarding') && 
+        currentPath !== '/home' &&
+        currentPath !== '/login' &&
+        currentPath !== '/signup') {
+      navigate('/onboarding', { replace: true })
       return
     }
 
     // Handle users who have completed onboarding trying to access onboarding pages
     if (isAuthenticated && user?.onboarding_completed && currentPath.startsWith('/onboarding')) {
-      navigate('/home')
+      navigate('/dashboard', { replace: true })
       return
     }
 
-    // Custom redirect logic - only apply if we're not on auth pages
-    if (shouldRedirect && shouldRedirect !== currentPath && 
-        !currentPath.startsWith('/login') && 
-        !currentPath.startsWith('/signup') && 
-        !currentPath.startsWith('/onboarding-flow')) {
-      navigate(shouldRedirect)
+    // For AuthRoute (requireAuth=false), don't redirect unauthenticated users
+    // They should be able to stay on login/signup/onboarding-flow pages
+    if (!requireAuth && !isAuthenticated) {
+      // Allow unauthenticated users to stay on auth pages
       return
     }
-  }, [isAuthenticated, user, isLoading, location.pathname, navigate, requireAuth, requireOnboarding, redirectTo, getRedirectPath])
+
+    // Custom redirect logic - only apply if redirectTo is explicitly set
+    if (redirectTo && redirectTo !== currentPath && 
+        !currentPath.startsWith('/login') && 
+        !currentPath.startsWith('/signup') && 
+        !currentPath.startsWith('/onboarding')) {
+      navigate(redirectTo, { replace: true })
+      return
+    }
+  }, [isAuthenticated, user?.onboarding_completed, isLoading, location.pathname, navigate, requireAuth, requireOnboarding, redirectTo])
 
   // Show loading state while determining redirect
   if (isLoading) {

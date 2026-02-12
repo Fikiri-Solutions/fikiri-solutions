@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Palette, Upload, RotateCcw, X } from 'lucide-react'
+import { Upload, RotateCcw, X } from 'lucide-react'
 import { useCustomization } from '../contexts/CustomizationContext'
 
 interface CustomizationPanelProps {

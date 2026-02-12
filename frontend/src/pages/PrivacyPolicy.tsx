@@ -1,8 +1,14 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Home } from 'lucide-react';
+import { RadiantLayout } from '../components/radiant';
 
 const PrivacyPolicy: React.FC = () => {
+  const navigate = useNavigate();
+
   return (
+    <RadiantLayout>
     <>
       <Helmet>
         <title>Privacy Policy - Fikiri Solutions</title>
@@ -11,8 +17,26 @@ const PrivacyPolicy: React.FC = () => {
       
       <div className="min-h-screen bg-gray-900 text-white">
         <div className="container mx-auto px-4 py-8 max-w-4xl">
+          {/* Navigation Buttons */}
+          <div className="mb-6 flex items-center gap-4">
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              <Home className="h-4 w-4" />
+              Home
+            </button>
+          </div>
+
           <div className="bg-gray-800 rounded-lg p-8 shadow-xl">
-            <h1 className="text-4xl font-bold text-center mb-8 text-blue-400">
+            <h1 className="text-4xl font-bold text-center mb-8 text-brand-primary">
                   Privacy Policy
                 </h1>
             
@@ -23,17 +47,17 @@ const PrivacyPolicy: React.FC = () => {
               </p>
 
               <section className="mb-8">
-                <h2 className="text-2xl font-semibold text-blue-300 mb-4">Introduction</h2>
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Introduction</h2>
                 <p className="text-gray-300 leading-relaxed">
                   Fikiri Solutions ("we," "our," or "us") is committed to protecting your privacy. 
                   This Privacy Policy explains how we collect, use, disclose, and safeguard your 
                   information when you use our AI-powered Gmail automation platform at 
-                  <a href="https://fikirisolutions.com" className="text-blue-400 hover:text-blue-300"> https://fikirisolutions.com</a> (the "Service").
+                  <a href="https://fikirisolutions.com" className="text-brand-primary hover:text-muted-foreground"> https://fikirisolutions.com</a> (the "Service").
                 </p>
               </section>
 
               <section className="mb-8">
-                <h2 className="text-2xl font-semibold text-blue-300 mb-4">Information We Collect</h2>
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Information We Collect</h2>
                 
                 <h3 className="text-xl font-medium text-green-300 mb-3">Information You Provide</h3>
                 <ul className="list-disc list-inside text-gray-300 mb-4 space-y-2">
@@ -52,7 +76,7 @@ const PrivacyPolicy: React.FC = () => {
               </section>
 
               <section className="mb-8">
-                <h2 className="text-2xl font-semibold text-blue-300 mb-4">How We Use Your Information</h2>
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">How We Use Your Information</h2>
                 <p className="text-gray-300 mb-3">We use your information to:</p>
                 <ul className="list-disc list-inside text-gray-300 space-y-2">
                   <li><strong>Provide Services:</strong> Process emails, generate AI responses, manage automation rules</li>
@@ -63,7 +87,7 @@ const PrivacyPolicy: React.FC = () => {
               </section>
 
               <section className="mb-8">
-                <h2 className="text-2xl font-semibold text-blue-300 mb-4">Gmail API Integration</h2>
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Gmail API Integration</h2>
                 <p className="text-gray-300 mb-3">Our Service integrates with Gmail API to:</p>
                 <ul className="list-disc list-inside text-gray-300 mb-4 space-y-2">
                   <li><strong>Read Emails:</strong> Process incoming messages for AI analysis and automation</li>
@@ -77,7 +101,7 @@ const PrivacyPolicy: React.FC = () => {
               </section>
 
               <section className="mb-8">
-                <h2 className="text-2xl font-semibold text-blue-300 mb-4">Data Security</h2>
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Data Security</h2>
                 <p className="text-gray-300 mb-3">We implement industry-standard security measures:</p>
                 <ul className="list-disc list-inside text-gray-300 space-y-2">
                   <li><strong>Encryption:</strong> All data transmitted using TLS 1.3 encryption</li>
@@ -88,7 +112,7 @@ const PrivacyPolicy: React.FC = () => {
               </section>
 
               <section className="mb-8">
-                <h2 className="text-2xl font-semibold text-blue-300 mb-4">Your Rights and Choices</h2>
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Your Rights and Choices</h2>
                 <p className="text-gray-300 mb-3">You have the right to:</p>
                 <ul className="list-disc list-inside text-gray-300 space-y-2">
                   <li><strong>Access:</strong> Request copies of your personal data</li>
@@ -100,7 +124,7 @@ const PrivacyPolicy: React.FC = () => {
               </section>
 
               <section className="mb-8">
-                <h2 className="text-2xl font-semibold text-blue-300 mb-4">Contact Information</h2>
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Contact Information</h2>
                 <p className="text-gray-300">
                   If you have questions about this Privacy Policy or our data practices, please contact us:
                 </p>
@@ -108,7 +132,7 @@ const PrivacyPolicy: React.FC = () => {
                   <p className="text-gray-300">
                     <strong>Email:</strong> privacy@fikirisolutions.com<br />
                     <strong>Address:</strong> Fikiri Solutions, Privacy Department<br />
-                    <strong>Website:</strong> <a href="/contact" className="text-blue-400 hover:text-blue-300">https://fikirisolutions.com/contact</a>
+                    <strong>Website:</strong> <a href="/contact" className="text-brand-primary hover:text-muted-foreground">https://fikirisolutions.com/contact</a>
                   </p>
                 </div>
               </section>
@@ -123,6 +147,7 @@ const PrivacyPolicy: React.FC = () => {
             </div>
       </div>
     </>
+    </RadiantLayout>
   );
 };
 

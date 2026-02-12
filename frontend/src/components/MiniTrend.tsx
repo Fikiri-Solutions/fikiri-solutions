@@ -1,11 +1,13 @@
 interface MiniTrendProps {
   data: Array<{
-    day: string;
+    day?: string;
     leads?: number;
     emails?: number;
     revenue?: number;
+    responses?: number;
+    value?: number;
   }>;
-  dataKey: "leads" | "emails" | "revenue";
+  dataKey: "leads" | "emails" | "revenue" | "responses" | "value";
   color?: string;
   height?: number;
 }

@@ -1,12 +1,22 @@
-import React, { useState, useEffect } from 'react'
-import { Users, Mail, Phone, Building, Calendar, Star, Filter, Search, Plus } from 'lucide-react'
+import React, { useState, useEffect, useMemo } from 'react'
+import { Users, Mail, Phone, Building, Calendar, Star, Filter, Search, Plus, Activity, Zap } from 'lucide-react'
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { apiClient, LeadData } from '../services/apiClient'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorMessage, getUserFriendlyError } from '../components/ErrorMessage'
 import { FeatureStatus, getFeatureStatus } from '../components/FeatureStatus'
+import { useToast } from '../components/Toast'
+
+const pipelineStages = [
+  { id: 'new', title: 'New Leads', accent: 'border-blue-200 bg-blue-50 dark:bg-blue-900/30', helper: 'Synced from Gmail & forms' },
+  { id: 'contacted', title: 'Contacted', accent: 'border-amber-200 bg-amber-50 dark:bg-amber-900/30', helper: 'Awaiting replies' },
+  { id: 'qualified', title: 'Qualified', accent: 'border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20', helper: 'Ready for meetings' },
+  { id: 'booked', title: 'Booked', accent: 'border-purple-200 bg-purple-50 dark:bg-purple-900/30', helper: 'Won deals' }
+] as const
 
 export const CRM: React.FC = () => {
   const [leads, setLeads] = useState<LeadData[]>([])
+  const [pipeline, setPipeline] = useState<Record<string, LeadData[]>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<{ type: 'error' | 'warning' | 'info' | 'success'; title: string; message: string } | null>(null)
   const [showAddLeadModal, setShowAddLeadModal] = useState(false)
@@ -23,6 +33,7 @@ export const CRM: React.FC = () => {
     lastContact: new Date().toISOString(),
     source: 'web'
   })
+  const { addToast } = useToast()
 
   const handleAddLead = async () => {
     if (!newLead.name || !newLead.email) {
@@ -51,11 +62,8 @@ export const CRM: React.FC = () => {
         source: 'web' 
       })
       setShowAddLeadModal(false)
-      setError({
-        type: 'success',
-        title: 'Lead Added Successfully',
-        message: 'The new lead has been added to your CRM.'
-      })
+      addToast({ type: 'success', title: 'Lead Added', message: 'The new lead has been added to your CRM.' })
+      setError(null)
       fetchLeads() // Refresh the leads list
     } catch (error) {
       // Failed to add lead
@@ -76,6 +84,7 @@ export const CRM: React.FC = () => {
     try {
       const leadsData = await apiClient.getLeads()
       setLeads(leadsData)
+      setPipeline(groupLeadsByStage(leadsData))
     } catch (error) {
       // Failed to fetch leads
       setError(getUserFriendlyError(error))
@@ -84,15 +93,80 @@ export const CRM: React.FC = () => {
     }
   }
 
-  const filteredLeads = leads.filter(lead => {
-    const matchesSearch = lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         lead.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         lead.company.toLowerCase().includes(searchTerm.toLowerCase())
+  // Optimized: O(n) single pass instead of O(n²) nested loops
+  const groupLeadsByStage = (items: LeadData[]) => {
+    const grouped: Record<string, LeadData[]> = {}
+    // Initialize all stages
+    pipelineStages.forEach(stage => {
+      grouped[stage.id] = []
+    })
+    // Single pass through items - O(n)
+    items.forEach(lead => {
+      if (grouped[lead.stage]) {
+        grouped[lead.stage].push(lead)
+      }
+    })
+    return grouped
+  }
+
+  const handleDragEnd = async (result: DropResult) => {
+    if (!result.destination) return
+
+    const sourceStage = result.source.droppableId
+    const destStage = result.destination.droppableId
+    if (!result.draggableId || (sourceStage === destStage && result.source.index === result.destination.index)) {
+      return
+    }
+
+    const previous = JSON.parse(JSON.stringify(pipeline))
+    setPipeline(prev => {
+      const updated = { ...prev }
+      const sourceItems = Array.from(updated[sourceStage] || [])
+      const destItems = sourceStage === destStage ? sourceItems : Array.from(updated[destStage] || [])
+      const [moved] = sourceItems.splice(result.source.index, 1)
+      if (!moved) return prev
+      moved.stage = destStage
+      destItems.splice(result.destination.index, 0, moved)
+
+      updated[sourceStage] = sourceStage === destStage ? destItems : sourceItems
+      updated[destStage] = destItems
+      return updated
+    })
+
+    try {
+      await apiClient.updateLeadStage(result.draggableId, destStage)
+      addToast({ type: 'success', title: 'Lead Updated', message: 'Lead stage updated successfully' })
+      fetchLeads()
+    } catch (err) {
+      setPipeline(previous)
+      addToast({ type: 'error', title: 'Update Failed', message: 'Failed to update lead. Please try again.' })
+    }
+  }
+
+  // Optimized: memoize toLowerCase() calls
+  // Optimized: memoize filter results and toLowerCase() calls
+  const filteredLeads = useMemo(() => {
+    if (!searchTerm && filterStage === 'all') return leads
     
-    const matchesStage = filterStage === 'all' || lead.stage === filterStage
-    
-    return matchesSearch && matchesStage
-  })
+    const searchLower = searchTerm.toLowerCase()
+    return leads.filter(lead => {
+      const matchesSearch = !searchTerm || 
+        lead.name.toLowerCase().includes(searchLower) ||
+        lead.email.toLowerCase().includes(searchLower) ||
+        lead.company.toLowerCase().includes(searchLower)
+      
+      const matchesStage = filterStage === 'all' || lead.stage === filterStage
+      
+      return matchesSearch && matchesStage
+    })
+  }, [leads, searchTerm, filterStage])
+
+  // Optimized: memoize stats calculations
+  const leadStats = useMemo(() => ({
+    total: leads.length,
+    qualified: leads.filter(lead => lead.stage === 'qualified').length,
+    contacted: leads.filter(lead => lead.stage === 'contacted').length,
+  }), [leads])
 
   const getStageColor = (stage: string) => {
     switch (stage) {
@@ -158,7 +232,7 @@ export const CRM: React.FC = () => {
             <div className="ml-4 w-0 flex-1">
               <dl>
                 <dt className="text-sm font-medium text-brand-text/70 dark:text-gray-400 truncate">Total Leads</dt>
-                <dd className="text-2xl font-semibold text-brand-text dark:text-white">{leads.length}</dd>
+                <dd className="text-2xl font-semibold text-brand-text dark:text-white">{leadStats.total}</dd>
               </dl>
             </div>
           </div>
@@ -173,7 +247,7 @@ export const CRM: React.FC = () => {
               <dl>
                 <dt className="text-sm font-medium text-brand-text/70 dark:text-gray-400 truncate">Qualified Leads</dt>
                 <dd className="text-2xl font-semibold text-brand-text dark:text-white">
-                  {leads.filter(lead => lead.stage === 'qualified').length}
+                  {leadStats.qualified}
                 </dd>
               </dl>
             </div>
@@ -189,7 +263,7 @@ export const CRM: React.FC = () => {
               <dl>
                 <dt className="text-sm font-medium text-brand-text/70 dark:text-gray-400 truncate">Contacted</dt>
                 <dd className="text-2xl font-semibold text-brand-text dark:text-white">
-                  {leads.filter(lead => lead.stage === 'contacted').length}
+                  {leadStats.contacted}
                 </dd>
               </dl>
             </div>
@@ -211,6 +285,96 @@ export const CRM: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Kanban Pipeline */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-semibold text-brand-text dark:text-white">Pipeline board</h3>
+            <p className="text-sm text-brand-text/70 dark:text-gray-400">
+              Drag leads across stages. Gmail sync automatically feeds the "New" column.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-brand-text/70 dark:text-gray-300">
+            <Zap className="h-4 w-4 text-brand-accent" />
+            Auto-sync enabled
+          </div>
+        </div>
+
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
+            {pipelineStages.map((stage) => (
+              <Droppable droppableId={stage.id} key={stage.id}>
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={`rounded-2xl border ${stage.accent} shadow-sm transition p-4 ${
+                      snapshot.isDraggingOver ? 'ring-2 ring-brand-primary/40' : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="text-sm uppercase tracking-wide text-brand-text/60 dark:text-gray-400">{stage.title}</p>
+                        <p className="text-xs text-brand-text/50 dark:text-gray-500">{stage.helper}</p>
+                      </div>
+                      <span className="text-sm font-semibold text-brand-text dark:text-white">
+                        {pipeline[stage.id]?.length || 0}
+                      </span>
+                    </div>
+                    <div className="space-y-3 min-h-[120px]">
+                      {(pipeline[stage.id] || []).map((lead, index) => (
+                        <Draggable draggableId={lead.id} index={index} key={lead.id}>
+                          {(dragProvided, dragSnapshot) => (
+                            <div
+                              ref={dragProvided.innerRef}
+                              {...dragProvided.draggableProps}
+                              {...dragProvided.dragHandleProps}
+                              className={`rounded-xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-sm transition ${
+                                dragSnapshot.isDragging ? 'ring-2 ring-brand-primary/40' : ''
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="font-semibold text-brand-text dark:text-white">{lead.name}</p>
+                                  <p className="text-xs text-brand-text/60 dark:text-gray-400">{lead.email}</p>
+                                </div>
+                                <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                                  lead.score >= 7 ? 'bg-emerald-100 text-emerald-700' :
+                                  lead.score >= 4 ? 'bg-amber-100 text-amber-700' :
+                                  'bg-rose-100 text-rose-700'
+                                }`}>
+                                  {lead.score}/10
+                                </span>
+                              </div>
+                              <div className="mt-3 flex items-center justify-between text-xs text-brand-text/60 dark:text-gray-400">
+                                <div className="flex items-center gap-1">
+                                  <Mail className="h-3.5 w-3.5" />
+                                  {lead.source || 'Inbox'}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Activity className="h-3.5 w-3.5" />
+                                  {new Date(lead.lastContact).toLocaleDateString()}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                      {(pipeline[stage.id] || []).length === 0 && (
+                        <div className="rounded-xl border border-dashed border-brand-text/20 dark:border-gray-700 p-4 text-center text-sm text-brand-text/60 dark:text-gray-400">
+                          Drop leads here
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </Droppable>
+            ))}
+          </div>
+        </DragDropContext>
       </div>
 
       {/* Filters and Search */}
@@ -263,7 +427,7 @@ export const CRM: React.FC = () => {
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-brand-text/10 dark:divide-gray-700">
-              <thead className="bg-brand-background/50 dark:bg-gray-800">
+              <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider">
                     Lead
@@ -287,7 +451,7 @@ export const CRM: React.FC = () => {
               </thead>
               <tbody className="bg-white dark:bg-gray-900 divide-y divide-brand-text/10 dark:divide-gray-700">
                 {filteredLeads.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-brand-background/30 dark:hover:bg-gray-800">
+                  <tr key={lead.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10">
@@ -331,8 +495,7 @@ export const CRM: React.FC = () => {
               <EmptyState 
                 type="crm" 
                 onAction={searchTerm || filterStage !== 'all' ? undefined : () => {
-                  // Add lead functionality would go here
-                  // Add lead clicked
+                  setShowAddLeadModal(true)
                 }}
               />
             )}

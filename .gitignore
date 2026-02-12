@@ -62,10 +62,14 @@ logs/
 *.h5
 *.model
 
-# Environment variables
+# Environment variables and secrets
 .env
 .env.local
 .env.production
+.env.bak
+.env*.bak
+*SECRETS*.txt
+NEW_SECRETS.txt
 
 # Credentials
 credentials.json
@@ -91,3 +95,10 @@ data/vector_db/
 
 # Docker
 .dockerignore
+
+# Test artifacts
+frontend/playwright-report/
+frontend/test-results/
+
+# Node dependencies
+frontend/node_modules/

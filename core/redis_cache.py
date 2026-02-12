@@ -44,30 +44,15 @@ class FikiriCache:
             return
             
         try:
-            if self.config.redis_url:
-                self.redis_client = redis.from_url(
-                    self.config.redis_url,
-                    decode_responses=True,
-                    socket_connect_timeout=5,
-                    socket_timeout=5,
-                    retry_on_timeout=True
-                )
+            from core.redis_connection_helper import get_redis_client
+            self.redis_client = get_redis_client(
+                decode_responses=True,
+                db=self.config.redis_db if hasattr(self.config, 'redis_db') else 0
+            )
+            if self.redis_client:
+                logger.info("✅ Redis cache layer connected successfully")
             else:
-                self.redis_client = redis.Redis(
-                    host=self.config.redis_host,
-                    port=self.config.redis_port,
-                    password=self.config.redis_password,
-                    db=self.config.redis_db,
-                    decode_responses=True,
-                    socket_connect_timeout=5,
-                    socket_timeout=5,
-                    retry_on_timeout=True
-                )
-            
-            # Test connection
-            self.redis_client.ping()
-            logger.info("✅ Redis cache layer connected successfully")
-            
+                logger.warning("⚠️ Redis cache unavailable, using in-memory cache")
         except Exception as e:
             logger.error(f"❌ Redis cache connection failed: {e}")
             self.redis_client = None

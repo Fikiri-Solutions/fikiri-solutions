@@ -1,13 +1,24 @@
-import { expect, afterEach, vi } from 'vitest'
+import { expect, afterEach, beforeEach, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import * as matchers from '@testing-library/jest-dom/matchers'
 
 // Extend Vitest's expect with jest-dom matchers
 expect.extend(matchers)
 
+// Setup localStorage mock before each test
+beforeEach(() => {
+  // Clear localStorage before each test
+  if (typeof localStorage !== 'undefined') {
+    localStorage.clear()
+  }
+})
+
 // Cleanup after each test case
 afterEach(() => {
   cleanup()
+  if (typeof localStorage !== 'undefined') {
+    localStorage.clear()
+  }
 })
 
 // Mock window.matchMedia for dark mode tests

@@ -47,6 +47,13 @@ Opens at http://localhost:3000
 npm run build
 ```
 
+## 📚 **Documentation**
+
+### **Testing**
+- [FRONTEND_TESTING_CHECKLIST.md](./FRONTEND_TESTING_CHECKLIST.md) - Comprehensive testing guidelines
+- [TESTING_CHECKLIST.md](./TESTING_CHECKLIST.md) - Quick visual testing checklist
+- [DEVELOPMENT_WORKFLOW.md](./DEVELOPMENT_WORKFLOW.md) - Development workflow and best practices
+
 ## 🏗️ **Architecture**
 
 ### **Technology Stack**

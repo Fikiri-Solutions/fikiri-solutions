@@ -86,8 +86,28 @@ class SmartFAQSystem:
             'can', 'could', 'would', 'should', 'do', 'does', 'did', 'i', 'you',
             'we', 'they', 'my', 'your', 'our', 'their'
         }
+        # Optimized: Build inverted index for O(1) keyword lookups instead of O(n) scans
+        self._keyword_index: Dict[str, List[str]] = {}
+        self._build_keyword_index()
         
         logger.info("🤖 Smart FAQ system initialized")
+    
+    def _build_keyword_index(self):
+        """Build inverted index mapping keywords to FAQ IDs for O(1) lookups"""
+        self._keyword_index = {}
+        for faq_id, faq in self.faq_entries.items():
+            # Combine all keywords from FAQ
+            all_keywords = set(faq.keywords)
+            # Add words from question and answer
+            faq_text = f"{faq.question} {faq.answer}".lower()
+            text_keywords = self._extract_keywords(faq_text)
+            all_keywords.update(text_keywords)
+            
+            # Add to inverted index
+            for keyword in all_keywords:
+                if keyword not in self._keyword_index:
+                    self._keyword_index[keyword] = []
+                self._keyword_index[keyword].append(faq_id)
     
     def _load_default_faqs(self) -> Dict[str, FAQEntry]:
         """Load default FAQ entries"""
@@ -502,32 +522,38 @@ class SmartFAQSystem:
         return matches
     
     def _find_keyword_matches(self, query_keywords: List[str]) -> List[FAQMatch]:
-        """Find matches based on keyword overlap"""
+        """Find matches based on keyword overlap - optimized with inverted index"""
         matches = []
+        query_set = set(query_keywords)
         
-        for faq in self.faq_entries.values():
-            # Combine FAQ keywords with words from question and answer
-            faq_text = f"{faq.question} {faq.answer}".lower()
-            faq_words = set(self._extract_keywords(faq_text) + faq.keywords)
+        # Use inverted index for O(k) lookup instead of O(n) scan where k = unique keywords
+        faq_matches: Dict[str, set] = {}  # FAQ ID -> set of matched keywords
+        
+        for keyword in query_set:
+            if keyword in self._keyword_index:
+                for faq_id in self._keyword_index[keyword]:
+                    if faq_id not in faq_matches:
+                        faq_matches[faq_id] = set()
+                    faq_matches[faq_id].add(keyword)
+        
+        # Calculate confidence for matched FAQs
+        for faq_id, matched_keywords in faq_matches.items():
+            faq = self.faq_entries[faq_id]
+            overlap = matched_keywords
             
-            # Calculate keyword overlap
-            query_set = set(query_keywords)
-            overlap = query_set.intersection(faq_words)
+            # Calculate confidence based on overlap ratio and FAQ priority
+            overlap_ratio = len(overlap) / len(query_set) if query_set else 0
+            priority_boost = faq.priority * 0.05  # Small boost for higher priority
+            confidence = min(overlap_ratio + priority_boost, 0.85)  # Cap at 85%
             
-            if overlap:
-                # Calculate confidence based on overlap ratio and FAQ priority
-                overlap_ratio = len(overlap) / len(query_set) if query_set else 0
-                priority_boost = faq.priority * 0.05  # Small boost for higher priority
-                confidence = min(overlap_ratio + priority_boost, 0.85)  # Cap at 85%
-                
-                if confidence >= 0.3:  # 30% threshold
-                    matches.append(FAQMatch(
-                        faq_entry=faq,
-                        confidence=confidence,
-                        match_type="keyword",
-                        matched_text=", ".join(overlap),
-                        explanation=f"Matched keywords: {', '.join(overlap)}"
-                    ))
+            if confidence >= 0.3:  # 30% threshold
+                matches.append(FAQMatch(
+                    faq_entry=faq,
+                    confidence=confidence,
+                    match_type="keyword",
+                    matched_text=", ".join(overlap),
+                    explanation=f"Matched keywords: {', '.join(overlap)}"
+                ))
         
         return matches
     

@@ -29,14 +29,14 @@ try:
     FLASK_AVAILABLE = True
 except ImportError:
     FLASK_AVAILABLE = False
-    print("Warning: Flask not available. Install with: pip install flask flask-cors flask-limiter")
+    logger.warning("Flask not available. Install with: pip install flask flask-cors flask-limiter")
 
 try:
     import redis
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
-    print("Warning: Redis not available. Install with: pip install redis")
+    logger.warning("Redis not available. Install with: pip install redis")
 
 def init_security(app: Flask):
     """Initialize security middleware and configurations"""
@@ -49,32 +49,98 @@ def init_security(app: Flask):
     else:
         logger.warning("⚠️ ProxyFix not available - install werkzeug for production deployments")
     
-    # Initialize Redis for rate limiting
-    redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/1')
-    redis_client = redis.from_url(redis_url, decode_responses=True)
+    # Initialize Redis for rate limiting with proper SSL handling
+    # Note: Flask-Limiter's limits library creates its own Redis connection from URLs
+    # and doesn't support passing SSL configuration directly, so we use in-memory for now
+    # to avoid SSL certificate verification issues with Upstash Redis
     
-    # Initialize rate limiter (fixed - use single initialization style)
+    storage_uri = 'memory://'  # Use in-memory to avoid SSL certificate issues
+    
+    # Try to use Redis if we can configure it properly
+    # For now, we'll use in-memory storage since RedisStorage doesn't accept
+    # a pre-configured client with SSL settings
+    try:
+        try:
+            from core.redis_connection_helper import _resolve_redis_url
+            redis_url = _resolve_redis_url() or os.getenv('REDIS_URL', '') or ''
+        except Exception:
+            redis_url = os.getenv('REDIS_URL', '')
+        if redis_url and redis_url.startswith('rediss://'):
+            # Upstash Redis with TLS - Flask-Limiter can't handle SSL cert verification
+            # Use in-memory storage to avoid SSL certificate errors
+            logger.info("ℹ️ Using in-memory rate limiting (Upstash SSL certificate verification not supported by Flask-Limiter)")
+            storage_uri = 'memory://'
+        elif redis_url and redis_url.startswith('redis://'):
+            # Standard Redis without TLS - can try to use it
+            try:
+                from core.redis_connection_helper import get_redis_client
+                redis_client = get_redis_client(decode_responses=True, db=0)
+                if redis_client:
+                    # Test if we can use Redis URL (non-TLS only)
+                    storage_uri = redis_url
+                    logger.info("✅ Rate limiter will use Redis (non-TLS)")
+                else:
+                    storage_uri = 'memory://'
+                    logger.warning("⚠️ Redis not available, using in-memory rate limiting")
+            except Exception as e:
+                logger.warning(f"⚠️ Redis connection test failed: {e}, using in-memory")
+                storage_uri = 'memory://'
+        else:
+            # No Redis URL configured
+            storage_uri = 'memory://'
+            logger.info("ℹ️ No Redis URL configured, using in-memory rate limiting")
+    except Exception as e:
+        logger.warning(f"⚠️ Error configuring rate limiter storage: {e}, using in-memory")
+        storage_uri = 'memory://'
+    
+    # Initialize rate limiter
     limiter = None
     if FLASK_AVAILABLE:
-        limiter = Limiter(
-            key_func=get_remote_address,
-            storage_uri=redis_url,
-            default_limits=["1000 per hour", "100 per minute"]
-        )
-        limiter.init_app(app)
-        logger.info("✅ Rate limiter initialized")
+        try:
+            limiter = Limiter(
+                key_func=get_remote_address,
+                storage_uri=storage_uri,
+                default_limits=["1000 per hour", "100 per minute"]
+            )
+            limiter.init_app(app)
+            if storage_uri == 'memory://':
+                logger.info("✅ Rate limiter initialized (in-memory storage - limits reset on restart)")
+            else:
+                logger.info(f"✅ Rate limiter initialized with Redis: {redis_url.split('@')[-1] if '@' in redis_url else 'localhost'}")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize rate limiter: {e}")
+            logger.warning("⚠️ Rate limiting disabled due to initialization error")
+            # Try in-memory as last resort
+            try:
+                limiter = Limiter(
+                    key_func=get_remote_address,
+                    storage_uri='memory://',
+                    default_limits=["1000 per hour", "100 per minute"]
+                )
+                limiter.init_app(app)
+                logger.info("✅ Rate limiter initialized (in-memory fallback)")
+            except Exception as e2:
+                logger.error(f"❌ Failed to initialize in-memory rate limiter: {e2}")
+                limiter = None
     else:
         logger.warning("⚠️ Flask-Limiter not available - rate limiting disabled")
     
-    # Configure CORS
-    cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')
-    CORS(app, 
-         origins=cors_origins,
-         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-         allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
-         supports_credentials=True,
-         max_age=3600
-    )
+    # Configure CORS (only if not already configured in app.py)
+    # Check if CORS is already configured by checking if app has _cors attribute
+    if not hasattr(app, '_cors_configured'):
+        cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173,http://localhost:5174').split(',')
+        # Strip whitespace from origins
+        cors_origins = [origin.strip() for origin in cors_origins if origin.strip()]
+        CORS(app, 
+             origins=cors_origins,
+             methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+             allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
+             supports_credentials=True,
+             max_age=3600
+        )
+        logger.info(f"✅ CORS configured with origins: {cors_origins}")
+    else:
+        logger.info("ℹ️ CORS already configured in app.py, skipping reconfiguration")
     
     # Security headers middleware
     @app.after_request

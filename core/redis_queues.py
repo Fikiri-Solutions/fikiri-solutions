@@ -72,25 +72,11 @@ class RedisQueue:
             return
             
         try:
-            if self.config.redis_url:
-                self.redis_client = redis.from_url(
-                    self.config.redis_url,
-                    decode_responses=True,
-                    socket_connect_timeout=5,
-                    socket_timeout=5
-                )
-            else:
-                self.redis_client = redis.Redis(
-                    host=self.config.redis_host,
-                    port=self.config.redis_port,
-                    password=self.config.redis_password,
-                    db=self.config.redis_db,
-                    decode_responses=True,
-                    socket_connect_timeout=5,
-                    socket_timeout=5
-                )
-            
-            self.redis_client.ping()
+            from core.redis_connection_helper import get_redis_client
+            redis_db = getattr(self.config, 'redis_db', 0) if hasattr(self.config, 'redis_db') else 0
+            self.redis_client = get_redis_client(decode_responses=True, db=redis_db)
+            if self.redis_client:
+                self.redis_client.ping()
             logger.info(f"✅ Redis queue '{self.queue_name}' connected")
             
         except Exception as e:
@@ -498,7 +484,7 @@ def start_worker(queue: RedisQueue, worker_name: str = "worker"):
 def send_email(to: str, subject: str, body: str, **kwargs):
     """Send email task implementation"""
     # Import your email service here
-    from core.minimal_email_actions import MinimalEmailActions
+    from email_automation.actions import MinimalEmailActions
     
     email_service = MinimalEmailActions()
     result = email_service.send_email(to, subject, body)
@@ -513,7 +499,7 @@ def send_email(to: str, subject: str, body: str, **kwargs):
 def process_ai_request(prompt: str, user_id: str, **kwargs):
     """Process AI request task implementation"""
     # Import your AI service here
-    from core.minimal_ai_assistant import MinimalAIAssistant
+    from email_automation.ai_assistant import MinimalAIEmailAssistant as MinimalAIAssistant
     
     ai_service = MinimalAIAssistant()
     result = ai_service.process_request(prompt, user_id)
@@ -528,10 +514,11 @@ def process_ai_request(prompt: str, user_id: str, **kwargs):
 def update_crm(lead_data: Dict[str, Any], **kwargs):
     """Update CRM task implementation"""
     # Import your CRM service here
-    from core.minimal_crm_service import MinimalCRMService
+    from crm.service import enhanced_crm_service
     
-    crm_service = MinimalCRMService()
-    result = crm_service.add_lead(lead_data)
+    # Get user_id from lead_data or use default
+    user_id = lead_data.get('user_id', 1)
+    result = enhanced_crm_service.create_lead(user_id, lead_data)
     
     return {
         "success": True,

@@ -8,12 +8,13 @@ import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from flask import Blueprint, request, jsonify
-import uuid
 
 from core.smart_faq_system import get_smart_faq, FAQCategory
 from core.knowledge_base_system import get_knowledge_base, DocumentType
 from core.context_aware_responses import get_context_system, MessageType
 from core.multi_channel_support import get_multi_channel_system, ChannelType
+from core.minimal_vector_search import MinimalVectorSearch
+from core.api_validation import handle_api_errors, create_error_response
 
 logger = logging.getLogger(__name__)
 
@@ -25,60 +26,58 @@ faq_system = get_smart_faq()
 knowledge_base = get_knowledge_base()
 context_system = get_context_system()
 multi_channel = get_multi_channel_system()
+vector_search = MinimalVectorSearch()
 
 # Smart FAQ Endpoints
 
 @chatbot_bp.route('/faq/search', methods=['POST'])
+@handle_api_errors
 def search_faqs():
     """Search FAQs with intelligent matching"""
-    try:
-        data = request.json
-        query = data.get('query', '')
-        max_results = data.get('max_results', 5)
-        
-        if not query:
-            return jsonify({"success": False, "error": "Query is required"}), 400
-        
-        # Search FAQs
-        response = faq_system.search_faqs(query, max_results)
-        
-        if response.success:
-            return jsonify({
-                "success": True,
-                "query": response.query if hasattr(response, 'query') else query,
-                "matches": [
-                    {
-                        "faq_id": match.faq_entry.id,
-                        "question": match.faq_entry.question,
-                        "answer": match.faq_entry.answer,
-                        "confidence": match.confidence,
-                        "match_type": match.match_type,
-                        "category": match.faq_entry.category.value,
-                        "explanation": match.explanation
-                    } for match in response.matches
-                ],
-                "best_match": {
-                    "faq_id": response.best_match.faq_entry.id,
-                    "question": response.best_match.faq_entry.question,
-                    "answer": response.best_match.faq_entry.answer,
-                    "confidence": response.best_match.confidence
-                } if response.best_match else None,
-                "suggested_questions": response.suggested_questions,
-                "fallback_response": response.fallback_response,
-                "processing_time": response.processing_time
-            })
-        else:
-            return jsonify({
-                "success": False,
-                "error": "FAQ search failed",
-                "fallback_response": response.fallback_response if hasattr(response, 'fallback_response') else None
-            }), 500
-            
-    except Exception as e:
-        logger.error(f"❌ FAQ search failed: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+    data = request.json
+    query = data.get('query', '') if data else ''
+    max_results = data.get('max_results', 5) if data else 5
+    
+    if not query:
+        return create_error_response("Query is required", 400, 'MISSING_QUERY')
+    
+    # Search FAQs
+    response = faq_system.search_faqs(query, max_results)
+    
+    if response.success:
+        return jsonify({
+            "success": True,
+            "query": response.query if hasattr(response, 'query') else query,
+            "matches": [
+                {
+                    "faq_id": match.faq_entry.id,
+                    "question": match.faq_entry.question,
+                    "answer": match.faq_entry.answer,
+                    "confidence": match.confidence,
+                    "match_type": match.match_type,
+                    "category": match.faq_entry.category.value,
+                    "explanation": match.explanation
+                } for match in response.matches
+            ],
+            "best_match": {
+                "faq_id": response.best_match.faq_entry.id,
+                "question": response.best_match.faq_entry.question,
+                "answer": response.best_match.faq_entry.answer,
+                "confidence": response.best_match.confidence
+            } if response.best_match else None,
+            "suggested_questions": response.suggested_questions,
+            "fallback_response": response.fallback_response,
+            "processing_time": response.processing_time
+        })
+    else:
+        return create_error_response(
+            "FAQ search failed", 
+            500, 
+            'FAQ_SEARCH_ERROR'
+        )
 
 @chatbot_bp.route('/faq/categories', methods=['GET'])
+@handle_api_errors
 def get_faq_categories():
     """Get all FAQ categories"""
     try:
@@ -91,9 +90,10 @@ def get_faq_categories():
         
     except Exception as e:
         logger.error(f"❌ Failed to get FAQ categories: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return create_error_response("Failed to get FAQ categories", 500, 'FAQ_CATEGORIES_ERROR')
 
 @chatbot_bp.route('/faq/statistics', methods=['GET'])
+@handle_api_errors
 def get_faq_statistics():
     """Get FAQ system statistics"""
     try:
@@ -106,9 +106,10 @@ def get_faq_statistics():
         
     except Exception as e:
         logger.error(f"❌ Failed to get FAQ statistics: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return create_error_response("Failed to get FAQ statistics", 500, 'FAQ_STATISTICS_ERROR')
 
 @chatbot_bp.route('/faq/<faq_id>/feedback', methods=['POST'])
+@handle_api_errors
 def record_faq_feedback(faq_id):
     """Record FAQ helpfulness feedback"""
     try:
@@ -124,7 +125,52 @@ def record_faq_feedback(faq_id):
         
     except Exception as e:
         logger.error(f"❌ Failed to record FAQ feedback: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return create_error_response("Failed to record FAQ feedback", 500, 'FAQ_FEEDBACK_ERROR')
+
+@chatbot_bp.route('/faq', methods=['POST'])
+@handle_api_errors
+def create_faq_entry():
+    """Create a new FAQ entry"""
+    try:
+        data = request.json or {}
+        question = data.get('question', '').strip()
+        answer = data.get('answer', '').strip()
+        category = data.get('category', 'general')
+        keywords = data.get('keywords', [])
+        variations = data.get('variations', [])
+        priority = data.get('priority', 1)
+
+        if not question or not answer:
+            return create_error_response("Question and answer are required", 400, 'MISSING_FIELDS')
+
+        try:
+            category_enum = FAQCategory(category)
+        except ValueError:
+            category_enum = FAQCategory.GENERAL
+
+        if not isinstance(keywords, list):
+            keywords = [keywords]
+        if not isinstance(variations, list):
+            variations = [variations]
+
+        faq_id = faq_system.add_faq(
+            question=question,
+            answer=answer,
+            category=category_enum,
+            keywords=keywords,
+            variations=variations,
+            priority=priority
+        )
+
+        return jsonify({
+            "success": True,
+            "faq_id": faq_id,
+            "message": "FAQ entry created successfully"
+        })
+
+    except Exception as e:
+        logger.error(f"❌ Failed to create FAQ entry: {e}")
+        return create_error_response("Failed to create FAQ entry", 500, 'FAQ_CREATE_ERROR')
 
 # Knowledge Base Endpoints
 
@@ -214,6 +260,48 @@ def get_knowledge_document(doc_id):
         logger.error(f"❌ Failed to get knowledge document: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+@chatbot_bp.route('/knowledge/documents', methods=['POST'])
+def create_knowledge_document():
+    """Add a new knowledge base document"""
+    try:
+        data = request.json or {}
+        title = data.get('title', 'Untitled Document').strip()
+        content = data.get('content', '').strip()
+        summary = data.get('summary', content[:200])
+        category = data.get('category', 'general')
+        tags = data.get('tags', [])
+        keywords = data.get('keywords', [])
+        author = data.get('author', 'system')
+
+        if not content:
+            return jsonify({"success": False, "error": "Content cannot be empty"}), 400
+
+        if not isinstance(tags, list):
+            tags = [tags]
+        if not isinstance(keywords, list):
+            keywords = [keywords]
+
+        doc_id = knowledge_base.add_document(
+            title=title,
+            content=content,
+            summary=summary,
+            document_type=DocumentType.ARTICLE,
+            tags=tags,
+            keywords=keywords,
+            category=category,
+            author=author
+        )
+
+        return jsonify({
+            "success": True,
+            "document_id": doc_id,
+            "message": "Knowledge document added"
+        })
+
+    except Exception as e:
+        logger.error(f"❌ Failed to add knowledge document: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @chatbot_bp.route('/knowledge/categories', methods=['GET'])
 def get_knowledge_categories():
     """Get all knowledge base categories"""
@@ -252,6 +340,32 @@ def get_popular_documents():
         
     except Exception as e:
         logger.error(f"❌ Failed to get popular documents: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@chatbot_bp.route('/knowledge/vectorize', methods=['POST'])
+def vectorize_document_content():
+    """Vectorize content for chatbot retrieval"""
+    try:
+        data = request.json or {}
+        content = data.get('content', '').strip()
+        metadata = data.get('metadata', {})
+
+        if not content:
+            return jsonify({"success": False, "error": "Content cannot be empty"}), 400
+
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        doc_id = vector_search.add_document(content, metadata)
+
+        return jsonify({
+            "success": True,
+            "vector_id": doc_id,
+            "message": "Content vectorized successfully"
+        })
+
+    except Exception as e:
+        logger.error(f"❌ Failed to vectorize content: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 # Context-Aware Conversation Endpoints

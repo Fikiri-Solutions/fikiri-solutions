@@ -35,6 +35,94 @@ class StripeWebhookHandler:
         else:
             self.billing_manager = None
         self.webhook_secret = os.getenv('STRIPE_WEBHOOK_SECRET')
+        self._billing_from_email = os.getenv('BILLING_FROM_EMAIL', 'billing@fikirisolutions.com')
+    
+    def _get_customer_email(self, customer_id: str) -> str:
+        """Get customer email from Stripe. Returns empty string if unavailable."""
+        if not STRIPE_AVAILABLE or not customer_id:
+            return ''
+        try:
+            customer = stripe.Customer.retrieve(customer_id, timeout=10)
+            return (customer.email or '') if hasattr(customer, 'email') else (customer.get('email') or '')
+        except Exception as e:
+            logger.warning(f"Could not get customer email for {customer_id}: {e}")
+            return ''
+    
+    def _send_billing_email(self, to_email: str, subject: str, body: str) -> bool:
+        """Send transactional billing email via SendGrid, SES, or SMTP. Returns True if sent or attempted."""
+        if not to_email or '@' not in to_email:
+            logger.warning("No valid recipient for billing email")
+            return False
+        try:
+            sendgrid_key = os.getenv('SENDGRID_API_KEY')
+            if sendgrid_key:
+                return self._send_billing_via_sendgrid(to_email, subject, body)
+            if os.getenv('AWS_ACCESS_KEY_ID'):
+                return self._send_billing_via_ses(to_email, subject, body)
+            if os.getenv('SMTP_SERVER'):
+                return self._send_billing_via_smtp(to_email, subject, body)
+            logger.info(f"Billing email (no provider configured): to={to_email} subject={subject!r}")
+            return False
+        except Exception as e:
+            logger.error(f"Failed to send billing email to {to_email}: {e}")
+            return False
+    
+    def _send_billing_via_sendgrid(self, to_email: str, subject: str, body: str) -> bool:
+        try:
+            import sendgrid
+            from sendgrid.helpers.mail import Mail
+            sg = sendgrid.SendGridAPIClient(api_key=os.getenv('SENDGRID_API_KEY'))
+            mail = Mail(from_email=self._billing_from_email, to_emails=to_email, subject=subject, html_content=body)
+            sg.send(mail)
+            logger.info(f"Billing email sent via SendGrid to {to_email}")
+            return True
+        except ImportError:
+            logger.warning("SendGrid not available")
+            return False
+        except Exception as e:
+            logger.error(f"SendGrid billing email failed: {e}")
+            return False
+    
+    def _send_billing_via_ses(self, to_email: str, subject: str, body: str) -> bool:
+        try:
+            import boto3
+            ses = boto3.client('ses')
+            ses.send_email(
+                Source=self._billing_from_email,
+                Destination={'ToAddresses': [to_email]},
+                Message={'Subject': {'Data': subject}, 'Body': {'Text': {'Data': body}}}
+            )
+            logger.info(f"Billing email sent via SES to {to_email}")
+            return True
+        except ImportError:
+            logger.warning("boto3 not available")
+            return False
+        except Exception as e:
+            logger.error(f"SES billing email failed: {e}")
+            return False
+    
+    def _send_billing_via_smtp(self, to_email: str, subject: str, body: str) -> bool:
+        try:
+            import smtplib
+            from email.mime.text import MIMEText
+            smtp_server = os.getenv('SMTP_SERVER')
+            smtp_port = int(os.getenv('SMTP_PORT', '587'))
+            smtp_user = os.getenv('SMTP_USERNAME')
+            smtp_pass = os.getenv('SMTP_PASSWORD')
+            msg = MIMEText(body, 'html')
+            msg['Subject'] = subject
+            msg['From'] = self._billing_from_email
+            msg['To'] = to_email
+            with smtplib.SMTP(smtp_server, smtp_port) as s:
+                if smtp_user and smtp_pass:
+                    s.starttls()
+                    s.login(smtp_user, smtp_pass)
+                s.sendmail(self._billing_from_email, [to_email], msg.as_string())
+            logger.info(f"Billing email sent via SMTP to {to_email}")
+            return True
+        except Exception as e:
+            logger.error(f"SMTP billing email failed: {e}")
+            return False
     
     def verify_webhook_signature(self, payload: bytes, sig_header: str):
         """Verify webhook signature and construct event"""
@@ -78,6 +166,10 @@ class StripeWebhookHandler:
             'payment_method.attached': self.handle_payment_method_attached,
             'checkout.session.completed': self.handle_checkout_completed,
             'checkout.session.expired': self.handle_checkout_expired,
+            'payment_intent.succeeded': self.handle_payment_intent_succeeded,
+            'payment_intent.payment_failed': self.handle_payment_intent_failed,
+            'charge.succeeded': self.handle_charge_succeeded,
+            'charge.refunded': self.handle_charge_refunded,
         }
         
         handler = handlers.get(event_type)
@@ -412,93 +504,285 @@ class StripeWebhookHandler:
             logger.error(f"Error handling checkout expired: {e}")
             return {'status': 'error', 'error': str(e)}
     
+    def handle_payment_intent_succeeded(self, payment_intent: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle successful payment intent (card verification)"""
+        try:
+            payment_intent_id = payment_intent['id']
+            customer_id = payment_intent.get('customer')
+            amount = payment_intent['amount']
+            metadata = payment_intent.get('metadata', {})
+            
+            # Check if this is a verification charge ($1 or less)
+            is_verification = metadata.get('verification', 'false') == 'true' or amount <= 100
+            
+            if is_verification:
+                logger.info(f"Card verification succeeded: Payment Intent {payment_intent_id} - Amount: ${amount/100}")
+                
+                # If it's a $1 verification charge, refund it immediately
+                if amount == 100 and STRIPE_AVAILABLE:
+                    try:
+                        refund = stripe.Refund.create(
+                            payment_intent=payment_intent_id,
+                            amount=100,
+                            reason='requested_by_customer',
+                            metadata={'reason': 'card_verification', 'original_payment_intent': payment_intent_id}
+                        )
+                        logger.info(f"Refunded $1 verification charge: Refund {refund.id}")
+                    except Exception as e:
+                        logger.error(f"Failed to refund verification charge: {e}")
+            
+            return {
+                'status': 'success',
+                'payment_intent_id': payment_intent_id,
+                'customer_id': customer_id,
+                'action': 'payment_intent_succeeded',
+                'is_verification': is_verification,
+                'amount': amount
+            }
+            
+        except Exception as e:
+            logger.error(f"Error handling payment intent succeeded: {e}")
+            return {'status': 'error', 'error': str(e)}
+    
+    def handle_payment_intent_failed(self, payment_intent: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle failed payment intent (card verification failed)"""
+        try:
+            payment_intent_id = payment_intent['id']
+            customer_id = payment_intent.get('customer')
+            last_payment_error = payment_intent.get('last_payment_error', {})
+            error_message = last_payment_error.get('message', 'Payment failed')
+            
+            logger.warning(f"Card verification failed: Payment Intent {payment_intent_id} - {error_message}")
+            
+            # Track failed verification
+            self._track_payment_event('verification_failed', payment_intent_id, customer_id, 0)
+            
+            return {
+                'status': 'success',
+                'payment_intent_id': payment_intent_id,
+                'customer_id': customer_id,
+                'action': 'payment_intent_failed',
+                'error_message': error_message
+            }
+            
+        except Exception as e:
+            logger.error(f"Error handling payment intent failed: {e}")
+            return {'status': 'error', 'error': str(e)}
+    
+    def handle_charge_succeeded(self, charge: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle successful charge (including verification charges)"""
+        try:
+            charge_id = charge['id']
+            customer_id = charge.get('customer')
+            amount = charge['amount']
+            metadata = charge.get('metadata', {})
+            
+            is_verification = metadata.get('verification', 'false') == 'true' or amount <= 100
+            
+            if is_verification:
+                logger.info(f"Verification charge succeeded: Charge {charge_id} - Amount: ${amount/100}")
+            
+            return {
+                'status': 'success',
+                'charge_id': charge_id,
+                'customer_id': customer_id,
+                'action': 'charge_succeeded',
+                'is_verification': is_verification,
+                'amount': amount
+            }
+            
+        except Exception as e:
+            logger.error(f"Error handling charge succeeded: {e}")
+            return {'status': 'error', 'error': str(e)}
+    
+    def handle_charge_refunded(self, charge: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle refunded charge (verification refund)"""
+        try:
+            charge_id = charge['id']
+            customer_id = charge.get('customer')
+            amount_refunded = charge.get('amount_refunded', 0)
+            metadata = charge.get('metadata', {})
+            
+            if metadata.get('reason') == 'card_verification':
+                logger.info(f"Verification charge refunded: Charge {charge_id} - Amount: ${amount_refunded/100}")
+            
+            return {
+                'status': 'success',
+                'charge_id': charge_id,
+                'customer_id': customer_id,
+                'action': 'charge_refunded',
+                'amount_refunded': amount_refunded
+            }
+            
+        except Exception as e:
+            logger.error(f"Error handling charge refunded: {e}")
+            return {'status': 'error', 'error': str(e)}
+    
     # Private helper methods
     def _update_user_subscription(self, subscription_id: str, customer_id: str, status: str):
-        """Update user subscription in database"""
-        # TODO: Implement database update
-        logger.info(f"Updating subscription {subscription_id} for customer {customer_id} to status {status}")
-        pass
+        """Update user subscription in database - persists webhook data"""
+        from core.database_optimization import DatabaseOptimizer
+        db = DatabaseOptimizer()
+        
+        try:
+            # Get subscription details from Stripe
+            if not STRIPE_AVAILABLE:
+                logger.warning("Stripe not available, cannot update subscription")
+                return
+            
+            subscription = stripe.Subscription.retrieve(subscription_id, timeout=10)
+            
+            # Get customer details to find user
+            customer = stripe.Customer.retrieve(customer_id, timeout=10)
+            user_email = customer.email
+            
+            if not user_email:
+                logger.error(f"No email found for customer {customer_id}")
+                return
+            
+            # Find user by email
+            user_result = db.execute_query("SELECT id FROM users WHERE email = ?", (user_email,))
+            if not user_result or len(user_result) == 0 or not user_result[0]:
+                logger.error(f"User not found for email: {user_email}")
+                return
+            
+            user_row = user_result[0]
+            user_id = user_row[0] if isinstance(user_row, tuple) else user_row.get('id') if isinstance(user_row, dict) else None
+            if not user_id:
+                logger.error(f"Invalid user data for email: {user_email}")
+                return
+            
+            # Get tier from product metadata
+            tier = 'starter'  # default
+            billing_period = 'monthly'  # default
+            
+            if subscription.items.data and len(subscription.items.data) > 0:
+                product_id = subscription.items.data[0].price.product
+                try:
+                    product = stripe.Product.retrieve(product_id, timeout=10)
+                    tier = product.metadata.get('tier', 'starter')
+                    
+                    # Get billing period from price
+                    price = subscription.items.data[0].price
+                    if price.recurring:
+                        billing_period = price.recurring.interval  # 'month' or 'year'
+                        if billing_period == 'year':
+                            billing_period = 'annual'
+                except Exception as e:
+                    logger.warning(f"Failed to get product details: {e}")
+            
+            # Update or insert subscription in database
+            db.execute_query("""
+                INSERT OR REPLACE INTO subscriptions 
+                (user_id, stripe_customer_id, stripe_subscription_id, status, tier,
+                 billing_period, current_period_start, current_period_end, 
+                 trial_end, cancel_at_period_end, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (
+                user_id, 
+                customer_id, 
+                subscription_id, 
+                status, 
+                tier,
+                billing_period,
+                subscription.current_period_start,
+                subscription.current_period_end,
+                subscription.trial_end,
+                subscription.cancel_at_period_end or False
+            ), fetch=False)
+            
+            # Update customer_id in users table
+            db.execute_query(
+                "UPDATE users SET stripe_customer_id = ? WHERE id = ?",
+                (customer_id, user_id),
+                fetch=False
+            )
+            
+            logger.info(f"✅ Updated subscription {subscription_id} in database for user {user_id}")
+            
+        except stripe.error.StripeError as e:
+            logger.error(f"Stripe API error updating subscription: {e}")
+        except Exception as e:
+            logger.error(f"Failed to update subscription in database: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
     
     def _send_welcome_email(self, customer_id: str, subscription_id: str):
         """Send welcome email to new subscriber"""
-        # TODO: Implement email sending
-        logger.info(f"Sending welcome email to customer {customer_id}")
-        pass
+        email = self._get_customer_email(customer_id)
+        if not email:
+            logger.info(f"Skipping welcome email: no email for customer {customer_id}")
+            return
+        body = f"<p>Welcome to Fikiri Solutions! Your subscription is active.</p><p>Subscription ID: {subscription_id}</p>"
+        self._send_billing_email(email, "Welcome to Fikiri Solutions", body)
     
     def _send_cancellation_email(self, customer_id: str, subscription_id: str):
         """Send cancellation email"""
-        # TODO: Implement email sending
-        logger.info(f"Sending cancellation email to customer {customer_id}")
-        pass
+        email = self._get_customer_email(customer_id)
+        if not email:
+            return
+        body = f"<p>Your Fikiri subscription has been canceled. We're sorry to see you go.</p><p>Subscription ID: {subscription_id}</p>"
+        self._send_billing_email(email, "Your Fikiri subscription has been canceled", body)
     
     def _send_trial_ending_email(self, customer_id: str, subscription_id: str, trial_end: int):
         """Send trial ending email"""
-        # TODO: Implement email sending
-        logger.info(f"Sending trial ending email to customer {customer_id}")
-        pass
+        email = self._get_customer_email(customer_id)
+        if not email:
+            return
+        end_str = datetime.utcfromtimestamp(trial_end).strftime('%Y-%m-%d') if trial_end else 'soon'
+        body = f"<p>Your Fikiri trial ends on {end_str}. Add a payment method to continue using the service.</p>"
+        self._send_billing_email(email, "Your Fikiri trial is ending soon", body)
     
     def _send_payment_confirmation_email(self, customer_id: str, invoice_id: str, amount_paid: int):
         """Send payment confirmation email"""
-        # TODO: Implement email sending
-        logger.info(f"Sending payment confirmation email to customer {customer_id}")
-        pass
+        email = self._get_customer_email(customer_id)
+        if not email:
+            return
+        amount_str = f"${amount_paid / 100:.2f}" if amount_paid is not None else "—"
+        body = f"<p>Thank you for your payment. We've received {amount_str} for invoice {invoice_id}.</p>"
+        self._send_billing_email(email, "Payment received – Fikiri Solutions", body)
     
     def _send_payment_failure_email(self, customer_id: str, invoice_id: str, amount_due: int):
         """Send payment failure email"""
-        # TODO: Implement email sending
-        logger.info(f"Sending payment failure email to customer {customer_id}")
-        pass
+        email = self._get_customer_email(customer_id)
+        if not email:
+            return
+        amount_str = f"${amount_due / 100:.2f}" if amount_due is not None else "—"
+        body = f"<p>We couldn't process your payment for invoice {invoice_id}. Amount due: {amount_str}. Please update your payment method.</p>"
+        self._send_billing_email(email, "Payment failed – action needed", body)
     
     def _handle_subscription_activated(self, subscription_id: str, customer_id: str):
-        """Handle subscription activation"""
+        """Handle subscription activation (status already persisted by caller)."""
         logger.info(f"Subscription activated: {subscription_id}")
-        # TODO: Implement activation logic
-        pass
     
     def _handle_subscription_past_due(self, subscription_id: str, customer_id: str):
-        """Handle subscription past due"""
+        """Handle subscription past due (status already persisted by caller)."""
         logger.info(f"Subscription past due: {subscription_id}")
-        # TODO: Implement past due logic
-        pass
     
     def _handle_subscription_canceled(self, subscription_id: str, customer_id: str):
-        """Handle subscription cancellation"""
+        """Handle subscription cancellation (status already persisted by caller)."""
         logger.info(f"Subscription canceled: {subscription_id}")
-        # TODO: Implement cancellation logic
-        pass
     
     def _track_subscription_event(self, event_type: str, subscription_id: str, customer_id: str):
-        """Track subscription events for analytics"""
-        # TODO: Implement analytics tracking
+        """Log subscription events (extend later for analytics)."""
         logger.info(f"Tracking subscription event: {event_type} for {subscription_id}")
-        pass
     
     def _track_payment_event(self, event_type: str, invoice_id: str, customer_id: str, amount: int):
-        """Track payment events for analytics"""
-        # TODO: Implement analytics tracking
+        """Log payment events (extend later for analytics)."""
         logger.info(f"Tracking payment event: {event_type} for invoice {invoice_id}")
-        pass
     
     def _track_invoice_event(self, event_type: str, invoice_id: str, customer_id: str, amount: int):
-        """Track invoice events for analytics"""
-        # TODO: Implement analytics tracking
+        """Log invoice events (extend later for analytics)."""
         logger.info(f"Tracking invoice event: {event_type} for invoice {invoice_id}")
-        pass
     
     def _track_customer_event(self, event_type: str, customer_id: str, email: str):
-        """Track customer events for analytics"""
-        # TODO: Implement analytics tracking
+        """Log customer events (extend later for analytics)."""
         logger.info(f"Tracking customer event: {event_type} for customer {customer_id}")
-        pass
     
     def _track_payment_method_event(self, event_type: str, payment_method_id: str, customer_id: str):
-        """Track payment method events for analytics"""
-        # TODO: Implement analytics tracking
+        """Log payment method events (extend later for analytics)."""
         logger.info(f"Tracking payment method event: {event_type} for {payment_method_id}")
-        pass
     
     def _track_checkout_event(self, event_type: str, session_id: str, customer_id: str, subscription_id: str = None):
-        """Track checkout events for analytics"""
-        # TODO: Implement analytics tracking
+        """Log checkout events (extend later for analytics)."""
         logger.info(f"Tracking checkout event: {event_type} for session {session_id}")
-        pass

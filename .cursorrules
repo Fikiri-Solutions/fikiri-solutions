@@ -1,0 +1,322 @@
+# ==========================================================
+# FIKIRI SOLUTIONS — ELITE ENGINEERING RULEPACK (v4.1)
+# Focus: Correctness, Performance, Zero Bloat, Readability
+# ==========================================================
+
+# ==========================================================
+# 0. META-RULES (HOW CURSOR SHOULD "THINK")
+# ==========================================================
+- Treat this repository as a production SaaS platform, not a demo.
+- Prefer simple, readable, minimal solutions over abstractions and patterns.
+- Never introduce new layers, classes, or patterns unless:
+    - They solve a real, recurring problem
+    - They clearly reduce complexity for future code
+- Before writing code, inspect existing files and follow their patterns.
+- Reuse utilities and helpers instead of re-implementing similar logic.
+- If a change would significantly alter architecture or break compatibility, STOP and surface this to the developer.
+
+# ==========================================================
+# 1. ARCHITECTURE RULES (DOMAIN-ORIENTED)
+# ==========================================================
+- Fikiri uses domain-oriented architecture:
+    core/            ← shared utilities (ai, logging, config, validation)
+    services/        ← business logic (email, crm, analytics, workflows)
+    integrations/    ← external connectors (Google, Outlook, Shopify, etc.)
+    crm/             ← CRM models, schemas, workflows
+    email_automation/← email classification, reply generation, schedulers
+    analytics/       ← reporting, dashboards, metrics
+    frontend/        ← React/Next.js app
+
+- Keep boundaries strict:
+    - services/ calls core/ and integrations/, not the other way around
+    - frontend/ never calls external APIs directly; only Fikiri backend
+- Avoid circular imports. If they appear, refactor minimally (e.g., move shared logic to core/).
+
+# ==========================================================
+# 2. AI PIPELINES & MODEL ROUTING
+# ==========================================================
+All LLM work MUST go through:
+
+    core/ai/llm_router.py
+    core/ai/llm_client.py
+    core/ai/validators.py
+
+Pipeline for any AI call:
+1. preprocess(input)
+2. detect_intent(input)
+3. choose_model(intent, cost_budget, latency_requirement)
+4. call_llm(model, prompt, params)
+5. postprocess(output)
+6. validate_schema(output)
+7. log cost + latency
+8. return structured result
+
+Constraints:
+- No direct OpenAI (or other LLM) calls from routes, services, or frontend.
+- Always enforce a schema for outputs (no "free text" as final API response).
+- Use bounded temperature and max_tokens; no unbounded generation.
+- Use exponential backoff with jitter on LLM/API failures and log failures clearly.
+
+# ==========================================================
+# 3. EMAIL AUTOMATION RULES (GMAIL / OUTLOOK)
+# ==========================================================
+Email logic must pass through:
+
+    integrations/gmail/gmail_client.py
+    integrations/outlook/outlook_client.py
+    email_automation/actions.py, parser.py, service_manager.py, jobs.py
+
+A thin orchestration façade may exist at email_automation/pipeline.py. The pipeline is composed across the above modules.
+
+Each processed email must include:
+- intent
+- sentiment
+- priority (low | medium | high)
+- actionability_score (0.0–1.0)
+- extracted_contact_info (name, email, business where possible)
+- recommended_category (lead, question, support, spam, newsletter, other)
+
+Rules:
+- Never send a raw LLM response to a human. Always format and validate.
+- Strip trackers and unsafe HTML links where possible.
+- Auto-create/merge lead records in CRM when a new sender appears.
+
+Caching:
+- Cache email metadata for ~300 seconds.
+- Cache classifications for ~1800 seconds.
+- Respect user-configurable overrides if present.
+
+# ==========================================================
+# 4. CRM RULES (STRICT, SIMPLE SCHEMA)
+# ==========================================================
+Canonical CRM schema and mutations live in crm/service.py. No separate workflows folder exists at this stage. Introduce crm/workflows/ only if CRM complexity later demands it.
+
+Canonical schema (in crm/service.py):
+
+    Contact/Lead:
+        id, user_id, email, name, phone, company, source, stage, score,
+        created_at, updated_at, last_contact, notes, tags, metadata
+
+Rules:
+- Email is unique (case-insensitive). No duplicates.
+- Updates merge into existing contacts instead of creating new ones.
+- All CRM mutations go through crm/service.py (enhanced_crm_service), not direct DB calls from random modules.
+- Favor simple queries (id/email lookups) and indexes over complex joins.
+- crm/minimal_service.py and core/minimal_crm_service.py are legacy; no new imports or logic. Canonical = crm/service.py.
+
+# ==========================================================
+# 5. REDIS RULES (CACHING, RATE LIMITS, QUEUES)
+# ==========================================================
+Key format:
+
+    fikiri:<domain>:<resource>:<identifier>
+
+Examples:
+    fikiri:email:thread:<thread_id>
+    fikiri:crm:contact:<email_hash>
+    fikiri:ratelimit:<route>:<user_id_or_ip>
+
+TTL rules:
+- Email metadata: ~300s
+- Classifications / lead scoring: ~600–1800s
+- Rate limit windows: 60–300s
+- Queue items: no TTL (managed by workers)
+
+Job queue:
+- Long-running and external-API-heavy tasks must be queued.
+- Do not block HTTP request handlers with heavy work.
+- Workers must be idempotent and safe to retry.
+
+# ==========================================================
+# 6. SECURITY RULES
+# ==========================================================
+- Never hardcode secrets; always use environment variables loaded via config layer (Doppler / Infisical).
+- All non-health-check endpoints require auth (API key, JWT, session, or configured mechanism).
+- Validate webhook signatures and timestamps.
+- Sanitize all externally-sourced text before storing or forwarding to LLMs.
+- Never log secrets, raw tokens, or full email bodies unless explicitly redacted.
+
+# ==========================================================
+# 7. FRONTEND RULES (NEXT.JS / REACT / TAILWIND)
+# ==========================================================
+- All frontend HTTP calls must go through a single API client module (e.g. frontend/src/api/client.ts or frontend/src/services/apiClient.ts). Hardcoded backend URLs are forbidden; use config.apiUrl (or equivalent) only inside that client.
+- Components:
+    - Use TypeScript.
+    - Keep them small, focused, and composable.
+    - Prefer function components + hooks.
+
+Styling rules:
+- Use TailwindCSS + shadcn/ui components.
+- Avoid unnecessary custom CSS if a Tailwind/shadcn solution exists.
+- Keep layouts simple and readable; no over-designed animations without purpose.
+
+UX rules:
+- Every async action must show: loading state → success or error feedback.
+- Never show raw error objects to users; show friendly messages.
+
+Performance rules (frontend):
+- Use pagination or infinite scroll for large lists.
+- Use React.memo/useMemo/useCallback when a component re-renders over large lists or expensive computations.
+- Lazy-load heavy components and pages (code splitting where obvious).
+
+# ==========================================================
+# 8. LOGGING & OBSERVABILITY
+# ==========================================================
+Log format (JSON-like):
+
+    {
+      "event": "string",
+      "service": "email|crm|ai|frontend|integration|other",
+      "severity": "DEBUG|INFO|WARN|ERROR",
+      "trace_id": "uuid",
+      "user_id": "optional",
+      "latency_ms": "optional",
+      "cost_usd": "optional",
+      "metadata": {...}
+    }
+
+Rules:
+- LLM calls must include latency_ms and cost_usd where possible.
+- Do not log full prompts/responses when they contain sensitive data; prefer hashes, IDs, or summaries.
+- Use one logging utility in core/logging.py; do not create ad-hoc print/log statements all over.
+
+# ==========================================================
+# 9. DEPLOYMENT, TESTING & CI/CD
+# ==========================================================
+- Code must (eventually) pass:
+    - static checks (ruff/flake8) for Python
+    - type checks (mypy or pyright)
+    - unit tests and integration tests for critical paths
+- Docker:
+    - Use multi-stage builds.
+    - Keep images as lean as possible (no unused tools or dev-only extras).
+- Config:
+    - Separate dev/stage/prod configs.
+    - Do not mix dev test keys in prod images.
+
+# ==========================================================
+# 10. READABILITY & SELF-DOCUMENTING CODE
+# ==========================================================
+- Write code so that a new engineer can understand it without needing comments.
+- Use clear, intention-revealing names:
+    - functions: verbs that describe actions (classify_email, create_contact)
+    - variables: concrete and specific (lead_score, max_retries, contact_email)
+- Keep functions small:
+    - Prefer multiple short, focused functions over a single large one.
+- Comments are for:
+    - non-obvious business rules
+    - tricky edge cases
+    - external API quirks
+- Do NOT comment obvious code (no "# increment i by 1" type comments).
+
+# ==========================================================
+# 11. PERFORMANCE & COMPLEXITY RULES (BACKEND)
+# ==========================================================
+General:
+- Prefer the simplest correct algorithm with acceptable time/space complexity.
+- Avoid premature generalization and abstraction.
+
+API design:
+- All list/collection endpoints MUST be paginated (limit/offset or cursor-based).
+- Never return unbounded lists from the database.
+- For queries over potentially large tables:
+    - Always use indexed fields in WHERE clauses.
+    - Avoid "SELECT *" over entire tables without pagination.
+
+Time complexity:
+- Avoid nested loops over unbounded collections (O(n^2) or worse) unless necessary and documented.
+- Prefer:
+    - O(1) or O(log n) lookups using dictionaries, indexes, or Redis.
+    - Bulk operations (batch inserts, batch updates) over repeated single-row operations in loops.
+- If a task is O(n) over large data (emails, leads), consider:
+    - streaming
+    - chunked processing
+    - background jobs
+
+Async:
+- All network-bound operations (HTTP, DB, LLM, external APIs) should be async when framework supports it.
+- Do not block event loops with synchronous waits around I/O.
+
+Memory:
+- Avoid loading entire large datasets into memory when streaming or batching would work.
+- Do not keep large AI prompts/responses in memory longer than necessary.
+
+# ==========================================================
+# 12. PERFORMANCE & SIMPLICITY RULES (AI & PIPELINES)
+# ==========================================================
+- Do not run AI over entire databases or large email histories in one shot.
+- Always set:
+    - max_tokens bounds
+    - clear truncation rules for long threads
+- Preprocess to the minimal context needed before calling the LLM.
+- Avoid chains of calls that depend on full previous outputs if a structured/summarized representation would work.
+
+Complexity:
+- Pipelines must be linear and easy to trace:
+    input → preprocess → model → postprocess → validate → save
+- Avoid deep nesting of callbacks or complex recursive flows.
+- Prefer explicit, flat logic rather than clever meta-programming.
+
+# ==========================================================
+# 13. PERFORMANCE & SIMPLICITY RULES (FRONTEND)
+# ==========================================================
+- Do not over-engineer state management:
+    - Use React context or a light store (Zustand/Redux) only where needed.
+    - Prefer local component state when scope is small.
+- Avoid unnecessary renders:
+    - Memoize expensive components.
+    - Avoid passing new inline functions/objects where not needed.
+- Large tables / lists:
+    - Use pagination or virtualization.
+- Don't introduce fancy animations or libraries unless they improve UX meaningfully.
+
+# ==========================================================
+# 14. ANTI-BLOAT / ANTI-OVERENGINEERING GUARDRAILS
+# ==========================================================
+- Do NOT:
+    - introduce design patterns (e.g., strategy, factory, CQRS) just for style.
+    - build generic abstractions "just in case" for future hypotheticals.
+    - create unused helper functions, classes, or services.
+    - create multiple ways to do the same thing in the same domain.
+- Prefer:
+    - direct, explicit logic over "clever" meta-programming.
+    - a single, obvious implementation over multiple configurable layers.
+
+When in doubt:
+- Choose the simplest approach that:
+    - is easy to read,
+    - is easy to test,
+    - meets performance constraints,
+    - fits into the existing architecture.
+
+# ==========================================================
+# 15. SIMPLE CLASSES, SIMPLE METHODS, INTENTIONAL NAMING
+# ==========================================================
+- Apply to both legacy code and new features. When touching old code, nudge it toward these rules where practical; for new code, follow them strictly.
+
+Classes:
+- Keep classes small and single-purpose. One clear responsibility per class.
+- Prefer plain data + functions over deep inheritance or many layers of abstraction.
+- Do not add classes, interfaces, or types "for future flexibility" unless there is a concrete, current need.
+
+Methods / functions:
+- Keep methods short and focused. If a method does more than one logical thing, split it.
+- One level of abstraction per function: either "what" (orchestration) or "how" (implementation), not both mixed.
+- Prefer pure functions and explicit inputs/outputs over hidden state or side effects where possible.
+
+Naming:
+- Names must be intentional and self-explanatory. A reader should understand role and behavior from the name alone.
+- Classes: nouns that describe the thing (e.g. Contact, EmailClassifier, CheckoutSession).
+- Methods: verbs or verb phrases that describe the action (e.g. create_contact, validate_email, get_redirect_path).
+- Variables: concrete and specific (e.g. lead_score, max_retries, contact_email). Avoid generic names (data, info, result) unless scope is tiny and type is obvious.
+- Booleans: name so that true/false reads naturally (e.g. is_authenticated, has_redirect, allow_retry).
+
+Simplicity:
+- Do not over-complicate. If a linear script or a single function is enough, do not introduce classes or layers.
+- Avoid indirection that does not add clarity or reuse (e.g. extra wrappers, "manager" or "handler" classes that only forward calls).
+- When refactoring legacy code, simplify naming and structure in the same change if it keeps the diff understandable.
+
+# ==========================================================
+# END OF FIKIRI SOLUTIONS RULEPACK (v4.1)
+# ==========================================================
+

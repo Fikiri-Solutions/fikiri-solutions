@@ -14,7 +14,6 @@
 
 import { config } from '../config'
 
-const CURRENT_APP_VERSION = config.version
 const CURRENT_BUILD_TIMESTAMP = config.buildTimestamp
 const CURRENT_CACHE_VERSION = config.cacheVersion
 

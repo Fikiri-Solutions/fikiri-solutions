@@ -1,7 +1,9 @@
 // lib/api.ts
 // Shared fetch helper with cookie credentials for Fikiri Solutions
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+import { config } from '../config'
+
+const API_BASE_URL = config.apiUrl;
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -84,10 +86,20 @@ export async function api<T = any>(
       throw error;
     }
     
-    // Network or other errors
+    // Network or other errors - provide user-friendly messages
+    let errorMessage = 'Network error';
+    if (error instanceof Error) {
+      if (error.message.includes('Failed to fetch') || error.message.includes('ERR_CONNECTION_REFUSED')) {
+        errorMessage = 'Unable to connect to server. Please check your connection or try again later.';
+      } else {
+        errorMessage = error.message;
+      }
+    }
+    
     throw new ApiError(
-      error instanceof Error ? error.message : 'Network error',
-      0
+      errorMessage,
+      0,
+      'NETWORK_ERROR'
     );
   }
 }

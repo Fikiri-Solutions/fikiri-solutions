@@ -10,6 +10,7 @@ interface FikiriLogoProps {
   className?: string;
   animated?: boolean;
   showText?: boolean;
+  textColor?: 'default' | 'white' | 'light'; // For text color on dark backgrounds
 }
 
 export const FikiriLogo: React.FC<FikiriLogoProps> = ({ 
@@ -17,7 +18,8 @@ export const FikiriLogo: React.FC<FikiriLogoProps> = ({
   variant = 'circle',
   className = '',
   animated = false,
-  showText = false
+  showText = false,
+  textColor = 'default'
 }) => {
   const sizeClasses = {
     xs: 'h-8',
@@ -39,6 +41,27 @@ export const FikiriLogo: React.FC<FikiriLogoProps> = ({
   const animationClass = animated ? 'animate-pulse' : '';
 
   if (variant === 'full' || showText) {
+    // Determine text styling based on textColor prop
+    const isLightText = textColor === 'white' || textColor === 'light'
+    const textSizeClasses = {
+      xs: 'text-sm',
+      sm: 'text-base',
+      md: 'text-lg',
+      lg: 'text-xl',
+      xl: 'text-2xl',
+      '2xl': 'text-3xl',
+      '3xl': 'text-4xl'
+    }
+    const subtextSizeClasses = {
+      xs: 'text-xs',
+      sm: 'text-sm',
+      md: 'text-base',
+      lg: 'text-lg',
+      xl: 'text-lg',
+      '2xl': 'text-xl',
+      '3xl': 'text-2xl'
+    }
+    
     return (
       <div className={`flex items-center space-x-4 ${className}`}>
         <img 
@@ -47,16 +70,25 @@ export const FikiriLogo: React.FC<FikiriLogoProps> = ({
           className={`${sizeClasses[size]} ${animationClass}`}
         />
         <div className="flex flex-col">
-          <span className="text-xl font-bold bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent tracking-wide" style={{
-            background: 'linear-gradient(to right, #FF6B35, #D2691E, #8B0000)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent'
-          }}>FIKIRI</span>
-          <span className="text-base font-medium bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent tracking-wide" style={{
-            background: 'linear-gradient(to right, #FF6B35, #D2691E, #8B0000)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent'
-          }}>SOLUTIONS</span>
+          {isLightText ? (
+            <>
+              <span className={`${textSizeClasses[size]} font-bold text-white tracking-wide drop-shadow-lg`}>FIKIRI</span>
+              <span className={`${subtextSizeClasses[size]} font-medium text-white tracking-wide drop-shadow-lg`}>SOLUTIONS</span>
+            </>
+          ) : (
+            <>
+              <span className={`${textSizeClasses[size]} font-bold bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent tracking-wide`} style={{
+                background: 'linear-gradient(to right, #FF6B35, #D2691E, #8B0000)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent'
+              }}>FIKIRI</span>
+              <span className={`${subtextSizeClasses[size]} font-medium bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent tracking-wide`} style={{
+                background: 'linear-gradient(to right, #FF6B35, #D2691E, #8B0000)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent'
+              }}>SOLUTIONS</span>
+            </>
+          )}
         </div>
       </div>
     );

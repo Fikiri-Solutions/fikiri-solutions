@@ -32,7 +32,7 @@ except ImportError:
 
 # Try to import CRM and Gmail client
 try:
-    from core.gmail_client import gmail_client
+    from integrations.gmail.gmail_client import gmail_client
     GMAIL_CLIENT_AVAILABLE = True
 except ImportError:
     GMAIL_CLIENT_AVAILABLE = False
@@ -42,13 +42,17 @@ class OnboardingJobManager:
     """Manages onboarding background jobs with progress tracking"""
     
     def __init__(self):
-        self.redis_url = os.getenv("REDIS_URL")
-        self.redis_client = None
+        try:
+            from core.redis_connection_helper import get_redis_client, _resolve_redis_url
+            self.redis_url = _resolve_redis_url()
+            self.redis_client = get_redis_client(decode_responses=True) if self.redis_url else None
+        except Exception:
+            self.redis_url = None
+            self.redis_client = None
         self.queue = None
-        
-        if REDIS_AVAILABLE and self.redis_url:
+
+        if REDIS_AVAILABLE and self.redis_client:
             try:
-                self.redis_client = Redis.from_url(self.redis_url, decode_responses=True)
                 self.redis_client.ping()
                 
                 if REDIS_QUEUE_AVAILABLE:
@@ -159,11 +163,12 @@ def run_first_sync(user_id: int, limit: int = 500, newer_than_days: int = 90) ->
     try:
         logger.info(f"🔄 Starting first sync for user {user_id}")
         
-        # Initialize Redis for progress tracking
+        # Initialize Redis for progress tracking (uses REDIS_URL or UPSTASH_* via helper)
         redis_client = None
-        if REDIS_AVAILABLE and os.getenv("REDIS_URL"):
+        if REDIS_AVAILABLE:
             try:
-                redis_client = Redis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
+                from core.redis_connection_helper import get_redis_client
+                redis_client = get_redis_client(decode_responses=True)
             except Exception as e:
                 logger.warning(f"⚠️ Redis connection failed: {e}")
         
@@ -330,11 +335,12 @@ def run_first_sync(user_id: int, limit: int = 500, newer_than_days: int = 90) ->
         }
         
         # Update Redis if available
-        if REDIS_AVAILABLE and os.getenv("REDIS_URL"):
+        if REDIS_AVAILABLE:
             try:
-                import redis
-                redis_client = redis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
-                redis_client.hset(prog_key, mapping=error_progress)
+                from core.redis_connection_helper import get_redis_client
+                redis_client = get_redis_client(decode_responses=True, db=0)
+                if redis_client:
+                    redis_client.hset(prog_key, mapping=error_progress)
             except Exception as redis_e:
                 logger.error(f"❌ Failed to update Redis with error: {redis_e}")
         

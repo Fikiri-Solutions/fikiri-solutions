@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { CheckCircle, Database, Users, Zap, Settings, Loader2, AlertCircle } from 'lucide-react'
+import { apiClient } from '../services/apiClient'
 
 interface SyncProgressProps {
   userId: number
@@ -28,10 +29,9 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({ userId, onComplete }
 
   const pollSyncStatus = async () => {
     try {
-      const response = await fetch(`https://fikirisolutions.onrender.com/api/onboarding/status?user_id=${userId}`)
-      const data = await response.json()
-      
-      if (data.success) {
+      const data = await apiClient.getOnboardingStatus(userId) as { success?: boolean; progress?: any; error?: string }
+
+      if (data?.success && data.progress) {
         const progress = data.progress
         
         // Transform the new progress format to match current interface

@@ -142,9 +142,9 @@ class UserAuthManager:
                 logger.error(f"Error inserting user: {e}")
                 raise
             
-            # Get the created user
+            # Get the created user (rulepack compliance: specific columns, not SELECT *)
             user_data = db_optimizer.execute_query(
-                "SELECT * FROM users WHERE id = ?",
+                "SELECT id, email, name, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE id = ?",
                 (user_id,)
             )[0]
             
@@ -168,9 +168,9 @@ class UserAuthManager:
                          ip_address: str = None, user_agent: str = None) -> Dict[str, Any]:
         """Authenticate user login"""
         try:
-            # Get user data
+            # Get user data (rulepack compliance: specific columns, including password_hash for auth)
             user_data = db_optimizer.execute_query(
-                "SELECT * FROM users WHERE email = ? AND is_active = 1",
+                "SELECT id, email, name, password_hash, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE email = ? AND is_active = 1",
                 (email,)
             )
             
@@ -362,9 +362,9 @@ class UserAuthManager:
             
             db_optimizer.execute_query(query, tuple(update_values), fetch=False)
             
-            # Get updated user data
+            # Get updated user data (rulepack compliance: specific columns, not SELECT *)
             user_data = db_optimizer.execute_query(
-                "SELECT * FROM users WHERE id = ?",
+                "SELECT id, email, name, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE id = ?",
                 (user_id,)
             )[0]
             
@@ -415,7 +415,7 @@ class UserAuthManager:
             )
             
             # Queue password reset email
-            from core.email_jobs import email_job_manager
+            from email_automation.jobs import email_job_manager
             email_job_manager.queue_password_reset_email(
                 email=email,
                 reset_token=reset_token,
@@ -559,8 +559,9 @@ class UserAuthManager:
     def get_user_by_id(self, user_id: int) -> Optional[UserProfile]:
         """Get user profile by ID"""
         try:
+            # Rulepack compliance: specific columns, not SELECT *
             user_data = db_optimizer.execute_query(
-                "SELECT * FROM users WHERE id = ?",
+                "SELECT id, email, name, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE id = ?",
                 (user_id,)
             )
             

@@ -8,6 +8,9 @@ import { VitePWA } from 'vite-plugin-pwa'
 export const pwaConfig = VitePWA({
   registerType: 'autoUpdate',
   includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.png'],
+  // Disable automatic prefetch/preload generation to prevent wildcard issues
+  injectRegister: 'script',
+  strategies: 'generateSW',
   manifest: {
     name: 'Fikiri Solutions - AI Email Automation',
     short_name: 'Fikiri Solutions',
@@ -81,7 +84,6 @@ export const pwaConfig = VitePWA({
       }
     ]
   },
-  devOptions: {
-    enabled: true
-  }
+  // PWA is only enabled in production builds (see vite.config.ts)
+  // No devOptions needed since plugin is conditionally included
 })

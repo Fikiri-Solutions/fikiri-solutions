@@ -9,7 +9,7 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from core.automation_engine import TriggerType, ActionType, AutomationStatus
+from services.automation_engine import TriggerType, ActionType, AutomationStatus
 
 logger = logging.getLogger(__name__)
 
@@ -540,7 +540,8 @@ class WorkflowTemplatesSystem:
             }
             
             # Import automation engine
-            from core.automation_engine import automation_engine
+            from services.automation_engine import AutomationEngine
+            automation_engine = AutomationEngine()
             
             # Create the automation rule
             result = automation_engine.create_automation_rule(user_id, rule_data)

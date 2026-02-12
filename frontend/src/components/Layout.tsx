@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Mail, Users, Brain, Settings, Menu, X, Palette, LogOut, Building2, Shield, Zap, User } from 'lucide-react'
+import { Mail, Users, Brain, Settings, Menu, X, Palette, LogOut, BarChart3, Shield, Zap, User, PlugZap, BookOpen, CreditCard } from 'lucide-react'
 import { MobileBottomNav } from './MobileBottomNav'
 import { ThemeToggle } from './ThemeToggle'
 import { CustomizationPanel } from './CustomizationPanel'
@@ -52,10 +52,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Mail },
+    { name: 'Inbox', href: '/inbox', icon: Mail },
     { name: 'Services', href: '/services', icon: Settings },
+    { name: 'Integrations', href: '/integrations', icon: PlugZap },
+    { name: 'Automations', href: '/automations', icon: Zap },
     { name: 'CRM', href: '/crm', icon: Users },
     { name: 'AI Assistant', href: '/ai', icon: Brain },
-    { name: 'Industry AI', href: '/industry', icon: Building2 },
+    { name: 'Chatbot Builder', href: '/ai/chatbot-builder', icon: BookOpen },
+    { name: 'Usage Analytics', href: '/industry', icon: BarChart3 },
+    { name: 'Billing', href: '/billing', icon: CreditCard },
     { name: 'Privacy', href: '/privacy', icon: Shield },
   ]
 
@@ -65,11 +70,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   }
 
   return (
-    <div className="min-h-screen bg-brand-background dark:bg-gray-900 transition-colors duration-300">
+    <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
       {/* Mobile sidebar */}
       <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`}>
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-75" onClick={() => setSidebarOpen(false)} />
-        <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-brand-background dark:bg-gray-800 transition-colors duration-300">
+        <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-colors duration-300">
           <div className="flex h-16 items-center justify-between px-4">
             <Link to="/dashboard" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
               <FikiriLogo 
@@ -119,7 +124,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex flex-col flex-grow bg-brand-background dark:bg-gray-800 border-r border-brand-text/10 dark:border-gray-700 transition-colors duration-300">
+        <div className="flex flex-col flex-grow bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-colors duration-300">
           <div className="flex h-16 items-center px-4">
             <Link to="/dashboard" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
               <FikiriLogo 
@@ -163,7 +168,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Top bar */}
-        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-brand-text/10 dark:border-gray-700 bg-brand-background dark:bg-gray-800 px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8 transition-colors duration-300">
+        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8 transition-colors duration-300">
           <button
             type="button"
             className="-m-2.5 p-2.5 text-brand-text dark:text-gray-300 hover:text-brand-primary dark:hover:text-white lg:hidden transition-colors"
@@ -235,4 +240,3 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     </div>
   )
 }
-

@@ -40,6 +40,7 @@
     <meta name="msapplication-TileColor" content="#F97316" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- Removed deprecated apple-mobile-web-app-capable meta tag -->
     <meta name="apple-mobile-web-app-title" content="Fikiri Solutions" />
     
     <!-- Canonical URL -->
@@ -49,20 +50,18 @@
     <link rel="preconnect" href="https://fikirisolutions.onrender.com">
     
     <!-- Resource hints for performance -->
-    <link rel="prefetch" href="/assets/EnhancedDashboard-*.js" as="script">
-    <link rel="prefetch" href="/assets/DashboardCharts-*.js" as="script">
     <link rel="dns-prefetch" href="https://fonts.gstatic.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     
-    <!-- Local font preloading for better performance -->
-    <link rel="preload" href="/fonts/inter.woff2" as="font" type="font/woff2" crossorigin="anonymous">
-    
-    <!-- Font preloading will be handled by the CSS with font-display: swap -->
+    <!-- Plus Jakarta Sans - Modern, sleek font for SaaS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <!-- Critical CSS for above-the-fold content -->
     <style>
       /* Critical CSS for initial render */
-      body { font-family: Inter, system-ui, -apple-system, sans-serif; margin: 0; }
+      body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; margin: 0; }
       #root { min-height: 100vh; }
       .loading-spinner { 
         position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -114,6 +113,26 @@
     </script>
   </head>
   <body>
+    <!-- Immediately unregister service workers in dev mode (before React loads) -->
+    <script>
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for(var i = 0; i < registrations.length; i++) {
+              registrations[i].unregister();
+            }
+          });
+          if ('caches' in window) {
+            caches.keys().then(function(cacheNames) {
+              cacheNames.forEach(function(cacheName) {
+                caches.delete(cacheName);
+              });
+            });
+          }
+        }
+      }
+    </script>
+    
     <!-- Skip navigation for accessibility -->
     <a href="#main-content" class="skip-link">Skip to main content</a>
     <div id="root"></div>

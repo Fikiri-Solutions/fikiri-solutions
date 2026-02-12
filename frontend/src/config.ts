@@ -30,9 +30,28 @@ export const features = {
  */
 export const config = {
   // API Configuration
-  apiUrl: import.meta.env.VITE_API_URL || (features.mockData 
-    ? 'http://localhost:3000/api'  // Mock API for local testing
-    : 'https://fikirisolutions.onrender.com/api'),  // ✅ WORKING Render backend
+  // Automatically detect local development and use local backend
+  // Falls back to production if local backend is not available
+  apiUrl: import.meta.env.VITE_API_URL || (() => {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      // Check if running locally (localhost, 127.0.0.1, or local network IPs)
+      const isLocal = 
+        hostname === 'localhost' || 
+        hostname === '127.0.0.1' ||
+        hostname.startsWith('10.') ||  // Local network IPs (10.x.x.x)
+        hostname.startsWith('192.168.') ||  // Local network IPs (192.168.x.x)
+        hostname.startsWith('172.');  // Local network IPs (172.16-31.x.x)
+      
+      if (isLocal) {
+        // Default to local backend for development (avoids CORS issues)
+        // Set VITE_API_URL=https://fikirisolutions.onrender.com/api in .env to use production
+        return 'http://localhost:5000/api';
+      }
+    }
+    // Otherwise use production backend
+    return 'https://fikirisolutions.onrender.com/api';
+  })(),
   
   // Domain Configuration
   domain: 'fikirisolutions.com',

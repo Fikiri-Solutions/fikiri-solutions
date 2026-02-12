@@ -14,7 +14,8 @@ from flask import request, jsonify
 from core.minimal_config import get_config
 from core.database_optimization import db_optimizer
 from core.google_sheets_connector import get_sheets_connector
-from core.notion_connector import get_notion_connector
+# notion_connector archived - feature not currently implemented
+# from core.notion_connector import get_notion_connector
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,8 @@ class WebhookIntakeService:
     def __init__(self, config: WebhookConfig):
         self.config = config
         self.sheets_connector = get_sheets_connector()
-        self.notion_connector = get_notion_connector()
+        # notion_connector archived - feature not currently implemented
+        self.notion_connector = None  # get_notion_connector()
     
     def verify_webhook_signature(self, payload: str, signature: str, secret: str) -> bool:
         """Verify webhook signature for security"""
@@ -227,11 +229,12 @@ class WebhookIntakeService:
                 if not sheets_result['success']:
                     logger.warning(f"⚠️ Failed to sync to Google Sheets: {sheets_result.get('error')}")
             
-            # Sync to Notion
+            # Sync to Notion (feature archived - not currently implemented)
             if self.notion_connector:
                 notion_result = self.notion_connector.create_customer_profile(lead_data)
                 if not notion_result['success']:
                     logger.warning(f"⚠️ Failed to sync to Notion: {notion_result.get('error')}")
+            # else: notion_connector is None (feature not implemented)
             
             logger.info(f"✅ Successfully processed lead: {lead_data['email']}")
             return {

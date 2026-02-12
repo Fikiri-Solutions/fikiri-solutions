@@ -1,8 +1,10 @@
 import React, { useState } from 'react'
 import { Mail, ArrowLeft, CheckCircle } from 'lucide-react'
 import { FikiriLogo } from '../components/FikiriLogo'
+import { RadiantLayout } from '../components/radiant'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
+import { apiClient } from '../services/apiClient'
 
 export const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('')
@@ -30,15 +32,11 @@ export const ForgotPassword: React.FC = () => {
         throw new Error('Please enter a valid email address')
       }
       
-      const response = await fetch('https://fikirisolutions.onrender.com/api/auth/forgot-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email })
-      })
-
-      const data = await response.json()
+      const data = await apiClient.request<{ success?: boolean; error?: string }>(
+        'POST',
+        '/auth/forgot-password',
+        { data: { email } }
+      )
 
       if (data.success) {
         setSuccess(true)
@@ -54,7 +52,8 @@ export const ForgotPassword: React.FC = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center p-4">
+      <RadiantLayout>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-fikiri-900 to-fikiri-800 flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -74,7 +73,7 @@ export const ForgotPassword: React.FC = () => {
             <div className="space-y-4">
               <button
                 onClick={() => navigate('/login')}
-                className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                className="w-full px-6 py-3 bg-brand-primary text-white rounded-lg font-medium hover:bg-fikiri-400 transition-colors"
               >
                 Back to Login
               </button>
@@ -92,11 +91,13 @@ export const ForgotPassword: React.FC = () => {
           </div>
         </motion.div>
       </div>
+      </RadiantLayout>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center p-4">
+    <RadiantLayout>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-fikiri-900 to-fikiri-800 flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -126,7 +127,7 @@ export const ForgotPassword: React.FC = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
                 placeholder="Enter your email address"
                 required
               />
@@ -136,7 +137,7 @@ export const ForgotPassword: React.FC = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+            className="w-full px-6 py-3 bg-brand-primary text-white rounded-lg font-medium hover:bg-fikiri-400 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
           >
             {isLoading ? (
               <>
@@ -161,5 +162,6 @@ export const ForgotPassword: React.FC = () => {
         </form>
       </motion.div>
     </div>
+    </RadiantLayout>
   )
 }

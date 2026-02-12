@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Brain, Send, Bot, User, Clock, Zap, Mail, Users, Wifi, WifiOff } from 'lucide-react'
-import { apiClient, AIResponse } from '../services/apiClient'
+import { Brain, Send, Bot, User, Clock, Zap, Mail, Users, Wifi, WifiOff, Inbox, MessageSquare, Sparkles, Loader2, RefreshCw } from 'lucide-react'
+import { apiClient, AIResponse, LeadData } from '../services/apiClient'
 import { StatusIcon } from '../components/StatusIcon'
+import { EmptyState } from '../components/EmptyState'
 import { useWebSocket } from '../hooks/useWebSocket'
+import { useToast } from '../components/Toast'
 
 interface ChatMessage {
   id: string
@@ -65,8 +67,14 @@ export const AIAssistant: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [aiStatus, setAiStatus] = useState<AIResponse | null>(null)
   const [isTyping, setIsTyping] = useState(false)
+  const [leadInbox, setLeadInbox] = useState<LeadData[]>([])
+  const [selectedLead, setSelectedLead] = useState<LeadData | null>(null)
+  const [inboxLoading, setInboxLoading] = useState(false)
+  const [suggestedReply, setSuggestedReply] = useState('')
+  const [suggestionLoading, setSuggestionLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { isConnected } = useWebSocket()
+  const { addToast } = useToast()
 
   useEffect(() => {
     fetchAIStatus()
@@ -78,6 +86,23 @@ export const AIAssistant: React.FC = () => {
       timestamp: new Date()
     }])
   }, [])
+
+  const loadLeadInbox = async () => {
+    setInboxLoading(true)
+    try {
+      const leads = await apiClient.getLeads()
+      setLeadInbox(leads)
+      setSelectedLead(leads[0] ?? null)
+    } catch (err) {
+      addToast({ type: 'error', title: 'Load Failed', message: 'Unable to load AI inbox. Using cached data.' })
+    } finally {
+      setInboxLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadLeadInbox()
+  }, [])  
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -126,7 +151,8 @@ export const AIAssistant: React.FC = () => {
         conversation_history: messages.slice(-6) // Last 6 messages for context
       })
       
-      const rawResponse = response.data?.response || 'I apologize, but I encountered an issue generating a response.'
+      // sendChatMessage already unwraps the response, so access response.response directly
+      const rawResponse = response?.response || response?.data?.response || 'I apologize, but I encountered an issue generating a response.'
       const formattedResponse = formatAIResponse(rawResponse)
 
       // Simulate typing effect by updating the existing placeholder message
@@ -153,6 +179,67 @@ export const AIAssistant: React.FC = () => {
       }, 25)
       
       setError(null) // Clear error since we provided a fallback
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSelectLead = (lead: LeadData) => {
+    setSelectedLead(lead)
+    setSuggestedReply('')
+  }
+
+  const buildReplyPrompt = (lead: LeadData) => {
+    return `You are Fikiri Solutions' AI email assistant. Write a concise, friendly reply to ${lead.name} (${lead.email}) who is interested in our services. 
+Lead context:
+- Score: ${lead.score}
+- Stage: ${lead.stage}
+- Source: ${lead.source}
+Response should include a next step and keep tone professional but warm.`
+  }
+
+  const handleGenerateReply = async () => {
+    if (!selectedLead) return
+    setSuggestionLoading(true)
+    try {
+      const response = await apiClient.sendChatMessage(buildReplyPrompt(selectedLead))
+      // sendChatMessage already unwraps the response, so access response.response directly
+      const text = response?.response || response?.data?.response || 'Unable to generate a reply right now.'
+      setSuggestedReply(text)
+      addToast({ type: 'success', title: 'Reply Drafted', message: 'Suggested reply drafted' })
+    } catch (err) {
+      addToast({ type: 'error', title: 'Generation Failed', message: 'Failed to generate reply. Try again.' })
+    } finally {
+      setSuggestionLoading(false)
+    }
+  }
+
+  const handleSendReply = async () => {
+    if (!suggestedReply) {
+      addToast({ type: 'warning', title: 'No Reply', message: 'Generate or edit a reply before sending.' })
+      return
+    }
+    if (!selectedLead) {
+      addToast({ type: 'warning', title: 'No Lead Selected', message: 'Please select a lead to send an email to.' })
+      return
+    }
+
+    try {
+      setIsLoading(true)
+      const result = await apiClient.sendEmail({
+        to: selectedLead.email,
+        subject: `Re: Inquiry from ${selectedLead.name}`,
+        body: suggestedReply
+      })
+      
+      addToast({ type: 'success', title: 'Email Sent', message: 'Email sent successfully!' })
+      setSuggestedReply('') // Clear the reply after sending
+      
+      // Optionally refresh the lead inbox
+      loadLeadInbox()
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to send email'
+      addToast({ type: 'error', title: 'Send Failed', message: errorMessage })
     } finally {
       setIsLoading(false)
     }
@@ -211,119 +298,251 @@ export const AIAssistant: React.FC = () => {
         </div>
       )}
 
-      {/* Chat Interface */}
-      <div className="card h-[600px] flex flex-col bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg">
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Lead Inbox */}
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400">Lead inbox</p>
+              <h2 className="text-xl font-semibold text-brand-text dark:text-white">Classified by AI</h2>
+            </div>
+            <button
+              onClick={loadLeadInbox}
+              className="text-sm text-brand-primary hover:text-brand-secondary inline-flex items-center gap-2"
             >
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </button>
+          </div>
+          <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
+            {inboxLoading ? (
+              <div className="flex items-center justify-center py-12 text-brand-text/60">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                Loading inbox…
+              </div>
+            ) : leadInbox.length === 0 ? (
+              <EmptyState
+                icon={Inbox}
+                title="No leads yet"
+                description="Connect Gmail or forms to start capturing leads automatically."
+              />
+            ) : (
+              leadInbox.map((lead) => {
+                const sentiment =
+                  lead.score >= 7 ? { label: 'Hot', classes: 'bg-red-100 text-red-700' } :
+                  lead.score >= 4 ? { label: 'Warm', classes: 'bg-amber-100 text-amber-700' } :
+                  { label: 'Cold', classes: 'bg-blue-100 text-blue-700' }
+
+                return (
+                  <button
+                    key={lead.id}
+                    onClick={() => handleSelectLead(lead)}
+                    className={`w-full text-left rounded-xl border px-4 py-3 transition ${
+                      selectedLead?.id === lead.id
+                        ? 'border-brand-primary shadow-md ring-2 ring-brand-primary/40 bg-brand-accent/10'
+                        : 'border-brand-text/10 hover:border-brand-primary/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-brand-text dark:text-white">{lead.name}</p>
+                        <p className="text-xs text-brand-text/60 dark:text-gray-400">{lead.email}</p>
+                      </div>
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-full ${sentiment.classes}`}>
+                        {sentiment.label}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-xs text-brand-text/60 dark:text-gray-400">
+                      <span className="inline-flex items-center gap-1">
+                        <Users className="h-3.5 w-3.5" />
+                        {lead.stage}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <Mail className="h-3.5 w-3.5" />
+                        {lead.source || 'Inbox'}
+                      </span>
+                    </div>
+                  </button>
+                )
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Suggested Replies */}
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm p-6 flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400">AI drafts</p>
+              <h2 className="text-xl font-semibold text-brand-text dark:text-white">Suggested reply</h2>
+            </div>
+            {selectedLead && (
+              <span className="inline-flex items-center gap-2 text-xs text-brand-text/60 dark:text-gray-400">
+                <MessageSquare className="h-3.5 w-3.5" />
+                {selectedLead.stage}
+              </span>
+            )}
+          </div>
+
+          {selectedLead ? (
+            <>
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30 p-4 mb-4 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-semibold text-brand-text dark:text-white">{selectedLead.name}</span>
+                  <span className="text-brand-text/60 dark:text-gray-400">{selectedLead.company || 'Unknown company'}</span>
+                </div>
+                <p className="text-xs text-brand-text/60 dark:text-gray-400 break-words">{selectedLead.email}</p>
+                <div className="flex items-center gap-2 text-xs text-brand-text/70 dark:text-gray-400">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Lead score {selectedLead.score}/10 · Source: {selectedLead.source || 'Inbox'}
+                </div>
+              </div>
+
+              <textarea
+                rows={12}
+                value={suggestedReply}
+                onChange={(e) => setSuggestedReply(e.target.value)}
+                className="flex-1 rounded-xl border border-brand-text/10 dark:border-gray-700 focus:ring-brand-primary focus:border-brand-primary bg-white dark:bg-gray-900 text-brand-text dark:text-gray-100 p-4 text-sm"
+                placeholder="Generate an AI reply or start typing your own..."
+              />
+
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <button
+                  onClick={handleGenerateReply}
+                  disabled={suggestionLoading}
+                  className="inline-flex items-center gap-2 rounded-xl border border-brand-primary/40 px-4 py-2 text-sm font-medium text-brand-primary hover:bg-brand-primary/10 disabled:opacity-50"
+                >
+                  {suggestionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  Generate reply
+                </button>
+                <button
+                  onClick={handleSendReply}
+                  className="inline-flex items-center gap-2 rounded-xl bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-secondary"
+                >
+                  <Send className="h-4 w-4" />
+                  Send email
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-center text-brand-text/60 dark:text-gray-400">
+              Select a lead to generate a tailored reply.
+            </div>
+          )}
+        </div>
+
+        {/* Chat Console */}
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm flex flex-col h-[620px]">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-brand-text/10 dark:border-gray-700">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400">AI console</p>
+              <h2 className="text-lg font-semibold text-brand-text dark:text-white">Conversational control</h2>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            {messages.map((message) => (
               <div
-                className={`max-w-lg lg:max-w-2xl px-6 py-4 rounded-2xl shadow-sm ${
-                  message.type === 'user'
-                    ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white'
-                    : 'bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 text-gray-800 dark:text-gray-100 border border-gray-200 dark:border-gray-600'
-                }`}
+                key={message.id}
+                className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div className="flex items-start space-x-3">
-                  {message.type === 'ai' && (
+                <div
+                  className={`max-w-lg px-6 py-4 rounded-2xl shadow-sm ${
+                    message.type === 'user'
+                      ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white'
+                      : 'bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 text-gray-800 dark:text-gray-100 border border-gray-200 dark:border-gray-600'
+                  }`}
+                >
+                  <div className="flex items-start space-x-3">
+                    {message.type === 'ai' && (
+                      <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full flex items-center justify-center">
+                        <Bot className="h-4 w-4 text-white" />
+                      </div>
+                    )}
+                    {message.type === 'user' && (
+                      <div className="flex-shrink-0 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                        <User className="h-4 w-4 text-white" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                      <p className={`text-xs mt-2 ${
+                        message.type === 'user' ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'
+                      }`}>
+                        {message.timestamp.toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {isTyping && (
+              <div className="flex justify-start">
+                <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 text-gray-800 dark:text-gray-100 max-w-lg px-6 py-4 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-600">
+                  <div className="flex items-start space-x-3">
                     <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full flex items-center justify-center">
                       <Bot className="h-4 w-4 text-white" />
                     </div>
-                  )}
-                  {message.type === 'user' && (
-                    <div className="flex-shrink-0 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                      <User className="h-4 w-4 text-white" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="prose prose-sm max-w-none">
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
-                    </div>
-                    <p className={`text-xs mt-2 ${
-                      message.type === 'user' ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'
-                    }`}>
-                      {message.timestamp.toLocaleTimeString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-          
-          {/* Typing Indicator */}
-          {isTyping && (
-            <div className="flex justify-start">
-              <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 text-gray-800 dark:text-gray-100 max-w-lg lg:max-w-2xl px-6 py-4 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-600">
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full flex items-center justify-center">
-                    <Bot className="h-4 w-4 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      <div className="flex space-x-1">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-1">
                         <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce delay-75"></div>
+                        <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce delay-150"></div>
+                        <span className="text-xs text-gray-500 dark:text-gray-300 ml-2">AI assistant is typing…</span>
                       </div>
-                      <span className="text-sm text-gray-600 dark:text-gray-300">AI is thinking...</span>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-          
-          {/* Auto-scroll anchor */}
-          <div ref={messagesEndRef} />
-          
-          {/* Loading Indicator */}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 text-gray-800 dark:text-gray-100 px-6 py-4 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-600">
-                <div className="flex items-center space-x-3">
-                  <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full flex items-center justify-center">
-                    <Bot className="h-4 w-4 text-white" />
-                  </div>
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Input */}
-        <div className="border-t border-gray-200 dark:border-gray-700 p-6 bg-gray-50 dark:bg-gray-900">
-          <div className="flex space-x-4">
-            <div className="flex-1">
-              <input
-                type="text"
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200"
-                placeholder="Ask me anything about email responses, leads, or automation..."
+            )}
+          </div>
+          <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-4">
+            <div className="flex flex-col space-y-3">
+              <textarea
+                rows={3}
+                className="w-full rounded-xl border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 p-4 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                placeholder="Ask the AI assistant anything... e.g., 'Draft a response to Acme Corp lead'"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                disabled={isLoading}
               />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center space-x-2">
+                    <Brain className="h-4 w-4" />
+                    <span>AI model: Universal Assistant</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Zap className="h-4 w-4" />
+                    <span>Context-aware responses enabled</span>
+                  </div>
+                </div>
+                <button
+                  onClick={handleSendMessage}
+                  disabled={isLoading || !inputMessage.trim()}
+                  className={`inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-xl shadow-sm ${
+                    isLoading || !inputMessage.trim()
+                      ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:shadow-lg hover:translate-y-[-1px] transition'
+                  }`}
+                >
+                  {isLoading ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Sending...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Send to AI Assistant
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-            <button
-              onClick={handleSendMessage}
-              disabled={!inputMessage.trim() || isLoading}
-              className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-6 py-3 rounded-xl font-medium transition-all duration-200 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
-            >
-              <Send className="h-4 w-4" />
-              <span>Send</span>
-            </button>
           </div>
         </div>
       </div>
-
       {/* Quick Actions */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <button

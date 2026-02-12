@@ -24,14 +24,14 @@ try:
     SENTRY_AVAILABLE = True
 except ImportError:
     SENTRY_AVAILABLE = False
-    print("Warning: sentry-sdk not available. Install with: pip install sentry-sdk[flask]")
+    logging.warning("sentry-sdk not available. Install with: pip install sentry-sdk[flask]")
 
 try:
     from flask import Flask, request, g, jsonify
     FLASK_AVAILABLE = True
 except ImportError:
     FLASK_AVAILABLE = False
-    print("Warning: Flask not available. Install with: pip install flask")
+    logging.warning("Flask not available. Install with: pip install flask")
 
 # Configure logging
 logging.basicConfig(
@@ -480,33 +480,54 @@ class HealthMonitor:
     def check_redis(self) -> Dict[str, Any]:
         """Check Redis connectivity with enhanced checks"""
         try:
-            import redis
+            from core.redis_connection_helper import get_redis_client
             
-            redis_url = os.getenv('REDIS_URL')
-            if redis_url:
-                client = redis.from_url(redis_url, decode_responses=True)
-            else:
-                client = redis.Redis(
-                    host=os.getenv('REDIS_HOST', 'localhost'),
-                    port=int(os.getenv('REDIS_PORT', 6379)),
-                    password=os.getenv('REDIS_PASSWORD'),
-                    db=int(os.getenv('REDIS_DB', 0)),
-                    decode_responses=True
-                )
+            client = get_redis_client(decode_responses=True, db=int(os.getenv('REDIS_DB', 0)))
+            if not client:
+                return {
+                    'status': 'unavailable',
+                    'connected': False,
+                    'response_time_ms': None,
+                    'error': 'Redis connection failed'
+                }
             
             start_time = time.time()
             client.ping()
             response_time = (time.time() - start_time) * 1000
             
             # Get Redis info
-            info = client.info()
+            info = client.info('memory')
+            stats = client.info('stats')
+            
+            # Calculate usage for Upstash free tier
+            used_memory_bytes = info.get('used_memory', 0)
+            used_memory_mb = used_memory_bytes / (1024 * 1024)
+            storage_percent = (used_memory_mb / 256) * 100  # 256 MB limit
+            
+            # Count keys
+            key_count = client.dbsize()
+            
+            # Count keys by prefix (sample first 100 to avoid blocking)
+            all_keys = client.keys('fikiri:*')[:100]  # Limit to avoid blocking
+            prefix_counts = {}
+            for key in all_keys:
+                parts = key.split(':')
+                if len(parts) >= 2:
+                    prefix = parts[1]
+                    prefix_counts[prefix] = prefix_counts.get(prefix, 0) + 1
             
             return {
                 'connected': True,
                 'response_time_ms': round(response_time, 2),
                 'redis_version': info.get('redis_version', 'unknown'),
-                'used_memory_mb': round(info.get('used_memory', 0) / 1024 / 1024, 2),
-                'connected_clients': info.get('connected_clients', 0)
+                'used_memory_mb': round(used_memory_mb, 2),
+                'used_memory_percent': round(storage_percent, 2),
+                'memory_limit_mb': 256,
+                'memory_status': '✅ Excellent' if storage_percent < 10 else '⚠️ Monitor' if storage_percent < 50 else '❌ High',
+                'key_count': key_count,
+                'keys_by_prefix': prefix_counts,
+                'connected_clients': info.get('connected_clients', 0),
+                'total_commands': stats.get('total_commands_processed', 0)
             }
         except Exception as e:
             raise Exception(f"Redis check failed: {e}")

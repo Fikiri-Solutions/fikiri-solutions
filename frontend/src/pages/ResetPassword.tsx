@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react'
 import { FikiriLogo } from '../components/FikiriLogo'
+import { RadiantLayout } from '../components/radiant'
 import { motion } from 'framer-motion'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { apiClient } from '../services/apiClient'
 
 export const ResetPassword: React.FC = () => {
   const [password, setPassword] = useState('')
@@ -45,18 +47,11 @@ export const ResetPassword: React.FC = () => {
         throw new Error('Passwords do not match')
       }
       
-      const response = await fetch('https://fikirisolutions.onrender.com/api/auth/reset-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          token,
-          password 
-        })
-      })
-
-      const data = await response.json()
+      const data = await apiClient.request<{ success?: boolean; error?: string }>(
+        'POST',
+        '/auth/reset-password',
+        { data: { token, password } }
+      )
 
       if (data.success) {
         setSuccess(true)
@@ -72,7 +67,8 @@ export const ResetPassword: React.FC = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center p-4">
+      <RadiantLayout>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-fikiri-900 to-fikiri-800 flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -90,19 +86,21 @@ export const ResetPassword: React.FC = () => {
             
             <button
               onClick={() => navigate('/login')}
-              className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              className="w-full px-6 py-3 bg-brand-primary text-white rounded-lg font-medium hover:bg-fikiri-400 transition-colors"
             >
               Go to Login
             </button>
           </div>
         </motion.div>
       </div>
+      </RadiantLayout>
     )
   }
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center p-4">
+      <RadiantLayout>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-fikiri-900 to-fikiri-800 flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -120,18 +118,20 @@ export const ResetPassword: React.FC = () => {
             
             <button
               onClick={() => navigate('/forgot-password')}
-              className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              className="w-full px-6 py-3 bg-brand-primary text-white rounded-lg font-medium hover:bg-fikiri-400 transition-colors"
             >
               Request New Reset Link
             </button>
           </div>
         </motion.div>
       </div>
+      </RadiantLayout>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center p-4">
+    <RadiantLayout>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-fikiri-900 to-fikiri-800 flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -161,7 +161,7 @@ export const ResetPassword: React.FC = () => {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-12 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-12 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
                 placeholder="Enter new password"
                 required
               />
@@ -186,7 +186,7 @@ export const ResetPassword: React.FC = () => {
                 type={showConfirmPassword ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full pl-10 pr-12 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-12 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
                 placeholder="Confirm new password"
                 required
               />
@@ -203,7 +203,7 @@ export const ResetPassword: React.FC = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+            className="w-full px-6 py-3 bg-brand-primary text-white rounded-lg font-medium hover:bg-fikiri-400 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
           >
             {isLoading ? (
               <>
@@ -217,5 +217,6 @@ export const ResetPassword: React.FC = () => {
         </form>
       </motion.div>
     </div>
+    </RadiantLayout>
   )
 }

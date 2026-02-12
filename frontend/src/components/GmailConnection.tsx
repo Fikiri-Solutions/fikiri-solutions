@@ -1,6 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { CheckCircle, AlertCircle, Mail, Shield, Eye, Clock, Loader2, ExternalLink, Info, AlertTriangle } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 import { useToast } from './Toast'
+import { config } from '../config'
+import { apiClient } from '../services/apiClient'
 
 interface GmailConnectionProps {
   userId: number
@@ -16,16 +20,58 @@ interface GmailStatus {
 }
 
 export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConnected }) => {
+  const location = useLocation()
+  const { user } = useAuth()
   const [isConnecting, setIsConnecting] = useState(false)
   const [gmailStatus, setGmailStatus] = useState<GmailStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showDetails, setShowDetails] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
   const { addToast } = useToast()
+  const hasShownOAuthToast = useRef(false) // Prevent duplicate toasts
+  
+  // Get redirect parameter from URL to preserve through OAuth
+  const getRedirectParam = () => {
+    const urlParams = new URLSearchParams(location.search)
+    const redirectParam = urlParams.get('redirect')
+    if (redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')) {
+      return redirectParam
+    }
+    return null
+  }
+  
+  // Determine the appropriate redirect URL based on context
+  const getOAuthRedirectUrl = () => {
+    // If there's an explicit redirect parameter, use it
+    const redirectParam = getRedirectParam()
+    if (redirectParam) {
+      return redirectParam
+    }
+    
+    // If user is in onboarding (on onboarding-flow pages), redirect back to onboarding
+    if (location.pathname.startsWith('/onboarding-flow') || location.pathname.startsWith('/onboarding')) {
+      const redirectPath = getRedirectParam()
+      const redirectQuery = redirectPath ? `?redirect=${encodeURIComponent(redirectPath)}` : ''
+      return `/onboarding-flow/2${redirectQuery}`
+    }
+    
+    // If user is already onboarded, redirect back to where they came from
+    // This handles the case where they're connecting Gmail after account creation
+    if (user?.onboarding_completed) {
+      // If they're on the integrations page, stay there
+      if (location.pathname === '/integrations/gmail') {
+        return '/integrations/gmail'
+      }
+      // Otherwise, default to integrations page
+      return '/integrations/gmail'
+    }
+    
+    // Default: onboarding flow step 2 (for new users)
+    return '/onboarding-flow/2'
+  }
 
-  useEffect(() => {
-    checkGmailStatus()
-  }, [checkGmailStatus])
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const isMountedRef = useRef(true)
 
   const checkGmailStatus = useCallback(async () => {
     if (!userId || userId <= 0) {
@@ -33,27 +79,26 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
       return
     }
 
+    // Abort any previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     try {
-      const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
-      const response = await fetch(`https://fikirisolutions.onrender.com/api/auth/gmail/status?user_id=${userId}`, {
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      })
+      const data = await apiClient.getGmailStatus(userId)
       
       clearTimeout(timeoutId)
       
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      const data = await response.json()
+      // Check if component is still mounted before updating state
+      if (!isMountedRef.current) return
       
       if (data.success) {
-        setGmailStatus(data.data)
+        setGmailStatus(data.data || {})
         setError(null)
         if (data.data.connected) {
           onConnected()
@@ -61,17 +106,84 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
       } else {
         throw new Error(data.error || 'Failed to check Gmail status')
       }
-    } catch (error) {
-      console.error('Error checking Gmail status:', error)
+    } catch (error: any) {
+      // Ignore AbortErrors - they're expected when component unmounts or request is cancelled
       if (error.name === 'AbortError') {
-        setError('Request timed out. Please check your connection.')
-        addToast('Connection timeout. Please try again.', 'error')
-      } else {
-        setError('Failed to check Gmail connection status')
-        addToast('Unable to check Gmail status. Please try again.', 'error')
+        // Only log in development, and only if it's not a cleanup abort
+        if (process.env.NODE_ENV === 'development' && isMountedRef.current) {
+          // This is a timeout, not a cleanup
+          setError('Request timed out. Please check your connection.')
+          addToast('Connection timeout. Please try again.', 'error')
+        }
+        return
+      }
+      
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return
+      
+      console.error('Error checking Gmail status:', error)
+      setError('Failed to check Gmail connection status')
+      addToast('Unable to check Gmail status. Please try again.', 'error')
+    } finally {
+      // Clear the controller reference if this was the active request
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null
       }
     }
   }, [userId, onConnected, addToast])
+
+  useEffect(() => {
+    isMountedRef.current = true
+    checkGmailStatus()
+    
+    // Cleanup: abort request and mark as unmounted
+    return () => {
+      isMountedRef.current = false
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+        abortControllerRef.current = null
+      }
+    }
+  }, [checkGmailStatus])
+
+  // Check if user just returned from OAuth (check URL params and refresh status)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search)
+    const oauthSuccess = urlParams.get('oauth_success')
+    const oauthError = urlParams.get('oauth_error')
+    
+    // If OAuth just completed, check status and show feedback
+    if (oauthSuccess === 'true' && !hasShownOAuthToast.current) {
+      hasShownOAuthToast.current = true
+      // Clear the URL parameter immediately to prevent re-triggering
+      window.history.replaceState({}, '', location.pathname)
+      // Wait a moment for backend to process, then check status
+      setTimeout(async () => {
+        await checkGmailStatus()
+        // Show toast after status is confirmed (only once)
+        if (!hasShownOAuthToast.current) return
+        addToast({ 
+          type: 'success', 
+          title: 'Gmail Connected Successfully!', 
+          message: 'Your Gmail account is now connected. We\'ll start syncing your emails shortly.' 
+        })
+        // Reset after showing toast to allow future connections
+        setTimeout(() => {
+          hasShownOAuthToast.current = false
+        }, 5000)
+      }, 1000)
+    } else if (oauthError) {
+      // Clear the URL parameter
+      window.history.replaceState({}, '', location.pathname)
+      setError(decodeURIComponent(oauthError))
+      addToast({ 
+        type: 'error', 
+        title: 'Gmail Connection Failed', 
+        message: decodeURIComponent(oauthError) 
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]) // Only depend on location.search to prevent duplicate runs
 
   const connectGmail = async () => {
     if (!userId || userId <= 0) {
@@ -87,25 +199,12 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
       const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
 
       // Use new proven OAuth endpoint - GET request with redirect parameter
-      const redirectUri = '/onboarding-flow/sync'  // Will show sync progress step
-      const response = await fetch(`https://fikirisolutions.onrender.com/api/oauth/gmail/start?redirect=${encodeURIComponent(redirectUri)}`, {
-        method: 'GET',
-        credentials: 'include', // Include session cookies for CSRF protection
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal
-      })
+      // Determine appropriate redirect based on user context
+      const redirectUri = getOAuthRedirectUrl()
+      const data = await apiClient.startGmailOAuth(redirectUri)
 
       clearTimeout(timeoutId)
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      const data = await response.json()
-      
-      // New OAuth endpoint returns { url: "https://accounts.google.com/..." }
       if (data.url) {
         // Security: Validate the auth URL
         if (!data.url.startsWith('https://accounts.google.com/')) {
@@ -133,26 +232,36 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
   }
 
   const disconnectGmail = async () => {
-    try {
-      const response = await fetch('https://fikirisolutions.onrender.com/api/auth/gmail/disconnect', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: userId
-        })
-      })
+    if (!confirm('Are you sure you want to disconnect your Gmail account? This will stop syncing your emails.')) {
+      return
+    }
 
-      const data = await response.json()
+    try {
+      const data = await apiClient.disconnectGmail(userId)
       
       if (data.success) {
         setGmailStatus({ connected: false })
+        setError(null)
+        // Refresh status to confirm disconnect
+        await checkGmailStatus()
+        addToast({ 
+          type: 'success', 
+          title: 'Gmail Disconnected', 
+          message: 'Your Gmail account has been disconnected successfully.' 
+        })
+        onConnected() // Notify parent to refresh
       } else {
-        throw new Error(data.error || 'Failed to disconnect Gmail')
+        throw new Error(data.error || data.message || 'Failed to disconnect Gmail')
       }
-    } catch (error) {
-      setError('Failed to disconnect Gmail. Please try again.')
+    } catch (error: any) {
+      console.error('Error disconnecting Gmail:', error)
+      const errorMessage = error.message || 'Failed to disconnect Gmail. Please try again.'
+      setError(errorMessage)
+      addToast({ 
+        type: 'error', 
+        title: 'Disconnect Failed', 
+        message: errorMessage 
+      })
     }
   }
 
@@ -167,6 +276,7 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
     return descriptions[scope] || scope
   }
 
+  // Show connection status with clear visual feedback
   if (gmailStatus?.connected) {
     return (
       <div className="space-y-6">

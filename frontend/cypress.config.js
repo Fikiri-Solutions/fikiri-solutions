@@ -12,7 +12,7 @@ module.exports = defineConfig({
     defaultCommandTimeout: 10000,
     requestTimeout: 10000,
     responseTimeout: 10000,
-    setupNodeEvents(on, config) {
+    setupNodeEvents(_on, _config) {
       // implement node event listeners here
     },
   },
@@ -23,4 +23,3 @@ module.exports = defineConfig({
     },
   },
 })
-

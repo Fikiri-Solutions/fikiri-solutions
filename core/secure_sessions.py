@@ -44,10 +44,23 @@ class SecureSessionManager:
         self.session_prefix = "fikiri:secure:session:"
         self.session_ttl = 24 * 60 * 60  # 24 hours
         self.cookie_name = "fikiri_session"
-        self.cookie_secure = True  # Always secure for production
+        # For localhost, cookie_secure must be False (HTTPS required for secure cookies)
+        # For production, use True
+        self.cookie_secure = os.getenv('FLASK_ENV') == 'production'
         self.cookie_httponly = True
-        self.cookie_samesite = 'None'  # Allow cross-site for SPA
-        self.cookie_domain = os.getenv('SESSION_COOKIE_DOMAIN', '.fikirisolutions.com')
+        self.cookie_samesite = 'Lax'  # Use 'Lax' for localhost, 'None' for cross-site (requires Secure)
+        # For localhost, don't set domain (None). For production, use configured domain
+        cookie_domain_env = os.getenv('SESSION_COOKIE_DOMAIN')
+        if cookie_domain_env:
+            self.cookie_domain = cookie_domain_env
+        else:
+            # Default: None for localhost, '.fikirisolutions.com' for production
+            self.cookie_domain = None if os.getenv('FLASK_ENV') == 'development' else '.fikirisolutions.com'
+        
+        # Override samesite for localhost (can't use 'None' without Secure)
+        if self.cookie_domain is None or 'localhost' in str(self.cookie_domain):
+            self.cookie_samesite = 'Lax'
+            self.cookie_secure = False
         self._connect_redis()
         self._initialize_tables()
     
@@ -59,23 +72,16 @@ class SecureSessionManager:
             return
         
         try:
-            redis_url = os.getenv('REDIS_URL')
-            if redis_url:
-                self.redis_client = redis.from_url(redis_url, decode_responses=True)
+            from core.redis_connection_helper import get_redis_client
+            self.redis_client = get_redis_client(decode_responses=True, db=0)
+            if self.redis_client:
+                logger.info("✅ Secure session Redis connection established")
             else:
-                self.redis_client = redis.Redis(
-                    host=os.getenv('REDIS_HOST', 'localhost'),
-                    port=int(os.getenv('REDIS_PORT', 6379)),
-                    password=os.getenv('REDIS_PASSWORD'),
-                    db=int(os.getenv('REDIS_DB', 0)),
-                    decode_responses=True
-                )
-            
-            self.redis_client.ping()
-            logger.info("✅ Secure session Redis connection established")
-            
+                logger.warning("⚠️ Upstash Redis connection failed")
+                logger.info("🔄 Falling back to database-only sessions")
+                self.redis_client = None
         except Exception as e:
-            logger.error(f"❌ Secure session Redis connection failed: {e}")
+            logger.warning(f"⚠️ Redis connection failed, using database-only sessions: {e}")
             self.redis_client = None
     
     def _initialize_tables(self):
@@ -198,8 +204,10 @@ class SecureSessionManager:
                     return data
             
             # Fallback to database
+            # Rulepack compliance: specific columns, not SELECT *
             db_data = db_optimizer.execute_query("""
-                SELECT * FROM secure_sessions 
+                SELECT id, session_id, user_id, ip_address, user_agent, created_at, last_accessed, expires_at, is_active, metadata 
+                FROM secure_sessions 
                 WHERE session_id = ? AND is_active = TRUE 
                 AND expires_at > datetime('now')
             """, (session_id,))

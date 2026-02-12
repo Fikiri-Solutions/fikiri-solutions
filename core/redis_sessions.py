@@ -54,19 +54,15 @@ class RedisSessionManager:
             return
             
         try:
-            # Create Redis client directly
-            import os
-            redis_url = os.getenv('REDIS_URL')
-            if redis_url:
-                self.redis_client = redis.from_url(redis_url)
-            else:
-                self.redis_client = redis.Redis(host='localhost', port=6379, db=0)
-            
+            from core.redis_connection_helper import get_redis_client
+            self.redis_client = get_redis_client(decode_responses=True, db=0)
             if self.redis_client:
-                self.redis_client.ping()
-                logger.info("✅ Redis session manager connected directly")
-        except Exception as e:
-            logger.error(f"❌ Redis session connection failed: {e}")
+                logger.info("✅ Redis session manager connected")
+            else:
+                logger.warning("⚠️ Redis connection failed (Upstash/local), using in-memory")
+                self.redis_client = None
+        except Exception as redis_error:
+            logger.warning(f"⚠️ Redis connection failed (Upstash/local), using in-memory: {redis_error}")
             self.redis_client = None
     
     def is_connected(self) -> bool:
@@ -279,6 +275,9 @@ def init_flask_sessions(app):
     @app.before_request
     def load_session():
         """Load session from Redis before each request"""
+        # Skip session loading for OPTIONS preflight requests
+        if request.method == 'OPTIONS':
+            return None
         session_id = session.get('session_id')
         if session_id:
             session_data = session_manager.get_session(session_id)

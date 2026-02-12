@@ -15,9 +15,8 @@ from flask_cors import CORS
 try:
     from dotenv import load_dotenv
     load_dotenv()
-    print("✅ Environment variables loaded from .env file")
 except ImportError:
-    print("ℹ️ python-dotenv not available - using system environment variables")
+    pass  # python-dotenv not available - using system environment variables
 
 # Ensure logging directories exist
 os.makedirs("logs", exist_ok=True)
@@ -40,20 +39,18 @@ if os.getenv("FLASK_ENV") not in ["production", "development", "staging"]:
     logger.warning(f"⚠️ Invalid FLASK_ENV value: {os.getenv('FLASK_ENV')}")
 
 # Safe Startup Logging
-print("🚀 Starting Fikiri API environment:", os.getenv("FLASK_ENV", "production"))
+logger.info("Starting Fikiri API environment: %s", os.getenv("FLASK_ENV", "production"))
 
 # Core imports
 from core.minimal_config import get_config
-from core.minimal_auth import MinimalAuthenticator
-from core.minimal_email_parser import MinimalEmailParser
-from core.minimal_gmail_utils import MinimalGmailService
-from core.minimal_email_actions import MinimalEmailActions
-from core.minimal_crm_service import MinimalCRMService
-from core.minimal_ai_assistant import MinimalAIEmailAssistant
+from email_automation.parser import MinimalEmailParser
+from integrations.gmail.utils import MinimalGmailService
+from email_automation.actions import MinimalEmailActions
+from email_automation.ai_assistant import MinimalAIEmailAssistant
 from core.minimal_ml_scoring import MinimalMLScoring
 from core.minimal_vector_search import MinimalVectorSearch
 from core.feature_flags import get_feature_flags
-from core.email_service_manager import EmailServiceManager
+from email_automation.service_manager import EmailServiceManager
 
 # Enhanced services
 from core.jwt_auth import get_jwt_manager
@@ -71,24 +68,19 @@ try:
 except ImportError:
     LIMITER_AVAILABLE = False
     Limiter = None
-from core.backend_excellence import create_api_blueprint
-from core.business_operations import create_business_blueprint
-from core.enterprise_logging import log_api_request
-from core.business_operations import business_intelligence, legal_compliance
-from core.structured_logging import monitor, error_tracker
-from core.performance_monitor import performance_monitor
+from services.business_operations import create_business_blueprint
 
 # Blueprint imports
 from core.app_onboarding import bp as onboarding_bp
 from core.billing_api import billing_bp
 from core.webhook_api import webhook_bp
-from core.crm_completion_api import crm_bp
+from crm.completion_api import crm_bp
 from core.docs_forms_api import docs_forms_bp
 from core.chatbot_smart_faq_api import chatbot_bp
 from core.workflow_templates_api import workflow_templates_bp
-from core.monitoring_dashboard_api import monitoring_dashboard_bp
+from analytics.monitoring_api import monitoring_dashboard_bp
 from core.ai_chat_api import ai_bp
-from core.dashboard_api import dashboard_bp
+from analytics.dashboard_api import dashboard_bp
 
 # Dev test routes (development only)
 if os.getenv('FLASK_ENV') == 'development':
@@ -103,6 +95,8 @@ except ImportError:
 
 # Route blueprints (extracted modules)
 from routes import auth_bp, business_bp, test_bp, user_bp, monitoring_bp
+from routes.integrations import integrations_bp
+from routes.appointments import appointments_bp
 
 # Global services dictionary
 services = {}
@@ -111,50 +105,86 @@ def create_app():
     """Flask Application Factory Pattern with Enhanced Monitoring"""
     app = Flask(__name__)
     app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
+    app.socketio = None  # Will be initialized in create_app() if available
     
     # 🔧 Database sanity check and initialization
     try:
         from core.database_init import init_database, check_database_health
         from core.database_optimization import db_optimizer
         
-        print("🔍 Checking database connectivity...")
+        logger.info("Checking database connectivity...")
         try:
-            print(f"Database path: {db_optimizer.db_path}")
+            logger.info("Database path: %s", db_optimizer.db_path)
             result = db_optimizer.execute_query("SELECT name FROM sqlite_master WHERE type='table';")
-            print(f"Existing tables: {[r['name'] for r in result]}")
+            logger.info("Existing tables: %s", [r['name'] for r in result])
         except Exception as e:
-            print(f"❌ Database connection failed: {e}")
-        
-        print("⚙️ Running init_database() ...")
+            logger.error("Database connection failed: %s", e)
+        logger.info("Running init_database() ...")
         if init_database():
-            print("✅ Database initialized.")
+            logger.info("Database initialized.")
         else:
-            print("❌ Database initialization failed")
-        
-        print("🏥 Running database health check ...")
+            logger.warning("Database initialization failed")
+        logger.info("Running database health check ...")
         if check_database_health():
-            print("✅ Health check completed.")
+            logger.info("Health check completed.")
         else:
-            print("❌ Health check failed")
-            
+            logger.warning("Health check failed")
     except Exception as e:
-        print(f"❌ Database startup error: {e}")
-        logger.error(f"❌ Database startup error: {e}")
+        logger.error("Database startup error: %s", e)
     
     # Enhanced CORS configuration for cookie-based auth
+    # Allow both local development ports (3000 for Next.js, 5173/5174 for Vite)
+    cors_origins = [
+        "https://fikirisolutions.com",
+        "https://www.fikirisolutions.com",
+        "https://fikirisolutions.onrender.com",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+    ]
+    
+    # In development, dynamically allow the requesting origin
+    # Note: Cannot use '*' with supports_credentials=True
+    def get_cors_origins():
+        if os.getenv('FLASK_ENV') == 'development':
+            # In development, allow any localhost or local network origin
+            return cors_origins  # Will be validated dynamically
+        return cors_origins
+    
     CORS(app, 
-         resources={r"/api/*": {"origins": [
-             "https://fikirisolutions.com",
-             "https://www.fikirisolutions.com", 
-             "http://localhost:3000",
-             "http://127.0.0.1:3000"
-         ]}},
-         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-         allow_headers=['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRFToken'],
+         resources={r"/api/*": {"origins": get_cors_origins()}},
+         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
+         allow_headers=['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRFToken', 'Accept', 'Cache-Control', 'Pragma', 'x-cache-version', 'x-deployment-timestamp', 'expires'],
          supports_credentials=True,
          max_age=3600,
-         vary_header=True
+         vary_header=True,
+         automatic_options=True  # Automatically handle OPTIONS requests
     )
+    # Mark CORS as configured to prevent init_security from overriding it
+    app._cors_configured = True
+    
+    # Add explicit OPTIONS handler for CORS preflight in development
+    @app.before_request
+    def handle_preflight():
+        if request.method == "OPTIONS":
+            origin = request.headers.get('Origin')
+            # In development, allow any localhost or local network origin
+            if os.getenv('FLASK_ENV') == 'development' and origin:
+                if (origin.startswith('http://localhost') or 
+                    origin.startswith('http://127.0.0.1') or
+                    origin.startswith('http://10.') or
+                    origin.startswith('http://192.168.') or
+                    origin.startswith('http://172.')):
+                    response = jsonify({})
+                    response.headers.add("Access-Control-Allow-Origin", origin)
+                    response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Requested-With,X-CSRFToken,Accept,Cache-Control,Pragma,x-cache-version,x-deployment-timestamp,expires")
+                    response.headers.add("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS,PATCH,HEAD")
+                    response.headers.add("Access-Control-Allow-Credentials", "true")
+                    response.headers.add("Access-Control-Max-Age", "3600")
+                    return response
     
     # Setup request logging
     setup_request_logging(app)
@@ -165,6 +195,48 @@ def create_app():
     # Setup routes
     setup_routes(app)
     
+    # Initialize SocketIO for real-time updates (optional, non-blocking)
+    app.socketio = None
+    try:
+        from flask_socketio import SocketIO
+        
+        # SocketIO origin validation function
+        def validate_socketio_origin(origin):
+            """Validate SocketIO origin, allowing local network IPs in development"""
+            if not origin:
+                return False
+            # Production origins
+            if origin in cors_origins:
+                return True
+            # In development, allow localhost and local network IPs
+            if os.getenv('FLASK_ENV') == 'development':
+                if (origin.startswith('http://localhost') or 
+                    origin.startswith('http://127.0.0.1') or
+                    origin.startswith('http://10.') or
+                    origin.startswith('http://192.168.') or
+                    origin.startswith('http://172.')):
+                    return True
+            return False
+        
+        # SocketIO with dynamic origin validation (callable function)
+        socketio = SocketIO(
+            app, 
+            cors_allowed_origins=validate_socketio_origin,
+            async_mode='threading', 
+            logger=False, 
+            engineio_logger=False
+        )
+        
+        app.socketio = socketio
+        setup_socketio_handlers(socketio)
+        logger.info("✅ SocketIO initialized with secure CORS (supports local network IPs in development)")
+    except ImportError:
+        logger.info("ℹ️ SocketIO not installed, skipping WebSocket support")
+        app.socketio = None
+    except Exception as e:
+        logger.warning(f"⚠️ SocketIO initialization failed: {e}, continuing without WebSocket support")
+        app.socketio = None
+    
     # Initialize services with app reference
     if initialize_services(app):
         register_blueprints(app)
@@ -174,6 +246,27 @@ def create_app():
     
     return app
 
+def setup_socketio_handlers(socketio):
+    """Simple WebSocket handlers for real-time updates"""
+    from flask import request
+    from flask_socketio import emit, join_room
+    
+    @socketio.on('connect')
+    def handle_connect():
+        emit('connected', {'status': 'ok'})
+    
+    @socketio.on('subscribe_dashboard')
+    def handle_subscribe(*args):
+        """Handle dashboard subscription with flexible argument handling"""
+        # SocketIO may pass data as first arg, or no args at all
+        data = args[0] if args and len(args) > 0 else {}
+        if not isinstance(data, dict):
+            data = {}
+        user_id = data.get('user_id', '1')
+        room = f"user:{user_id}"
+        join_room(room)
+        emit('subscribed', {'room': room})
+
 def initialize_services(app):
     """Initialize all core services with app reference."""
     global services
@@ -181,11 +274,9 @@ def initialize_services(app):
     try:
         # Initialize core services
         services['config'] = get_config()
-        services['auth'] = MinimalAuthenticator()
         services['parser'] = MinimalEmailParser()
         services['gmail'] = MinimalGmailService()
         services['actions'] = MinimalEmailActions()
-        services['crm'] = MinimalCRMService()
         services['ai_assistant'] = MinimalAIEmailAssistant(api_key=os.getenv("OPENAI_API_KEY"))
         services['ml_scoring'] = MinimalMLScoring()
         services['vector_search'] = MinimalVectorSearch()
@@ -203,6 +294,11 @@ def initialize_services(app):
         # ✅ Observability layer - Single monitoring initialization
         from core.monitoring import init_monitoring
         init_monitoring(app)
+        
+        # ✅ Cleanup scheduler - Start background cleanup jobs
+        from core.cleanup_scheduler import cleanup_scheduler
+        cleanup_scheduler.start()
+        logger.info("✅ Cleanup scheduler started")
 
         logger.info("✅ All services initialized successfully")
         return True
@@ -216,6 +312,9 @@ def setup_request_logging(app):
     @app.before_request
     def log_request():
         """Log incoming requests"""
+        # Skip logging for OPTIONS preflight requests - let CORS handle it
+        if request.method == 'OPTIONS':
+            return None
         request.start_time = time.time()
     
     @app.after_request
@@ -223,28 +322,10 @@ def setup_request_logging(app):
         """Log responses and performance"""
         if hasattr(request, 'start_time'):
             response_time = time.time() - request.start_time
-            
-            # Log to enterprise logging
-            try:
-                log_api_request(
-                    endpoint=request.endpoint or request.path,
-                    method=request.method,
-                    status_code=response.status_code,
-                    response_time=response_time,
-                    user_agent=request.headers.get('User-Agent')
-                )
-            except Exception as e:
-                logger.warning(f"Logging failed: {e}")
-            
-            # Record performance metrics
-            performance_monitor.record_request(
-                endpoint=request.endpoint or request.path,
-                method=request.method,
-                response_time=response_time,
-                status_code=response.status_code
-            )
+            # Simple logging - no need for multiple logging systems
+            logger.debug(f"{request.method} {request.path} - {response.status_code} - {response_time:.3f}s")
         
-        return response  # Always return response outside the if-block
+        return response
 
 def setup_error_handlers(app):
     """Setup error handlers"""
@@ -358,8 +439,7 @@ def register_blueprints(app):
     
     # Core feature blueprints
     blueprints = [
-        (create_api_blueprint('v1'), 'api_v1'),
-        (create_api_blueprint('v2'), 'api_v2'),
+        (appointments_bp, 'appointments'),
         (create_business_blueprint(), 'business'),
         (onboarding_bp, 'onboarding'),
         (billing_bp, 'billing'),
@@ -375,7 +455,8 @@ def register_blueprints(app):
         (business_bp, 'routes_business'),
         (test_bp, 'routes_test'),
         (user_bp, 'routes_user'),
-        (monitoring_bp, 'routes_monitoring')
+        (monitoring_bp, 'routes_monitoring'),
+        (integrations_bp, 'integrations')
     ]
     
     # Add dev test blueprint in development
@@ -503,9 +584,13 @@ def ai_response_direct():
 
 if __name__ == '__main__':
     # Development server configuration
-    app.run(
-        host='0.0.0.0',
-        port=int(os.getenv('PORT', 5000)),
-        debug=os.getenv('FLASK_ENV') == 'development',
-        threaded=True
-    )# Database corruption fix - Sat Oct  4 20:29:41 EDT 2025
+    app = create_app()
+    port = int(os.getenv('PORT', 5000))
+    debug = os.getenv('FLASK_ENV') == 'development'
+    
+    if app.socketio:
+        logger.info(f"🚀 Starting Flask server with SocketIO on port {port}")
+        app.socketio.run(app, host='0.0.0.0', port=port, debug=debug, use_reloader=False)
+    else:
+        logger.info(f"🚀 Starting Flask server on port {port}")
+        app.run(host='0.0.0.0', port=port, debug=debug, threaded=True, use_reloader=False)

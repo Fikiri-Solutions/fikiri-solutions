@@ -256,22 +256,13 @@ class FikiriStripeManager:
         if not STRIPE_AVAILABLE:
             logger.warning("Stripe not available, skipping feature creation")
             return {}
-            
-        created_features = {}
         
-        for feature_name, feature in self.features.items():
-            try:
-                stripe_feature = stripe.Feature.create(
-                    name=feature_name,
-                    display_name=feature.display_name,
-                    description=feature.description
-                )
-                created_features[feature_name] = stripe_feature.id
-                logger.info(f"Created feature: {feature_name} ({stripe_feature.id})")
-            except stripe.error.StripeError as e:
-                logger.error(f"Failed to create feature {feature_name}: {e}")
-                
-        return created_features
+        # Note: Stripe Features API is not available in Python SDK yet
+        # Features/Entitlements are managed through Products and Prices
+        # For now, we'll skip feature creation and use product metadata instead
+        logger.info("Skipping feature creation (Features API not available in Python SDK)")
+        logger.info("Features will be managed through product metadata and entitlements")
+        return {}
 
     def create_products(self, feature_ids: Dict[str, str]) -> Dict[str, str]:
         """Create all Fikiri products in Stripe"""
@@ -296,17 +287,19 @@ class FikiriStripeManager:
                 created_products[tier.value] = product.id
                 logger.info(f"Created product: {product_config['name']} ({product.id})")
                 
-                # Create product features
-                for feature_name in product_config['features']:
-                    if feature_name in feature_ids:
-                        try:
-                            stripe.ProductFeature.create(
-                                product=product.id,
-                                feature=feature_ids[feature_name]
-                            )
-                            logger.info(f"Added feature {feature_name} to product {product.id}")
-                        except stripe.error.StripeError as e:
-                            logger.error(f"Failed to add feature {feature_name} to product {product.id}: {e}")
+                # Note: Product Features API not available in Python SDK
+                # Features are stored in product metadata instead
+                product_metadata = {
+                    'tier': tier.value,
+                    'integrations': ','.join(product_config['integrations']),
+                    'features': ','.join(product_config['features'])
+                }
+                # Update product with features in metadata
+                stripe.Product.modify(
+                    product.id,
+                    metadata=product_metadata
+                )
+                logger.info(f"Added features to product {product.id} metadata")
                 
                 # Create prices for the product
                 self._create_product_prices(product.id, product_config['pricing'])
@@ -411,6 +404,118 @@ class FikiriStripeManager:
             logger.error(f"Failed to check feature access for {feature_name}: {e}")
             return False
 
+    def get_customer_invoices(self, customer_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get customer invoices"""
+        if not STRIPE_AVAILABLE:
+            return []
+        try:
+            invoices = stripe.Invoice.list(customer=customer_id, limit=limit)
+            return [{
+                'id': inv.id,
+                'number': inv.number,
+                'amount_paid': inv.amount_paid / 100,
+                'amount_due': inv.amount_due / 100,
+                'currency': inv.currency,
+                'status': inv.status,
+                'created': inv.created,
+                'hosted_invoice_url': inv.hosted_invoice_url,
+                'invoice_pdf': inv.invoice_pdf
+            } for inv in invoices.data]
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to get invoices: {e}")
+            return []
+
+    def create_customer_portal_session(self, customer_id: str, return_url: str) -> Dict[str, Any]:
+        """Create Stripe Customer Portal session"""
+        if not STRIPE_AVAILABLE:
+            return {}
+        try:
+            session = stripe.billing_portal.Session.create(
+                customer=customer_id,
+                return_url=return_url
+            )
+            return {'url': session.url}
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to create portal session: {e}")
+            raise
+
+    def get_customer_payment_methods(self, customer_id: str) -> List[Dict[str, Any]]:
+        """Get customer's payment methods"""
+        if not STRIPE_AVAILABLE:
+            return []
+        try:
+            payment_methods = stripe.PaymentMethod.list(customer=customer_id, type='card')
+            ach_methods = stripe.PaymentMethod.list(customer=customer_id, type='us_bank_account')
+            all_methods = list(payment_methods.data) + list(ach_methods.data)
+            return [{
+                'id': pm.id,
+                'type': pm.type,
+                'card': {
+                    'brand': pm.card.brand if hasattr(pm, 'card') and pm.card else None,
+                    'last4': pm.card.last4 if hasattr(pm, 'card') and pm.card else None,
+                    'exp_month': pm.card.exp_month if hasattr(pm, 'card') and pm.card else None,
+                    'exp_year': pm.card.exp_year if hasattr(pm, 'card') and pm.card else None
+                } if hasattr(pm, 'card') and pm.card else None,
+                'us_bank_account': {
+                    'bank_name': pm.us_bank_account.bank_name if hasattr(pm, 'us_bank_account') and pm.us_bank_account else None,
+                    'last4': pm.us_bank_account.last4 if hasattr(pm, 'us_bank_account') and pm.us_bank_account else None,
+                    'account_type': pm.us_bank_account.account_type if hasattr(pm, 'us_bank_account') and pm.us_bank_account else None
+                } if hasattr(pm, 'us_bank_account') and pm.us_bank_account else None,
+                'created': pm.created
+            } for pm in all_methods]
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to get payment methods: {e}")
+            return []
+
+    def detach_payment_method(self, payment_method_id: str) -> Dict[str, Any]:
+        """Remove a payment method"""
+        if not STRIPE_AVAILABLE:
+            return {}
+        try:
+            pm = stripe.PaymentMethod.detach(payment_method_id)
+            return {'id': pm.id, 'detached': True}
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to detach payment method: {e}")
+            raise
+
+    def set_default_payment_method(self, customer_id: str, payment_method_id: str) -> Dict[str, Any]:
+        """Set default payment method for customer"""
+        if not STRIPE_AVAILABLE:
+            return {}
+        try:
+            customer = stripe.Customer.modify(customer_id, invoice_settings={'default_payment_method': payment_method_id})
+            return {'id': customer.id, 'default_payment_method': customer.invoice_settings.default_payment_method}
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to set default payment method: {e}")
+            raise
+
+    def get_customer_details(self, customer_id: str) -> Dict[str, Any]:
+        """Get detailed customer information"""
+        if not STRIPE_AVAILABLE:
+            return {}
+        try:
+            customer = stripe.Customer.retrieve(customer_id, expand=['default_source', 'invoice_settings.default_payment_method'])
+            return {
+                'id': customer.id,
+                'email': customer.email,
+                'name': customer.name,
+                'phone': customer.phone,
+                'address': {
+                    'line1': customer.address.line1 if customer.address else None,
+                    'line2': customer.address.line2 if customer.address else None,
+                    'city': customer.address.city if customer.address else None,
+                    'state': customer.address.state if customer.address else None,
+                    'postal_code': customer.address.postal_code if customer.address else None,
+                    'country': customer.address.country if customer.address else None
+                } if customer.address else None,
+                'default_payment_method': customer.invoice_settings.default_payment_method if customer.invoice_settings else None,
+                'created': customer.created,
+                'metadata': customer.metadata
+            }
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to get customer details: {e}")
+            return {}
+
     def get_customer_limits(self, customer_id: str) -> Dict[str, int]:
         """Get customer's usage limits based on their subscription"""
         try:
@@ -459,42 +564,102 @@ class FikiriStripeManager:
             logger.error(f"Failed to create customer: {e}")
             raise
 
-    def create_checkout_session(self, price_id: str, customer_id: str = None, success_url: str = None, cancel_url: str = None) -> Dict[str, Any]:
-        """Create Stripe Checkout session"""
+    def create_checkout_session(self, price_id: str, customer_id: str = None, success_url: str = None, cancel_url: str = None, trial_days: int = 14) -> Dict[str, Any]:
+        """Create Stripe Checkout session with optional trial period"""
+        if not STRIPE_AVAILABLE:
+            logger.warning("Stripe not available")
+            return {}
+        
         try:
+            frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5174')
             session_params = {
                 'payment_method_types': ['card'],
-                'line_items': [{
-                    'price': price_id,
-                    'quantity': 1,
-                }],
+                'line_items': [{'price': price_id, 'quantity': 1}],
                 'mode': 'subscription',
-                'success_url': success_url or f"{os.getenv('FRONTEND_URL')}/dashboard?success=true",
-                'cancel_url': cancel_url or f"{os.getenv('FRONTEND_URL')}/pricing?canceled=true",
-                'trial_period_days': 14,
+                'success_url': success_url or f"{frontend_url}/dashboard?success=true",
+                'cancel_url': cancel_url or f"{frontend_url}/pricing?canceled=true",
                 'allow_promotion_codes': True,
                 'billing_address_collection': 'required',
+                'payment_method_collection': 'always',
                 'customer_creation': 'always' if not customer_id else None,
-                'customer': customer_id if customer_id else None,
+                'customer': customer_id,
                 'subscription_data': {
-                    'trial_period_days': 14,
-                    'metadata': {
-                        'source': 'fikiri_checkout'
-                    }
-                }
+                    'metadata': {'source': 'fikiri_checkout', 'purchase_type': 'trial' if trial_days > 0 else 'immediate'}
+                },
+                'payment_method_options': {'card': {'request_three_d_secure': 'automatic'}},
+                'metadata': {'checkout_type': 'subscription_with_trial' if trial_days > 0 else 'subscription_immediate', 'trial_days': str(trial_days)}
             }
+            
+            if trial_days > 0:
+                session_params['trial_period_days'] = trial_days
+                session_params['subscription_data']['trial_period_days'] = trial_days
             
             session = stripe.checkout.Session.create(**session_params)
-            
-            logger.info(f"Created checkout session {session.id}")
-            return {
-                'session_id': session.id,
-                'url': session.url
-            }
+            logger.info(f"Created checkout session {session.id} ({trial_days}-day trial)" if trial_days > 0 else f"Created checkout session {session.id} (immediate)")
+            return {'session_id': session.id, 'url': session.url}
             
         except stripe.error.StripeError as e:
             logger.error(f"Failed to create checkout session: {e}")
             raise
+
+    def get_price_id(self, tier_name: str, billing_period: str = 'monthly') -> Optional[str]:
+        """Get Stripe price ID for a tier and billing period"""
+        if not STRIPE_AVAILABLE:
+            logger.warning("Stripe not available, cannot get price ID")
+            return None
+        
+        try:
+            # Map tier name to SubscriptionTier enum
+            tier_map = {
+                'starter': SubscriptionTier.STARTER,
+                'growth': SubscriptionTier.GROWTH,
+                'business': SubscriptionTier.BUSINESS,
+                'enterprise': SubscriptionTier.ENTERPRISE
+            }
+            
+            tier = tier_map.get(tier_name.lower())
+            if not tier:
+                logger.error(f"Invalid tier name: {tier_name}")
+                return None
+            
+            # Get product config
+            product_config = self.products.get(tier)
+            if not product_config:
+                logger.error(f"Product config not found for tier: {tier_name}")
+                return None
+            
+            # Look up product by name in Stripe
+            products = stripe.Product.list(limit=100, active=True)
+            product = None
+            for p in products.data:
+                if p.name == product_config['name']:
+                    product = p
+                    break
+            
+            if not product:
+                logger.warning(f"Product {product_config['name']} not found in Stripe, may need to run setup")
+                return None
+            
+            # Look up price for this product and billing period
+            interval = 'month' if billing_period == 'monthly' else 'year'
+            prices = stripe.Price.list(product=product.id, active=True, limit=100)
+            
+            for price in prices.data:
+                if (price.recurring and 
+                    price.recurring.interval == interval and
+                    price.currency == 'usd'):
+                    logger.info(f"Found price ID {price.id} for {tier_name} {billing_period}")
+                    return price.id
+            
+            logger.warning(f"Price not found for {tier_name} {billing_period}, may need to create it")
+            return None
+            
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to get price ID: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Error getting price ID: {e}")
+            return None
 
     def get_pricing_tiers(self) -> Dict[str, Dict[str, Any]]:
         """Get all pricing tiers with their details"""

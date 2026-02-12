@@ -59,20 +59,12 @@ class MinimalMLScoring:
     def _initialize_redis(self):
         """Initialize Redis client for caching."""
         try:
-            import redis
-            redis_url = os.getenv('REDIS_URL')
-            if redis_url:
-                self.redis_client = redis.from_url(redis_url, decode_responses=True)
+            from core.redis_connection_helper import get_redis_client
+            self.redis_client = get_redis_client(decode_responses=True, db=int(os.getenv('REDIS_DB', 0)))
+            if self.redis_client:
+                logger.info("✅ Redis initialized for ML scoring cache")
             else:
-                self.redis_client = redis.Redis(
-                    host=os.getenv('REDIS_HOST', 'localhost'),
-                    port=int(os.getenv('REDIS_PORT', 6379)),
-                    password=os.getenv('REDIS_PASSWORD'),
-                    db=int(os.getenv('REDIS_DB', 0)),
-                    decode_responses=True
-                )
-            self.redis_client.ping()
-            logger.info("✅ Redis initialized for ML scoring cache")
+                logger.info("ℹ️ Redis not available for ML scoring cache (using database fallback)")
         except Exception as e:
             logger.info(f"ℹ️ Redis not available for ML scoring cache: {e}")
             self.redis_client = None

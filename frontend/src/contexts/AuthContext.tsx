@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { config } from '../config'
+import { apiClient } from '../services/apiClient'
 
 export interface User {
   id: number
@@ -37,7 +39,7 @@ export interface OnboardingData {
 }
 
 interface AuthContextType extends AuthState {
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; user?: User }>
   signup: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>
   logout: () => void
   updateUser: (user: User) => void
@@ -62,20 +64,119 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    isAuthenticated: false,
-    isLoading: true,
-    onboardingData: null
-  })
+  // Initialize auth state synchronously from localStorage if available
+  // This prevents race conditions where RouteGuard checks before useEffect runs
+  const getInitialAuthState = (): AuthState => {
+    if (typeof window === 'undefined') {
+      return {
+        user: null,
+        isAuthenticated: false,
+        isLoading: true,
+        onboardingData: null
+      }
+    }
+
+    try {
+      console.log('🔍 getInitialAuthState - Checking localStorage...')
+      let userData = localStorage.getItem('fikiri-user')
+      let userId = localStorage.getItem('fikiri-user-id')
+      
+      // Fallback: Check Zustand store if AuthContext keys don't exist
+      if (!userData || !userId) {
+        console.log('🔍 Checking Zustand store (fikiri-auth) as fallback...')
+        const zustandAuth = localStorage.getItem('fikiri-auth')
+        if (zustandAuth) {
+          try {
+            const zustandData = JSON.parse(zustandAuth)
+            const zustandUser = zustandData?.state?.user
+            if (zustandUser && zustandUser.id && zustandUser.email) {
+              console.log('✅ Found user in Zustand store, migrating to AuthContext format')
+              // Migrate from Zustand to AuthContext format
+              userData = JSON.stringify(zustandUser)
+              userId = zustandUser.id.toString()
+              // Save in AuthContext format for future use
+              localStorage.setItem('fikiri-user', userData)
+              localStorage.setItem('fikiri-user-id', userId)
+            }
+          } catch (error) {
+            console.error('❌ Error parsing Zustand auth data:', error)
+          }
+        }
+      }
+      
+      console.log('🔍 getInitialAuthState - localStorage check:', {
+        hasUserData: !!userData,
+        hasUserId: !!userId,
+        userDataLength: userData?.length || 0,
+        userDataPreview: userData ? userData.substring(0, 100) : null
+      })
+      
+      if (userData && userId) {
+        try {
+          const user = JSON.parse(userData)
+          if (user && user.id && user.email) {
+            console.log('✅ Initial auth state loaded from localStorage:', {
+              userId: user.id,
+              email: user.email,
+              onboarding_completed: user.onboarding_completed
+            })
+            return {
+              user,
+              isAuthenticated: true,
+              isLoading: false, // Already loaded, no need to wait
+              onboardingData: null
+            }
+          } else {
+            console.warn('⚠️ User data missing required fields:', {
+              hasId: !!user?.id,
+              hasEmail: !!user?.email,
+              user: user
+            })
+          }
+        } catch (error) {
+          console.error('❌ Error parsing initial user data:', error)
+        }
+      } else {
+        console.log('⚠️ No auth data in localStorage during initial state check')
+      }
+    } catch (error) {
+      console.error('❌ Error reading initial auth state:', error)
+    }
+
+    // Default: no auth data found, will check async
+    console.log('⚠️ Returning default (unauthenticated) initial state')
+    return {
+      user: null,
+      isAuthenticated: false,
+      isLoading: true,
+      onboardingData: null
+    }
+  }
+
+  const [authState, setAuthState] = useState<AuthState>(getInitialAuthState())
   
   const navigate = useNavigate()
 
-  // Load auth state from localStorage on mount
-  useEffect(() => {
-    checkAuthStatus()
-  }, [])
+  // Define clearAuthData first (used by checkAuthStatus)
+  const clearAuthData = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('fikiri-user')
+      localStorage.removeItem('fikiri-user-id')
+      localStorage.removeItem('fikiri-onboarding-data')
+      localStorage.removeItem('fikiri-onboarding-completed')
+      localStorage.removeItem('fikiri-remember-email')
+      localStorage.removeItem('fikiri-remember-password')
+      localStorage.removeItem('fikiri-remember-me')
+    }
+    setAuthState({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      onboardingData: null
+    })
+  }
 
+  // Define checkAuthStatus before useEffect uses it
   const checkAuthStatus = async () => {
     try {
       // Check if we're in the browser environment
@@ -87,24 +188,64 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return
       }
 
-      const userData = localStorage.getItem('fikiri-user')
-      const userId = localStorage.getItem('fikiri-user-id')
+      // Read from localStorage synchronously (this is fast)
+      let userData = localStorage.getItem('fikiri-user')
+      let userId = localStorage.getItem('fikiri-user-id')
       const onboardingData = localStorage.getItem('fikiri-onboarding-data')
+      
+      // Fallback: Check Zustand store if AuthContext keys don't exist
+      if (!userData || !userId) {
+        console.log('🔍 checkAuthStatus - Checking Zustand store (fikiri-auth) as fallback...')
+        const zustandAuth = localStorage.getItem('fikiri-auth')
+        if (zustandAuth) {
+          try {
+            const zustandData = JSON.parse(zustandAuth)
+            const zustandUser = zustandData?.state?.user
+            if (zustandUser && zustandUser.id && zustandUser.email) {
+              console.log('✅ Found user in Zustand store, migrating to AuthContext format')
+              // Migrate from Zustand to AuthContext format
+              userData = JSON.stringify(zustandUser)
+              userId = zustandUser.id.toString()
+              // Save in AuthContext format for future use
+              localStorage.setItem('fikiri-user', userData)
+              localStorage.setItem('fikiri-user-id', userId)
+            }
+          } catch (error) {
+            console.error('❌ Error parsing Zustand auth data:', error)
+          }
+        }
+      }
+      
+      console.log('🔍 checkAuthStatus - localStorage check:', {
+        hasUserData: !!userData,
+        hasUserId: !!userId,
+        userDataLength: userData?.length || 0
+      })
 
       if (userData && userId) {
         try {
           const user = JSON.parse(userData)
-          setAuthState(prev => ({
-            ...prev,
-            user,
-            isAuthenticated: true,
-            isLoading: false
-          }))
+          // Validate user object has required fields
+          if (user && user.id && user.email) {
+            // Set auth state immediately (synchronous)
+            setAuthState(prev => ({
+              ...prev,
+              user,
+              isAuthenticated: true,
+              isLoading: false
+            }))
+            console.log('✅ Auth state restored from localStorage:', user.email)
+          } else {
+            console.warn('Invalid user data in localStorage, clearing auth')
+            clearAuthData()
+          }
         } catch (error) {
           console.error('Error parsing user data:', error)
           clearAuthData()
         }
       } else {
+        // No user data found
+        console.log('No auth data in localStorage')
         setAuthState(prev => ({
           ...prev,
           isLoading: false
@@ -132,65 +273,139 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }
 
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const response = await fetch('https://fikirisolutions.onrender.com/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password })
-      })
-
-      // Handle rate limiting specifically
-      if (response.status === 429) {
-        return { 
-          success: false, 
-          error: 'Too many login attempts. Please wait a few minutes and try again.' 
+  // Load auth state from localStorage on mount (for onboarding data and validation)
+  useEffect(() => {
+    // Only run async check if we didn't already load from localStorage
+    if (authState.isLoading) {
+      checkAuthStatus()
+    } else {
+      // Still check for onboarding data
+      const onboardingData = localStorage.getItem('fikiri-onboarding-data')
+      if (onboardingData) {
+        try {
+          const data = JSON.parse(onboardingData)
+          setAuthState(prev => ({
+            ...prev,
+            onboardingData: data
+          }))
+        } catch (error) {
+          console.error('Error parsing onboarding data:', error)
         }
       }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Only run once on mount
 
-      const data = await response.json()
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; user?: User }> => {
+    try {
+      const data = await apiClient.login(email, password)
+
+      // Handle rate limiting (if backend returns 429, axios throws; handle in catch if needed)
+      if ((data as any)?.retry_after != null) {
+        const minutes = Math.ceil((data as any).retry_after / 60)
+        return {
+          success: false,
+          error: `Too many login attempts. Please wait ${minutes} minute${minutes !== 1 ? 's' : ''} and try again.`
+        }
+      }
+      
+      console.log('🔍 Login response:', JSON.stringify(data, null, 2))
 
       if (data.success) {
-        const user = data.data.user
-        const tokens = data.data.tokens
+        // Backend returns: { success: true, data: { user: {...}, access_token: "..." } }
+        // So we need to access data.data.user
+        const user = data.data?.user
+        const accessToken = data.data?.access_token
+        
+        console.log('🔍 Extracted user:', user)
+        if (import.meta.env.DEV) {
+          console.log('🔍 Extracted token:', accessToken ? 'present' : 'missing')
+        }
+        
+        // Validate user object
+        if (!user || !user.id) {
+          console.error('❌ Invalid user data in login response. Full response:', data)
+          console.error('❌ Tried to extract from:', {
+            'data.data?.user': data.data?.user,
+            'data.user': data.user,
+            'data.data': data.data
+          })
+          return { 
+            success: false, 
+            error: 'Invalid response from server' 
+          }
+        }
         
         // Store user data and tokens (only in browser)
         if (typeof window !== 'undefined') {
-          localStorage.setItem('fikiri-user', JSON.stringify(user))
-          localStorage.setItem('fikiri-user-id', user.id.toString())
-          if (tokens && tokens.access_token) {
-            localStorage.setItem('fikiri-token', tokens.access_token)
+          try {
+            const userJson = JSON.stringify(user)
+            localStorage.setItem('fikiri-user', userJson)
+            localStorage.setItem('fikiri-user-id', user.id.toString())
+            if (accessToken) {
+              localStorage.setItem('fikiri-token', accessToken)
+            }
+            
+            console.log('✅ Saved to localStorage:', {
+              userId: user.id,
+              email: user.email,
+              hasToken: !!accessToken,
+              userJsonLength: userJson.length
+            })
+            
+            // Immediately verify it was saved
+            const savedUser = localStorage.getItem('fikiri-user')
+            const savedUserId = localStorage.getItem('fikiri-user-id')
+            console.log('✅ Verified localStorage immediately after save:', {
+              hasUser: !!savedUser,
+              hasUserId: !!savedUserId,
+              savedUserLength: savedUser?.length || 0
+            })
+            
+            // Double-check after a tiny delay
+            setTimeout(() => {
+              const checkUser = localStorage.getItem('fikiri-user')
+              console.log('✅ Verified localStorage after 10ms:', checkUser ? 'STILL SAVED' : 'CLEARED!')
+            }, 10)
+          } catch (error) {
+            console.error('❌ Error saving to localStorage:', error)
           }
         }
         
         setAuthState(prev => ({
           ...prev,
           user,
-          isAuthenticated: true
+          isAuthenticated: true,
+          isLoading: false
         }))
+        
+        console.log('✅ Auth state updated:', { 
+          userId: user.id, 
+          email: user.email,
+          isAuthenticated: true, 
+          isLoading: false 
+        })
 
-        return { success: true }
+        return { success: true, user }
       } else {
         return { 
           success: false, 
           error: data.error || 'Login failed' 
         }
       }
-    } catch (error) {
-      return { 
-        success: false, 
-        error: 'Network error. Please try again.' 
+    } catch (error: any) {
+      if (error?.response?.status === 429) {
+        const retryAfter = error.response?.data?.retry_after
+        const minutes = retryAfter ? Math.ceil(retryAfter / 60) : 15
+        return { success: false, error: `Too many login attempts. Please wait ${minutes} minute${minutes !== 1 ? 's' : ''} and try again.` }
       }
+      return { success: false, error: 'Network error. Please try again.' }
     }
   }
 
   const signup = async (email: string, password: string, name: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      // Get onboarding data if available
       const onboardingData = authState.onboardingData
-      
       const signupData = {
         email,
         password,
@@ -204,19 +419,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         marketing_consent: onboardingData?.marketingConsent || false
       }
 
-      const response = await fetch('https://fikirisolutions.onrender.com/api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(signupData)
-      })
-
-      const data = await response.json()
+      const data = await apiClient.signup(signupData)
 
       if (data.success) {
-        const user = data.data.user
-        const tokens = data.data.tokens
+        const user = data.data?.user
+        const tokens = data.data?.tokens
         
         // Store user data and tokens (only in browser)
         if (typeof window !== 'undefined') {
@@ -254,18 +461,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
-      // Call backend logout endpoint to invalidate session
-      await fetch('https://fikirisolutions.onrender.com/api/auth/logout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      })
+      await apiClient.logout()
     } catch (error) {
-      // Continue with logout even if backend call fails
-      console.warn('Backend logout failed, continuing with local logout')
+      // Continue with logout even if backend call fails (backend might be down)
+      if (import.meta.env.DEV) {
+        console.warn('Backend logout failed, continuing with local logout:', error)
+      }
     } finally {
-      // Always clear local auth data
+      // Always clear local auth data regardless of backend response
       clearAuthData()
       navigate('/')
     }
@@ -301,23 +504,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }))
   }
 
-  const clearAuthData = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('fikiri-user')
-      localStorage.removeItem('fikiri-user-id')
-      localStorage.removeItem('fikiri-onboarding-data')
-      localStorage.removeItem('fikiri-onboarding-completed')
-      localStorage.removeItem('fikiri-remember-email')
-      localStorage.removeItem('fikiri-remember-password')
-      localStorage.removeItem('fikiri-remember-me')
-    }
-    setAuthState({
-      user: null,
-      isAuthenticated: false,
-      isLoading: false,
-      onboardingData: null
-    })
-  }
+  // clearAuthData is now defined above, near checkAuthStatus
 
   const getRedirectPath = (): string => {
     if (!authState.isAuthenticated) {
@@ -333,7 +520,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return '/onboarding' // User needs to complete onboarding
     }
 
-    return '/home' // Fully onboarded user
+    return '/dashboard' // Fully onboarded user (changed from /home to /dashboard)
   }
 
   const value: AuthContextType = {

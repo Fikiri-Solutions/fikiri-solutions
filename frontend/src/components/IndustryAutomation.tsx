@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, TrendingUp, Settings, CheckCircle } from 'lucide-react';
+import { Building2, TrendingUp, Settings, CheckCircle, Loader2 } from 'lucide-react';
+import { useToast } from './Toast';
+import { useAuth } from '../contexts/AuthContext';
+import { apiClient } from '../services/apiClient';
 
 interface IndustryPrompt {
   industry: string;
@@ -25,15 +28,20 @@ interface UsageMetrics {
 }
 
 export const IndustryAutomation: React.FC = () => {
-  const [selectedIndustry, setSelectedIndustry] = useState<string>('landscaping');
+  const [selectedIndustry, setSelectedIndustry] = useState<string>('real_estate');
   const [clientId, setClientId] = useState<string>('demo-client');
   const [message, setMessage] = useState<string>('');
   const [response, setResponse] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoadingPrompts, setIsLoadingPrompts] = useState<boolean>(true);
+  const [isLoadingTiers, setIsLoadingTiers] = useState<boolean>(true);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState<boolean>(true);
   const [prompts, setPrompts] = useState<Record<string, IndustryPrompt>>({});
   const [pricingTiers, setPricingTiers] = useState<Record<string, PricingTier>>({});
   const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
   const [toolsUsed, setToolsUsed] = useState<any[]>([]);
+  const { addToast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchIndustryPrompts();
@@ -42,62 +50,133 @@ export const IndustryAutomation: React.FC = () => {
   }, [clientId]);
 
   const fetchIndustryPrompts = async () => {
+    setIsLoadingPrompts(true);
     try {
       // Mock data for now - replace with actual API call when backend endpoints are ready
       const mockPrompts = {
-        landscaping: {
-          industry: 'landscaping',
+        real_estate: {
+          industry: 'real_estate',
           tone: 'professional',
-          focus_areas: ['appointment scheduling', 'service quotes', 'seasonal planning'],
-          tools: ['calendar', 'quote_generator', 'weather_api'],
+          focus_areas: ['property listings', 'client consultations', 'market analysis', 'showings scheduling'],
+          tools: ['calendar', 'crm', 'property_api', 'market_data'],
+          pricing_tier: 'business'
+        },
+        property_management: {
+          industry: 'property_management',
+          tone: 'professional',
+          focus_areas: ['tenant communication', 'maintenance requests', 'lease renewals', 'rent collection'],
+          tools: ['calendar', 'crm', 'payment_processor', 'maintenance_tracker'],
+          pricing_tier: 'growth'
+        },
+        construction: {
+          industry: 'construction',
+          tone: 'professional',
+          focus_areas: ['project quotes', 'client communication', 'scheduling', 'material orders'],
+          tools: ['calendar', 'quote_generator', 'project_manager', 'inventory'],
+          pricing_tier: 'growth'
+        },
+        legal_services: {
+          industry: 'legal_services',
+          tone: 'professional',
+          focus_areas: ['client intake', 'appointment scheduling', 'document management', 'case updates'],
+          tools: ['calendar', 'crm', 'document_storage', 'compliance_checker'],
+          pricing_tier: 'business'
+        },
+        cleaning_services: {
+          industry: 'cleaning_services',
+          tone: 'friendly',
+          focus_areas: ['service scheduling', 'quote requests', 'recurring appointments', 'customer follow-up'],
+          tools: ['calendar', 'quote_generator', 'recurring_scheduler', 'crm'],
           pricing_tier: 'starter'
+        },
+        auto_services: {
+          industry: 'auto_services',
+          tone: 'friendly',
+          focus_areas: ['appointment booking', 'service reminders', 'estimate requests', 'customer follow-up'],
+          tools: ['calendar', 'quote_generator', 'reminder_system', 'crm'],
+          pricing_tier: 'starter'
+        },
+        event_planning: {
+          industry: 'event_planning',
+          tone: 'friendly',
+          focus_areas: ['client consultations', 'vendor coordination', 'timeline management', 'follow-up'],
+          tools: ['calendar', 'crm', 'project_manager', 'vendor_portal'],
+          pricing_tier: 'growth'
+        },
+        fitness_wellness: {
+          industry: 'fitness_wellness',
+          tone: 'motivational',
+          focus_areas: ['class scheduling', 'membership inquiries', 'appointment booking', 'wellness tips'],
+          tools: ['calendar', 'crm', 'class_scheduler', 'payment_processor'],
+          pricing_tier: 'starter'
+        },
+        beauty_spa: {
+          industry: 'beauty_spa',
+          tone: 'friendly',
+          focus_areas: ['appointment booking', 'service inquiries', 'reminders', 'promotions'],
+          tools: ['calendar', 'crm', 'reminder_system', 'promotion_manager'],
+          pricing_tier: 'starter'
+        },
+        accounting_consulting: {
+          industry: 'accounting_consulting',
+          tone: 'professional',
+          focus_areas: ['client onboarding', 'appointment scheduling', 'document requests', 'tax reminders'],
+          tools: ['calendar', 'crm', 'document_storage', 'reminder_system'],
+          pricing_tier: 'business'
         },
         restaurant: {
           industry: 'restaurant',
           tone: 'friendly',
-          focus_areas: ['reservation management', 'menu recommendations', 'special promotions'],
-          tools: ['reservation_system', 'menu_api', 'promotion_tracker'],
+          focus_areas: ['reservation management', 'menu recommendations', 'special promotions', 'catering inquiries'],
+          tools: ['reservation_system', 'menu_api', 'promotion_tracker', 'crm'],
           pricing_tier: 'growth'
         },
         medical_practice: {
           industry: 'medical_practice',
           tone: 'professional',
-          focus_areas: ['appointment scheduling', 'patient reminders', 'HIPAA compliance'],
-          tools: ['calendar', 'patient_portal', 'compliance_checker'],
+          focus_areas: ['appointment scheduling', 'patient reminders', 'HIPAA compliance', 'follow-up care'],
+          tools: ['calendar', 'patient_portal', 'compliance_checker', 'reminder_system'],
           pricing_tier: 'business'
         },
         enterprise_solutions: {
           industry: 'enterprise_solutions',
           tone: 'professional',
-          focus_areas: ['custom workflows', 'multi-industry support', 'advanced analytics'],
-          tools: ['custom_api', 'white_label', 'dedicated_support'],
+          focus_areas: ['custom workflows', 'multi-industry support', 'advanced analytics', 'white-label options'],
+          tools: ['custom_api', 'white_label', 'dedicated_support', 'advanced_analytics'],
           pricing_tier: 'enterprise'
         }
       };
       setPrompts(mockPrompts);
     } catch (error) {
-      console.error('Failed to fetch industry prompts:', error)
+      addToast({ 
+        type: 'error', 
+        title: 'Load Failed', 
+        message: 'Failed to load industry prompts. Using fallback data.' 
+      });
       // Set fallback data
       setPrompts({
-        landscaping: {
-          industry: 'landscaping',
+        real_estate: {
+          industry: 'real_estate',
           tone: 'professional',
-          focus_areas: ['appointment scheduling', 'service quotes', 'seasonal planning'],
-          tools: ['calendar', 'quote_generator', 'weather_api'],
-          pricing_tier: 'starter'
+          focus_areas: ['property listings', 'client consultations', 'market analysis', 'showings scheduling'],
+          tools: ['calendar', 'crm', 'property_api', 'market_data'],
+          pricing_tier: 'business'
         },
         enterprise_solutions: {
           industry: 'enterprise_solutions',
           tone: 'professional',
-          focus_areas: ['custom workflows', 'multi-industry support', 'advanced analytics'],
-          tools: ['custom_api', 'white_label', 'dedicated_support'],
+          focus_areas: ['custom workflows', 'multi-industry support', 'advanced analytics', 'white-label options'],
+          tools: ['custom_api', 'white_label', 'dedicated_support', 'advanced_analytics'],
           pricing_tier: 'enterprise'
         }
       })
+    } finally {
+      setIsLoadingPrompts(false);
     }
   };
 
   const fetchPricingTiers = async () => {
+    setIsLoadingTiers(true);
     try {
       // Mock data for now - replace with actual API call when backend endpoints are ready
       const mockTiers = {
@@ -128,7 +207,11 @@ export const IndustryAutomation: React.FC = () => {
       };
       setPricingTiers(mockTiers);
     } catch (error) {
-      console.error('Failed to fetch pricing tiers:', error)
+      addToast({ 
+        type: 'error', 
+        title: 'Load Failed', 
+        message: 'Failed to load pricing tiers. Using fallback data.' 
+      });
       // Set fallback data
       setPricingTiers({
         starter: {
@@ -138,10 +221,13 @@ export const IndustryAutomation: React.FC = () => {
           features: ['Basic AI responses', 'Email automation', 'Simple CRM', '500 emails/month']
         }
       })
+    } finally {
+      setIsLoadingTiers(false);
     }
   };
 
   const fetchClientAnalytics = async () => {
+    setIsLoadingAnalytics(true);
     try {
       // Mock data for now - replace with actual API call when backend endpoints are ready
       const mockAnalytics = {
@@ -153,7 +239,11 @@ export const IndustryAutomation: React.FC = () => {
       };
       setUsageMetrics(mockAnalytics);
     } catch (error) {
-      console.error('Failed to fetch client analytics:', error)
+      addToast({ 
+        type: 'error', 
+        title: 'Load Failed', 
+        message: 'Failed to load analytics. Using fallback data.' 
+      });
       // Set fallback data
       setUsageMetrics({
         tier: 'starter',
@@ -162,40 +252,65 @@ export const IndustryAutomation: React.FC = () => {
         tokens: 0,
         monthly_cost: 29
       })
+    } finally {
+      setIsLoadingAnalytics(false);
     }
   };
 
+  const getUserId = (): number => {
+    // Try to get user ID from auth context first
+    if (user?.id) {
+      return user.id;
+    }
+    // Fallback to localStorage
+    const stored = localStorage.getItem('fikiri-user-id');
+    return stored ? Number(stored) : 1; // Default to 1 if not found
+  };
+
   const handleIndustryChat = async () => {
-    if (!message.trim()) return;
+    if (!message.trim()) {
+      addToast({ 
+        type: 'warning', 
+        title: 'Empty Message', 
+        message: 'Please enter a message before sending.' 
+      });
+      return;
+    }
 
     setIsLoading(true);
     try {
-        // Use the main AI API endpoint
-        const response = await fetch('https://fikirisolutions.onrender.com/api/ai/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: message,
-          user_id: 1, // Add user_id parameter
-          context: {
-            industry: selectedIndustry,
-            client_id: clientId
-          }
-        }),
+      const data = await apiClient.sendChatMessage(message, {
+        industry: selectedIndustry,
+        client_id: clientId
       });
-
-      const data = await response.json();
-      if (data.success) {
-        setResponse(data.data?.response || 'No response received');
-        setToolsUsed(data.data?.service_queries || []);
+      const responseText = (data as any)?.response ?? (data as any)?.data?.response;
+      const tools = (data as any)?.service_queries ?? (data as any)?.data?.service_queries ?? [];
+      if (responseText != null) {
+        setResponse(responseText || 'No response received');
+        setToolsUsed(tools);
         setMessage('');
+        addToast({ 
+          type: 'success', 
+          title: 'Message Sent', 
+          message: 'AI response received successfully.' 
+        });
       } else {
-        setResponse(`Error: ${data.error || 'Failed to get response'}`);
+        const errorMessage = (data as any)?.error || 'Failed to get response';
+        setResponse(`Error: ${errorMessage}`);
+        addToast({ 
+          type: 'error', 
+          title: 'Request Failed', 
+          message: errorMessage 
+        });
       }
-    } catch (error) {
-      setResponse(`Network error: ${error}`);
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Network error occurred';
+      setResponse(`Network error: ${errorMessage}`);
+      addToast({ 
+        type: 'error', 
+        title: 'Network Error', 
+        message: 'Unable to connect to the server. Please try again.' 
+      });
     } finally {
       setIsLoading(false);
     }
@@ -203,100 +318,64 @@ export const IndustryAutomation: React.FC = () => {
 
   const getIndustryIcon = (industry: string) => {
     const icons: Record<string, string> = {
-      // Food & Beverage
-      'restaurant': '🍽️',
-      'cafe': '☕',
-      'food_truck': '🚚',
-      
       // Real Estate
       'real_estate': '🏠',
-      'property_management': '🏢',
+      'property_management': '🏘️',
+      
+      // Construction & Services
+      'construction': '🔨',
+      'cleaning_services': '🧹',
+      'auto_services': '🚗',
+      
+      // Events & Lifestyle
+      'event_planning': '🎉',
+      'fitness_wellness': '💪',
+      'beauty_spa': '💅',
+      
+      // Professional Services
+      'legal_services': '⚖️',
+      'accounting_consulting': '📊',
+      
+      // Food & Beverage
+      'restaurant': '🍽️',
       
       // Medical & Healthcare
       'medical_practice': '🏥',
-      'dental_clinic': '🦷',
-      'veterinary': '🐕',
-      
-      // Labor & Trades
-      'landscaping': '🌱',
-      'painting': '🎨',
-      'carpenter': '🔨',
-      'drywall': '🔧',
-      'plumber': '🚰',
-      'roofer': '🏠',
-      
-      // Transportation & Services
-      'car_rental': '🚗',
-      'ride_share': '🚕',
-      
-      // Creative & Marketing
-      'content_creation': '📱',
-      'marketing_agency': '📊',
-      'photography': '📸',
       
       // Enterprise & Technology
-      'enterprise_solutions': '🏢',
-      'software_development': '💻',
-      'consulting': '📈',
-      
-      // Professional Services
-      'tax_services': '📋',
-      'accounting': '💰',
-      'legal_services': '⚖️',
-      
-      // Retail & E-commerce
-      'retail_store': '🛍️',
-      'ecommerce': '💻'
+      'enterprise_solutions': '🏢'
     };
     return icons[industry] || '🏢';
   };
 
   const getIndustryCategory = (industry: string) => {
     const categories: Record<string, string> = {
-      // Food & Beverage
-      'restaurant': 'Food & Beverage',
-      'cafe': 'Food & Beverage',
-      'food_truck': 'Food & Beverage',
-      
       // Real Estate
       'real_estate': 'Real Estate',
       'property_management': 'Real Estate',
       
-      // Medical & Healthcare
-      'medical_practice': 'Medical & Healthcare',
-      'dental_clinic': 'Medical & Healthcare',
-      'veterinary': 'Medical & Healthcare',
+      // Construction & Services
+      'construction': 'General',
+      'cleaning_services': 'General',
+      'auto_services': 'General',
       
-      // Labor & Trades
-      'landscaping': 'Labor & Trades',
-      'painting': 'Labor & Trades',
-      'carpenter': 'Labor & Trades',
-      'drywall': 'Labor & Trades',
-      'plumber': 'Labor & Trades',
-      'roofer': 'Labor & Trades',
-      
-      // Transportation & Services
-      'car_rental': 'Transportation & Services',
-      'ride_share': 'Transportation & Services',
-      
-      // Creative & Marketing
-      'content_creation': 'Creative & Marketing',
-      'marketing_agency': 'Creative & Marketing',
-      'photography': 'Creative & Marketing',
-      
-      // Enterprise & Technology
-      'enterprise_solutions': 'Enterprise & Technology',
-      'software_development': 'Enterprise & Technology',
-      'consulting': 'Enterprise & Technology',
+      // Events & Lifestyle
+      'event_planning': 'General',
+      'fitness_wellness': 'General',
+      'beauty_spa': 'General',
       
       // Professional Services
-      'tax_services': 'Professional Services',
-      'accounting': 'Professional Services',
       'legal_services': 'Professional Services',
+      'accounting_consulting': 'Professional Services',
       
-      // Retail & E-commerce
-      'retail_store': 'Retail & E-commerce',
-      'ecommerce': 'Retail & E-commerce'
+      // Food & Beverage
+      'restaurant': 'Food & Beverage',
+      
+      // Medical & Healthcare
+      'medical_practice': 'Medical & Healthcare',
+      
+      // Enterprise & Technology
+      'enterprise_solutions': 'Enterprise & Technology'
     };
     return categories[industry] || 'General';
   };
@@ -334,13 +413,13 @@ export const IndustryAutomation: React.FC = () => {
   const getTierColor = (tier: string) => {
     switch (tier) {
       case 'starter':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-      case 'professional':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-      case 'premium':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
+        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300';
+      case 'growth':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300';
+      case 'business':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300';
       case 'enterprise':
-        return 'bg-gold-100 text-gold-800 dark:bg-gold-900 dark:text-gold-300';
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
     }
@@ -369,6 +448,12 @@ export const IndustryAutomation: React.FC = () => {
               </h2>
               
               {/* Industry Categories */}
+              {isLoadingPrompts ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-brand-primary mr-2" />
+                  <span className="text-brand-text/70 dark:text-gray-400">Loading industries...</span>
+                </div>
+              ) : (
               <div className="space-y-6">
                 {Object.entries(
                   Object.entries(prompts).reduce((acc, [industry, config]) => {
@@ -398,7 +483,7 @@ export const IndustryAutomation: React.FC = () => {
                           <div className="flex flex-col items-center text-center space-y-2">
                             <div className="text-2xl">{getIndustryIcon(industry)}</div>
                             <div className="font-medium text-brand-text dark:text-white capitalize text-sm">
-                              {industry.replace('_', ' ')}
+                              {industry.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                             </div>
                             <div className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getTierColor(config.pricing_tier)}`}>
                               {config.pricing_tier}
@@ -410,6 +495,7 @@ export const IndustryAutomation: React.FC = () => {
                   </div>
                 ))}
               </div>
+              )}
 
               {/* Chat Interface */}
               <div className="space-y-4">
@@ -435,7 +521,7 @@ export const IndustryAutomation: React.FC = () => {
                     onChange={(e) => setMessage(e.target.value)}
                     className="w-full px-3 py-2 border border-brand-text/20 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-brand-text dark:text-white focus:border-brand-accent dark:focus:border-brand-accent focus:ring-brand-accent dark:focus:ring-brand-accent transition-colors duration-200"
                     rows={3}
-                    placeholder={`Test ${selectedIndustry} AI assistant...`}
+                    placeholder={`Test ${selectedIndustry.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')} AI assistant...`}
                   />
                 </div>
 
@@ -485,7 +571,14 @@ export const IndustryAutomation: React.FC = () => {
           {/* Right Column - Analytics & Pricing */}
           <div className="space-y-6">
             {/* Usage Metrics */}
-            {usageMetrics && (
+            {isLoadingAnalytics ? (
+              <div className="bg-brand-background dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-brand-text/10">
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-brand-primary mr-2" />
+                  <span className="text-brand-text/70 dark:text-gray-400">Loading analytics...</span>
+                </div>
+              </div>
+            ) : usageMetrics ? (
               <div className="bg-brand-background dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-brand-text/10">
                 <h3 className="text-lg font-semibold text-brand-text dark:text-white mb-4">
                   <TrendingUp className="inline-block w-5 h-5 mr-2" />
@@ -529,7 +622,7 @@ export const IndustryAutomation: React.FC = () => {
                   </div>
                 </div>
               </div>
-            )}
+            ) : null}
 
             {/* Pricing Tiers */}
             <div className="bg-brand-background dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-brand-text/10">
@@ -538,6 +631,12 @@ export const IndustryAutomation: React.FC = () => {
                 Pricing Tiers
               </h3>
               
+              {isLoadingTiers ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-brand-primary mr-2" />
+                  <span className="text-brand-text/70 dark:text-gray-400">Loading tiers...</span>
+                </div>
+              ) : (
               <div className="space-y-4">
                 {Object.entries(pricingTiers).map(([tier, config]) => {
                   // Check if this tier matches the selected industry's pricing tier
@@ -552,22 +651,17 @@ export const IndustryAutomation: React.FC = () => {
                           : 'border-brand-text/20 dark:border-gray-700 hover:border-brand-accent dark:hover:border-gray-600'
                       }`}
                       onClick={() => {
-                        console.log(`Clicked on ${tier} tier`); // Debug log
-                        
                         // Find an industry that uses this tier and select it
                         const industryForTier = Object.keys(prompts).find(
                           industry => prompts[industry]?.pricing_tier === tier
                         );
                         if (industryForTier) {
                           setSelectedIndustry(industryForTier);
-                          console.log(`Selected industry: ${industryForTier}`); // Debug log
                         }
                         
                         // Update usage metrics based on selected tier with consistent data
                         const tierConfig = pricingTiers[tier];
                         if (tierConfig) {
-                          console.log(`Updating metrics for ${tier} tier`); // Debug log
-                          
                           // Define tier-specific usage patterns
                           const tierUsagePatterns = {
                             starter: {
@@ -610,10 +704,7 @@ export const IndustryAutomation: React.FC = () => {
                             monthly_cost: tierConfig.price
                           };
                           
-                          console.log(`New metrics:`, newMetrics); // Debug log
                           setUsageMetrics(newMetrics);
-                        } else {
-                          console.error(`No config found for tier: ${tier}`); // Debug log
                         }
                       }}
                     >
@@ -645,6 +736,7 @@ export const IndustryAutomation: React.FC = () => {
                   );
                 })}
               </div>
+              )}
             </div>
 
             {/* Industry Focus Areas */}
@@ -652,7 +744,7 @@ export const IndustryAutomation: React.FC = () => {
               <div className="bg-brand-background dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-brand-text/10">
                 <h3 className="text-lg font-semibold text-brand-text dark:text-white mb-4">
                   <Settings className="inline-block w-5 h-5 mr-2" />
-                  {selectedIndustry.charAt(0).toUpperCase() + selectedIndustry.slice(1)} Focus
+                  {selectedIndustry.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')} Focus
                 </h3>
                 
                 <div className="space-y-3">

@@ -1,12 +1,28 @@
 import React from 'react'
-import { Users, Plus, Mail, Settings, ArrowRight } from 'lucide-react'
+import { Users, Plus, Mail, Settings, ArrowRight, LucideIcon } from 'lucide-react'
 
 interface EmptyStateProps {
-  type: 'crm' | 'dashboard' | 'services' | 'ai'
+  type?: 'crm' | 'dashboard' | 'services' | 'ai' | 'chatbot' | 'faq'
   onAction?: () => void
+  // Direct props (alternative to type-based)
+  icon?: LucideIcon
+  title?: string
+  description?: string
+  actionText?: string
+  actionIcon?: LucideIcon
+  illustration?: string
 }
 
-export const EmptyState: React.FC<EmptyStateProps> = ({ type, onAction }) => {
+export const EmptyState: React.FC<EmptyStateProps> = ({ 
+  type, 
+  onAction,
+  icon: directIcon,
+  title: directTitle,
+  description: directDescription,
+  actionText: directActionText,
+  actionIcon: directActionIcon,
+  illustration: directIllustration
+}) => {
   const getEmptyStateConfig = () => {
     switch (type) {
       case 'crm':
@@ -45,38 +61,80 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ type, onAction }) => {
           actionIcon: ArrowRight,
           illustration: '🤖',
         }
+      case 'chatbot':
+      case 'faq':
+        return {
+          icon: Settings,
+          title: 'No FAQs yet',
+          description: 'Start building your knowledge base by adding FAQs or documents.',
+          actionText: 'Add FAQ',
+          actionIcon: Plus,
+          illustration: '💬',
+        }
+      default:
+        return {
+          icon: Settings,
+          title: 'No data available',
+          description: 'Get started by configuring your services.',
+          actionText: 'Get Started',
+          actionIcon: ArrowRight,
+          illustration: '📋',
+        }
     }
   }
 
-  const config = getEmptyStateConfig()
-  const Icon = config.icon
+  // Use direct props if provided, otherwise use type-based config
+  const config = type ? getEmptyStateConfig() : null
+  const finalConfig = {
+    icon: directIcon || config?.icon,
+    title: directTitle || config?.title,
+    description: directDescription || config?.description,
+    actionText: directActionText || config?.actionText,
+    actionIcon: directActionIcon || config?.actionIcon,
+    illustration: directIllustration || config?.illustration,
+  }
+  
+  if (!finalConfig.icon) {
+    return null
+  }
+  
+  const Icon = finalConfig.icon
+  const ActionIcon = finalConfig.actionIcon
 
   return (
     <div className="text-center py-12 px-6">
-      <div className="text-6xl mb-4">{config.illustration}</div>
+      {finalConfig.illustration && (
+        <div className="text-6xl mb-4">{finalConfig.illustration}</div>
+      )}
       
       <div className="max-w-md mx-auto">
-        <div className="flex items-center justify-center mb-4">
-          <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-full">
-            <Icon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+        {Icon && (
+          <div className="flex items-center justify-center mb-4">
+            <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-full">
+              <Icon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+            </div>
           </div>
-        </div>
+        )}
         
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-          {config.title}
-        </h3>
+        {finalConfig.title && (
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            {finalConfig.title}
+          </h3>
+        )}
         
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
-          {config.description}
-        </p>
+        {finalConfig.description && (
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            {finalConfig.description}
+          </p>
+        )}
         
-        {onAction && (
+        {onAction && ActionIcon && finalConfig.actionText && (
           <button
             onClick={onAction}
             className="fikiri-button inline-flex items-center space-x-2"
           >
-            <config.actionIcon className="h-4 w-4" />
-            <span>{config.actionText}</span>
+            <ActionIcon className="h-4 w-4" />
+            <span>{finalConfig.actionText}</span>
           </button>
         )}
       </div>

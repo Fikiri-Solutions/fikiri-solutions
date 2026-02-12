@@ -12,7 +12,7 @@ export const fikiriColors = {
     6: '#C0392B', // Deep red-orange
     7: '#B33B1E', // Primary brand color
     8: '#8B4513', // Muted brown
-    9: '#4B1E0C', // Tree brown text
+    9: '#1a1a1a', // Neutral black for text (easy on eyes)
     10: '#3E2723', // Dark brown
     11: '#2C1810', // Darker brown
     12: '#1B0A0A', // Darkest brown
@@ -98,17 +98,17 @@ export const fikiriColors = {
     12: '#020617',
   },
   
-  // Brand-specific colors for Fikiri (refined from logo)
+  // Brand-specific colors for Fikiri (WCAG-compliant)
   brand: {
     primary: '#B33B1E',    // Primary red-orange - buttons, strong CTAs
-    secondary: '#E7641C', // Bright orange - hovers, icons, accents
-    accent: '#F39C12',    // Golden yellow - highlights, graphs, stats
+    secondary: '#C55A0F', // Bright orange - hovers, icons, accents
+    accent: '#8B6914',    // Darker goldenrod (WCAG-compliant, 4.5+ contrast) - highlights, graphs, stats
     warning: '#992D1E',   // Deep red - alerts, section headers
     error: '#C0392B',     // Deep red-orange
-    text: '#4B1E0C',      // Tree brown - text, footer background
-    background: '#F7F3E9', // Cream - page background, cards
+    text: '#1a1a1a',      // Neutral black for easy reading (LangChain-style)
+    background: '#FFFFFF', // White - modern SaaS page background
     tan: '#8B4513',       // Darker tan/brown - signup backgrounds
-    gradient: 'linear-gradient(135deg, #F39C12 0%, #E7641C 50%, #B33B1E 100%)',
+    gradient: 'linear-gradient(135deg, #8B6914 0%, #C55A0F 50%, #B33B1E 100%)',
   }
 }
 
@@ -117,12 +117,12 @@ export const fikiriCSSVariables = `
 :root {
   /* Fikiri Brand Colors (refined from logo) */
   --fikiri-primary: #B33B1E;        /* Primary red-orange */
-  --fikiri-secondary: #E7641C;      /* Bright orange */
-  --fikiri-accent: #F39C12;         /* Golden yellow */
+  --fikiri-secondary: #C55A0F;      /* Bright orange */
+  --fikiri-accent: #8B6914;         /* Darker goldenrod (WCAG-compliant, 4.5+ contrast) */
   --fikiri-warning: #992D1E;        /* Deep red */
   --fikiri-error: #C0392B;          /* Deep red-orange */
-  --fikiri-text: #4B1E0C;           /* Tree brown */
-  --fikiri-bg: #F7F3E9;            /* Cream background */
+  --fikiri-text: #1a1a1a;           /* Neutral black for easy reading */
+  --fikiri-bg: #FFFFFF;            /* White background (modern SaaS) */
   --fikiri-tan: #8B4513;           /* Darker tan/brown */
   
   /* Primary Colors */
@@ -130,28 +130,28 @@ export const fikiriCSSVariables = `
   --primary-foreground: 0 0% 98%;
   
   /* Secondary Colors */
-  --secondary: 25 75% 50%; /* #E7641C */
+  --secondary: 25 75% 42%; /* #C55A0F adjusted for WCAG-compliant, 4.5+ contrast with white */
   --secondary-foreground: 0 0% 98%;
   
   /* Background Colors */
   --background: 45 30% 95%; /* #F7F3E9 */
-  --foreground: 25 60% 15%; /* #4B1E0C */
+  --foreground: 0 0% 10%; /* #1a1a1a - Neutral black for text */
   
   /* Card Colors */
   --card: 45 30% 95%;
-  --card-foreground: 25 60% 15%;
+  --card-foreground: 0 0% 10%; /* #1a1a1a - Neutral black for text */
   
   /* Popover Colors */
   --popover: 45 30% 95%;
-  --popover-foreground: 25 60% 15%;
+  --popover-foreground: 0 0% 10%; /* #1a1a1a - Neutral black */
   
   /* Muted Colors */
   --muted: 45 20% 90%;
-  --muted-foreground: 25 40% 30%;
+  --muted-foreground: 0 0% 45%; /* #737373 - Medium gray for secondary text */
   
   /* Accent Colors */
-  --accent: 45 85% 50%; /* #F39C12 */
-  --accent-foreground: 25 60% 15%;
+  --accent: 45 70% 30%; /* #8B6914 (WCAG-compliant, 4.5+ contrast) */
+  --accent-foreground: 0 0% 10%; /* #1a1a1a - Neutral black */
   
   /* Destructive Colors */
   --destructive: 0 60% 50%; /* #C0392B */

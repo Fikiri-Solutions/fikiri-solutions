@@ -3,8 +3,9 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts'
+import type { TooltipProps } from 'recharts'
+import type { ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/Button"
 import { 
   TrendingUp, BarChart3, PieChart as PieChartIcon, 
@@ -12,9 +13,11 @@ import {
 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 
-interface ChartWidgetProps {
+export type ChartDatum = Record<string, string | number>
+
+export interface ChartWidgetProps {
   title: string
-  data: any[]
+  data: ChartDatum[]
   type: 'line' | 'bar' | 'pie' | 'area'
   dataKey: string
   color?: string
@@ -43,21 +46,20 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({
   showControls = true
 }) => {
   const [isExpanded, setIsExpanded] = useState(false)
-  const [chartType, setChartType] = useState(type)
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip: React.FC<TooltipProps<ValueType, NameType>> = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-white dark:bg-gray-800 p-3 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
           <p className="font-semibold text-gray-900 dark:text-gray-100 mb-1">{label}</p>
-          {payload.map((entry: any, index: number) => (
+          {payload.map((entry, index) => (
             <div key={index} className="flex items-center gap-2">
               <div 
                 className="w-2 h-2 rounded-full" 
-                style={{ backgroundColor: entry.color }}
+                style={{ backgroundColor: entry?.color }}
               />
               <span className="text-sm text-gray-600 dark:text-gray-300">
-                {entry.dataKey}: <span className="font-semibold">{entry.value}</span>
+                {entry?.dataKey}: <span className="font-semibold">{entry?.value}</span>
               </span>
             </div>
           ))}
@@ -71,7 +73,7 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({
     const height = compact ? (isExpanded ? 300 : 150) : 200
     const margin = compact ? { top: 5, right: 5, left: 5, bottom: 5 } : { top: 20, right: 30, left: 20, bottom: 20 }
 
-    switch (chartType) {
+    switch (type) {
       case 'line':
         return (
           <ResponsiveContainer width="100%" height={height}>
@@ -175,14 +177,14 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }: any) => compact ? `${(percent * 100).toFixed(0)}%` : `${name} ${(percent * 100).toFixed(0)}%`}
+                label={({ name, percent }: { name: string; percent: number }) => compact ? `${(percent * 100).toFixed(0)}%` : `${name} ${(percent * 100).toFixed(0)}%`}
                 outerRadius={compact ? 60 : 80}
                 innerRadius={compact ? 20 : 40}
                 fill="#8884d8"
                 dataKey={dataKey}
                 animationDuration={500}
               >
-                {data.map((entry, index) => (
+                {data.map((_, index) => (
                   <Cell 
                     key={`cell-${index}`} 
                     fill={color}
@@ -256,7 +258,7 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({
 interface CompactChartGridProps {
   charts: Array<{
     title: string
-    data: any[]
+    data: ChartDatum[]
     type: 'line' | 'bar' | 'pie' | 'area'
     dataKey: string
     color?: string
@@ -270,7 +272,8 @@ export const CompactChartGrid: React.FC<CompactChartGridProps> = ({ charts, clas
       charts.length === 1 ? "grid-cols-1" :
       charts.length === 2 ? "grid-cols-1 md:grid-cols-2" :
       charts.length === 3 ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" :
-      "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+      "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+      className
     )}>
       {charts.map((chart, index) => (
         <ChartWidget

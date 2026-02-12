@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from core.database_optimization import db_optimizer
-from core.enhanced_crm_service import enhanced_crm_service
-from core.email_parser_service import email_parser_service
+from crm.service import enhanced_crm_service
+from email_automation.parser import MinimalEmailParser
 
 logger = logging.getLogger(__name__)
 
@@ -492,6 +492,18 @@ class AutomationEngine:
             # Log execution
             self._log_execution(rule.id, rule.user_id, trigger_data, result)
             
+            # Emit WebSocket update (simple, optional)
+            try:
+                from flask import has_app_context, current_app
+                if has_app_context() and hasattr(current_app, 'socketio') and current_app.socketio:
+                    current_app.socketio.emit('automation_executed', {
+                        'rule_id': rule.id,
+                        'rule_name': rule.name,
+                        'status': 'success' if result['success'] else 'error'
+                    }, room=f"user:{rule.user_id}")
+            except Exception:
+                pass  # WebSocket not available, continue silently
+            
             return result
             
         except Exception as e:
@@ -716,6 +728,62 @@ class AutomationEngine:
             )
         except Exception as e:
             logger.error(f"Error logging execution: {e}")
+
+    def get_execution_logs(self, user_id: int, rule_id: Optional[int] = None,
+                           slug: Optional[str] = None, limit: int = 20) -> Dict[str, Any]:
+        """Get execution logs for a user's automations"""
+        try:
+            query = """
+                SELECT ae.*, ar.name as rule_name, ar.action_parameters
+                FROM automation_executions ae
+                JOIN automation_rules ar ON ae.rule_id = ar.id
+                WHERE ae.user_id = ?
+            """
+            params = [user_id]
+            
+            if rule_id:
+                query += " AND ae.rule_id = ?"
+                params.append(rule_id)
+            
+            if slug:
+                query += " AND json_extract(ar.action_parameters, '$.slug') = ?"
+                params.append(slug)
+            
+            query += " ORDER BY ae.executed_at DESC LIMIT ?"
+            params.append(limit)
+            
+            rows = db_optimizer.execute_query(query, tuple(params))
+            
+            logs = []
+            for row in rows:
+                action_params = json.loads(row['action_parameters']) if row.get('action_parameters') else {}
+                logs.append({
+                    'execution_id': row['id'],
+                    'rule_id': row['rule_id'],
+                    'rule_name': row['rule_name'],
+                    'slug': action_params.get('slug'),
+                    'status': row['status'],
+                    'trigger_data': json.loads(row['trigger_data']) if row.get('trigger_data') else {},
+                    'action_result': json.loads(row['action_result']) if row.get('action_result') else {},
+                    'executed_at': row['executed_at'],
+                    'error_message': row['error_message']
+                })
+            
+            return {
+                'success': True,
+                'data': {
+                    'logs': logs,
+                    'count': len(logs)
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error fetching automation logs: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'data': None
+            }
     
     def _analyze_email_patterns(self, user_id: int) -> Dict[str, Any]:
         """Analyze user's email patterns for automation suggestions"""
@@ -770,7 +838,7 @@ class AutomationEngine:
         return self.execute_automation_rules(TriggerType.KEYWORD_DETECTED, trigger_data, user_id)
     
     # Advanced workflow action implementations
-    def _execute_schedule_follow_up(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+    def _execute_schedule_follow_up(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Schedule a follow-up action"""
         try:
             lead_id = action_data.get('lead_id')
@@ -794,7 +862,7 @@ class AutomationEngine:
             logger.error(f"Error scheduling follow-up: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _execute_create_calendar_event(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+    def _execute_create_calendar_event(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Create a calendar event"""
         try:
             event_title = action_data.get('title', 'Meeting')
@@ -819,12 +887,67 @@ class AutomationEngine:
             logger.error(f"Error creating calendar event: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _execute_update_crm_field(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Update a CRM field"""
+    def _execute_update_crm_field(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+        """Update a CRM field or create lead from email"""
         try:
+            # Check if this is "Gmail → CRM" preset (creates lead from email)
+            if trigger_data.get('sender_email') and not action_data.get('lead_id'):
+                # Create lead from email
+                from crm.service import enhanced_crm_service
+                
+                sender_email = trigger_data.get('sender_email', '')
+                sender_name = trigger_data.get('sender_name', sender_email.split('@')[0])
+                target_stage = action_data.get('target_stage', 'new')
+                
+                # Check if lead exists
+                existing = db_optimizer.execute_query(
+                    "SELECT id FROM leads WHERE user_id = ? AND email = ?",
+                    (user_id, sender_email)
+                )
+                
+                if existing:
+                    lead_id = existing[0]['id']
+                    # Update stage if specified
+                    if target_stage:
+                        db_optimizer.execute_query(
+                            "UPDATE leads SET stage = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                            (target_stage, lead_id),
+                            fetch=False
+                        )
+                    logger.info(f"Lead already exists: {sender_email}, updated stage to {target_stage}")
+                    return {
+                        'success': True,
+                        'data': {'lead_id': lead_id, 'action': 'lead_updated', 'message': f'Lead updated to {target_stage} stage'}
+                    }
+                else:
+                    # Create new lead
+                    lead_result = enhanced_crm_service.create_lead(user_id, {
+                        'email': sender_email,
+                        'name': sender_name,
+                        'source': 'gmail',
+                        'stage': target_stage
+                    })
+                    
+                    if lead_result.get('success'):
+                        logger.info(f"Created lead from email: {sender_email}")
+                        return {
+                            'success': True,
+                            'data': {
+                                'lead_id': lead_result['data']['lead_id'],
+                                'action': 'lead_created',
+                                'message': f'Lead created in {target_stage} stage'
+                            }
+                        }
+                    else:
+                        return {'success': False, 'error': lead_result.get('error', 'Failed to create lead')}
+            
+            # Standard CRM field update
             lead_id = action_data.get('lead_id')
             field_name = action_data.get('field_name')
             field_value = action_data.get('field_value')
+            
+            if not lead_id or not field_name:
+                return {'success': False, 'error': 'Missing lead_id or field_name'}
             
             # Update lead field
             db_optimizer.execute_query(
@@ -834,33 +957,36 @@ class AutomationEngine:
             )
             
             logger.info(f"Updated CRM field {field_name} for lead {lead_id}")
-            return {'success': True}
+            return {'success': True, 'data': {'message': f'Updated {field_name}'}}
             
         except Exception as e:
             logger.error(f"Error updating CRM field: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _execute_trigger_webhook(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+    def _execute_trigger_webhook(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Trigger a webhook"""
+        import requests
+        
+        webhook_url = action_data.get('webhook_url') or action_data.get('sheet_url')
+        if not webhook_url:
+            return {'success': False, 'error': 'Missing webhook_url'}
+        
+        payload = {
+            'user_id': user_id,
+            'timestamp': datetime.now().isoformat(),
+            'event': trigger_data.get('event_type', 'automation_triggered'),
+            **trigger_data,
+            **(action_data.get('payload', {}))
+        }
+        
         try:
-            webhook_url = action_data.get('webhook_url')
-            payload = action_data.get('payload', {})
-            
-            # Add user context to payload
-            payload['user_id'] = user_id
-            payload['timestamp'] = datetime.now().isoformat()
-            
-            # In a real implementation, you would make an HTTP request here
-            # For now, we'll log the webhook trigger
-            logger.info(f"Triggered webhook to {webhook_url} with payload: {payload}")
-            
-            return {'success': True, 'webhook_url': webhook_url}
-            
+            response = requests.post(webhook_url, json=payload, timeout=10)
+            response.raise_for_status()
+            return {'success': True, 'data': {'webhook_url': webhook_url, 'status_code': response.status_code}}
         except Exception as e:
-            logger.error(f"Error triggering webhook: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _execute_generate_document(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+    def _execute_generate_document(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Generate a document"""
         try:
             template_id = action_data.get('template_id')
@@ -880,7 +1006,7 @@ class AutomationEngine:
             logger.error(f"Error generating document: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _execute_send_sms(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+    def _execute_send_sms(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Send SMS message"""
         try:
             phone_number = action_data.get('phone_number')
@@ -906,7 +1032,7 @@ class AutomationEngine:
             logger.error(f"Error sending SMS: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _execute_create_invoice(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+    def _execute_create_invoice(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Create an invoice"""
         try:
             lead_id = action_data.get('lead_id')
@@ -930,7 +1056,7 @@ class AutomationEngine:
             logger.error(f"Error creating invoice: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _execute_assign_team_member(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+    def _execute_assign_team_member(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Assign team member to lead"""
         try:
             lead_id = action_data.get('lead_id')

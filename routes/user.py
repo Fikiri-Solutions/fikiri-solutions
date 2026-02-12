@@ -36,8 +36,9 @@ def get_user_profile():
         user_id = user_data['user_id']
         
         # Get user profile directly from database
+        # Rulepack compliance: specific columns, not SELECT *
         user_data_db = db_optimizer.execute_query(
-            "SELECT * FROM users WHERE id = ? AND is_active = 1",
+            "SELECT id, email, name, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE id = ? AND is_active = 1",
             (user_id,)
         )
         
@@ -223,7 +224,7 @@ def get_dashboard_data():
 
         try:
             # Get CRM stats
-            from core.enhanced_crm_service import enhanced_crm_service
+            from crm.service import enhanced_crm_service
             leads = enhanced_crm_service.get_leads(user_id)
             dashboard_data['quick_stats']['total_leads'] = len(leads or [])
             
@@ -282,7 +283,7 @@ def export_user_data():
 
         try:
             # Get CRM data
-            from core.enhanced_crm_service import enhanced_crm_service
+            from crm.service import enhanced_crm_service
             leads = enhanced_crm_service.get_leads(user_id)
             export_data['user_data']['leads'] = leads
             

@@ -93,17 +93,15 @@ class RemindersAlertsSystem:
     def _init_redis(self):
         """Initialize Redis client"""
         try:
-            config = get_config()
-            redis_url = getattr(config, 'redis_url', '')
-            if redis_url:
-                self.redis_client = redis.from_url(redis_url)
-                # Test connection
-                self.redis_client.ping()
+            from core.redis_connection_helper import get_redis_client
+            self.redis_client = get_redis_client(decode_responses=True, db=0)
+            if self.redis_client:
                 logger.info("✅ Redis client initialized for reminders")
             else:
                 logger.warning("⚠️ Redis URL not configured - using in-memory storage")
         except Exception as e:
             logger.error(f"❌ Failed to initialize Redis: {e}")
+            self.redis_client = None
     
     def create_reminder(self, user_id: int, reminder_type: str, title: str, 
                       description: str, due_date: datetime, priority: str = 'medium',
@@ -240,24 +238,32 @@ class RemindersAlertsSystem:
         try:
             alerts = []
             
-            # Get from Redis first (real-time)
+            # Get from Redis first (real-time) - optimized: batch get instead of N+1 queries
             if self.redis_client:
                 alert_ids = self.redis_client.lrange(f"user_alerts:{user_id}", 0, limit - 1)
-                for alert_id in alert_ids:
-                    alert_data = self.redis_client.get(f"alert:{alert_id}")
-                    if alert_data:
-                        alerts.append(json.loads(alert_data))
+                if alert_ids:
+                    # Batch get all alerts at once using pipeline (O(1) network roundtrip)
+                    pipe = self.redis_client.pipeline()
+                    for alert_id in alert_ids:
+                        pipe.get(f"alert:{alert_id}")
+                    alert_data_list = pipe.execute()
+                    
+                    for alert_data in alert_data_list:
+                        if alert_data:
+                            alerts.append(json.loads(alert_data))
             
             # Fallback to database
             if not alerts:
+                # Rulepack compliance: specific columns, not SELECT *
                 query = """
-                    SELECT * FROM alerts 
+                    SELECT id, user_id, alert_type, title, message, priority, is_read, created_at 
+                    FROM alerts 
                     WHERE user_id = ? 
                     ORDER BY created_at DESC 
-                    LIMIT ?
+                    LIMIT ? OFFSET ?
                 """
                 
-                db_alerts = db_optimizer.execute_query(query, (user_id, limit))
+                db_alerts = db_optimizer.execute_query(query, (user_id, limit, 0))  # TODO: Add offset parameter
                 for alert_data in db_alerts:
                     alerts.append({
                         'id': alert_data['id'],
@@ -279,8 +285,10 @@ class RemindersAlertsSystem:
     def get_user_reminders(self, user_id: int, upcoming_days: int = 7) -> Dict[str, Any]:
         """Get user's upcoming reminders"""
         try:
+            # Rulepack compliance: specific columns, not SELECT *
             query = """
-                SELECT * FROM reminders 
+                SELECT id, user_id, lead_id, reminder_type, title, description, due_date, priority, is_active, created_at 
+                FROM reminders 
                 WHERE user_id = ? 
                 AND is_active = 1
                 AND due_date BETWEEN ? AND ?
@@ -394,8 +402,10 @@ class RemindersAlertsSystem:
         """Process expired reminders and create alerts"""
         try:
             # Get expired reminders
+            # Rulepack compliance: specific columns, not SELECT *
             query = """
-                SELECT * FROM reminders 
+                SELECT id, user_id, lead_id, reminder_type, title, description, due_date, priority, is_active, created_at 
+                FROM reminders 
                 WHERE is_active = 1 
                 AND due_date <= ?
             """

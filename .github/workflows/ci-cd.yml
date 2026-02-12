@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION: '20.18.2'  # Latest LTS with security patches (CVE-2025-23083, CVE-2025-23084, CVE-2025-23085)
   PYTHON_VERSION: '3.11'
 
 jobs:
@@ -133,7 +133,7 @@ jobs:
         output: 'trivy-results.sarif'
     
     - name: Upload Trivy scan results
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: 'trivy-results.sarif'
     

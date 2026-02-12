@@ -261,22 +261,36 @@ class AutomationSafetyManager:
     def _get_user_safety_config(self, user_id: int) -> AutomationSafetyConfig:
         """Get user-specific safety configuration"""
         try:
+            # Rulepack compliance: specific columns, not SELECT *
             result = self.db_optimizer.execute_query(
-                "SELECT * FROM automation_safety_config WHERE user_id = ? LIMIT 1",
+                "SELECT id, user_id, global_kill_switch, max_auto_replies_per_contact_per_day, max_actions_per_user_per_5min, max_actions_per_user_per_hour, dry_run_mode, oauth_failure_threshold, oauth_failure_window_minutes, created_at, updated_at FROM automation_safety_config WHERE user_id = ? LIMIT 1",
                 (user_id,)
             )
             
             if result:
                 row = result[0]
-                return AutomationSafetyConfig(
-                    global_kill_switch=bool(row[2]),
-                    max_auto_replies_per_contact_per_day=row[3],
-                    max_actions_per_user_per_5min=row[4],
-                    max_actions_per_user_per_hour=row[5],
-                    dry_run_mode=bool(row[6]),
-                    oauth_failure_threshold=row[7],
-                    oauth_failure_window_minutes=row[8]
-                )
+                # Handle both dict and tuple result formats
+                if isinstance(row, dict):
+                    return AutomationSafetyConfig(
+                        global_kill_switch=bool(row.get('global_kill_switch', False)),
+                        max_auto_replies_per_contact_per_day=row.get('max_auto_replies_per_contact_per_day', 2),
+                        max_actions_per_user_per_5min=row.get('max_actions_per_user_per_5min', 50),
+                        max_actions_per_user_per_hour=row.get('max_actions_per_user_per_hour', 200),
+                        dry_run_mode=bool(row.get('dry_run_mode', True)),
+                        oauth_failure_threshold=row.get('oauth_failure_threshold', 3),
+                        oauth_failure_window_minutes=row.get('oauth_failure_window_minutes', 15)
+                    )
+                else:
+                    # Fallback for tuple format
+                    return AutomationSafetyConfig(
+                        global_kill_switch=bool(row[2]),
+                        max_auto_replies_per_contact_per_day=row[3],
+                        max_actions_per_user_per_5min=row[4],
+                        max_actions_per_user_per_hour=row[5],
+                        dry_run_mode=bool(row[6]),
+                        oauth_failure_threshold=row[7],
+                        oauth_failure_window_minutes=row[8]
+                    )
             else:
                 # Return default config
                 return AutomationSafetyConfig()
@@ -363,14 +377,26 @@ class AutomationSafetyManager:
             recent_actions_1hour = self._get_user_action_count(user_id, 60)
             
             # Get OAuth failure count
-            oauth_failures = self.db_optimizer.execute_query(
-                """
-                SELECT COUNT(*) FROM oauth_failure_log 
-                WHERE user_id = ? AND created_at > datetime('now', '-{} minutes')
-                """.format(config.oauth_failure_window_minutes),
-                (user_id,)
-            )
-            oauth_failure_count = oauth_failures[0][0] if oauth_failures else 0
+            # Check if oauth_failure_log table exists
+            try:
+                oauth_failures = self.db_optimizer.execute_query(
+                    """
+                    SELECT COUNT(*) as failure_count FROM oauth_failure_log 
+                    WHERE user_id = ? AND created_at > datetime('now', '-{} minutes')
+                    """.format(config.oauth_failure_window_minutes),
+                    (user_id,)
+                )
+                # Handle both dict and tuple result formats
+                if oauth_failures:
+                    if isinstance(oauth_failures[0], dict):
+                        oauth_failure_count = oauth_failures[0].get('failure_count', 0) or oauth_failures[0].get('COUNT(*)', 0) or 0
+                    else:
+                        oauth_failure_count = oauth_failures[0][0] if isinstance(oauth_failures[0], (tuple, list)) else 0
+                else:
+                    oauth_failure_count = 0
+            except Exception as e:
+                logger.warning(f"Could not get OAuth failure count: {e}")
+                oauth_failure_count = 0
             
             return {
                 'success': True,

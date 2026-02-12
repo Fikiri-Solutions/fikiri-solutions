@@ -40,7 +40,13 @@ OPENAI_MAX_TOKENS=1000
 # =============================================================================
 # REDIS CONFIGURATION
 # =============================================================================
+# Option A: Full URL (works for Upstash or any Redis)
 REDIS_URL=redis://localhost:6379/0
+
+# Option B: Upstash-only — set these and REDIS_URL is derived automatically
+# UPSTASH_REDIS_REST_URL=https://YOUR-INSTANCE.upstash.io
+# UPSTASH_REDIS_REST_TOKEN=your-rest-token
+
 REDIS_SESSION_URL=${REDIS_URL}
 REDIS_CACHE_URL=${REDIS_URL}
 REDIS_QUEUE_URL=${REDIS_URL}

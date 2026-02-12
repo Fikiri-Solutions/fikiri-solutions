@@ -29,55 +29,92 @@ class MinimalVectorSearch:
         self.metadata = []
         self.dimension = 384  # Default dimension for sentence-transformers
         
-        # Embedding models
-        self.sentence_transformer = None
-        self.openai_client = None
+        # Pinecone client (optional)
+        self.pinecone_client = None
+        self.pinecone_index = None
+        self.use_pinecone = False
+        
+        # Embedding models (OpenAI only via core.ai.embedding_client)
+        self.sentence_transformer = None  # Lazy-loaded instance
+        self._SentenceTransformer = None  # Class reference for lazy loading
+        self._use_embedding_client = False  # True when using core.ai.embedding_client for OpenAI
+        self.openai_client = None  # Deprecated: do not set; use _use_embedding_client + get_embedding()
         self.embedding_model = "hash"  # hash, sentence_transformers, openai
+        
+        # Try Pinecone first (if configured)
+        self._initialize_pinecone()
         
         # Initialize embedding models
         self._initialize_embedding_models()
         
-        # Load existing data
-        self.load_vector_db()
+        # Load existing data (only if not using Pinecone)
+        if not self.use_pinecone:
+            self.load_vector_db()
+    
+    def _initialize_pinecone(self):
+        """Initialize Pinecone if API key is available."""
+        api_key = os.getenv("PINECONE_API_KEY")
+        if not api_key:
+            return
+        
+        try:
+            from pinecone import Pinecone, ServerlessSpec
+            index_name = os.getenv("PINECONE_INDEX_NAME", "fikiri-vectors")
+            
+            self.pinecone_client = Pinecone(api_key=api_key)
+            
+            # Create index if needed
+            existing = [idx.name for idx in self.pinecone_client.list_indexes()]
+            if index_name not in existing:
+                self.pinecone_client.create_index(
+                    name=index_name,
+                    dimension=384,
+                    metric="cosine",
+                    spec=ServerlessSpec(cloud="aws", region="us-east-1")
+                )
+            
+            self.pinecone_index = self.pinecone_client.Index(index_name)
+            self.use_pinecone = True
+            self.dimension = 384
+            logger.info(f"✅ Pinecone initialized: {index_name}")
+        except ImportError:
+            pass  # Pinecone not installed, use local storage
+        except Exception as e:
+            logger.warning(f"Pinecone failed: {e}, using local storage")
     
     def _initialize_embedding_models(self):
-        """Initialize available embedding models."""
-        # Try sentence-transformers first
+        """Initialize available embedding models (lazy loading to avoid mutex contention)."""
+        # Try sentence-transformers first (lazy load - don't initialize model until needed)
         try:
             from sentence_transformers import SentenceTransformer
-            self.sentence_transformer = SentenceTransformer('all-MiniLM-L6-v2')
+            # Store class, not instance (lazy initialization)
+            self._SentenceTransformer = SentenceTransformer
             self.dimension = 384  # all-MiniLM-L6-v2 dimension
             self.embedding_model = "sentence_transformers"
-            logger.info("✅ Sentence-transformers initialized")
+            logger.info("✅ Sentence-transformers available (lazy loading)")
         except ImportError:
             logger.info("ℹ️ Sentence-transformers not available")
+            self._SentenceTransformer = None
         except Exception as e:
-            logger.warning(f"Sentence-transformers initialization failed: {e}")
+            logger.warning(f"Sentence-transformers import failed: {e}")
+            self._SentenceTransformer = None
         
-        # Try OpenAI embeddings
-        if not self.sentence_transformer:
+        # Try OpenAI embeddings via core.ai only (no direct openai.OpenAI here)
+        if not self._SentenceTransformer:
             try:
-                import openai
-                api_key = os.getenv("OPENAI_API_KEY")
-                if api_key:
-                    if hasattr(openai, 'OpenAI'):
-                        # OpenAI >= 1.0.0
-                        self.openai_client = openai.OpenAI(api_key=api_key)
-                    else:
-                        # Legacy OpenAI < 1.0.0
-                        openai.api_key = api_key
-                        self.openai_client = openai
-                    
-                    self.dimension = 1536  # OpenAI text-embedding-ada-002 dimension
+                from core.ai.embedding_client import is_embedding_available, get_embedding_dimension
+                if is_embedding_available():
+                    self._use_embedding_client = True
+                    self.dimension = get_embedding_dimension()
                     self.embedding_model = "openai"
-                    logger.info("✅ OpenAI embeddings initialized")
+                    logger.info("✅ OpenAI embeddings initialized (core.ai.embedding_client)")
             except ImportError:
-                logger.info("ℹ️ OpenAI not available")
+                logger.info("ℹ️ core.ai.embedding_client not available")
             except Exception as e:
-                logger.warning(f"OpenAI initialization failed: {e}")
+                logger.warning("OpenAI embedding client init failed: %s", e)
         
         # Fallback to hash-based embeddings
-        if not self.sentence_transformer and not self.openai_client:
+        if not self._SentenceTransformer and not self._use_embedding_client:
             logger.info("ℹ️ Using hash-based embeddings (no external models available)")
     
     def load_vector_db(self) -> bool:
@@ -134,7 +171,14 @@ class MinimalVectorSearch:
             return False
     
     def add_document(self, text: str, metadata: Dict[str, Any] = None) -> int:
-        """Add a document to the vector database."""
+        """Add a document to the vector database (Pinecone or local)."""
+        if self.use_pinecone:
+            return self._add_document_pinecone(text, metadata)
+        else:
+            return self._add_document_local(text, metadata)
+    
+    def _add_document_local(self, text: str, metadata: Dict[str, Any] = None) -> int:
+        """Add a document to local vector database."""
         try:
             # Generate embedding
             embedding = self._generate_embedding(text)
@@ -162,6 +206,22 @@ class MinimalVectorSearch:
         except Exception as e:
             logger.error(f"❌ Error adding document: {e}")
             return -1
+    
+    def _add_document_pinecone(self, text: str, metadata: Dict[str, Any] = None) -> int:
+        """Add a document to Pinecone."""
+        import uuid
+        embedding = self._normalize_vector(self._generate_embedding(text))
+        doc_id = str(uuid.uuid4())
+        
+        enhanced_metadata = {
+            'text': text,
+            'created_at': datetime.now(timezone.utc).isoformat(),
+            'embedding_model': self.embedding_model,
+            **(metadata or {})
+        }
+        
+        self.pinecone_index.upsert(vectors=[(doc_id, embedding, enhanced_metadata)])
+        return hash(doc_id) % (10**9)
     
     def update_document(self, doc_id: int, text: str, metadata: Dict[str, Any] = None) -> bool:
         """Update an existing document."""
@@ -210,7 +270,14 @@ class MinimalVectorSearch:
             return False
     
     def search_similar(self, query: str, top_k: int = 5, threshold: float = 0.7) -> List[Dict[str, Any]]:
-        """Search for similar documents."""
+        """Search for similar documents (Pinecone or local)."""
+        if self.use_pinecone:
+            return self._search_similar_pinecone(query, top_k, threshold)
+        else:
+            return self._search_similar_local(query, top_k, threshold)
+    
+    def _search_similar_local(self, query: str, top_k: int = 5, threshold: float = 0.7) -> List[Dict[str, Any]]:
+        """Search for similar documents - optimized with heap for top-k."""
         try:
             if not self.vectors:
                 logger.warning("⚠️ No vectors in database")
@@ -220,29 +287,55 @@ class MinimalVectorSearch:
             query_embedding = self._generate_embedding(query)
             query_embedding = self._normalize_vector(query_embedding)
             
-            # Calculate similarities
-            similarities = []
+            # Use heap to maintain top-k results efficiently (O(n log k) instead of O(n log n))
+            import heapq
+            heap = []  # Min-heap to keep top-k largest similarities
+            
+            # Calculate similarities - single pass O(n)
             for i, vector in enumerate(self.vectors):
                 similarity = self._cosine_similarity(query_embedding, vector)
                 if similarity >= threshold:
-                    similarities.append({
-                        'index': i,
-                        'similarity': similarity,
-                        'document': self.documents[i],
-                        'metadata': self.metadata[i]
-                    })
+                    # Use negative similarity for min-heap (we want max)
+                    if len(heap) < top_k:
+                        heapq.heappush(heap, (similarity, i))
+                    elif similarity > heap[0][0]:  # Better than worst in heap
+                        heapq.heapreplace(heap, (similarity, i))
             
-            # Sort by similarity (highest first)
-            similarities.sort(key=lambda x: x['similarity'], reverse=True)
+            # Extract results from heap and sort (O(k log k))
+            results = []
+            while heap:
+                similarity, i = heapq.heappop(heap)
+                results.append({
+                    'index': i,
+                    'similarity': similarity,
+                    'document': self.documents[i],
+                    'metadata': self.metadata[i]
+                })
             
-            # Return top k results
-            results = similarities[:top_k]
+            # Sort by similarity descending (highest first)
+            results.sort(key=lambda x: x['similarity'], reverse=True)
+            
             logger.info(f"✅ Found {len(results)} similar documents")
             return results
             
         except Exception as e:
             logger.error(f"❌ Error searching: {e}")
             return []
+    
+    def _search_similar_pinecone(self, query: str, top_k: int = 5, threshold: float = 0.7) -> List[Dict[str, Any]]:
+        """Search for similar documents in Pinecone."""
+        query_embedding = self._normalize_vector(self._generate_embedding(query))
+        results = self.pinecone_index.query(vector=query_embedding, top_k=top_k, include_metadata=True)
+        
+        return [
+            {
+                'document': match.metadata.get('text', ''),
+                'similarity': float(match.score),
+                'metadata': {k: v for k, v in match.metadata.items() if k != 'text'},
+                'id': match.id
+            }
+            for match in results.matches if match.score >= threshold
+        ]
     
     async def search_similar_async(self, query: str, top_k: int = 5, threshold: float = 0.7) -> List[Dict[str, Any]]:
         """Async version of search_similar for FastAPI compatibility."""
@@ -294,26 +387,20 @@ class MinimalVectorSearch:
     def _generate_embedding(self, text: str) -> List[float]:
         """Generate embedding for text using available models."""
         try:
-            if self.sentence_transformer:
-                # Use sentence-transformers
-                embedding = self.sentence_transformer.encode(text)
-                return embedding.tolist()
-            elif self.openai_client:
-                # Use OpenAI embeddings
-                if hasattr(self.openai_client, 'embeddings'):
-                    # OpenAI >= 1.0.0
-                    response = self.openai_client.embeddings.create(
-                        input=text,
-                        model="text-embedding-ada-002"
-                    )
-                    return response.data[0].embedding
+            if self._SentenceTransformer:
+                # Use sentence-transformers (lazy load if needed)
+                model = self._get_sentence_transformer()
+                if model:
+                    embedding = model.encode(text)
                 else:
-                    # Legacy OpenAI < 1.0.0
-                    response = self.openai_client.Embedding.create(
-                        input=text,
-                        model="text-embedding-ada-002"
-                    )
-                    return response['data'][0]['embedding']
+                    raise ValueError("Sentence transformer model failed to load")
+                return embedding.tolist()
+            elif self._use_embedding_client:
+                from core.ai.embedding_client import get_embedding
+                emb = get_embedding(text)
+                if emb is not None:
+                    return emb
+                return self._hash_embedding(text)
             else:
                 # Fallback to hash-based embedding
                 return self._hash_embedding(text)
@@ -416,17 +503,17 @@ class MinimalVectorSearch:
             "vector_dimension": self.dimension,
             "embedding_model": self.embedding_model,
             "database_size_mb": self.vector_db_path.stat().st_size / (1024 * 1024) if self.vector_db_path.exists() else 0,
-            "has_sentence_transformers": self.sentence_transformer is not None,
-            "has_openai": self.openai_client is not None,
+            "has_sentence_transformers": self._SentenceTransformer is not None,
+            "has_openai": self._use_embedding_client,
             "compression_enabled": True,
             "async_support": True,
             "incremental_indexing": True
         }
         
         # Add model-specific stats
-        if self.sentence_transformer:
+        if self._SentenceTransformer:
             stats["sentence_transformer_model"] = "all-MiniLM-L6-v2"
-        if self.openai_client:
+        if self._use_embedding_client:
             stats["openai_model"] = "text-embedding-ada-002"
         
         return stats

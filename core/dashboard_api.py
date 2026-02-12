@@ -347,3 +347,53 @@ def get_dashboard_kpi():
     except Exception as e:
         logger.error(f"KPI dashboard error: {e}")
         return create_error_response(f"KPI failed: {str(e)}", 500, "KPI_ERROR")
+
+@dashboard_bp.route('/timeseries', methods=['GET'])
+@handle_api_errors
+def get_dashboard_timeseries():
+    """Get dashboard timeseries data for the last 14 days with change calculations"""
+    try:
+        user_id = request.args.get('user_id', 1, type=int)
+        period = request.args.get('period', 'week', type=str)
+        
+        # Mock data for now - replace with actual database queries
+        import random
+        
+        # Generate mock timeseries data for the last 14 days
+        timeseries = []
+        base_date = datetime.now() - timedelta(days=13)
+        
+        for i in range(14):
+            day = base_date + timedelta(days=i)
+            timeseries.append({
+                "day": day.strftime("%Y-%m-%d"),
+                "leads": random.randint(3, 15),
+                "emails": random.randint(8, 25),
+                "revenue": random.randint(500, 2000)
+            })
+        
+        # Split into current vs previous 7 days
+        current = timeseries[-7:]
+        previous = timeseries[:7]
+        
+        def calc_change(key):
+            cur = sum(d[key] for d in current)
+            prev = sum(d[key] for d in previous) if previous else 0
+            if prev == 0: 
+                return {"change_pct": None, "positive": True}
+            change = ((cur - prev) / prev) * 100
+            return {"change_pct": round(change, 1), "positive": change >= 0}
+        
+        return create_success_response({
+            "timeseries": timeseries,
+            "summary": {
+                "leads": calc_change("leads"),
+                "emails": calc_change("emails"),
+                "revenue": calc_change("revenue")
+            }
+        })
+    except Exception as e:
+        logger.error(f"Dashboard timeseries error: {e}")
+        import traceback
+        logger.error(f"Dashboard timeseries traceback: {traceback.format_exc()}")
+        return create_error_response(f"Failed to fetch dashboard data: {str(e)}", 500, 'DASHBOARD_TIMESERIES_ERROR')

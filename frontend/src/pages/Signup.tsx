@@ -16,6 +16,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { FikiriLogo } from '../components/FikiriLogo';
+import { RadiantLayout } from '../components/radiant';
 import { useAuth } from '../contexts/AuthContext';
 import { useUserActivityTracking } from '../contexts/ActivityContext';
 
@@ -37,7 +38,7 @@ const Signup: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   
-  const { signup, getRedirectPath } = useAuth();
+  const { signup, getRedirectPath, user } = useAuth();
   const { trackSignup } = useUserActivityTracking();
   const navigate = useNavigate();
 
@@ -146,6 +147,21 @@ const Signup: React.FC = () => {
         // Track successful signup
         trackSignup(formData.email, 'email');
         
+        // Check if user selected a plan before signing up
+        const selectedPlan = localStorage.getItem('fikiri-selected-plan');
+        if (selectedPlan) {
+          try {
+            const plan = JSON.parse(selectedPlan);
+            localStorage.removeItem('fikiri-selected-plan');
+            
+            // Redirect to pricing page with plan pre-selected and auto-checkout enabled
+            navigate(`/pricing?plan=${plan.tier}&billing=${plan.billingPeriod}&autoCheckout=true`);
+            return;
+          } catch (e) {
+            console.error('Error parsing selected plan:', e);
+          }
+        }
+        
         // Get the appropriate redirect path based on user state
         const redirectPath = getRedirectPath();
         navigate(redirectPath);
@@ -165,6 +181,7 @@ const Signup: React.FC = () => {
   };
 
   return (
+    <RadiantLayout>
     <div 
       id="main-content"
       className="min-h-screen bg-brand-tan dark:bg-gray-900 relative overflow-hidden"
@@ -291,7 +308,13 @@ const Signup: React.FC = () => {
             transition={{ duration: 0.6 }}
           >
             <div className="flex items-center justify-center mb-6">
-              <FikiriLogo size="xl" variant="full" className="mx-auto" />
+              <Link 
+                to={user ? "/dashboard" : "/"}
+                className="cursor-pointer hover:opacity-80 transition-opacity"
+                aria-label={user ? "Fikiri Solutions - Go to dashboard" : "Fikiri Solutions - Return to homepage"}
+              >
+                <FikiriLogo size="xl" variant="full" textColor="white" className="mx-auto" />
+              </Link>
             </div>
             <motion.h1 
               className="text-5xl font-bold text-white mb-2 font-serif tracking-tight"
@@ -666,6 +689,7 @@ const Signup: React.FC = () => {
         </div>
       </div>
     </div>
+    </RadiantLayout>
   );
 };
 

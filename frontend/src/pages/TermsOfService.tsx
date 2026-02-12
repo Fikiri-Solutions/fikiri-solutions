@@ -1,8 +1,10 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
+import { RadiantLayout } from '../components/radiant';
 
 const TermsOfService: React.FC = () => {
   return (
+    <RadiantLayout>
     <>
       <Helmet>
         <title>Terms of Service - Fikiri Solutions</title>
@@ -12,7 +14,7 @@ const TermsOfService: React.FC = () => {
       <div className="min-h-screen bg-gray-900 text-white">
         <div className="container mx-auto px-4 py-8 max-w-4xl">
           <div className="bg-gray-800 rounded-lg p-8 shadow-xl">
-            <h1 className="text-4xl font-bold text-center mb-8 text-blue-400">
+            <h1 className="text-4xl font-bold text-center mb-8 text-brand-primary">
                   Terms of Service
                 </h1>
             
@@ -23,17 +25,17 @@ const TermsOfService: React.FC = () => {
               </p>
 
               <section className="mb-8">
-                <h2 className="text-2xl font-semibold text-blue-300 mb-4">Agreement to Terms</h2>
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Agreement to Terms</h2>
                 <p className="text-gray-300 leading-relaxed">
                   By accessing or using Fikiri Solutions ("Service") at 
-                  <a href="https://fikirisolutions.com" className="text-blue-400 hover:text-blue-300"> https://fikirisolutions.com</a>, 
+                  <a href="https://fikirisolutions.com" className="text-brand-primary hover:text-muted-foreground"> https://fikirisolutions.com</a>, 
                   you agree to be bound by these Terms of Service ("Terms"). If you disagree with any part of these terms, 
                   you may not access the Service.
                 </p>
               </section>
 
               <section className="mb-8">
-                <h2 className="text-2xl font-semibold text-blue-300 mb-4">Description of Service</h2>
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Description of Service</h2>
                 <p className="text-gray-300 mb-3">Fikiri Solutions is an AI-powered Gmail automation platform that:</p>
                 <ul className="list-disc list-inside text-gray-300 space-y-2">
                   <li><strong>Processes Emails:</strong> Analyzes incoming messages using artificial intelligence</li>
@@ -44,7 +46,7 @@ const TermsOfService: React.FC = () => {
               </section>
 
               <section className="mb-8">
-                <h2 className="text-2xl font-semibold text-blue-300 mb-4">Gmail Integration and Permissions</h2>
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Gmail Integration and Permissions</h2>
                 
                 <h3 className="text-xl font-medium text-green-300 mb-3">OAuth Consent</h3>
                 <p className="text-gray-300 mb-3">
@@ -66,7 +68,7 @@ const TermsOfService: React.FC = () => {
               </section>
 
               <section className="mb-8">
-                <h2 className="text-2xl font-semibold text-blue-300 mb-4">Acceptable Use Policy</h2>
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Acceptable Use Policy</h2>
                 
                 <h3 className="text-xl font-medium text-green-300 mb-3">Permitted Uses</h3>
                 <p className="text-gray-300 mb-3">You may use our Service to:</p>
@@ -90,7 +92,7 @@ const TermsOfService: React.FC = () => {
               </section>
 
               <section className="mb-8">
-                <h2 className="text-2xl font-semibold text-blue-300 mb-4">Google API Services Compliance</h2>
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Google API Services Compliance</h2>
                 <p className="text-gray-300 mb-3">Our Service complies with Google API Services User Data Policy, including:</p>
                 <ul className="list-disc list-inside text-gray-300 space-y-2">
                   <li><strong>Data Usage:</strong> Limited to providing or improving user-facing features</li>
@@ -101,7 +103,7 @@ const TermsOfService: React.FC = () => {
               </section>
 
               <section className="mb-8">
-                <h2 className="text-2xl font-semibold text-blue-300 mb-4">Contact Information</h2>
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Contact Information</h2>
                 <p className="text-gray-300">
                   For questions about these Terms, please contact us:
                 </p>
@@ -109,7 +111,7 @@ const TermsOfService: React.FC = () => {
                   <p className="text-gray-300">
                     <strong>Email:</strong> legal@fikirisolutions.com<br />
                     <strong>Address:</strong> Fikiri Solutions, Legal Department<br />
-                    <strong>Website:</strong> <a href="/contact" className="text-blue-400 hover:text-blue-300">https://fikirisolutions.com/contact</a>
+                    <strong>Website:</strong> <a href="/contact" className="text-brand-primary hover:text-muted-foreground">https://fikirisolutions.com/contact</a>
                   </p>
                 </div>
               </section>
@@ -124,6 +126,7 @@ const TermsOfService: React.FC = () => {
               </div>
       </div>
     </>
+    </RadiantLayout>
   );
 };
 

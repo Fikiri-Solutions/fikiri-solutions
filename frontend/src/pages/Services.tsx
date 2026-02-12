@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react'
-import { Settings, ToggleLeft, ToggleRight, Save, RefreshCw, X, CheckCircle, AlertCircle, Clock, Zap } from 'lucide-react'
+import React, { useState, useEffect, useMemo } from 'react'
+import { Settings, ToggleLeft, ToggleRight, Save, RefreshCw, X, CheckCircle, AlertCircle, Zap } from 'lucide-react'
 import { apiClient } from '../services/apiClient'
+import { useToast } from '../components/Toast'
 
 export const Services: React.FC = () => {
+  const { addToast } = useToast()
   const [services, setServices] = useState([
     {
       id: 'ai-assistant',
@@ -66,10 +68,59 @@ export const Services: React.FC = () => {
   }, [])
 
   const loadServiceConfigurations = async () => {
+    setIsLoading(true)
     try {
-      // Load service configurations
+      // Load from API using the getServices method
+      const apiServices = await apiClient.getServices()
+      
+      if (apiServices && Array.isArray(apiServices) && apiServices.length > 0) {
+        // Map API services to our format
+        const apiServiceMap = new Map(apiServices.map((s: any) => [s.id, s]))
+        
+        setServices(prev => prev.map(service => {
+          const apiService = apiServiceMap.get(service.id)
+          if (apiService) {
+            return {
+              ...service,
+              enabled: apiService.status === 'active' || apiService.status === 'healthy',
+              settings: service.settings // Keep existing settings, API doesn't return settings in getServices()
+            }
+          }
+          return service
+        }))
+        setHasChanges(false)
+      } else {
+        // If no API services, try localStorage as fallback (for migration)
+        const savedConfig = localStorage.getItem('serviceConfigurations')
+        if (savedConfig) {
+          try {
+            const parsed = JSON.parse(savedConfig)
+            setServices(parsed)
+            setHasChanges(true) // Mark as changed so user can save to API
+            addToast({
+              type: 'info',
+              title: 'Migrating Settings',
+              message: 'Found local settings. Please save to sync with server.'
+            })
+          } catch (parseError) {
+            console.error('Failed to parse saved configurations:', parseError)
+          }
+        }
+      }
     } catch (error) {
-      // Failed to load configurations
+      console.error('Failed to load service configurations:', error)
+      // Fallback to localStorage only if API completely fails
+      const savedConfig = localStorage.getItem('serviceConfigurations')
+      if (savedConfig) {
+        try {
+          const parsed = JSON.parse(savedConfig)
+          setServices(parsed)
+        } catch (parseError) {
+          console.error('Failed to parse saved configurations:', parseError)
+        }
+      }
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -100,24 +151,48 @@ export const Services: React.FC = () => {
   const saveConfigurations = async () => {
     setIsLoading(true)
     try {
-      // Save service configurations
+      // Save each service to API
+      const savePromises = services.map(service => 
+        apiClient.saveService(
+          service.id,
+          service.name,
+          service.enabled,
+          service.settings
+        )
+      )
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await Promise.all(savePromises)
+      
+      // Clear localStorage after successful API save (migration complete)
+      localStorage.removeItem('serviceConfigurations')
       
       setHasChanges(false)
-      // Show success message
+      
+      // Show success toast
+      addToast({
+        type: 'success',
+        title: 'Configuration Saved',
+        message: 'Service configurations have been saved to the server.'
+      })
     } catch (error) {
-      // Failed to save configurations
-      // Show error message
+      console.error('❌ Failed to save service configurations:', error)
+      addToast({
+        type: 'error',
+        title: 'Save Failed',
+        message: 'Failed to save service configurations. Please try again.'
+      })
+      throw error // Re-throw to show error state
     } finally {
       setIsLoading(false)
     }
   }
 
+  // Optimized: Use Map for O(1) lookup instead of O(n) find()
+  const serviceMap = useMemo(() => new Map(services.map(s => [s.id, s])), [services])
+  
   const testService = async (serviceId: string) => {
     setIsLoading(true)
-    const service = services.find(s => s.id === serviceId)
+    const service = serviceMap.get(serviceId)
     
     try {
       // Testing service
@@ -270,49 +345,49 @@ export const Services: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-gray-700">Extract Contacts</label>
-                <p className="text-xs text-gray-500">Automatically extract contact information from emails</p>
+                <label className="text-sm font-medium text-brand-text dark:text-gray-300">Extract Contacts</label>
+                <p className="text-xs text-brand-text/60 dark:text-gray-400">Automatically extract contact information from emails</p>
               </div>
               <button
                 onClick={() => updateServiceSettings(service.id, 'extractContacts', !service.settings.extractContacts)}
                 className="ml-4"
               >
                 {service.settings.extractContacts ? (
-                  <ToggleRight className="h-6 w-6 text-blue-600" />
+                  <ToggleRight className="h-6 w-6 text-brand-primary" />
                 ) : (
-                  <ToggleLeft className="h-6 w-6 text-gray-400" />
+                  <ToggleLeft className="h-6 w-6 text-brand-text/40" />
                 )}
               </button>
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-gray-700">Detect Urgency</label>
-                <p className="text-xs text-gray-500">Identify urgent emails that need immediate attention</p>
+                <label className="text-sm font-medium text-brand-text dark:text-gray-300">Detect Urgency</label>
+                <p className="text-xs text-brand-text/60 dark:text-gray-400">Identify urgent emails that need immediate attention</p>
               </div>
               <button
                 onClick={() => updateServiceSettings(service.id, 'detectUrgency', !service.settings.detectUrgency)}
                 className="ml-4"
               >
                 {service.settings.detectUrgency ? (
-                  <ToggleRight className="h-6 w-6 text-blue-600" />
+                  <ToggleRight className="h-6 w-6 text-brand-primary" />
                 ) : (
-                  <ToggleLeft className="h-6 w-6 text-gray-400" />
+                  <ToggleLeft className="h-6 w-6 text-brand-text/40" />
                 )}
               </button>
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-gray-700">Categorize Emails</label>
-                <p className="text-xs text-gray-500">Automatically categorize emails by type</p>
+                <label className="text-sm font-medium text-brand-text dark:text-gray-300">Categorize Emails</label>
+                <p className="text-xs text-brand-text/60 dark:text-gray-400">Automatically categorize emails by type</p>
               </div>
               <button
                 onClick={() => updateServiceSettings(service.id, 'categorizeEmails', !service.settings.categorizeEmails)}
                 className="ml-4"
               >
                 {service.settings.categorizeEmails ? (
-                  <ToggleRight className="h-6 w-6 text-blue-600" />
+                  <ToggleRight className="h-6 w-6 text-brand-primary" />
                 ) : (
-                  <ToggleLeft className="h-6 w-6 text-gray-400" />
+                  <ToggleLeft className="h-6 w-6 text-brand-text/40" />
                 )}
               </button>
             </div>
@@ -323,9 +398,9 @@ export const Services: React.FC = () => {
         return (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Scoring Model</label>
+              <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Scoring Model</label>
               <select
-                className="input-field mt-1"
+                className="bg-white text-brand-text border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.scoringModel}
                 onChange={(e) => updateServiceSettings(service.id, 'scoringModel', e.target.value)}
               >
@@ -335,9 +410,9 @@ export const Services: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Update Frequency</label>
+              <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Update Frequency</label>
               <select
-                className="input-field mt-1"
+                className="bg-white text-brand-text border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.updateFrequency}
                 onChange={(e) => updateServiceSettings(service.id, 'updateFrequency', e.target.value)}
               >
@@ -348,7 +423,7 @@ export const Services: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Threshold Score</label>
+              <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Threshold Score</label>
               <input
                 type="range"
                 min="0"
@@ -358,7 +433,7 @@ export const Services: React.FC = () => {
                 value={service.settings.thresholdScore}
                 onChange={(e) => updateServiceSettings(service.id, 'thresholdScore', parseFloat(e.target.value))}
               />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <div className="flex justify-between text-xs text-brand-text/60 dark:text-gray-400 mt-1">
                 <span>0.0</span>
                 <span>{service.settings.thresholdScore}</span>
                 <span>1.0</span>
@@ -368,7 +443,7 @@ export const Services: React.FC = () => {
         )
 
       default:
-        return <div className="text-gray-500">No settings available for this service.</div>
+        return <div className="text-brand-text/60 dark:text-gray-400">No settings available for this service.</div>
     }
   }
 
@@ -384,11 +459,12 @@ export const Services: React.FC = () => {
         </div>
         <div className="flex space-x-3">
           <button
-            onClick={() => loadServiceConfigurations()}
-            className="px-4 py-2 text-brand-text bg-brand-background/50 hover:bg-brand-background/80 border border-brand-text/20 rounded-lg font-medium transition-all duration-200 flex items-center"
+            onClick={loadServiceConfigurations}
+            disabled={isLoading}
+            className="px-4 py-2 text-brand-text bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh Data
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            {isLoading ? 'Refreshing...' : 'Refresh Data'}
           </button>
           <button
             onClick={saveConfigurations}
@@ -480,7 +556,7 @@ export const Services: React.FC = () => {
                   <span className="font-medium">Test Successful</span>
                 </div>
                 
-                <div className="bg-brand-background/50 dark:bg-gray-700 rounded-lg p-4 space-y-2">
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm text-brand-text/70 dark:text-gray-400">Status:</span>
                     <span className="text-sm font-medium text-brand-accent">

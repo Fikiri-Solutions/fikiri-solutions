@@ -78,21 +78,12 @@ class EnhancedRateLimiter:
             return
         
         try:
-            redis_url = os.getenv('REDIS_URL')
-            if redis_url:
-                self.redis_client = redis.from_url(redis_url, decode_responses=True)
+            from core.redis_connection_helper import get_redis_client
+            self.redis_client = get_redis_client(decode_responses=True, db=int(os.getenv('REDIS_DB', 0)))
+            if self.redis_client:
+                logger.info("✅ Enhanced rate limiter Redis connection established")
             else:
-                self.redis_client = redis.Redis(
-                    host=os.getenv('REDIS_HOST', 'localhost'),
-                    port=int(os.getenv('REDIS_PORT', 6379)),
-                    password=os.getenv('REDIS_PASSWORD'),
-                    db=int(os.getenv('REDIS_DB', 0)),
-                    decode_responses=True
-                )
-            
-            self.redis_client.ping()
-            logger.info("✅ Enhanced rate limiter Redis connection established")
-            
+                logger.warning("⚠️ Redis connection failed, using database-only rate limiting")
         except Exception as e:
             logger.error(f"❌ Enhanced rate limiter Redis connection failed: {e}")
             self.redis_client = None

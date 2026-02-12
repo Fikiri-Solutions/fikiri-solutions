@@ -22,8 +22,12 @@ export const SkipToContent: React.FC = () => {
         e.preventDefault();
         const mainContent = document.getElementById('main-content');
         if (mainContent) {
-          mainContent.focus();
-          mainContent.scrollIntoView({ behavior: 'smooth' });
+          // Ensure element is focusable
+          if (mainContent instanceof HTMLElement) {
+            mainContent.setAttribute('tabindex', '-1');
+            mainContent.focus();
+            mainContent.scrollIntoView({ behavior: 'smooth' });
+          }
         }
       }}
     >
@@ -110,11 +114,11 @@ export const ColorContrastChecker: React.FC = () => {
   };
 
   React.useEffect(() => {
-    // Check brand color contrasts
+    // Check brand color contrasts (using updated WCAG-compliant colors)
     const brandColors = {
       primary: '#B33B1E',
-      secondary: '#E7641C',
-      accent: '#F39C12',
+      secondary: '#A0480C', // Darker secondary for WCAG AA compliance (4.5+ contrast)
+      accent: '#8B6914', // Darker goldenrod - WCAG-compliant (4.5+ contrast)
       text: '#4B1E0C',
       background: '#F7F3E9'
     };
@@ -127,15 +131,18 @@ export const ColorContrastChecker: React.FC = () => {
       'White on Secondary': checkContrast('#FFFFFF', brandColors.secondary)
     };
 
-    // Log contrast ratios for debugging
-    console.log('Brand Color Contrast Ratios:', contrasts);
-    
-    // Warn about low contrast
-    Object.entries(contrasts).forEach(([pair, ratio]) => {
-      if (ratio < 4.5) {
-        console.warn(`Low contrast warning: ${pair} has ratio ${ratio.toFixed(2)} (minimum 4.5 recommended)`);
-      }
-    });
+    // Only log in development mode to reduce console noise
+    if (import.meta.env.DEV) {
+      // Log contrast ratios for debugging (commented out to reduce console noise)
+      // console.log('Brand Color Contrast Ratios:', contrasts);
+      
+      // Warn about low contrast (only in dev)
+      Object.entries(contrasts).forEach(([pair, ratio]) => {
+        if (ratio < 4.5) {
+          console.warn(`Low contrast warning: ${pair} has ratio ${ratio.toFixed(2)} (minimum 4.5 recommended)`);
+        }
+      });
+    }
   }, []);
 
   return null;
@@ -150,7 +157,7 @@ export const useFocusManagement = () => {
     const firstFocusableElement = focusableContent[0] as HTMLElement;
     const lastFocusableElement = focusableContent[focusableContent.length - 1] as HTMLElement;
 
-    element.addEventListener('keydown', (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Tab') {
         if (e.shiftKey) {
           if (document.activeElement === firstFocusableElement) {
@@ -164,7 +171,14 @@ export const useFocusManagement = () => {
           }
         }
       }
-    });
+    };
+
+    element.addEventListener('keydown', handleKeyDown);
+
+    // Return cleanup function
+    return () => {
+      element.removeEventListener('keydown', handleKeyDown);
+    };
   };
 
   const restoreFocus = (previousElement: HTMLElement | null) => {
@@ -179,6 +193,12 @@ export const useFocusManagement = () => {
 // Screen Reader Announcements
 export const useScreenReaderAnnouncement = () => {
   const announce = (message: string, priority: 'polite' | 'assertive' = 'polite') => {
+    // Remove any existing announcements first
+    const existing = document.querySelector('[aria-live]');
+    if (existing && existing.parentNode) {
+      existing.parentNode.removeChild(existing);
+    }
+
     const announcement = document.createElement('div');
     announcement.setAttribute('aria-live', priority);
     announcement.setAttribute('aria-atomic', 'true');
@@ -187,9 +207,12 @@ export const useScreenReaderAnnouncement = () => {
     
     document.body.appendChild(announcement);
     
+    // Clean up after announcement is read (longer timeout for screen readers)
     setTimeout(() => {
-      document.body.removeChild(announcement);
-    }, 1000);
+      if (announcement.parentNode) {
+        announcement.parentNode.removeChild(announcement);
+      }
+    }, 2000);
   };
 
   return { announce };

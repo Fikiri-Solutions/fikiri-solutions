@@ -1,4 +1,5 @@
-import React, { useRef, useState } from 'react'
+import React, { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useInView } from 'react-intersection-observer'
 import { motion } from 'framer-motion'
 import { 
@@ -17,11 +18,24 @@ import FikiriLogo from '@/components/FikiriLogo'
 import SimpleAnimatedBackground from '@/components/SimpleAnimatedBackground'
 import DemoVideoModal from '@/components/DemoVideoModal'
 import LogoTicker from '@/components/LogoTicker'
+import { useAuth } from '@/contexts/AuthContext'
 
 const LandingPage: React.FC = () => {
   // State for mobile menu and demo video
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isDemoVideoOpen, setIsDemoVideoOpen] = useState(false)
+  const { isAuthenticated } = useAuth()
+  const navigate = useNavigate()
+  
+  // Handle logo click - go to dashboard if authenticated, home if not
+  const handleLogoClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    if (isAuthenticated) {
+      navigate('/dashboard')
+    } else {
+      navigate('/')
+    }
+  }
 
   const valueProps = [
     {
@@ -93,18 +107,12 @@ const LandingPage: React.FC = () => {
   ]
 
   // Refs for scroll-triggered animations
-  const heroRef = useRef(null)
-  const valuePropsRef = useRef(null)
-  const howItWorksRef = useRef(null)
-  const testimonialsRef = useRef(null)
-  const ctaRef = useRef(null)
-
   // Check if elements are in view
-  const heroInView = useInView(heroRef, { once: true, margin: "-100px" })
-  const valuePropsInView = useInView(valuePropsRef, { once: true, margin: "-100px" })
-  const howItWorksInView = useInView(howItWorksRef, { once: true, margin: "-100px" })
-  const testimonialsInView = useInView(testimonialsRef, { once: true, margin: "-100px" })
-  const ctaInView = useInView(ctaRef, { once: true, margin: "-100px" })
+  const { ref: heroRef, inView: heroInView } = useInView({ triggerOnce: true })
+  const { ref: valuePropsRef, inView: valuePropsInView } = useInView({ triggerOnce: true })
+  const { ref: howItWorksRef, inView: howItWorksInView } = useInView({ triggerOnce: true })
+  const { ref: testimonialsRef, inView: testimonialsInView } = useInView({ triggerOnce: true })
+  const { ref: ctaRef, inView: ctaInView } = useInView({ triggerOnce: true })
 
   // Simple navigation handlers without router
   const handleGetStarted = () => {
@@ -125,8 +133,10 @@ const LandingPage: React.FC = () => {
       localStorage.removeItem('fikiri-user-id')
       localStorage.removeItem('fikiri-onboarding-data')
       localStorage.removeItem('fikiri-onboarding-completed')
+      localStorage.removeItem('fikiri-auth') // Also clear Zustand store key if it exists
     }
-    window.location.href = '/login'
+    // Use navigate instead of window.location to avoid RouteGuard issues
+    navigate('/login')
   }
 
   const handleSignUp = () => {
@@ -136,8 +146,10 @@ const LandingPage: React.FC = () => {
       localStorage.removeItem('fikiri-user-id')
       localStorage.removeItem('fikiri-onboarding-data')
       localStorage.removeItem('fikiri-onboarding-completed')
+      localStorage.removeItem('fikiri-auth') // Also clear Zustand store key if it exists
     }
-    window.location.href = '/signup'
+    // Use navigate instead of window.location to avoid RouteGuard issues
+    navigate('/signup')
   }
 
   const handlePricing = () => {
@@ -151,9 +163,11 @@ const LandingPage: React.FC = () => {
       {/* Header Navigation */}
       <header className="relative z-20 w-full px-4 sm:px-6 lg:px-8 py-6">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div 
-            className="flex items-center space-x-3 hover:opacity-80 transition-opacity duration-200"
-            aria-label="Fikiri Solutions - Return to homepage"
+          <Link 
+            to={isAuthenticated ? "/dashboard" : "/"}
+            onClick={handleLogoClick}
+            className="flex items-center space-x-3 hover:opacity-80 transition-opacity duration-200 cursor-pointer"
+            aria-label={isAuthenticated ? "Fikiri Solutions - Go to dashboard" : "Fikiri Solutions - Return to homepage"}
           >
             <FikiriLogo 
               size="xl" 
@@ -161,7 +175,7 @@ const LandingPage: React.FC = () => {
               animated={true}
               className="hover:scale-105 transition-transform duration-200"
             />
-          </div>
+          </Link>
           
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
@@ -480,8 +494,11 @@ const LandingPage: React.FC = () => {
             transition={{ duration: 0.8 }}
             className="text-center"
           >
-            <p className="text-white mb-8 font-medium text-lg">Powered by industry-leading technology</p>
+            <p className="text-white mb-4 font-medium text-lg">Integrates with industry-leading platforms</p>
             <LogoTicker speed={25} className="max-w-4xl mx-auto" />
+            <p className="text-xs text-white/50 text-center mt-4">
+              * Technology representations shown for reference. We integrate with these platforms via their public APIs.
+            </p>
           </motion.div>
         </div>
       </section>

@@ -13,7 +13,6 @@ interface WorkflowStep {
 
 export const AnimatedWorkflow: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [isAnimating, setIsAnimating] = useState(false);
 
   const workflowSteps: WorkflowStep[] = [
     {
@@ -60,11 +59,7 @@ export const AnimatedWorkflow: React.FC = () => {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setIsAnimating(true);
-      setTimeout(() => {
-        setCurrentStep((prev) => (prev + 1) % workflowSteps.length);
-        setIsAnimating(false);
-      }, 300);
+      setCurrentStep((prev) => (prev + 1) % workflowSteps.length);
     }, 3000);
 
     return () => clearInterval(interval);

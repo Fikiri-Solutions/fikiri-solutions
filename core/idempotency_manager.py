@@ -42,21 +42,12 @@ class IdempotencyManager:
             return
         
         try:
-            redis_url = os.getenv('REDIS_URL')
-            if redis_url:
-                self.redis_client = redis.from_url(redis_url, decode_responses=True)
+            from core.redis_connection_helper import get_redis_client
+            self.redis_client = get_redis_client(decode_responses=True, db=int(os.getenv('REDIS_DB', 0)))
+            if self.redis_client:
+                logger.info("✅ Idempotency Redis connection established")
             else:
-                self.redis_client = redis.Redis(
-                    host=os.getenv('REDIS_HOST', 'localhost'),
-                    port=int(os.getenv('REDIS_PORT', 6379)),
-                    password=os.getenv('REDIS_PASSWORD'),
-                    db=int(os.getenv('REDIS_DB', 0)),
-                    decode_responses=True
-                )
-            
-            self.redis_client.ping()
-            logger.info("✅ Idempotency Redis connection established")
-            
+                logger.warning("⚠️ Redis connection failed, using database-only idempotency")
         except Exception as e:
             logger.error(f"❌ Idempotency Redis connection failed: {e}")
             self.redis_client = None
@@ -138,8 +129,10 @@ class IdempotencyManager:
                     return json.loads(cached_result)
             
             # Fallback to database
+            # Rulepack compliance: specific columns, not SELECT *
             key_data = db_optimizer.execute_query("""
-                SELECT * FROM idempotency_keys 
+                SELECT id, key_hash, operation_type, user_id, request_data, response_data, status, created_at, expires_at, metadata 
+                FROM idempotency_keys 
                 WHERE key_hash = ? AND expires_at > datetime('now')
             """, (key,))
             

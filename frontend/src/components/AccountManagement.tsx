@@ -88,7 +88,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
     username: user?.name || '',
     email: user?.email || '',
     phone: '',
-    timezone: 'America/New_York',
+    timezone: user?.timezone || 'America/New_York',
     businessName: user?.business_name || '',
     businessEmail: user?.business_email || '',
     businessPhone: '',
@@ -98,6 +98,22 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
     website: '',
     description: ''
   })
+
+  // Update accountData when user changes
+  React.useEffect(() => {
+    if (user) {
+      setAccountData(prev => ({
+        ...prev,
+        username: user.name || prev.username,
+        email: user.email || prev.email,
+        timezone: user.timezone || prev.timezone,
+        businessName: user.business_name || prev.businessName,
+        businessEmail: user.business_email || prev.businessEmail,
+        industry: user.industry || prev.industry,
+        teamSize: user.team_size || prev.teamSize
+      }))
+    }
+  }, [user])
 
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
     currentPassword: '',
@@ -131,7 +147,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
     { id: 'security', label: 'Security', icon: Shield },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'preferences', label: 'Preferences', icon: Settings }
-  ]
+  ] as const
 
   const timezones = [
     'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
@@ -139,8 +155,23 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
   ]
 
   const industries = [
-    'Technology', 'Healthcare', 'Finance', 'Education', 'Retail', 'Manufacturing',
-    'Real Estate', 'Legal', 'Marketing', 'Consulting', 'Non-profit', 'Other'
+    'Real Estate',
+    'Property Management',
+    'Construction',
+    'Legal Services',
+    'Cleaning Services',
+    'Auto Services',
+    'Event Planning',
+    'Fitness & Wellness',
+    'Beauty & Spa',
+    'Accounting & Consulting',
+    'Restaurant',
+    'Medical Practice',
+    'Technology',
+    'Marketing',
+    'Education',
+    'Retail',
+    'Other'
   ]
 
   const teamSizes = [
@@ -162,14 +193,15 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
           business_name: accountData.businessName,
           business_email: accountData.businessEmail,
           industry: accountData.industry,
-          team_size: accountData.teamSize
+          team_size: accountData.teamSize,
+          timezone: accountData.timezone
         }
         updateUser(updatedUser)
       }
       
       setIsEditing(false)
       addToast({ type: 'success', title: 'Profile updated successfully!' })
-    } catch (error) {
+    } catch (_error) {
       addToast({ type: 'error', title: 'Failed to update profile. Please try again.' })
     } finally {
       setIsLoading(false)
@@ -200,7 +232,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
       }))
       
       addToast({ type: 'success', title: 'Password changed successfully!' })
-    } catch (error) {
+    } catch (_error) {
       addToast({ type: 'error', title: 'Failed to change password. Please try again.' })
     } finally {
       setIsLoading(false)
@@ -227,7 +259,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
       URL.revokeObjectURL(url)
       
       addToast({ type: 'success', title: 'Account data exported successfully!' })
-    } catch (error) {
+    } catch (_error) {
       addToast({ type: 'error', title: 'Failed to export data. Please try again.' })
     }
   }
@@ -241,7 +273,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
         
         logout()
         addToast({ type: 'success', title: 'Account deleted successfully' })
-      } catch (error) {
+      } catch (_error) {
         addToast({ type: 'error', title: 'Failed to delete account. Please try again.' })
       } finally {
         setIsLoading(false)
@@ -318,9 +350,11 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             </label>
             <select
               value={accountData.timezone}
-              onChange={(e) => setAccountData(prev => ({ ...prev, timezone: e.target.value }))}
+              onChange={(e) => {
+                setAccountData(prev => ({ ...prev, timezone: e.target.value }))
+              }}
               disabled={!isEditing}
-              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-800"
+              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
             >
               {timezones.map(tz => (
                 <option key={tz} value={tz}>{tz}</option>
@@ -367,9 +401,11 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             </label>
             <select
               value={accountData.industry}
-              onChange={(e) => setAccountData(prev => ({ ...prev, industry: e.target.value }))}
+              onChange={(e) => {
+                setAccountData(prev => ({ ...prev, industry: e.target.value }))
+              }}
               disabled={!isEditing}
-              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-800"
+              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
             >
               <option value="">Select industry</option>
               {industries.map(industry => (
@@ -384,9 +420,11 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             </label>
             <select
               value={accountData.teamSize}
-              onChange={(e) => setAccountData(prev => ({ ...prev, teamSize: e.target.value }))}
+              onChange={(e) => {
+                setAccountData(prev => ({ ...prev, teamSize: e.target.value }))
+              }}
               disabled={!isEditing}
-              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-800"
+              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
             >
               <option value="">Select team size</option>
               {teamSizes.map(size => (
@@ -797,7 +835,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center space-x-2 px-6 py-4 font-medium transition-colors ${
                   activeTab === tab.id
                     ? 'text-orange-600 dark:text-orange-400 border-b-2 border-orange-500'

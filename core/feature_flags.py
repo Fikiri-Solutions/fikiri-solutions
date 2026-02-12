@@ -17,6 +17,9 @@ class FeatureLevel(Enum):
     ADVANCED = "advanced"            # Heavy ML (PyTorch, scikit-learn)
     FULL_AI = "full_ai"              # All AI capabilities
 
+SKIP_HEAVY_CHECKS = os.getenv("SKIP_HEAVY_DEP_CHECKS", "false").lower() == "true"
+
+
 class FeatureFlags:
     """Strategic feature flag manager."""
     
@@ -112,6 +115,21 @@ class FeatureFlags:
     
     def _check_heavy_dependencies(self):
         """Check which heavy dependencies are available."""
+        if SKIP_HEAVY_CHECKS:
+            self._heavy_deps_status = {
+                "openai": False,
+                "scikit-learn": False,
+                "sentence-transformers": False,
+                "faiss-cpu": False,
+                "beautifulsoup4": True,
+                "transformers": False,
+                "torch": False,
+                "opencv-python": False,
+                "pillow": False
+            }
+            self._auto_adjust_features()
+            return
+        
         heavy_deps = {
             "openai": self._check_import("openai"),
             "scikit-learn": False,  # Removed for lightweight operation
@@ -347,4 +365,3 @@ if __name__ == "__main__":
     print(f"✅ Heavy deps available: {status['heavy_deps_available']}")
     
     print("\n🎉 All feature flag tests completed!")
-

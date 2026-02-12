@@ -5,51 +5,51 @@
 /* Fikiri Solutions Brand Colors */
 @layer base {
   :root {
-    /* Fikiri Brand Colors (refined from logo) */
+    /* Fikiri Brand Colors (WCAG-compliant) */
     --fikiri-primary: #B33B1E;        /* Primary red-orange */
-    --fikiri-secondary: #E7641C;      /* Bright orange */
-    --fikiri-accent: #F39C12;         /* Golden yellow */
+    --fikiri-secondary: #C55A0F;      /* Bright orange (WCAG-compliant) */
+    --fikiri-accent: #D68910;         /* Golden yellow (WCAG-compliant) */
     --fikiri-warning: #992D1E;        /* Deep red */
     --fikiri-error: #C0392B;          /* Deep red-orange */
-    --fikiri-text: #4B1E0C;           /* Tree brown */
-    --fikiri-bg: #F7F3E9;            /* Cream background */
+    --fikiri-text: #1a1a1a;          /* Neutral black for easy reading (LangChain-style) */
+    --fikiri-bg: #FFFFFF;             /* White background (modern SaaS) */
     
-    /* Primary Colors */
+    /* Primary Colors - Fikiri brand red-orange for CTAs and buttons */
     --primary: 12 65% 40%; /* #B33B1E */
     --primary-foreground: 0 0% 98%;
     
-    /* Secondary Colors */
-    --secondary: 25 75% 50%; /* #E7641C */
+    /* Secondary Colors - Fikiri orange for accents */
+    --secondary: 25 65% 45%; /* #C55A0F (WCAG-compliant) */
     --secondary-foreground: 0 0% 98%;
     
-    /* Background Colors */
-    --background: 45 30% 95%; /* #F7F3E9 */
-    --foreground: 25 60% 15%; /* #4B1E0C */
+    /* Background Colors - White base for modern SaaS look */
+    --background: 0 0% 100%; /* #FFFFFF - Pure white */
+    --foreground: 0 0% 10%; /* #1a1a1a - Neutral black for text (easy on eyes) */
     
-    /* Card Colors */
-    --card: 45 30% 95%;
-    --card-foreground: 25 60% 15%;
+    /* Card Colors - White with subtle borders */
+    --card: 0 0% 100%; /* #FFFFFF - White cards */
+    --card-foreground: 0 0% 10%; /* #1a1a1a - Neutral black for text */
     
     /* Popover Colors */
-    --popover: 45 30% 95%;
-    --popover-foreground: 25 60% 15%;
+    --popover: 0 0% 100%; /* #FFFFFF */
+    --popover-foreground: 0 0% 10%; /* #1a1a1a - Neutral black */
     
-    /* Muted Colors */
-    --muted: 45 20% 90%;
-    --muted-foreground: 25 40% 30%;
+    /* Muted Colors - Very subtle gray for accents */
+    --muted: 0 0% 96%; /* #F5F5F5 - Very light gray */
+    --muted-foreground: 0 0% 45%; /* #737373 - Medium gray for secondary text */
     
-    /* Accent Colors */
-    --accent: 45 85% 50%; /* #F39C12 */
-    --accent-foreground: 25 60% 15%;
+    /* Accent Colors - Subtle Fikiri golden yellow for highlights */
+    --accent: 40 75% 45%; /* #D68910 (WCAG-compliant) */
+    --accent-foreground: 0 0% 10%; /* #1a1a1a - Neutral black */
     
     /* Destructive Colors */
     --destructive: 0 60% 50%; /* #C0392B */
     --destructive-foreground: 0 0% 98%;
     
-    /* Border Colors */
-    --border: 25 30% 80%;
-    --input: 25 30% 80%;
-    --ring: 12 65% 40%;
+    /* Border Colors - Subtle gray borders for white background */
+    --border: 0 0% 90%; /* #E5E5E5 - Light gray borders */
+    --input: 0 0% 90%; /* #E5E5E5 */
+    --ring: 12 65% 40%; /* #B33B1E - Brand color for focus rings */
     
     /* Radius */
     --radius: 0.5rem;
@@ -81,22 +81,27 @@
          }
 }
 
-/* Fikiri Brand Utilities */
+/* Fikiri Brand Utilities – Radiant-style soft gradient (cream → peach → terracotta) */
 @layer utilities {
   .fikiri-gradient {
-    background: linear-gradient(135deg, #F39C12 0%, #E7641C 50%, #B33B1E 100%);
+    /* Same structure as Radiant template: soft 3-stop gradient, Fikiri warm tones */
+    background: linear-gradient(115deg, #fff8f0 0%, #fff8f0 28%, #f4c4a0 70%, #c45c3a 100%);
   }
-  
+  @media (min-width: 640px) {
+    .fikiri-gradient {
+      background: linear-gradient(145deg, #fff8f0 0%, #fff8f0 28%, #f4c4a0 70%, #c45c3a 100%);
+    }
+  }
+
   .fikiri-gradient-subtle {
-    background: linear-gradient(135deg, #F7F3E9 0%, #F39C12 100%);
+    background: linear-gradient(135deg, #fff8f0 0%, #f4c4a0 100%);
   }
-  
+
   .fikiri-gradient-animated {
-    background: linear-gradient(135deg, #F39C12 0%, #E7641C 50%, #B33B1E 100%);
+    background: linear-gradient(115deg, #fff8f0 0%, #fff8f0 28%, #f4c4a0 70%, #c45c3a 100%);
     background-size: 200% 200%;
     animation: gradientShift 3s ease-in-out infinite;
   }
-  
   @keyframes gradientShift {
     0%, 100% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
@@ -127,20 +132,13 @@
   }
   
   .bg-fikiri-bg {
-    background-color: #F7F3E9;
+    background-color: #FFFFFF;
   }
 }
 
-/* Font optimization */
+/* Font optimization - Plus Jakarta Sans for modern, sleek look */
 html { 
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; 
-}
-
-@font-face { 
-  font-family: 'Inter';
-  src: url('/fonts/inter.woff2') format('woff2');
-  font-display: swap; 
-  font-weight: 600;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; 
 }
 
 
@@ -153,6 +151,7 @@ html {
   
   body {
     @apply bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100;
+    background-color: #FFFFFF;
     transition: background-color 0.3s ease, color 0.3s ease;
   }
   
@@ -167,20 +166,20 @@ html {
     transition: color 0.3s ease;
   }
   
-  /* Default link styling */
+  /* Default link styling - Fikiri brand colors as subtle accents */
   a {
-    @apply text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300;
+    @apply text-brand-primary dark:text-brand-secondary hover:text-brand-secondary dark:hover:text-brand-accent;
     transition: color 0.3s ease;
   }
   
-  /* Default button styling */
+  /* Default button styling - Fikiri brand color for focus */
   button {
-    @apply transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900;
+    @apply transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 dark:focus:ring-offset-gray-900;
   }
   
-  /* Default input styling */
+  /* Default input styling - Fikiri brand colors for focus states */
   input, textarea, select {
-    @apply bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400;
+    @apply bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 focus:border-brand-primary dark:focus:border-brand-secondary focus:ring-brand-primary dark:focus:ring-brand-secondary;
     transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
   }
   
@@ -198,14 +197,14 @@ html {
 
 @layer base {
   html {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
     /* Mobile optimization */
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
   }
   
   body {
-    background-color: var(--bg-secondary);
+    background-color: #FFFFFF;
     color: var(--text-primary);
     /* Prevent mobile zoom on input focus */
     -webkit-text-size-adjust: 100%;
@@ -263,7 +262,7 @@ html {
 
 @layer components {
   .btn-primary {
-    @apply bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-brand-primary hover:bg-fikiri-400 focus:ring-2 focus:ring-brand-primary focus:ring-offset-2 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
     /* Mobile touch improvements */
     min-height: 44px; /* iOS recommended touch target */
     min-width: 44px;
@@ -288,7 +287,7 @@ html {
   }
   
   .input-field {
-    @apply w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent transition-colors duration-200 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400;
+    @apply w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-primary dark:focus:ring-brand-secondary focus:border-transparent transition-colors duration-200 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400;
     /* Mobile improvements */
     min-height: 44px; /* iOS recommended touch target */
     font-size: 16px; /* Prevent zoom on iOS */
@@ -330,26 +329,30 @@ html {
     }
   }
   
-  /* Brand-specific components */
+  /* Brand-specific components – matches utilities .fikiri-gradient */
   .fikiri-gradient {
-    background: linear-gradient(135deg, var(--fikiri-primary) 0%, var(--fikiri-secondary) 100%);
+    background: linear-gradient(115deg, #fff8f0 0%, #fff8f0 28%, #f4c4a0 70%, #c45c3a 100%);
+  }
+  @media (min-width: 640px) {
+    .fikiri-gradient {
+      background: linear-gradient(145deg, #fff8f0 0%, #fff8f0 28%, #f4c4a0 70%, #c45c3a 100%);
+    }
   }
   
   .fikiri-card {
-    background-color: var(--bg-primary);
-    border: 1px solid var(--border-primary);
-    box-shadow: var(--shadow-sm);
+    background-color: #FFFFFF;
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
     @apply rounded-xl p-6 hover:shadow-lg transition-all duration-300;
-    background: linear-gradient(145deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
   }
   
   .fikiri-button {
-    @apply bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
-    box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.3);
+    @apply bg-brand-primary hover:bg-fikiri-400 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 focus:ring-2 focus:ring-brand-primary focus:ring-offset-2;
+    box-shadow: 0 4px 14px 0 rgba(179, 59, 30, 0.25);
   }
   
   .fikiri-button:hover {
-    box-shadow: 0 6px 20px 0 rgba(59, 130, 246, 0.4);
+    box-shadow: 0 6px 20px 0 rgba(179, 59, 30, 0.35);
   }
   
   /* Mobile-optimized toast styles */

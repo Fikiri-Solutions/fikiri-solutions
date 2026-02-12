@@ -34,7 +34,7 @@ export interface AuthState {
 // Create auth store with persistence for user data only
 export const useAuth = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       // Initial state
       user: null,
       accessToken: null,
@@ -90,13 +90,27 @@ export const useAccessToken = () => useAuth((state) => state.accessToken);
 export const useAuthLoading = () => useAuth((state) => state.isLoading);
 export const useAuthError = () => useAuth((state) => state.error);
 
-// Auth actions
-export const useAuthActions = () => useAuth((state) => ({
-  setUser: state.setUser,
-  setToken: state.setToken,
-  setLoading: state.setLoading,
-  setError: state.setError,
-  login: state.login,
-  logout: state.logout,
-  clearError: state.clearError,
-}));
+// Module-level cache for stable action references
+// Initialize immediately to ensure actions are available before first render
+const getActionsCache = () => {
+  const state = useAuth.getState();
+  return {
+    setUser: state.setUser,
+    setToken: state.setToken,
+    setLoading: state.setLoading,
+    setError: state.setError,
+    login: state.login,
+    logout: state.logout,
+    clearError: state.clearError,
+  };
+};
+
+// Cache the actions object once (stable reference)
+const actionsCache = getActionsCache();
+
+// Auth actions hook - returns stable action references
+// This hook does NOT subscribe to store changes, preventing infinite re-renders
+export const useAuthActions = () => {
+  // Return cached actions (stable references, no subscription)
+  return actionsCache;
+};

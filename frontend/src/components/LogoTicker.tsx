@@ -97,9 +97,9 @@ const LogoTicker: React.FC<LogoTickerProps> = ({ speed = 20, className = '' }) =
         </div>
       </div>
 
-      {/* Instructions for replacing with real logos */}
+      {/* Legal disclaimer */}
       <div className="text-xs text-white/50 text-center mt-4">
-        💡 Replace logo components with actual company logo files
+        Integrates with industry-leading APIs and platforms
       </div>
 
       <style dangerouslySetInnerHTML={{

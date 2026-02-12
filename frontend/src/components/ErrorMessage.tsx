@@ -7,6 +7,7 @@ interface ErrorMessageProps {
   type: ErrorType
   title: string
   message: string
+  steps?: string[]
   onDismiss?: () => void
   className?: string
 }
@@ -46,6 +47,7 @@ export const ErrorMessage: React.FC<ErrorMessageProps> = ({
   type,
   title,
   message,
+  steps,
   onDismiss,
   className = ''
 }) => {
@@ -63,6 +65,13 @@ export const ErrorMessage: React.FC<ErrorMessageProps> = ({
           <p className={`text-sm ${config.textColor} mt-1`}>
             {message}
           </p>
+          {steps && steps.length > 0 && (
+            <ol className={`text-sm ${config.textColor} mt-3 ml-4 list-decimal space-y-1`}>
+              {steps.map((step, index) => (
+                <li key={index}>{step}</li>
+              ))}
+            </ol>
+          )}
         </div>
         {onDismiss && (
           <button
@@ -77,72 +86,14 @@ export const ErrorMessage: React.FC<ErrorMessageProps> = ({
   )
 }
 
-// Helper function to get user-friendly error messages
-export const getUserFriendlyError = (error: any): { type: ErrorType; title: string; message: string } => {
-  // Network errors
-  if (error.code === 'NETWORK_ERROR' || error.message?.includes('fetch')) {
-    return {
-      type: 'error',
-      title: 'Connection Error',
-      message: 'Unable to connect to our servers. Please check your internet connection and try again.'
-    }
-  }
-
-  // API errors
-  if (error.status === 503 || error.message?.includes('503')) {
-    return {
-      type: 'warning',
-      title: 'Service Temporarily Unavailable',
-      message: 'This feature is currently being updated. Please try again in a few minutes.'
-    }
-  }
-
-  if (error.status === 401 || error.message?.includes('401')) {
-    return {
-      type: 'warning',
-      title: 'Authentication Required',
-      message: 'Please sign in to access this feature.'
-    }
-  }
-
-  if (error.status === 403 || error.message?.includes('403')) {
-    return {
-      type: 'error',
-      title: 'Access Denied',
-      message: 'You don\'t have permission to perform this action.'
-    }
-  }
-
-  // Feature-specific errors
-  if (error.message?.includes('API key') || error.message?.includes('OPENAI')) {
-    return {
-      type: 'warning',
-      title: 'AI Assistant Configuration',
-      message: 'The AI Assistant is being configured. This feature will be available shortly.'
-    }
-  }
-
-  if (error.message?.includes('Gmail') || error.message?.includes('OAuth')) {
-    return {
-      type: 'info',
-      title: 'Email Integration Setup',
-      message: 'Please complete the Gmail integration setup to use email features.'
-    }
-  }
-
-  // Generic errors
-  if (error.message?.includes('validation') || error.message?.includes('required')) {
-    return {
-      type: 'warning',
-      title: 'Invalid Input',
-      message: 'Please check your input and try again.'
-    }
-  }
-
-  // Default fallback
+// Helper function to get user-friendly error messages (now uses centralized errorMessages.ts)
+export const getUserFriendlyError = (error: any): { type: ErrorType; title: string; message: string; steps?: string[] } => {
+  const { getFriendlyError } = require('../utils/errorMessages')
+  const friendly = getFriendlyError(error)
   return {
-    type: 'error',
-    title: 'Something went wrong',
-    message: 'We encountered an unexpected error. Please try again or contact support if the problem persists.'
+    type: friendly.type,
+    title: friendly.title,
+    message: friendly.message,
+    steps: friendly.steps
   }
 }

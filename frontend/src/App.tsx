@@ -1,7 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { Suspense } from 'react'
-import { Analytics } from '@vercel/analytics/react'
-import { SpeedInsights } from '@vercel/speed-insights/react'
+import { Suspense, useMemo, lazy } from 'react'
+import { HelmetProvider } from 'react-helmet-async'
 import { Dashboard } from './pages/Dashboard'
 import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
@@ -13,6 +12,13 @@ import { Onboarding } from './pages/Onboarding'
 import { Services } from './pages/Services'
 import { CRM } from './pages/CRM'
 import { AIAssistant } from './pages/AIAssistant'
+import { Automations } from './pages/Automations'
+import { ChatbotBuilder } from './pages/ChatbotBuilder'
+import { GmailConnect } from './pages/GmailConnect'
+import { OutlookConnect } from './pages/OutlookConnect'
+import { Integrations } from './pages/Integrations'
+import { EmailInbox } from './pages/EmailInbox'
+import { GmailStatusCheck } from './pages/GmailStatusCheck'
 import { NotFoundPage, ErrorPage } from './pages/ErrorPages'
 import { ServicesLanding } from './pages/ServicesLanding'
 import { AIAssistantLanding } from './pages/AIAssistantLanding'
@@ -20,11 +26,13 @@ import { LandscapingLanding } from './pages/LandscapingLanding'
 import { RestaurantLanding } from './pages/RestaurantLanding'
 import { MedicalLanding } from './pages/MedicalLanding'
 import { Layout } from './components/Layout'
-import { IndustryAutomation } from './components/IndustryAutomation'
+import { UsageAnalytics } from './pages/UsageAnalytics'
 import { About } from './pages/About'
 import { PrivacySettings } from './components/PrivacySettings'
 import LandingPage from './pages/LandingPage'
+import RadiantLandingPage from './pages/RadiantLandingPage'
 import PricingPage from './pages/PricingPage'
+import { BillingPage } from './pages/BillingPage'
 import { QueryProvider } from './providers/QueryProvider'
 import { ToastProvider } from './components/Toast'
 import { ThemeProvider } from './contexts/ThemeContext'
@@ -39,14 +47,36 @@ import { getFeatureConfig } from './config'
 import { useWarmRoutes } from './hooks/useWarmRoutes'
 import { AccessibilityProvider } from './components/AccessibilityProvider'
 
+const Analytics = lazy(async () => {
+  const module = await import('@vercel/analytics/react')
+  return { default: module.Analytics }
+})
+
+const SpeedInsights = lazy(async () => {
+  const module = await import('@vercel/speed-insights/react')
+  return { default: module.SpeedInsights }
+})
+
 function App() {
   const features = getFeatureConfig()
   useWarmRoutes() // Warm up routes after first paint
+  const showObservability = useMemo(() => {
+    if (import.meta.env.PROD) {
+      return true
+    }
+    return import.meta.env.VITE_ENABLE_ANALYTICS === 'true'
+  }, [])
 
   return (
     <ErrorBoundary>
-      <AccessibilityProvider>
-        <Router>
+      <HelmetProvider>
+        <AccessibilityProvider>
+          <Router
+            future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true,
+            }}
+          >
           <ThemeProvider>
             <CustomizationProvider>
               <ActivityProvider>
@@ -54,17 +84,19 @@ function App() {
                   <QueryProvider>
                     <ToastProvider>
                       <ScrollToTop />
-                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+                      <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
                         <Suspense fallback={<PageLoader />}>
                           <Routes>
                           {/* Public routes - no authentication required */}
-                          <Route path="/" element={<LandingPage />} />
+                          <Route path="/" element={<RadiantLandingPage />} />
+                          <Route path="/landing-classic" element={<LandingPage />} />
                           <Route path="/pricing" element={<PricingPage />} />
                           <Route path="/services-landing" element={<ServicesLanding />} />
                           <Route path="/ai-landing" element={<AIAssistantLanding />} />
                           <Route path="/industries/landscaping" element={<LandscapingLanding />} />
                           <Route path="/industries/restaurant" element={<RestaurantLanding />} />
                           <Route path="/industries/medical" element={<MedicalLanding />} />
+                          <Route path="/about" element={<About />} />
                           <Route path="/terms" element={<TermsOfService />} />
                           <Route path="/privacy" element={<PrivacyPolicy />} />
                           <Route path="/error" element={<ErrorPage />} />
@@ -76,6 +108,12 @@ function App() {
                             </AuthRoute>
                           } />
                           <Route path="/onboarding-flow/:step" element={
+                            <AuthRoute>
+                              <Onboarding />
+                            </AuthRoute>
+                          } />
+                          {/* Redirect old sync route to step 2 */}
+                          <Route path="/onboarding-flow/sync" element={
                             <AuthRoute>
                               <Onboarding />
                             </AuthRoute>
@@ -152,12 +190,50 @@ function App() {
                           } />
                           <Route path="/industry" element={
                             <ProtectedRoute>
-                              <Layout><IndustryAutomation /></Layout>
+                              <Layout><UsageAnalytics /></Layout>
                             </ProtectedRoute>
                           } />
-                          <Route path="/about" element={
+                          <Route path="/analytics" element={
                             <ProtectedRoute>
-                              <Layout><About /></Layout>
+                              <Layout><UsageAnalytics /></Layout>
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/automations" element={
+                            <ProtectedRoute>
+                              <Layout><Automations /></Layout>
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/ai/chatbot-builder" element={
+                            <ProtectedRoute>
+                              <Layout><ChatbotBuilder /></Layout>
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/integrations" element={
+                            <ProtectedRoute>
+                              <Layout><Integrations /></Layout>
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/integrations/gmail" element={
+                            <ProtectedRoute>
+                              <Layout><GmailConnect /></Layout>
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/integrations/outlook" element={
+                            <ProtectedRoute>
+                              <Layout><OutlookConnect /></Layout>
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/billing" element={
+                            <ProtectedRoute>
+                              <Layout><BillingPage /></Layout>
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/inbox" element={
+                            <Layout><EmailInbox /></Layout>
+                          } />
+                          <Route path="/gmail-status" element={
+                            <ProtectedRoute>
+                              <Layout><GmailStatusCheck /></Layout>
                             </ProtectedRoute>
                           } />
                           <Route path="/privacy-settings" element={
@@ -171,8 +247,12 @@ function App() {
                         </Routes>
                       </Suspense>
                     </div>
-                    <Analytics />
-                    <SpeedInsights />
+                    {showObservability && (
+                      <Suspense fallback={null}>
+                        <Analytics />
+                        <SpeedInsights />
+                      </Suspense>
+                    )}
                     </ToastProvider>
                   </QueryProvider>
                 </AuthProvider>
@@ -180,7 +260,8 @@ function App() {
             </CustomizationProvider>
           </ThemeProvider>
         </Router>
-      </AccessibilityProvider>
+        </AccessibilityProvider>
+      </HelmetProvider>
     </ErrorBoundary>
   )
 }

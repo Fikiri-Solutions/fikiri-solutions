@@ -67,21 +67,12 @@ class JWTAuthManager:
             return
         
         try:
-            redis_url = os.getenv('REDIS_URL')
-            if redis_url:
-                self.redis_client = redis.from_url(redis_url, decode_responses=True)
+            from core.redis_connection_helper import get_redis_client
+            self.redis_client = get_redis_client(decode_responses=True, db=int(os.getenv('REDIS_DB', 0)))
+            if self.redis_client:
+                logger.info("✅ JWT Redis connection established")
             else:
-                self.redis_client = redis.Redis(
-                    host=os.getenv('REDIS_HOST', 'localhost'),
-                    port=int(os.getenv('REDIS_PORT', 6379)),
-                    password=os.getenv('REDIS_PASSWORD'),
-                    db=int(os.getenv('REDIS_DB', 0)),
-                    decode_responses=True
-                )
-            
-            self.redis_client.ping()
-            logger.info("✅ JWT Redis connection established")
-            
+                logger.warning("⚠️ Redis connection failed, using database-only JWT sessions")
         except Exception as e:
             logger.error(f"❌ JWT Redis connection failed: {e}")
             self.redis_client = None
@@ -246,8 +237,9 @@ class JWTAuthManager:
                 return {"error": "invalid_type"}
             
             # Check if user still exists and is active
+            # Rulepack compliance: specific columns, not SELECT *
             user_data = db_optimizer.execute_query(
-                "SELECT * FROM users WHERE id = ? AND is_active = 1",
+                "SELECT id, email, name, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE id = ? AND is_active = 1",
                 (payload['user_id'],)
             )
             

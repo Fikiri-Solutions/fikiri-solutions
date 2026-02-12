@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Cache - Fikiri Solutions</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #F97316;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #ea580c;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            background: #f0f9ff;
+            border-left: 4px solid #3b82f6;
+        }
+        .error {
+            background: #fef2f2;
+            border-left-color: #ef4444;
+        }
+        .success {
+            background: #f0fdf4;
+            border-left-color: #22c55e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Clear Cache & Service Workers</h1>
+        <p>This page will help you clear cached data and unregister service workers that might be causing chunk loading issues.</p>
+        
+        <button onclick="clearAll()">Clear All Cache & Service Workers</button>
+        <button onclick="clearCache()">Clear Cache Only</button>
+        <button onclick="unregisterSW()">Unregister Service Workers</button>
+        <button onclick="clearStorage()">Clear LocalStorage</button>
+        
+        <div id="status"></div>
+    </div>
+
+    <script>
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.className = `status ${type}`;
+            status.innerHTML = message;
+        }
+
+        async function clearAll() {
+            showStatus('Clearing all cache and service workers...', 'info');
+            try {
+                await unregisterSW();
+                await clearCache();
+                await clearStorage();
+                showStatus('✅ All cache and service workers cleared successfully! Please refresh the page.', 'success');
+            } catch (error) {
+                showStatus(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function clearCache() {
+            showStatus('Clearing cache...', 'info');
+            try {
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(cacheNames.map(name => caches.delete(name)));
+                    showStatus(`✅ Cleared ${cacheNames.length} cache(s)`, 'success');
+                } else {
+                    showStatus('⚠️ Cache API not available', 'error');
+                }
+            } catch (error) {
+                showStatus(`❌ Error clearing cache: ${error.message}`, 'error');
+            }
+        }
+
+        async function unregisterSW() {
+            showStatus('Unregistering service workers...', 'info');
+            try {
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(registrations.map(reg => reg.unregister()));
+                    showStatus(`✅ Unregistered ${registrations.length} service worker(s)`, 'success');
+                } else {
+                    showStatus('⚠️ Service Workers not available', 'error');
+                }
+            } catch (error) {
+                showStatus(`❌ Error unregistering service workers: ${error.message}`, 'error');
+            }
+        }
+
+        function clearStorage() {
+            showStatus('Clearing localStorage...', 'info');
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+                showStatus('✅ Cleared localStorage and sessionStorage', 'success');
+            } catch (error) {
+                showStatus(`❌ Error clearing storage: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run on load
+        window.addEventListener('load', () => {
+            showStatus('Ready. Click a button above to clear cache.', 'info');
+        });
+    </script>
+</body>
+</html>
+

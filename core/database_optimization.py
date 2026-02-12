@@ -119,9 +119,12 @@ class DatabaseOptimizer:
                 logger.info(f"📁 Database file doesn't exist, will be created: {self.db_path}")
                 return
             
-            # Test database integrity
-            conn = sqlite3.connect(self.db_path)
+            # Test database integrity with proper connection settings
+            conn = sqlite3.connect(self.db_path, timeout=30.0, check_same_thread=False)
             try:
+                # Set threading mode to serialized for thread safety
+                conn.execute("PRAGMA journal_mode=WAL")
+                conn.execute("PRAGMA busy_timeout=30000")
                 result = conn.execute("PRAGMA integrity_check").fetchone()
                 if result and result[0] == 'ok':
                     logger.info("✅ Database integrity check passed")
@@ -209,8 +212,23 @@ class DatabaseOptimizer:
             # Create metrics persistence table
             self._create_metrics_table(cursor)
             
+            # Run migrations
+            self._run_migrations(cursor)
+            
             conn.commit()
             logger.info("Database initialized with optimized schema")
+    
+    def _run_migrations(self, cursor):
+        """Run database migrations for schema updates"""
+        try:
+            # Migration: Add stripe_customer_id to users table if it doesn't exist
+            cursor.execute("PRAGMA table_info(users)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if 'stripe_customer_id' not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT")
+                logger.info("✅ Added stripe_customer_id column to users table")
+        except Exception as e:
+            logger.warning(f"Migration warning: {e}")
     
     def _create_metrics_table(self, cursor):
         """Create table for persistent query performance metrics"""
@@ -290,6 +308,42 @@ class DatabaseOptimizer:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 is_active BOOLEAN DEFAULT 1,
                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+        
+        # Outlook OAuth tokens table (similar to Gmail)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS outlook_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                access_token TEXT NOT NULL,
+                refresh_token TEXT,
+                access_token_enc TEXT,  -- Encrypted version
+                refresh_token_enc TEXT, -- Encrypted version
+                token_type TEXT DEFAULT 'Bearer',
+                expires_at TIMESTAMP,
+                expiry_timestamp INTEGER,  -- Unix timestamp version
+                scope TEXT,  -- OAuth scopes granted
+                scopes_json TEXT,  -- OAuth scopes granted (JSON string) for encrypted tokens
+                tenant_id TEXT,  -- Azure AD tenant ID
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_active BOOLEAN DEFAULT 1,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+        
+        # OAuth states table for CSRF protection
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS oauth_states (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                state TEXT UNIQUE NOT NULL,
+                user_id INTEGER,
+                provider TEXT NOT NULL,
+                redirect_url TEXT,
+                expires_at INTEGER,
+                metadata TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         """)
         
@@ -376,6 +430,39 @@ class DatabaseOptimizer:
                 metadata TEXT,  -- JSON object for additional data
                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
                 UNIQUE(user_id, email)  -- Unique email per user
+            )
+        """)
+        
+        # Subscriptions table for Stripe subscription caching
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS subscriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                stripe_customer_id TEXT NOT NULL,
+                stripe_subscription_id TEXT UNIQUE NOT NULL,
+                status TEXT NOT NULL,  -- active, trialing, past_due, canceled, unpaid, incomplete
+                tier TEXT NOT NULL,    -- starter, growth, business, enterprise
+                billing_period TEXT,   -- monthly, annual
+                current_period_start INTEGER,
+                current_period_end INTEGER,
+                trial_end INTEGER,
+                cancel_at_period_end BOOLEAN DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+        
+        # Billing usage table for usage-based billing (emails, leads, AI, etc.)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS billing_usage (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                month TEXT NOT NULL,
+                usage_type TEXT NOT NULL,
+                quantity INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
             )
         """)
         
@@ -635,6 +722,88 @@ class DatabaseOptimizer:
             ON email_actions_log (user_id)
         """)
         
+        # Services table for user service configurations
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_services (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                service_id TEXT NOT NULL,
+                service_name TEXT NOT NULL,
+                enabled BOOLEAN DEFAULT 0,
+                status TEXT DEFAULT 'inactive',  -- 'active', 'inactive', 'error'
+                settings TEXT,  -- JSON object for service-specific settings
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_sync_at TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                UNIQUE(user_id, service_id)
+            )
+        """)
+        
+        # Email attachments table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS email_attachments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                email_id TEXT NOT NULL,
+                attachment_id TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                mime_type TEXT,
+                size INTEGER DEFAULT 0,
+                stored_path TEXT,  -- Path to stored file if downloaded
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+        
+        # Create indexes for services table
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_services_user_id 
+            ON user_services (user_id)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_services_service_id 
+            ON user_services (service_id)
+        """)
+        
+        # Create indexes for email attachments table
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_email_attachments_user_id 
+            ON email_attachments (user_id)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_email_attachments_email_id 
+            ON email_attachments (email_id)
+        """)
+        
+        # Appointments table (core primitive - real table, not flexible entity)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS appointments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT,
+                start_time TIMESTAMP NOT NULL,
+                end_time TIMESTAMP NOT NULL,
+                status TEXT NOT NULL DEFAULT 'scheduled',  -- scheduled, confirmed, completed, canceled, no_show
+                contact_id INTEGER,  -- Link to CRM contact
+                contact_name TEXT,
+                contact_email TEXT,
+                contact_phone TEXT,
+                location TEXT,
+                notes TEXT,
+                sync_to_calendar BOOLEAN DEFAULT 0,
+                reminder_24h_sent BOOLEAN DEFAULT 0,
+                reminder_2h_sent BOOLEAN DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                FOREIGN KEY (contact_id) REFERENCES leads (id) ON DELETE SET NULL
+            )
+        """)
+        
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_email_actions_timestamp 
             ON email_actions_log (timestamp)
@@ -665,6 +834,9 @@ class DatabaseOptimizer:
             ("idx_gmail_tokens_user_id", "gmail_tokens", ["user_id"]),
             ("idx_gmail_tokens_active", "gmail_tokens", ["is_active"]),
             ("idx_gmail_tokens_expires", "gmail_tokens", ["expires_at"]),
+            ("idx_outlook_tokens_user_id", "outlook_tokens", ["user_id"]),
+            ("idx_outlook_tokens_active", "outlook_tokens", ["is_active"]),
+            ("idx_outlook_tokens_expires", "outlook_tokens", ["expires_at"]),
             
             # Email sync indexes
             ("idx_email_sync_user_id", "email_sync", ["user_id"]),
@@ -745,6 +917,23 @@ class DatabaseOptimizer:
             ("idx_performance_endpoint", "performance_metrics", ["endpoint"]),
             ("idx_performance_timestamp", "performance_metrics", ["timestamp"]),
             ("idx_performance_response_time", "performance_metrics", ["response_time"]),
+            
+            # Subscriptions table indexes
+            ("idx_subscriptions_user_id", "subscriptions", ["user_id"]),
+            ("idx_subscriptions_stripe_customer", "subscriptions", ["stripe_customer_id"]),
+            ("idx_subscriptions_stripe_subscription", "subscriptions", ["stripe_subscription_id"]),
+            ("idx_subscriptions_status", "subscriptions", ["status"]),
+            
+            # Billing usage indexes
+            ("idx_billing_usage_user_month", "billing_usage", ["user_id", "month"]),
+            
+            # Appointments table indexes
+            ("idx_appointments_user_id", "appointments", ["user_id"]),
+            ("idx_appointments_start_time", "appointments", ["start_time"]),
+            ("idx_appointments_end_time", "appointments", ["end_time"]),
+            ("idx_appointments_status", "appointments", ["status"]),
+            ("idx_appointments_contact_id", "appointments", ["contact_id"]),
+            ("idx_appointments_time_range", "appointments", ["start_time", "end_time"]),
         ]
         
         for index_name, table_name, columns in indexes:
@@ -826,79 +1015,71 @@ class DatabaseOptimizer:
     
     @contextmanager
     def get_connection(self, retries=3):
-        """Get database connection with retry logic and corruption prevention"""
+        """Get database connection with retry logic"""
         conn = None
         last_error = None
         
-        for attempt in range(retries):
-            try:
-                if self.db_type == "postgresql" and self.connection_pool:
-                    conn = self.connection_pool.getconn()
-                else:
-                    # SQLite connection with corruption prevention
-                    conn = sqlite3.connect(self.db_path, timeout=30.0)
-                    conn.row_factory = sqlite3.Row  # Enable dict-like access
-                    
-                    # Production-safe PRAGMAs to prevent corruption
-                    conn.execute("PRAGMA journal_mode=DELETE")  # Use DELETE mode for stability
-                    conn.execute("PRAGMA synchronous=FULL")  # Maximum safety to prevent corruption
-                    conn.execute("PRAGMA cache_size=2000")  # Smaller cache to reduce memory pressure
-                    conn.execute("PRAGMA temp_store=MEMORY")  # Store temp tables in memory
-                    conn.execute("PRAGMA busy_timeout = 10000")  # Longer timeout for locks
-                    conn.execute("PRAGMA foreign_keys=ON")  # Enable foreign key constraints
-                    
-                    # Check integrity on connection
-                    integrity_result = conn.execute("PRAGMA integrity_check").fetchone()
-                    if integrity_result and integrity_result[0] != 'ok':
-                        logger.error(f"Database integrity check failed: {integrity_result[0]}")
-                        conn.close()
-                        conn = None
-                        raise sqlite3.DatabaseError("Database integrity check failed")
-                
-                yield conn
-                return  # Success, exit retry loop
-                
-            except (sqlite3.DatabaseError, sqlite3.OperationalError) as e:
-                last_error = e
-                if conn:
-                    try:
-                        conn.close()
-                    except:
-                        pass
-                    conn = None
-                
-                if "database disk image is malformed" in str(e):
-                    logger.error(f"Database corruption detected on attempt {attempt + 1}: {e}")
-                    if attempt < retries - 1:
-                        logger.info("Attempting database repair...")
-                        self._repair_database()
-                        continue
+        try:
+            for attempt in range(retries):
+                try:
+                    if self.db_type == "postgresql" and self.connection_pool:
+                        conn = self.connection_pool.getconn()
                     else:
-                        logger.error("All repair attempts failed")
+                        # Use check_same_thread=False for thread safety with serialized mode
+                        conn = sqlite3.connect(self.db_path, timeout=30.0, check_same_thread=False)
+                        conn.row_factory = sqlite3.Row
+                        # Use WAL mode for better concurrency and performance
+                        conn.execute("PRAGMA journal_mode=WAL")
+                        conn.execute("PRAGMA busy_timeout=30000")
+                        # Use NORMAL synchronous mode for better performance (FULL is too slow)
+                        conn.execute("PRAGMA synchronous=NORMAL")
+                        conn.execute("PRAGMA foreign_keys=ON")
+                        # Remove integrity check from every connection (too expensive)
+                        # Integrity is checked once during initialization
+                    
+                    yield conn
+                    return
+                    
+                except (sqlite3.DatabaseError, sqlite3.OperationalError) as e:
+                    if conn:
+                        try:
+                            conn.close()
+                        except:
+                            pass
+                        conn = None
+                    
+                    last_error = e
+                    if "database disk image is malformed" in str(e) and attempt < retries - 1:
+                        logger.warning(f"Database corruption detected, attempting repair...")
+                        self._repair_database()
+                    
+                    if attempt < retries - 1:
+                        time.sleep(0.1 * (attempt + 1))
+                    else:
                         break
-                elif attempt < retries - 1:
-                    logger.warning(f"Database connection failed on attempt {attempt + 1}: {e}")
-                    time.sleep(0.1 * (attempt + 1))  # Exponential backoff
-                    continue
-                else:
+                except Exception as e:
+                    if conn:
+                        try:
+                            conn.close()
+                        except:
+                            pass
+                    last_error = e
                     break
-            except Exception as e:
-                last_error = e
-                if conn:
-                    try:
-                        conn.rollback()
-                        conn.close()
-                    except:
-                        pass
-                    conn = None
-                break
-        
-        # If we get here, all attempts failed
-        if last_error:
+            
             logger.error(f"Database connection failed after {retries} attempts: {last_error}")
-            raise last_error
-        else:
-            raise sqlite3.DatabaseError("Database connection failed after all retry attempts")
+            raise last_error or sqlite3.DatabaseError("Connection failed")
+        finally:
+            # Ensure connection is closed for SQLite (PostgreSQL connections are returned to pool)
+            if conn and self.db_type != "postgresql":
+                try:
+                    conn.close()
+                except:
+                    pass
+            elif conn and self.db_type == "postgresql" and self.connection_pool:
+                try:
+                    self.connection_pool.putconn(conn)
+                except:
+                    pass
     
     def encrypt_sensitive_data(self, data: str) -> str:
         """Encrypt sensitive data using Fernet encryption"""
@@ -980,7 +1161,15 @@ class DatabaseOptimizer:
                 
                 # Record metrics only if ready
                 if self._ready:
-                    self._record_query_metrics(query, execution_time, result, True, 
+                    # Calculate rows_affected properly
+                    if fetch and query.strip().upper().startswith(('SELECT', 'PRAGMA')):
+                        # For SELECT queries, rows_affected is the number of rows returned
+                        rows_affected = len(result) if isinstance(result, list) else (1 if result else 0)
+                    else:
+                        # For INSERT/UPDATE/DELETE, use rowcount
+                        rows_affected = cursor.rowcount if hasattr(cursor, 'rowcount') else 0
+                    
+                    self._record_query_metrics(query, execution_time, rows_affected, True, 
                                              user_id=user_id, endpoint=endpoint)
                 
                 return result
@@ -1048,7 +1237,9 @@ class DatabaseOptimizer:
         try:
             import sqlite3
             import json
-            conn = sqlite3.connect(self.db_path, timeout=30.0)
+            conn = sqlite3.connect(self.db_path, timeout=30.0, check_same_thread=False)
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=30000")
             cursor = conn.cursor()
             
             # Serialize complex data types

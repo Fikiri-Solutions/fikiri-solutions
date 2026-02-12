@@ -13,43 +13,38 @@ class WebSocketService {
   private maxReconnectAttempts = 5
 
   constructor() {
-    // Disabled for now - backend doesn't support WebSocket yet
-    // this.connect()
+    // Enable WebSocket connection (will fail gracefully if backend doesn't support it)
+    this.connect()
   }
 
   private connect() {
     try {
-      // Use the same base URL as the API client
       const wsUrl = config.apiUrl.replace('/api', '')
       
       this.socket = io(wsUrl, {
-        transports: ['polling'], // Use polling only until WebSocket support is added to backend
-        timeout: 20000,
+        transports: ['websocket', 'polling'],
+        timeout: 5000,
         reconnection: true,
         reconnectionAttempts: this.maxReconnectAttempts,
         reconnectionDelay: 1000,
       })
 
       this.socket.on('connect', () => {
-        // WebSocket connected
         this.isConnected = true
         this.reconnectAttempts = 0
-        
-        // Subscribe to dashboard updates
         this.socket?.emit('subscribe_dashboard')
       })
 
       this.socket.on('disconnect', () => {
-        // WebSocket disconnected
         this.isConnected = false
       })
 
       this.socket.on('connect_error', (error) => {
-        // WebSocket connection error
+        // Silently handle connection errors (WebSocket is optional)
         this.reconnectAttempts++
-        
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-          // Max reconnection attempts reached, falling back to polling
+          // Stop trying after max attempts
+          this.socket?.disconnect()
         }
       })
 
@@ -70,7 +65,7 @@ class WebSocketService {
         window.dispatchEvent(new CustomEvent('activityUpdate', { detail: data }))
       })
 
-      this.socket.on('error', (error) => {
+      this.socket.on('error', () => {
         // WebSocket error
       })
 

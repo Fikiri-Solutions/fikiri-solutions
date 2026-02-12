@@ -7,11 +7,36 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import { pwaConfig } from './src/config/pwa'
+import { removeInvalidPrefetch } from './vite-plugin-remove-invalid-prefetch'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  test: {
+    // Exclude e2e tests (they use Playwright, not Vitest)
+    exclude: ['**/node_modules/**', '**/dist/**', '**/tests/e2e.*.spec.ts', '**/tests/**/*.spec.ts'],
+    // Include only unit tests
+    include: ['**/__tests__/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    // Use jsdom environment for DOM APIs
+    environment: 'jsdom',
+    // Setup files
+    setupFiles: ['./src/__tests__/setup.ts'],
+    // Globals
+    globals: true,
+  },
   // Ensure absolute paths for Vercel custom domain deployment
   base: '/',
-  plugins: [react(), pwaConfig],
+  // Server configuration - use fixed port 5174
+  server: {
+    port: 5174,
+    strictPort: true, // Exit if port is already in use instead of trying next port
+    host: true, // Listen on all addresses
+  },
+  plugins: [
+    react(),
+    // Remove invalid prefetch links with wildcards
+    removeInvalidPrefetch(),
+    // Only enable PWA plugin in production builds
+    ...(mode === 'production' ? [pwaConfig] : [])
+  ],
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),
@@ -66,6 +91,6 @@ export default defineConfig({
   assetsInclude: ['**/*.webp', '**/*.avif'],
   // PWA configuration
   define: {
-    __PWA_ENABLED__: true,
+    __PWA_ENABLED__: mode === 'production',
   },
-})
+}))

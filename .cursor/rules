@@ -1,0 +1,256 @@
+# Fikiri Solutions - Cursor AI Project Rules
+# These rules must be followed in every file and every change
+
+🔥 1. Absolute Project Rules (Follow in Every File)
+
+Never break existing working functionality.
+
+Minimize scope of changes — modify the smallest number of files necessary.
+
+Maintain exactly the same API contracts unless explicitly told otherwise.
+
+Respect frontend/backend separation — do not mix concerns.
+
+Always validate with the backend schema before changing the frontend.
+
+Ensure any new code is fully type-safe (TypeScript on FE, Pydantic/typing on BE).
+
+Never generate secrets, API keys, or tokens. Use env variables only.
+
+If unsure about a file, ask before modifying it.
+
+🔐 2. Authentication & Authorization Rules
+
+When modifying auth code, Cursor must enforce:
+
+2.1 JWT Rules
+
+Always use the existing JWT_SECRET_KEY from environment.
+
+Always return:
+- access_token
+- refresh_token
+- user object
+
+Tokens must be invalidated on:
+- password change
+- onboarding reset
+- email change
+
+2.2 Login/Signup Rules
+
+Login must:
+- check password hash
+- return 401 on failure
+- return user with onboarding_step
+
+Signup must:
+- check unique email
+- initialize onboarding at step 1
+- create company only when business info is collected
+
+2.3 whoami Rules
+
+Must always return the latest server state.
+
+Never rely on cached user object.
+
+🧭 3. Onboarding Flow Rules
+
+Cursor must always maintain these principles:
+
+3.1 Linear Flow
+
+Steps only: 1 → 2 → 3 → 4 → dashboard
+
+No jumping forward (2→4 is not allowed)
+
+Backwards movement is allowed.
+
+On completion, set onboarding_step = 4.
+
+3.2 Step Validation
+
+Each update must:
+- Validate allowed range (1–4)
+- Validate next_step == current_step + 1 OR backwards
+- Reject any skip attempt with STEP_SKIP_NOT_ALLOWED.
+
+3.3 Frontend Sync
+
+Frontend must:
+- Call /onboarding/status on mount
+- Call /auth/whoami after each update
+- Redirect based on onboarding_step only
+
+3.4 State Persistence
+
+Always store:
+- name
+- business info
+- settings
+- phone
+- preferences
+
+But never store passwords or tokens client-side.
+
+🛠 4. Backend Engineering Rules (Flask)
+
+4.1 Database Rules
+
+Use SQLite in dev, but always abstract via helper functions.
+
+Never return raw DB rows — always return dicts.
+
+When modifying tables:
+- check database_init.py
+- check database_optimization.py
+- ensure migrations or compatibility
+
+4.2 Redis Rules
+
+If Redis is unavailable:
+- fallback to in-memory cache
+- no crashes allowed
+
+CRITICAL: Do not change logic that would break Upstash compatibility
+
+4.3 API Rules
+
+Every endpoint must return { success, message?, data? }.
+
+Never return raw exceptions.
+
+Log errors with meaningful messages.
+
+🎨 5. Front-End Engineering Rules (React + TS)
+
+5.1 State Management
+
+Use centralized AuthContext.
+
+Never store derived values in state — compute them.
+
+Never store onboarding step in localStorage. Always fetch from server.
+
+5.2 API Calls
+
+All fetches must use config.apiUrl.
+
+Must include credentials when needed.
+
+Must detect expired JWTs and refresh.
+
+5.3 UI/UX Rules
+
+Always ensure:
+- loading state
+- error state
+- disabled buttons during submission
+
+Do not block the UI without a spinner or skeleton.
+
+5.4 Assets and Logos
+
+Always import real logo files from /src/assets/logos/
+
+Maintain consistent sizing (max-height: 32px recommended)
+
+🚀 6. Deployment Rules (Render / Local)
+
+6.1 Render Production Requirements
+
+Must use Upstash Redis URL for Redis.
+
+Must NOT use localhost URLs anywhere.
+
+Must keep:
+- API_BASE_URL
+- FRONTEND_URL
+- CORS_ORIGINS
+consistent.
+
+6.2 Hot Reloading
+
+When developing locally:
+- backend: use flask --reload
+- frontend: use npm run dev
+
+Avoid redeploying constantly — use local testing first.
+
+🔍 7. Debugging Rules
+
+When Cursor attempts to fix bugs, it must:
+
+7.1 Ask These 5 Questions Internally
+
+1. Is the error in the backend or frontend?
+2. Is it state out-of-sync?
+3. Is it a token refresh issue?
+4. Is it a database mutation issue?
+5. Is it a bad redirect or missing route?
+
+7.2 Logging
+
+All backend fixes must add logging.
+
+All critical logic paths must log:
+- user_id
+- endpoint called
+- step before
+- step after
+
+7.3 Never Guess Data Structures
+
+Always check:
+- Pydantic models
+- existing schemas
+- database_init.py
+
+🧱 8. Code Quality Rules
+
+Keep functions ≤ 40 lines when possible.
+
+Add docstrings to any non-trivial function.
+
+Make sure tests pass (pytest).
+
+Run smoke tests before approving major changes.
+
+📦 9. Cursor Behavior Rules
+
+When producing code in this project:
+
+Never refactor entire files unless explicitly asked.
+
+Prefer targeted patches/diffs.
+
+When unsure, ask the user for missing context.
+
+Always show the real file path in your patch.
+
+Test logic mentally before outputting code.
+
+Respect all existing naming conventions.
+
+No experimental frameworks unless authorized.
+
+🧠 10. Project Identity
+
+Cursor must remember:
+
+Project name: Fikiri Solutions
+
+Tech stack:
+- Backend: Flask + SQLite + Upstash Redis
+- Frontend: React + TypeScript + Vite
+- Deployment: Render (free tier)
+
+Primary modules:
+- Auth
+- Onboarding
+- Email Assistant
+- CRM
+
+Stability is more important than adding new features.
+

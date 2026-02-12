@@ -91,8 +91,9 @@ class PrivacyManager:
     def get_privacy_settings(self, user_id: int) -> Optional[PrivacySettings]:
         """Get user privacy settings"""
         try:
+            # Rulepack compliance: specific columns, not SELECT *
             settings_data = db_optimizer.execute_query(
-                "SELECT * FROM user_privacy_settings WHERE user_id = ?",
+                "SELECT id, user_id, data_retention_days, email_scanning_enabled, personal_email_exclusion, auto_labeling_enabled, lead_detection_enabled, analytics_tracking_enabled, created_at, updated_at FROM user_privacy_settings WHERE user_id = ?",
                 (user_id,)
             )
             
@@ -214,8 +215,9 @@ class PrivacyManager:
     def get_privacy_consents(self, user_id: int) -> List[PrivacyConsent]:
         """Get all privacy consents for user"""
         try:
+            # Rulepack compliance: specific columns, not SELECT *
             consents_data = db_optimizer.execute_query(
-                "SELECT * FROM privacy_consents WHERE user_id = ? ORDER BY granted_at DESC",
+                "SELECT id, user_id, consent_type, granted, consent_text, ip_address, user_agent, granted_at, revoked_at FROM privacy_consents WHERE user_id = ? ORDER BY granted_at DESC",
                 (user_id,)
             )
             
@@ -382,15 +384,16 @@ class PrivacyManager:
     def export_user_data(self, user_id: int) -> Dict[str, Any]:
         """Export all user data for GDPR compliance"""
         try:
-            # Get user profile
+            # Get user profile (rulepack compliance: specific columns, not SELECT *)
+            # Note: For GDPR export, we need all user data, but still use explicit columns
             user_data = db_optimizer.execute_query(
-                "SELECT * FROM users WHERE id = ?",
+                "SELECT id, email, name, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE id = ?",
                 (user_id,)
             )[0]
             
-            # Get leads data
+            # Get leads data (rulepack compliance: specific columns, not SELECT *)
             leads_data = db_optimizer.execute_query(
-                "SELECT * FROM leads WHERE user_id = ?",
+                "SELECT id, user_id, email, name, phone, company, source, stage, score, created_at, updated_at, last_contact, notes, tags, metadata FROM leads WHERE user_id = ?",
                 (user_id,)
             )
             
