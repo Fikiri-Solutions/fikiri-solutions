@@ -19,7 +19,7 @@ function DesktopNav() {
         <PlusGridItem key={to} className="relative flex">
           <RadiantLink
             to={to}
-            className="flex items-center px-4 py-3 text-base font-medium text-foreground hover:bg-black/5 rounded-lg"
+            className="flex items-center min-h-[44px] px-4 py-3 text-base font-medium text-foreground hover:bg-black/5 rounded-lg touch-manipulation"
           >
             {label}
           </RadiantLink>
@@ -55,7 +55,7 @@ function MobileNav() {
               rotateX: { duration: 0.3, delay: linkIndex * 0.1 },
             }}
           >
-            <RadiantLink to={to} className="text-base font-medium text-foreground">
+            <RadiantLink to={to} className="flex items-center min-h-[44px] py-3 text-base font-medium text-foreground">
               {label}
             </RadiantLink>
           </motion.div>

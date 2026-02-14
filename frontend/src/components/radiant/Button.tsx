@@ -5,20 +5,20 @@ import { RadiantLink } from './RadiantLink'
 
 const variants = {
   primary: clsx(
-    'inline-flex items-center justify-center px-4 py-2 rounded-full border border-transparent',
+    'inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-4 py-2 sm:py-2.5 rounded-full border border-transparent',
     'bg-brand-primary hover:bg-fikiri-400 text-white font-medium whitespace-nowrap',
-    'shadow-md transition-colors duration-200',
+    'shadow-md transition-colors duration-200 touch-manipulation',
     'disabled:opacity-40 disabled:cursor-not-allowed'
   ),
   secondary: clsx(
-    'inline-flex items-center justify-center px-4 py-2 rounded-full border border-transparent',
+    'inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-4 py-2 sm:py-2.5 rounded-full border border-transparent',
     'bg-white dark:bg-gray-800 ring-1 ring-border text-foreground font-medium whitespace-nowrap',
-    'hover:bg-muted transition-colors duration-200',
+    'hover:bg-muted transition-colors duration-200 touch-manipulation',
     'disabled:opacity-40 disabled:cursor-not-allowed'
   ),
   outline: clsx(
-    'inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-transparent',
-    'ring-1 ring-border text-foreground font-medium whitespace-nowrap text-sm',
+    'inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3 py-1.5 rounded-lg border border-transparent',
+    'ring-1 ring-border text-foreground font-medium whitespace-nowrap text-sm touch-manipulation',
     'hover:bg-muted transition-colors duration-200',
     'disabled:opacity-40 disabled:cursor-not-allowed'
   ),
@@ -34,7 +34,8 @@ type ButtonProps = {
 export function Button({ variant = 'primary', className, to, ...props }: ButtonProps) {
   const combinedClassName = clsx(className, variants[variant])
   if (to !== undefined) {
-    return <RadiantLink to={to} className={combinedClassName} {...(props as LinkProps)} />
+    const { to: _omit, ...linkProps } = props as LinkProps & { to?: string }
+    return <RadiantLink to={to} className={combinedClassName} {...linkProps} />
   }
   return <Headless.Button {...(props as Headless.ButtonProps)} className={combinedClassName} />
 }
