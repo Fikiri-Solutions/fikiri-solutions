@@ -96,8 +96,8 @@ npm run dev
 ### 5. Verify Installation
 
 - **Frontend**: http://localhost:3000
-- **Backend**: http://localhost:5000
-- **API Docs**: http://localhost:5000/api/docs
+- **Backend**: http://localhost:8081
+- **API Docs**: http://localhost:8081/api/docs
 
 ## 🛠️ Development Workflow
 
@@ -337,7 +337,7 @@ git push origin main
 
 ### Documentation
 
-- [API Documentation](http://localhost:5000/api/docs)
+- [API Documentation](http://localhost:8081/api/docs)
 - [Component Library](http://localhost:3000/storybook)
 - [Architecture Overview](./docs/SYSTEM_ARCHITECTURE.md)
 
@@ -357,8 +357,8 @@ git push origin main
    # Kill process on port 3000
    lsof -ti:3000 | xargs kill -9
    
-   # Kill process on port 5000
-   lsof -ti:5000 | xargs kill -9
+   # Kill process on port 8081
+   lsof -ti:8081 | xargs kill -9
    ```
 
 2. **Redis connection failed**:

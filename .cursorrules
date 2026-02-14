@@ -2,7 +2,10 @@
 # FIKIRI SOLUTIONS — ELITE ENGINEERING RULEPACK (v4.1)
 # Focus: Correctness, Performance, Zero Bloat, Readability
 # ==========================================================
-
+#
+# MULTI-TOOL: Cursor + Codex work this codebase. See COORDINATION.md
+# for shared practices, conflict avoidance, and domain boundaries.
+#
 # ==========================================================
 # 0. META-RULES (HOW CURSOR SHOULD "THINK")
 # ==========================================================

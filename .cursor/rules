@@ -1,6 +1,13 @@
 # Fikiri Solutions - Cursor AI Project Rules
 # These rules must be followed in every file and every change
-
+#
+# COORDINATION: Codex also edits this repo. See COORDINATION.md for
+# shared practices. Before editing, check git status / recent changes.
+#
+# WORK ASSIGNMENT: Roles are interchangeable - either tool can work on
+# backend or frontend. Always check git status before editing to avoid
+# conflicts. Coordinate on API contract changes.
+#
 🔥 1. Absolute Project Rules (Follow in Every File)
 
 Never break existing working functionality.

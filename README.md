@@ -1,6 +1,6 @@
-# Fikiri Solutions - AI-Powered Gmail Automation
+# Fikiri Solutions - AI-Powered Business Automation
 
-A comprehensive Gmail lead management and automation platform with AI-powered responses, CRM integration, and strategic feature flags.
+We help small and large businesses save money through automation. Gmail lead management, AI-powered responses, CRM integration, and strategic feature flags, all in one platform.
 
 ## 🚀 Quick Start
 
@@ -25,7 +25,7 @@ A comprehensive Gmail lead management and automation platform with AI-powered re
    ```
 
 5. **Access the dashboard:**
-   - Open `http://localhost:8081` in your browser
+   - Open `http://localhost:8081` in your browser (set `PORT` or `FLASK_RUN_PORT` to override)
    - Test all services through the web interface
 
 ## 🔧 Configuration
@@ -95,7 +95,7 @@ Fikiri/
 
 ### Web Application
 - `python app.py` - Start Flask web dashboard
-- Access `http://localhost:8081` for full interface
+- Access `http://localhost:8081` for full interface (set `PORT` or `FLASK_RUN_PORT` to override)
 
 ## ✅ Features
 
@@ -139,7 +139,7 @@ Control which features are enabled:
 
 ### Web Interface Testing
 1. Start the Flask app: `python app.py`
-2. Open `http://localhost:8081`
+2. Open `http://localhost:8081` (set `PORT` or `FLASK_RUN_PORT` to override)
 3. Click "Test" buttons for each service
 4. Verify all services return successful responses
 
@@ -164,7 +164,7 @@ All services are tested and working:
 2. Set up Gmail authentication: `python main_minimal.py setup`
 3. Configure environment variables
 4. Start the web application: `python app.py`
-5. Access dashboard at `http://localhost:8081`
+5. Access dashboard at `http://localhost:8081` (set `PORT` or `FLASK_RUN_PORT` to override)
 
 ### MCP Integration
 The project includes MCP configuration for AI assistant integration:
@@ -176,7 +176,7 @@ The project includes MCP configuration for AI assistant integration:
 **Current Status: FULLY OPERATIONAL** ✅
 
 All core services are working and tested:
-- Web dashboard running on port 8081
+- Web dashboard running on port 8081 (default)
 - All API endpoints responding correctly
 - Feature flags system operational
 - MCP integration ready
