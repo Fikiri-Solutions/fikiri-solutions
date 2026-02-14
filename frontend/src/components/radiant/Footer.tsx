@@ -6,6 +6,14 @@ import { RadiantLink } from './RadiantLink'
 import { FikiriLogo } from '@/components/FikiriLogo'
 import { Subheading } from './Text'
 import { AnimatedFikiriLogo } from './AnimatedFikiriLogo'
+import { ExternalLink } from 'lucide-react'
+
+const SOCIAL_LINKS = [
+  { label: 'Twitter', href: 'https://twitter.com/fikirisolutions', aria: 'Fikiri on Twitter' },
+  { label: 'Instagram', href: 'https://www.instagram.com/fikirisolutions', aria: 'Fikiri on Instagram' },
+  { label: 'Facebook', href: 'https://www.facebook.com/fikirisolutions', aria: 'Fikiri on Facebook' },
+  { label: 'LinkedIn', href: 'https://www.linkedin.com/company/fikirisolutions', aria: 'Fikiri on LinkedIn' },
+] as const
 
 function CallToAction() {
   return (
@@ -68,6 +76,25 @@ function Sitemap() {
           <SitemapLink to="/terms">Terms of service</SitemapLink>
           <SitemapLink to="/privacy">Privacy policy</SitemapLink>
         </SitemapLinks>
+      </div>
+      <div>
+        <SitemapHeading>Follow us</SitemapHeading>
+        <ul className="mt-6 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+          {SOCIAL_LINKS.map(({ label, href, aria }) => (
+            <li key={label}>
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={aria}
+                className="font-medium text-foreground hover:text-muted-foreground inline-flex items-center gap-1.5"
+              >
+                <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
+                {label}
+              </a>
+            </li>
+          ))}
+        </ul>
       </div>
     </>
   )
