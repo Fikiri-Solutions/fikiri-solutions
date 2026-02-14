@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
-import { RadiantLayout, Gradient, Container } from '../components/radiant';
+import { RadiantLayout, Gradient, Container, AnimatedBackground } from '../components/radiant';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../services/apiClient';
 import { useToast } from '../components/Toast';
@@ -51,7 +51,7 @@ const PricingPage: React.FC = () => {
           type: 'info',
           title: useTrial ? 'Starting Free Trial' : 'Starting Subscription',
           message: useTrial 
-            ? 'Card required for verification. You won\'t be charged during your 14-day trial.'
+            ? 'Card required for verification. You won\'t be charged during your 7-day trial.'
             : 'You\'ll be charged immediately and can start using all features right away.'
         });
       }
@@ -129,7 +129,7 @@ const PricingPage: React.FC = () => {
       name: 'Starter',
       price: billingPeriod === 'monthly' ? 39 : (39 * 12) - Math.round(39 * 12 * 0.10), // Exactly 10% discount
       period: billingPeriod === 'monthly' ? '/month' : '/year',
-      description: 'Perfect for small businesses getting started with AI automation',
+      description: 'Perfect for small businesses getting started with automation',
       responses_limit: 200,
       features: [
         '200 AI responses per month',
@@ -326,9 +326,13 @@ const PricingPage: React.FC = () => {
 
   return (
     <RadiantLayout>
-    <div className="min-h-screen bg-background text-foreground overflow-hidden">
+      <div className="min-h-screen bg-background text-foreground overflow-hidden relative">
+        <div className="absolute inset-0 fikiri-gradient-animated pointer-events-none">
+          <AnimatedBackground />
+        </div>
+        <div className="relative z-10">
       {/* Hero Section */}
-      <section ref={heroRef} className="relative py-16 sm:py-20">
+      <section ref={heroRef} className="relative py-16 sm:py-20 z-10">
         <Container>
           <div className="max-w-4xl mx-auto text-center">
             <motion.div
@@ -346,7 +350,7 @@ const PricingPage: React.FC = () => {
                 {purchaseType === 'trial' ? (
                   <span className="inline-flex items-center gap-2">
                     <CreditCard className="w-4 h-4" />
-                    Card required for free trial verification. No charge during trial period.
+                    Card required for free trial verification. No charge during your 7-day trial.
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-2">
@@ -364,7 +368,7 @@ const PricingPage: React.FC = () => {
               transition={{ duration: 0.8, delay: 0.2 }}
               className="flex flex-col items-center justify-center mb-8 gap-4"
             >
-              <div className="bg-card rounded-lg p-1 border border-border shadow-sm">
+              <div className="bg-card/90 backdrop-blur-sm rounded-lg p-1 border border-border shadow-sm">
                 <button
                   onClick={() => setBillingPeriod('monthly')}
                   className={`px-6 py-2 rounded-md font-medium transition-all duration-300 ${
@@ -388,7 +392,7 @@ const PricingPage: React.FC = () => {
                 </button>
               </div>
 
-              <div className="bg-card rounded-lg p-1 border border-border shadow-sm">
+              <div className="bg-card/90 backdrop-blur-sm rounded-lg p-1 border border-border shadow-sm">
                 <button
                   onClick={() => setPurchaseType('trial')}
                   className={`px-6 py-2 rounded-md font-medium transition-all duration-300 ${
@@ -398,7 +402,7 @@ const PricingPage: React.FC = () => {
                   }`}
                 >
                   <span>Free Trial</span>
-                  <span className="ml-2 text-xs bg-brand-primary/90 text-white px-2 py-1 rounded-full">14 days</span>
+                  <span className="ml-2 text-xs bg-brand-primary/90 text-white px-2 py-1 rounded-full">7 days</span>
                 </button>
                 <button
                   onClick={() => setPurchaseType('immediate')}
@@ -417,7 +421,7 @@ const PricingPage: React.FC = () => {
       </section>
 
       {/* Pricing Cards - Radiant-style gradient behind */}
-      <section ref={pricingRef} className="relative py-20">
+      <section ref={pricingRef} className="relative py-20 z-10">
         <Gradient className="absolute inset-x-2 top-24 bottom-0 rounded-3xl ring-1 ring-black/5 ring-inset opacity-30" />
         <Container className="relative">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -427,7 +431,7 @@ const PricingPage: React.FC = () => {
                 initial={{ opacity: 0, y: 30 }}
                 animate={pricingInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
                 transition={{ duration: 0.8, delay: index * 0.1 }}
-                className={`relative bg-card rounded-2xl p-8 border border-border shadow-lg ring-1 ring-black/5 transition-all duration-300 hover:shadow-xl ${
+                className={`relative bg-card/90 backdrop-blur-sm rounded-2xl p-8 border border-border shadow-lg ring-1 ring-black/5 transition-all duration-300 hover:shadow-xl ${
                   tier.highlighted
                     ? 'ring-2 ring-brand-primary/30'
                     : 'hover:border-brand-primary/30'
@@ -510,7 +514,7 @@ const PricingPage: React.FC = () => {
       </section>
 
       {/* Industry-Specific Pricing */}
-      <section ref={industriesRef} className="relative py-20 bg-muted/50">
+      <section ref={industriesRef} className="relative py-20 bg-muted/50 z-10">
         <Container>
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -533,7 +537,7 @@ const PricingPage: React.FC = () => {
                 initial={{ opacity: 0, y: 30 }}
                 animate={industriesInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
                 transition={{ duration: 0.8, delay: index * 0.1 }}
-                className="bg-card rounded-xl p-6 border border-border shadow-sm hover:border-brand-primary/30 transition-all duration-300"
+                className="bg-card/90 backdrop-blur-sm rounded-xl p-6 border border-border shadow-sm hover:border-brand-primary/30 transition-all duration-300"
               >
                 <div className="text-center mb-4">
                   <div className="text-4xl mb-2">{industry.icon}</div>
@@ -566,7 +570,7 @@ const PricingPage: React.FC = () => {
       </section>
 
       {/* Feature Comparison */}
-      <section ref={featuresRef} className="relative py-20">
+      <section ref={featuresRef} className="relative py-20 z-10">
         <Container>
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -579,7 +583,7 @@ const PricingPage: React.FC = () => {
             </h2>
           </motion.div>
 
-          <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div className="bg-card/90 backdrop-blur-sm rounded-2xl border border-border shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -638,7 +642,7 @@ const PricingPage: React.FC = () => {
       </section>
 
       {/* FAQ Section */}
-      <section className="relative py-20 bg-muted/50">
+      <section className="relative py-20 bg-muted/50 z-10">
         <Container>
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-16">
@@ -651,7 +655,7 @@ const PricingPage: React.FC = () => {
               {[
                 {
                   question: "Which plan is right for me?",
-                  answer: "Our Starter plan is great for small businesses just getting started. The Growth plan is perfect for businesses that need advanced features and higher usage limits. Business plan is ideal for established companies, and Enterprise is for large organizations with custom needs."
+                  answer: "We help businesses of all sizes save money through automation. Starter is great for small businesses getting started. Growth fits teams that need more automation and higher limits. Business is for established companies, and Enterprise is for large organizations with custom needs."
                 },
                 {
                   question: "Can I change plans anytime?",
@@ -659,14 +663,14 @@ const PricingPage: React.FC = () => {
                 },
                 {
                   question: "Do you offer a free trial?",
-                  answer: "Yes, all plans come with a 14-day free trial. No credit card required to get started."
+                  answer: "Yes, all plans come with a 7-day free trial. No credit card required to get started."
                 },
                 {
                   question: "What happens if I exceed my response limit?",
                   answer: "We'll notify you when you're approaching your limit. You can upgrade your plan or purchase additional responses as needed."
                 }
               ].map((faq, index) => (
-                <div key={index} className="bg-card rounded-xl p-6 border border-border shadow-sm">
+                <div key={index} className="bg-card/90 backdrop-blur-sm rounded-xl p-6 border border-border shadow-sm">
                   <h3 className="text-lg font-semibold text-foreground mb-3">{faq.question}</h3>
                   <p className="text-muted-foreground">{faq.answer}</p>
                 </div>
@@ -677,7 +681,7 @@ const PricingPage: React.FC = () => {
       </section>
 
       {/* CTA Section - Radiant-style gradient strip */}
-      <section className="relative py-20">
+      <section className="relative py-20 z-10">
         <Gradient className="absolute inset-0 opacity-20" />
         <Container className="relative">
           <div className="max-w-4xl mx-auto text-center">
@@ -685,7 +689,7 @@ const PricingPage: React.FC = () => {
               Ready to start automating?
             </h2>
             <p className="text-xl text-muted-foreground mb-8">
-              Get started with a free trial. No credit card required.
+              Get started with a 7-day free trial. No credit card required.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
@@ -705,7 +709,8 @@ const PricingPage: React.FC = () => {
           </div>
         </Container>
       </section>
-    </div>
+        </div>
+      </div>
     </RadiantLayout>
   );
 };

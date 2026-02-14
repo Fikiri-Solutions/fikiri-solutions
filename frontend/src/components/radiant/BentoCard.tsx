@@ -28,8 +28,8 @@ export function BentoCard({
       className={clsx(
         className,
         'group relative flex flex-col overflow-hidden rounded-2xl',
-        'bg-card shadow-sm ring-1 ring-border',
-        dark && 'bg-gray-800 ring-white/15'
+        'bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-sm ring-1 ring-black/10 dark:ring-white/15',
+        dark && 'bg-gray-800/90'
       )}
     >
       <div className="relative h-80 shrink-0">
@@ -37,16 +37,16 @@ export function BentoCard({
         {fade.includes('top') && (
           <div
             className={clsx(
-              'absolute inset-0 bg-gradient-to-b from-card to-transparent to-50%',
-              dark && 'from-gray-800'
+              'absolute inset-0 bg-gradient-to-b to-transparent to-50%',
+              dark ? 'from-gray-800' : 'from-white/80'
             )}
           />
         )}
         {fade.includes('bottom') && (
           <div
             className={clsx(
-              'absolute inset-0 bg-gradient-to-t from-card to-transparent to-50%',
-              dark && 'from-gray-800'
+              'absolute inset-0 bg-gradient-to-t to-transparent to-50%',
+              dark ? 'from-gray-800' : 'from-white/80'
             )}
           />
         )}

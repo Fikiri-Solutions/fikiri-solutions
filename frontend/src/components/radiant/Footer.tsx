@@ -5,6 +5,7 @@ import { Gradient } from './Gradient'
 import { RadiantLink } from './RadiantLink'
 import { FikiriLogo } from '@/components/FikiriLogo'
 import { Subheading } from './Text'
+import { AnimatedFikiriLogo } from './AnimatedFikiriLogo'
 
 function CallToAction() {
   return (
@@ -14,11 +15,11 @@ function CallToAction() {
         <p className="mt-6 text-3xl font-medium tracking-tight text-foreground sm:text-5xl">
           Ready to grow?
           <br />
-          Start your free trial today.
+          Start your 7-day free trial today.
         </p>
       </hgroup>
-      <p className="mx-auto mt-6 max-w-xs text-sm text-muted-foreground">
-        Connect your tools, automate workflows, and let AI help you close more deals.
+      <p className="mx-auto mt-6 max-w-sm text-sm text-muted-foreground">
+        Connect your tools, automate workflows, save money, and let AI help you close more deals.
       </p>
       <div className="mt-6">
         <Button to="/signup" className="w-full sm:w-auto">
@@ -52,7 +53,7 @@ function Sitemap() {
         <SitemapHeading>Product</SitemapHeading>
         <SitemapLinks>
           <SitemapLink to="/pricing">Pricing</SitemapLink>
-          <SitemapLink to="/integrations">Integrations</SitemapLink>
+          <SitemapLink to="/automations">Automations</SitemapLink>
         </SitemapLinks>
       </div>
       <div>
@@ -84,15 +85,15 @@ export function Footer() {
   return (
     <footer>
       <Gradient className="relative">
-        <div className="absolute inset-2 rounded-3xl bg-white/80 dark:bg-gray-900/80" />
+        <div className="absolute inset-2 rounded-3xl bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm" />
         <Container>
           <CallToAction />
           <PlusGrid className="pb-16">
             <PlusGridRow>
               <div className="grid grid-cols-2 gap-y-10 pb-6 lg:grid-cols-6 lg:gap-8">
-                <div className="col-span-2 flex">
+                <div className="col-span-2 flex items-center">
                   <PlusGridItem className="pt-6 lg:pb-6">
-                    <FikiriLogo size="xs" variant="circle" className="h-9 w-auto" />
+                    <AnimatedFikiriLogo />
                   </PlusGridItem>
                 </div>
                 <div className="col-span-2 grid grid-cols-2 gap-x-8 gap-y-12 lg:col-span-4 lg:grid-cols-subgrid lg:pt-6">

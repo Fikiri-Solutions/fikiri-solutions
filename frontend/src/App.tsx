@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Suspense, useMemo, lazy } from 'react'
 import { HelmetProvider } from 'react-helmet-async'
 import { Dashboard } from './pages/Dashboard'
@@ -43,6 +43,7 @@ import { ScrollToTop } from './components/ScrollToTop'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { PageLoader } from './components/PageLoader'
 import { ProtectedRoute, AuthRoute, OnboardingRoute } from './components/RouteGuard'
+import { LandingThemeGuard } from './components/LandingThemeGuard'
 import { getFeatureConfig } from './config'
 import { useWarmRoutes } from './hooks/useWarmRoutes'
 import { AccessibilityProvider } from './components/AccessibilityProvider'
@@ -78,6 +79,7 @@ function App() {
             }}
           >
           <ThemeProvider>
+            <LandingThemeGuard />
             <CustomizationProvider>
               <ActivityProvider>
                 <AuthProvider>
@@ -208,11 +210,7 @@ function App() {
                               <Layout><ChatbotBuilder /></Layout>
                             </ProtectedRoute>
                           } />
-                          <Route path="/integrations" element={
-                            <ProtectedRoute>
-                              <Layout><Integrations /></Layout>
-                            </ProtectedRoute>
-                          } />
+                          <Route path="/integrations" element={<Navigate to="/automations" replace />} />
                           <Route path="/integrations/gmail" element={
                             <ProtectedRoute>
                               <Layout><GmailConnect /></Layout>

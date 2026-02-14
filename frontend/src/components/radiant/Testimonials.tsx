@@ -34,7 +34,7 @@ export function Testimonials() {
           {testimonials.map(({ name, title, quote }) => (
             <blockquote
               key={name}
-              className="rounded-2xl bg-card p-8 ring-1 ring-border"
+              className="rounded-2xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm p-8 ring-1 ring-black/10 dark:ring-white/15"
             >
               <p className="text-foreground text-lg font-medium">{quote}</p>
               <footer className="mt-6">

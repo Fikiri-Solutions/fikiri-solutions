@@ -1,12 +1,15 @@
 import React from 'react'
-import { RadiantLayout, Container, Gradient } from '../components/radiant'
+import { RadiantLayout, Container, Gradient, AnimatedBackground } from '../components/radiant'
 
 export const About: React.FC = () => {
   return (
     <RadiantLayout>
-      <div className="min-h-screen bg-background text-foreground">
+      <div className="min-h-screen bg-background text-foreground relative">
+        <div className="absolute inset-0 fikiri-gradient-animated">
+          <AnimatedBackground />
+        </div>
         {/* Hero */}
-        <section className="relative py-16 sm:py-20">
+        <section className="relative py-16 sm:py-20 z-10">
           <Gradient className="absolute inset-x-2 top-0 bottom-0 rounded-3xl ring-1 ring-black/5 ring-inset opacity-20" />
           <Container className="relative">
             <div className="max-w-3xl mx-auto text-center">
@@ -14,16 +17,16 @@ export const About: React.FC = () => {
                 About Fikiri Solutions
               </h1>
               <p className="text-xl text-muted-foreground">
-                AI-Powered Business Automation Platform
+                We help small and large businesses save money through automation.
               </p>
             </div>
           </Container>
         </section>
 
         {/* Business Information */}
-        <section className="py-16">
+        <section className="py-16 relative z-10">
           <Container>
-            <div className="bg-card rounded-2xl border border-border shadow-sm p-8 mb-12">
+            <div className="bg-card/90 backdrop-blur-sm rounded-2xl border border-border shadow-sm p-8 mb-12">
               <h2 className="text-2xl font-semibold text-foreground mb-6">
                 Business Information
               </h2>
@@ -68,7 +71,7 @@ export const About: React.FC = () => {
               Our Services
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-              <div className="text-center bg-card rounded-2xl border border-border shadow-sm p-8">
+              <div className="text-center bg-card/90 backdrop-blur-sm rounded-2xl border border-border shadow-sm p-8">
                 <div className="bg-brand-primary/15 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
                   <span className="text-2xl">📧</span>
                 </div>
@@ -79,7 +82,7 @@ export const About: React.FC = () => {
                   AI-powered email processing and response automation
                 </p>
               </div>
-              <div className="text-center bg-card rounded-2xl border border-border shadow-sm p-8">
+              <div className="text-center bg-card/90 backdrop-blur-sm rounded-2xl border border-border shadow-sm p-8">
                 <div className="bg-brand-primary/15 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
                   <span className="text-2xl">👥</span>
                 </div>
@@ -90,7 +93,7 @@ export const About: React.FC = () => {
                   Customer relationship management and lead tracking
                 </p>
               </div>
-              <div className="text-center bg-card rounded-2xl border border-border shadow-sm p-8">
+              <div className="text-center bg-card/90 backdrop-blur-sm rounded-2xl border border-border shadow-sm p-8">
                 <div className="bg-brand-primary/15 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
                   <span className="text-2xl">🤖</span>
                 </div>
@@ -108,7 +111,7 @@ export const About: React.FC = () => {
               Industry Specializations
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center p-6 bg-card border border-border rounded-2xl shadow-sm">
+              <div className="text-center p-6 bg-card/90 backdrop-blur-sm border border-border rounded-2xl shadow-sm">
                 <h3 className="text-lg font-medium text-foreground mb-2">
                   Landscaping
                 </h3>
@@ -116,7 +119,7 @@ export const About: React.FC = () => {
                   Automated client communication and project management
                 </p>
               </div>
-              <div className="text-center p-6 bg-card border border-border rounded-2xl shadow-sm">
+              <div className="text-center p-6 bg-card/90 backdrop-blur-sm border border-border rounded-2xl shadow-sm">
                 <h3 className="text-lg font-medium text-foreground mb-2">
                   Restaurants
                 </h3>
@@ -124,7 +127,7 @@ export const About: React.FC = () => {
                   Order management and customer service automation
                 </p>
               </div>
-              <div className="text-center p-6 bg-card border border-border rounded-2xl shadow-sm">
+              <div className="text-center p-6 bg-card/90 backdrop-blur-sm border border-border rounded-2xl shadow-sm">
                 <h3 className="text-lg font-medium text-foreground mb-2">
                   Medical Practices
                 </h3>

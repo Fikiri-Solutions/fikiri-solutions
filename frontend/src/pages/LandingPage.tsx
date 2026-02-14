@@ -101,7 +101,7 @@ const LandingPage: React.FC = () => {
 
   const features = [
     "No credit card required",
-    "14-day free trial",
+    "7-day free trial",
     "Cancel anytime",
     "24/7 customer support"
   ]
@@ -515,7 +515,7 @@ const LandingPage: React.FC = () => {
               Start Automating Today
             </h2>
             <p className="text-xl text-white mb-8">
-              Free trial, no credit card required. Join thousands of businesses already saving time with AI.
+              7-day free trial, no credit card required. Join thousands of businesses already saving time with AI.
             </p>
             <motion.div
               initial={{ opacity: 0, y: 30 }}

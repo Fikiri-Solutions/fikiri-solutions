@@ -79,37 +79,61 @@ export const Login: React.FC = () => {
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    if (import.meta.env.DEV) {
-      console.log('🎯 handleSubmit called!', { email: email ? 'provided' : 'missing', passwordLength: password.length })
-    }
+    console.log('🎯 handleSubmit called!', { 
+      email: email ? 'provided' : 'missing', 
+      passwordLength: password.length,
+      emailValue: email,
+      timestamp: new Date().toISOString()
+    })
     e.preventDefault()
+    e.stopPropagation()
+    
     // Validate inputs
     setError('')
 
     if (!email || !password) {
+      console.warn('⚠️ Validation failed: missing email or password')
       setError('Please enter both email and password')
       return
     }
     
     if (!validateEmail(email)) {
+      console.warn('⚠️ Validation failed: invalid email format')
       setError('Please enter a valid email address')
       return
     }
     
     if (password.length < 6) {
+      console.warn('⚠️ Validation failed: password too short')
       setError('Password must be at least 6 characters')
       return
     }
     
+    console.log('✅ Validation passed, starting login...')
+    
     startTransition(() => {
       const performLogin = async () => {
-      if (import.meta.env.DEV) {
-        console.log('🚀 Login attempt started:', { email: email ? 'provided' : 'missing', hasPassword: !!password })
-      }
+      console.log('🚀 Login attempt started:', { 
+        email: email ? 'provided' : 'missing', 
+        hasPassword: !!password,
+        timestamp: new Date().toISOString()
+      })
       try {
         // Attempt login via AuthContext to stay in sync with RouteGuard
-        console.log('📞 Calling contextLogin...')
-        const result = await contextLogin(email, password)
+        console.log('📞 Calling contextLogin...', { email, passwordLength: password.length })
+        let result
+        try {
+          result = await contextLogin(email, password)
+        } catch (loginError: any) {
+          console.error('❌ contextLogin threw an error:', loginError)
+          console.error('❌ Error details:', {
+            message: loginError?.message,
+            stack: loginError?.stack,
+            response: loginError?.response?.data
+          })
+          setError(loginError?.message || 'Login failed. Please check your credentials.')
+          return
+        }
         console.log('📞 contextLogin result:', { success: result.success, hasUser: !!result.user, error: result.error })
         if (!result.success) {
           setError(result.error || 'Login failed. Please try again.')
@@ -149,11 +173,23 @@ export const Login: React.FC = () => {
           ? redirectParam
           : null
 
-        // Wait a moment for auth state to fully update in context
-        await new Promise(resolve => setTimeout(resolve, 150))
+        // Wait a moment for auth state to fully update in context and localStorage to be written
+        await new Promise(resolve => setTimeout(resolve, 300))
         
         // Re-check user from auth context (may have been updated)
         const currentUser = result.user ?? user
+        
+        // Double-check localStorage is set (critical for page reload)
+        const verifyUser = localStorage.getItem('fikiri-user')
+        const verifyUserId = localStorage.getItem('fikiri-user-id')
+        if (!verifyUser || !verifyUserId) {
+          console.error('❌ localStorage not set after login, retrying...')
+          // Retry saving to localStorage
+          if (result.user) {
+            localStorage.setItem('fikiri-user', JSON.stringify(result.user))
+            localStorage.setItem('fikiri-user-id', result.user.id.toString())
+          }
+        }
         
         // Determine final destination
         let finalDestination = '/dashboard'
@@ -171,27 +207,31 @@ export const Login: React.FC = () => {
           }
         }
         
-        // Verify localStorage one more time before redirect
-        const verifyBeforeRedirect = localStorage.getItem('fikiri-user')
-        const verifyUserId = localStorage.getItem('fikiri-user-id')
+        // Verify localStorage one more time before redirect (reuse variables from earlier check)
         console.log('🔍 Final localStorage check before redirect:', {
-          hasUser: !!verifyBeforeRedirect,
+          hasUser: !!verifyUser,
           hasUserId: !!verifyUserId,
-          userLength: verifyBeforeRedirect?.length || 0
+          userLength: verifyUser?.length || 0
         })
         
-        if (!verifyBeforeRedirect || !verifyUserId) {
+        if (!verifyUser || !verifyUserId) {
           console.error('❌ CRITICAL: localStorage is empty before redirect! Login will fail.')
           setError('Login succeeded but failed to save session. Please try again.')
           return
         }
         
-        // Use window.location for hard redirect to completely break any loops
-        // This forces a full page reload with fresh auth state
+        // Ensure auth context is updated before redirect
+        // Force a re-check of auth status to update context state
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Use React Router navigate instead of window.location to avoid race conditions
+        // This allows RouteGuard to properly check auth state from context
         console.log('✅ Login successful, redirecting to:', finalDestination)
         console.log('User data:', currentUser)
         console.log('✅ localStorage verified - proceeding with redirect')
-        window.location.href = finalDestination
+        
+        // Clear any redirect params from URL before navigating
+        navigate(finalDestination, { replace: true })
         
       } catch (error: any) {
         if (error.message?.includes('429') || error.message?.includes('rate limit') || error.message?.includes('Too many login attempts')) {
