@@ -85,7 +85,7 @@ app.py (250 lines - Main)
 │   ├── core/billing_api → /api/billing/*
 │   ├── core/webhook_api → /api/webhooks/*
 │   ├── core/crm_completion_api → /api/crm/* (complement)
-│   └── core/monitoring_dashboard_api → /api/dashboard/*
+│   └── analytics/monitoring_api → /api/monitoring/*
 ```
 
 ## Service Initialization Order

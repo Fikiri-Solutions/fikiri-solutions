@@ -1,6 +1,8 @@
 # Fikiri Documentation
 
-Quick reference for project documentation. Root-level docs: [`COMPLETE_CODEBASE_WALKTHROUGH.md`](../COMPLETE_CODEBASE_WALKTHROUGH.md), [`SIMPLICITY_RULE.md`](../SIMPLICITY_RULE.md), [`GOOGLE_APIS_REQUIRED.md`](../GOOGLE_APIS_REQUIRED.md), [`PINECONE_SETUP.md`](../PINECONE_SETUP.md).
+Quick reference for project documentation. Root-level docs: [`COMPLETE_CODEBASE_WALKTHROUGH.md`](../COMPLETE_CODEBASE_WALKTHROUGH.md), [`SIMPLICITY_RULE.md`](../SIMPLICITY_RULE.md), [`GOOGLE_APIS_REQUIRED.md`](../GOOGLE_APIS_REQUIRED.md), [`PINECONE_SETUP.md`](../PINECONE_SETUP.md), [`COORDINATION.md`](../COORDINATION.md) (Cursor + Codex).
+
+**Multi-tool:** [`COORDINATION.md`](../COORDINATION.md) — shared rules for Cursor and Codex working in unison.
 
 ## Setup & Configuration
 
@@ -29,6 +31,13 @@ Quick reference for project documentation. Root-level docs: [`COMPLETE_CODEBASE_
 | [FOUNDER_ANALYSIS_INDUSTRY_PLAN.md](FOUNDER_ANALYSIS_INDUSTRY_PLAN.md) | Founder analysis and concerns |
 | [CRITICAL_INTEGRATIONS_PLAN.md](CRITICAL_INTEGRATIONS_PLAN.md) | Integration priority matrix |
 | [MOBILE_AND_INTEGRATION_STRATEGY.md](MOBILE_AND_INTEGRATION_STRATEGY.md) | Mobile and integration strategy |
+
+## Frontend
+
+| Doc | Description |
+|-----|-------------|
+| [FRONTEND_UX_PATTERNS.md](FRONTEND_UX_PATTERNS.md) | Tooltips, modals, scroll—consistent UX patterns |
+| [FRONTEND_AUTH_CHECKLIST.md](FRONTEND_AUTH_CHECKLIST.md) | Frontend auth checklist |
 
 ## Implementation Reference
 

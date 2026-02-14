@@ -233,6 +233,28 @@ print(f"Active threads: {threading.active_count()}")
 
 ---
 
+### **6. Vector Search Lazy Loading** ✅ (Jan 2026)
+
+**Status:** Applied in `core/chatbot_smart_faq_api.py`
+
+**Problem:** `MinimalVectorSearch()` was instantiated at import time, triggering `sentence_transformers` (PyTorch) or Pinecone SDK imports right after "Multi-channel support system initialized", causing `[mutex.cc] RAW: Lock blocking` and app startup hang.
+
+**Fix:** Lazy-initialize via `get_vector_search()` on first API use instead of at module load.
+
+```python
+# Before (blocking at import):
+vector_search = MinimalVectorSearch()
+
+# After (lazy on first request):
+def get_vector_search() -> MinimalVectorSearch:
+    global _vector_search
+    if _vector_search is None:
+        _vector_search = MinimalVectorSearch()
+    return _vector_search
+```
+
+---
+
 ## 📚 **References**
 
 - [SQLite WAL Mode](https://www.sqlite.org/wal.html)
