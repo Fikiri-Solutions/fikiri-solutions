@@ -239,7 +239,7 @@ export const BillingPage: React.FC = () => {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4">
+      <div className="bg-gray-50 dark:bg-gray-900 py-12 px-4">
         <div className="max-w-4xl mx-auto">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
             <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -258,7 +258,7 @@ export const BillingPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4">
+    <div className="bg-gray-50 dark:bg-gray-900 py-12 px-4">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Billing & Subscription</h1>
@@ -286,7 +286,7 @@ export const BillingPage: React.FC = () => {
                     Active
                   </span>
                 ) : (
-                  <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-medium">
+                  <span className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-full text-sm font-medium">
                     {subscription.subscription?.status || 'Unknown'}
                   </span>
                 )}
@@ -334,7 +334,7 @@ export const BillingPage: React.FC = () => {
                 Manage Payment Methods
               </button>
               {subscription.subscription?.cancel_at_period_end ? (
-                <span className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm">
+                <span className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg text-sm">
                   Cancels on {subscription.subscription?.current_period_end ? formatDate(subscription.subscription.current_period_end) : 'N/A'}
                 </span>
               ) : (

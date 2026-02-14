@@ -5,6 +5,7 @@ interface PieData {
   name: string
   value: number
   color?: string
+  [key: string]: unknown
 }
 
 interface ServiceDistributionChartProps {

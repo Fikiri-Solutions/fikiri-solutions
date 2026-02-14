@@ -44,9 +44,9 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service, compact = fal
     <div className={cn("card hover:shadow-md transition-shadow duration-200", compact && "p-2")}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <h3 className={cn("font-medium text-gray-900", compact ? "text-xs" : "text-sm")}>{service.name}</h3>
+          <h3 className={cn("font-medium text-gray-900 dark:text-white", compact ? "text-xs" : "text-sm")}>{service.name}</h3>
           {!compact && (
-            <p className="mt-1 text-xs text-gray-600">{service.description}</p>
+            <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">{service.description}</p>
           )}
         </div>
         <StatusIcon status={statusType} />

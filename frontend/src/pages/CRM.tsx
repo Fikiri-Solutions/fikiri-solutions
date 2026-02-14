@@ -120,6 +120,7 @@ export const CRM: React.FC = () => {
 
     const previous = JSON.parse(JSON.stringify(pipeline))
     setPipeline(prev => {
+      if (!result.destination) return prev
       const updated = { ...prev }
       const sourceItems = Array.from(updated[sourceStage] || [])
       const destItems = sourceStage === destStage ? sourceItems : Array.from(updated[destStage] || [])
@@ -171,22 +172,22 @@ export const CRM: React.FC = () => {
   const getStageColor = (stage: string) => {
     switch (stage) {
       case 'new':
-        return 'bg-blue-100 text-blue-800'
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
       case 'qualified':
-        return 'bg-green-100 text-green-800'
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
       case 'contacted':
-        return 'bg-yellow-100 text-yellow-800'
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
       case 'converted':
-        return 'bg-purple-100 text-purple-800'
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
     }
   }
 
   const getScoreColor = (score: number) => {
-    if (score >= 8) return 'text-green-600'
-    if (score >= 6) return 'text-yellow-600'
-    return 'text-red-600'
+    if (score >= 8) return 'text-green-600 dark:text-green-400'
+    if (score >= 6) return 'text-yellow-600 dark:text-yellow-400'
+    return 'text-red-600 dark:text-red-400'
   }
 
   return (
@@ -224,7 +225,7 @@ export const CRM: React.FC = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <Users className="h-6 w-6 text-brand-primary" />
@@ -238,7 +239,7 @@ export const CRM: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <Star className="h-6 w-6 text-brand-secondary" />
@@ -254,7 +255,7 @@ export const CRM: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <Mail className="h-6 w-6 text-brand-accent" />
@@ -270,7 +271,7 @@ export const CRM: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <Building className="h-6 w-6 text-brand-warning" />
@@ -378,7 +379,7 @@ export const CRM: React.FC = () => {
       </div>
 
       {/* Filters and Search */}
-      <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
           <div className="flex-1 max-w-lg">
             <div className="relative">
@@ -415,8 +416,8 @@ export const CRM: React.FC = () => {
       </div>
 
       {/* Leads Table */}
-      <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md border border-brand-text/10">
-        <div className="px-6 py-4 border-b border-brand-text/10">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-medium text-brand-text dark:text-white">Leads ({filteredLeads.length})</h3>
         </div>
         
@@ -506,7 +507,7 @@ export const CRM: React.FC = () => {
       {/* Add Lead Modal */}
       {showAddLeadModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border border-brand-text/10 w-96 shadow-lg rounded-md bg-brand-background dark:bg-gray-800">
+          <div className="relative top-20 mx-auto p-5 border border-gray-200 dark:border-gray-700 w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-brand-text dark:text-white mb-4">Add New Lead</h3>
               
@@ -584,7 +585,7 @@ export const CRM: React.FC = () => {
               <div className="flex justify-end space-x-3 mt-6">
                 <button
                   onClick={() => setShowAddLeadModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-brand-text bg-brand-background/50 hover:bg-brand-background/80 border border-brand-text/20 rounded-lg"
+                  className="px-4 py-2 text-sm font-medium text-brand-text dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-lg"
                 >
                   Cancel
                 </button>

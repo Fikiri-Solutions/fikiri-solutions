@@ -180,16 +180,29 @@ class ApiClient {
         // Add JWT token to requests if available
         if (typeof window !== 'undefined') {
           const userData = localStorage.getItem('fikiri-user')
+          const token = localStorage.getItem('fikiri-token')
+          
           if (userData) {
             try {
               const user = JSON.parse(userData)
-              // Get token from user data or separate storage
-              const token = localStorage.getItem('fikiri-token') || user.token
-              if (token) {
-                config.headers.Authorization = `Bearer ${token}`
+              // Get token from separate storage or user data
+              const authToken = token || user.token || user.access_token
+              if (authToken) {
+                config.headers.Authorization = `Bearer ${authToken}`
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`[apiClient] Added auth token to ${config.method?.toUpperCase()} ${config.url}`)
+                }
+              } else {
+                if (process.env.NODE_ENV === 'development') {
+                  console.warn(`[apiClient] No auth token found for ${config.method?.toUpperCase()} ${config.url}`)
+                }
               }
             } catch (e) {
-              // Ignore parsing errors
+              console.error('[apiClient] Error parsing user data:', e)
+            }
+          } else {
+            if (process.env.NODE_ENV === 'development' && config.url && !config.url.includes('/auth/')) {
+              console.warn(`[apiClient] No user data in localStorage for ${config.method?.toUpperCase()} ${config.url}`)
             }
           }
         }
@@ -206,28 +219,49 @@ class ApiClient {
     // Add response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => {
+        // Log login responses in development
+        if (process.env.NODE_ENV === 'development' && response.config.url?.includes('/auth/login')) {
+          console.log('[apiClient] Login response received:', {
+            status: response.status,
+            data: response.data,
+            hasSuccess: response.data?.success,
+            hasData: !!response.data?.data,
+            hasUser: !!response.data?.data?.user,
+            hasToken: !!response.data?.data?.access_token
+          })
+        }
         // API response logged
         return response
       },
       (error) => {
         // Handle 401 Unauthorized errors
         if (error.response?.status === 401) {
-          // Clear any stored auth data
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('fikiri-user')
-            localStorage.removeItem('fikiri-token')
-            localStorage.removeItem('fikiri-user-id')
-            
-            // Dispatch event for auth context to handle
-            window.dispatchEvent(new CustomEvent('auth:unauthorized'))
-            
-            // Redirect to login if not already there
-            // Don't redirect /inbox - it handles its own auth state
-            if (window.location.pathname !== '/login' && 
-                !window.location.pathname.startsWith('/signup') && 
-                window.location.pathname !== '/inbox') {
-              window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname)
+          // Don't clear localStorage if we're on login page (might be during login flow)
+          // or if the request was to /auth/login (login endpoint itself)
+          const isLoginRequest = error.config?.url?.includes('/auth/login')
+          const isOnLoginPage = window.location.pathname === '/login'
+          
+          if (!isLoginRequest && !isOnLoginPage) {
+            // Clear any stored auth data
+            if (typeof window !== 'undefined') {
+              console.log('[apiClient] 401 error - clearing localStorage and redirecting to login')
+              localStorage.removeItem('fikiri-user')
+              localStorage.removeItem('fikiri-token')
+              localStorage.removeItem('fikiri-user-id')
+              
+              // Dispatch event for auth context to handle
+              window.dispatchEvent(new CustomEvent('auth:unauthorized'))
+              
+              // Redirect to login if not already there
+              // Don't redirect /inbox - it handles its own auth state
+              if (window.location.pathname !== '/login' && 
+                  !window.location.pathname.startsWith('/signup') && 
+                  window.location.pathname !== '/inbox') {
+                window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname)
+              }
             }
+          } else {
+            console.log('[apiClient] 401 error on login endpoint or login page - NOT clearing localStorage')
           }
         }
         
@@ -299,10 +333,21 @@ class ApiClient {
   async getMetrics(): Promise<MetricData> {
     try {
       // Use dashboard/metrics endpoint (getMetrics is legacy, use getDashboardMetrics instead)
-      const response = await this.client.get('/dashboard/metrics')
-      return response.data
-    } catch (error) {
-      console.error('Failed to fetch metrics:', error)
+      const userId = this.getUserId()
+      console.log('[apiClient] Fetching metrics for user:', userId)
+      const response = await this.client.get('/dashboard/metrics', {
+        params: userId ? { user_id: userId } : undefined
+      })
+      console.log('[apiClient] Metrics response:', response.data)
+      // Handle both response formats: { success, data, ... } or direct data
+      return response.data?.data || response.data || {}
+    } catch (error: any) {
+      console.error('[apiClient] Failed to fetch metrics:', error)
+      console.error('[apiClient] Error details:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      })
       // Fallback to mock data if API fails
       return {
         totalEmails: Math.floor(Math.random() * 1000) + 100,
@@ -639,7 +684,7 @@ class ApiClient {
   }
 
   async runAutomationPreset(presetId: string): Promise<any> {
-    const response = await this.client.post('/automation/test', {
+    const response = await this.client.post('/automation/test/preset', {
       preset_id: presetId
     })
     return response.data

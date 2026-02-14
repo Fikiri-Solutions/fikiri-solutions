@@ -56,13 +56,22 @@ export const Dashboard: React.FC = () => {
     enabled: true,
   })
 
-  const { data: metricsData = mockMetrics, isLoading: metricsLoading } = useQuery({
+  const { data: metricsData = mockMetrics, isLoading: metricsLoading, error: metricsError } = useQuery({
     queryKey: ['metrics'],
-    queryFn: () => features.useMockData ? Promise.resolve(mockMetrics) : apiClient.getMetrics(),
+    queryFn: () => {
+      console.log('[Dashboard] Fetching metrics...')
+      return features.useMockData ? Promise.resolve(mockMetrics) : apiClient.getMetrics()
+    },
     staleTime: 30 * 1000, // 30 seconds - metrics update more frequently
     gcTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 60 * 1000, // Auto-refresh every minute
     enabled: true,
+    onError: (error) => {
+      console.error('[Dashboard] Error fetching metrics:', error)
+    },
+    onSuccess: (data) => {
+      console.log('[Dashboard] Metrics loaded:', data)
+    }
   })
 
   const { data: activityData = mockActivity, isLoading: activityLoading } = useQuery({
@@ -153,7 +162,7 @@ export const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
+    <div className="bg-white dark:bg-gray-900">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
@@ -188,11 +197,26 @@ export const Dashboard: React.FC = () => {
               <MetricCardSkeleton />
               <MetricCardSkeleton />
             </>
+          ) : metricsError ? (
+            <div className="col-span-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                <div>
+                  <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Unable to load dashboard metrics</p>
+                  <p className="text-xs text-yellow-600 dark:text-yellow-300 mt-1">
+                    {metricsError instanceof Error ? metricsError.message : 'Please check your connection and try again.'}
+                  </p>
+                  <p className="text-xs text-yellow-600 dark:text-yellow-300 mt-1">
+                    Check browser console for details. Using mock data for now.
+                  </p>
+                </div>
+              </div>
+            </div>
           ) : (
             <>
               <EnhancedMetricCard
                 title="Total Leads"
-                value={metrics?.activeLeads || 0}
+                value={metrics?.activeLeads || metrics?.leads?.total || 0}
                 icon={<Users className="h-5 w-5" />}
                 onClick={() => navigate('/crm')}
                 description="Total active leads in your CRM"
@@ -204,7 +228,7 @@ export const Dashboard: React.FC = () => {
               
               <EnhancedMetricCard
                 title="Emails Processed"
-                value={metrics?.totalEmails || 0}
+                value={metrics?.totalEmails || metrics?.emails?.total || 0}
                 icon={<Mail className="h-5 w-5" />}
                 onClick={() => navigate('/inbox')}
                 description="Total emails processed by the system"
@@ -216,7 +240,7 @@ export const Dashboard: React.FC = () => {
               
               <EnhancedMetricCard
                 title="AI Responses"
-                value={metrics?.aiResponses || 0}
+                value={metrics?.aiResponses || metrics?.ai?.total || 0}
                 icon={<Brain className="h-5 w-5" />}
                 onClick={() => navigate('/ai')}
                 description="AI-generated email responses"
@@ -279,7 +303,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Service Distribution Chart */}
-        <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8 border border-brand-text/10">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8 border border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-brand-text dark:text-white mb-4 flex items-center">
             <div className="w-3 h-3 bg-brand-accent rounded-full mr-2"></div>
             Service Distribution

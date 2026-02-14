@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { config } from '../config'
 import { apiClient } from '../services/apiClient'
 
 export interface User {
@@ -12,6 +11,7 @@ export interface User {
   business_email?: string
   industry?: string
   team_size?: string
+  timezone?: string
   is_active: boolean
   email_verified: boolean
   created_at: string
@@ -96,7 +96,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               userId = zustandUser.id.toString()
               // Save in AuthContext format for future use
               localStorage.setItem('fikiri-user', userData)
-              localStorage.setItem('fikiri-user-id', userId)
+              if (userId) localStorage.setItem('fikiri-user-id', userId)
             }
           } catch (error) {
             console.error('❌ Error parsing Zustand auth data:', error)
@@ -156,6 +156,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [authState, setAuthState] = useState<AuthState>(getInitialAuthState())
   
   const navigate = useNavigate()
+  
+  // Monitor localStorage for unexpected clears (development only)
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    const originalSetItem = Storage.prototype.setItem
+    const originalRemoveItem = Storage.prototype.removeItem
+    const originalClear = Storage.prototype.clear
+    
+    Storage.prototype.setItem = function(key: string, value: string) {
+      if (key.startsWith('fikiri-')) {
+        console.log(`[localStorage] SET ${key}:`, value.substring(0, 50) + (value.length > 50 ? '...' : ''))
+      }
+      return originalSetItem.call(this, key, value)
+    }
+    
+    Storage.prototype.removeItem = function(key: string) {
+      if (key.startsWith('fikiri-')) {
+        console.log(`[localStorage] REMOVE ${key}`, new Error().stack)
+      }
+      return originalRemoveItem.call(this, key)
+    }
+    
+    Storage.prototype.clear = function() {
+      console.log(`[localStorage] CLEAR ALL`, new Error().stack)
+      return originalClear.call(this)
+    }
+  }
 
   // Define clearAuthData first (used by checkAuthStatus)
   const clearAuthData = () => {
@@ -208,7 +234,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               userId = zustandUser.id.toString()
               // Save in AuthContext format for future use
               localStorage.setItem('fikiri-user', userData)
-              localStorage.setItem('fikiri-user-id', userId)
+              if (userId) localStorage.setItem('fikiri-user-id', userId)
             }
           } catch (error) {
             console.error('❌ Error parsing Zustand auth data:', error)
@@ -293,12 +319,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Only run once on mount
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; user?: User }> => {
+    console.log('🔐 [AuthContext] login() called', { email, hasPassword: !!password })
     try {
+      console.log('🔐 [AuthContext] Calling apiClient.login...')
       const data = await apiClient.login(email, password)
+      console.log('🔐 [AuthContext] apiClient.login returned:', data)
 
       // Handle rate limiting (if backend returns 429, axios throws; handle in catch if needed)
       if ((data as any)?.retry_after != null) {
@@ -310,6 +338,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       
       console.log('🔍 Login response:', JSON.stringify(data, null, 2))
+      console.log('🔍 Login response structure:', {
+        hasSuccess: 'success' in data,
+        success: data.success,
+        hasData: 'data' in data,
+        dataKeys: data.data ? Object.keys(data.data) : null,
+        hasUser: !!data.data?.user,
+        hasAccessToken: !!data.data?.access_token,
+        fullData: data.data,
+        fullResponse: data
+      })
 
       if (data.success) {
         // Backend returns: { success: true, data: { user: {...}, access_token: "..." } }
@@ -318,6 +356,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const accessToken = data.data?.access_token
         
         console.log('🔍 Extracted user:', user)
+        console.log('🔍 Extracted user details:', user ? {
+          id: user.id,
+          email: user.email,
+          hasId: !!user.id,
+          hasEmail: !!user.email
+        } : 'NO USER')
         if (import.meta.env.DEV) {
           console.log('🔍 Extracted token:', accessToken ? 'present' : 'missing')
         }
@@ -327,7 +371,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.error('❌ Invalid user data in login response. Full response:', data)
           console.error('❌ Tried to extract from:', {
             'data.data?.user': data.data?.user,
-            'data.user': data.user,
             'data.data': data.data
           })
           return { 
@@ -339,7 +382,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Store user data and tokens (only in browser)
         if (typeof window !== 'undefined') {
           try {
+            console.log('💾 About to save to localStorage:', {
+              userId: user.id,
+              email: user.email,
+              userObject: user
+            })
+            
             const userJson = JSON.stringify(user)
+            console.log('💾 User JSON stringified, length:', userJson.length)
+            
             localStorage.setItem('fikiri-user', userJson)
             localStorage.setItem('fikiri-user-id', user.id.toString())
             if (accessToken) {
@@ -359,17 +410,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             console.log('✅ Verified localStorage immediately after save:', {
               hasUser: !!savedUser,
               hasUserId: !!savedUserId,
-              savedUserLength: savedUser?.length || 0
+              savedUserLength: savedUser?.length || 0,
+              savedUserIdValue: savedUserId,
+              savedUserPreview: savedUser ? savedUser.substring(0, 100) : null
             })
             
             // Double-check after a tiny delay
             setTimeout(() => {
               const checkUser = localStorage.getItem('fikiri-user')
-              console.log('✅ Verified localStorage after 10ms:', checkUser ? 'STILL SAVED' : 'CLEARED!')
+              const checkUserId = localStorage.getItem('fikiri-user-id')
+              console.log('✅ Verified localStorage after 10ms:', {
+                hasUser: !!checkUser,
+                hasUserId: !!checkUserId,
+                stillSaved: checkUser ? 'YES' : 'NO - WAS CLEARED!'
+              })
             }, 10)
           } catch (error) {
             console.error('❌ Error saving to localStorage:', error)
+            console.error('❌ Error details:', {
+              message: error instanceof Error ? error.message : String(error),
+              stack: error instanceof Error ? error.stack : null
+            })
           }
+        } else {
+          console.warn('⚠️ window is undefined, cannot save to localStorage')
         }
         
         setAuthState(prev => ({
@@ -388,18 +452,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         return { success: true, user }
       } else {
+        console.error('❌ Login failed - data.success is false:', data)
         return { 
           success: false, 
           error: data.error || 'Login failed' 
         }
       }
     } catch (error: any) {
+      console.error('❌ [AuthContext] login() exception:', error)
+      console.error('❌ [AuthContext] Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        stack: error?.stack
+      })
+      
       if (error?.response?.status === 429) {
         const retryAfter = error.response?.data?.retry_after
         const minutes = retryAfter ? Math.ceil(retryAfter / 60) : 15
         return { success: false, error: `Too many login attempts. Please wait ${minutes} minute${minutes !== 1 ? 's' : ''} and try again.` }
       }
-      return { success: false, error: 'Network error. Please try again.' }
+      
+      const errorMessage = error?.response?.data?.error || error?.message || 'Network error. Please try again.'
+      return { success: false, error: errorMessage }
     }
   }
 

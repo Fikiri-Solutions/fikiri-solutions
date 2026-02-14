@@ -76,7 +76,7 @@ export const EnhancedMetricCard: React.FC<EnhancedMetricCardProps> = ({
               ) : (
                 <ArrowDown size={12} className="text-red-600 dark:text-red-400" />
               )}
-              {Math.abs(change)}%
+              {Math.abs(change ?? 0)}%
             </motion.div>
           )}
         </AnimatePresence>

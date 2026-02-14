@@ -84,7 +84,7 @@ export const Services: React.FC = () => {
               ...service,
               enabled: apiService.status === 'active' || apiService.status === 'healthy',
               settings: service.settings // Keep existing settings, API doesn't return settings in getServices()
-            }
+            } as typeof service
           }
           return service
         }))
@@ -251,7 +251,7 @@ export const Services: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Response Tone</label>
               <select
-                className="bg-white text-brand-text border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
+                className="bg-white dark:bg-gray-800 text-brand-text dark:text-gray-100 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.responseTone}
                 onChange={(e) => updateServiceSettings(service.id, 'responseTone', e.target.value)}
               >
@@ -265,7 +265,7 @@ export const Services: React.FC = () => {
               <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Auto-reply Delay (minutes)</label>
               <input
                 type="number"
-                className="bg-white text-brand-text border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
+                className="bg-white dark:bg-gray-800 text-brand-text dark:text-gray-100 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.autoReplyDelay}
                 onChange={(e) => updateServiceSettings(service.id, 'autoReplyDelay', parseInt(e.target.value))}
                 min="1"
@@ -276,7 +276,7 @@ export const Services: React.FC = () => {
               <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Max Responses Per Day</label>
               <input
                 type="number"
-                className="bg-white text-brand-text border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
+                className="bg-white dark:bg-gray-800 text-brand-text dark:text-gray-100 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.maxResponsesPerDay}
                 onChange={(e) => updateServiceSettings(service.id, 'maxResponsesPerDay', parseInt(e.target.value))}
                 min="1"
@@ -400,7 +400,7 @@ export const Services: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Scoring Model</label>
               <select
-                className="bg-white text-brand-text border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
+                className="bg-white dark:bg-gray-800 text-brand-text dark:text-gray-100 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.scoringModel}
                 onChange={(e) => updateServiceSettings(service.id, 'scoringModel', e.target.value)}
               >
@@ -412,7 +412,7 @@ export const Services: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Update Frequency</label>
               <select
-                className="bg-white text-brand-text border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
+                className="bg-white dark:bg-gray-800 text-brand-text dark:text-gray-100 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.updateFrequency}
                 onChange={(e) => updateServiceSettings(service.id, 'updateFrequency', e.target.value)}
               >
@@ -461,7 +461,7 @@ export const Services: React.FC = () => {
           <button
             onClick={loadServiceConfigurations}
             disabled={isLoading}
-            className="px-4 py-2 text-brand-text bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            className="px-4 py-2 text-brand-text dark:text-gray-200 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             {isLoading ? 'Refreshing...' : 'Refresh Data'}
@@ -480,7 +480,7 @@ export const Services: React.FC = () => {
       {/* Services List */}
       <div className="space-y-6">
         {services.map((service) => (
-          <div key={service.id} className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
+          <div key={service.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center">
@@ -521,9 +521,9 @@ export const Services: React.FC = () => {
 
             {/* Service Settings */}
             {service.enabled && (
-              <div className="mt-6 pt-6 border-t border-brand-text/10">
+              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
                 <div className="flex items-center mb-4">
-                  <Settings className="h-5 w-5 text-brand-text/60 mr-2" />
+                  <Settings className="h-5 w-5 text-brand-text/60 dark:text-gray-400 mr-2" />
                   <h4 className="text-sm font-medium text-brand-text dark:text-white">Settings</h4>
                 </div>
                 {renderServiceSettings(service)}
@@ -536,7 +536,7 @@ export const Services: React.FC = () => {
       {/* Test Result Modal */}
       {testResult && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-brand-background dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 border border-brand-text/10">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 border border-gray-200 dark:border-gray-700 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-brand-text dark:text-white">
                 Test Result: {testResult.serviceName}
@@ -590,13 +590,13 @@ export const Services: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center space-x-2 text-red-600">
+                <div className="flex items-center space-x-2 text-red-600 dark:text-red-400">
                   <AlertCircle className="h-5 w-5" />
                   <span className="font-medium">Test Failed</span>
                 </div>
                 
-                <div className="bg-brand-error/10 rounded-lg p-4 border border-brand-error/20">
-                  <p className="text-sm text-brand-error">
+                <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 border border-red-200 dark:border-red-800">
+                  <p className="text-sm text-red-700 dark:text-red-300">
                     {testResult.error || 'An unknown error occurred'}
                   </p>
                 </div>

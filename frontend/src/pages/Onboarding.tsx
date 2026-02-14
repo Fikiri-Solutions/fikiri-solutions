@@ -106,7 +106,7 @@ export const Onboarding: React.FC = () => {
     });
   };
 
-  const handleGoogleAuth = () => {
+  const handleGoogleAuth = async () => {
     // Preserve redirect parameter through OAuth flow
     const redirectPath = getRedirectPath()
     const redirectParam = redirectPath ? `?redirect=${encodeURIComponent(redirectPath)}` : ''

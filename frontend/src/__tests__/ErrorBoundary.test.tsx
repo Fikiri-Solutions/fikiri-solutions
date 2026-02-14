@@ -105,9 +105,11 @@ describe('ErrorBoundary', () => {
   })
 
   it('should have go to homepage button', () => {
-    const mockLocation = { ...window.location, href: '' }
-    delete (window as any).location
-    window.location = mockLocation as Location
+    const savedLocation = window.location
+    Object.defineProperty(window, 'location', {
+      value: { ...savedLocation, href: '' },
+      writable: true,
+    })
 
     render(
       <ErrorBoundary>
@@ -119,7 +121,10 @@ describe('ErrorBoundary', () => {
     expect(homeButton).toBeInTheDocument()
 
     // Restore window.location
-    window.location = location
+    Object.defineProperty(window, 'location', {
+      value: savedLocation,
+      writable: true,
+    })
   })
 
   it('should have refresh page button', () => {

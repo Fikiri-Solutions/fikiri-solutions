@@ -54,23 +54,23 @@ export const CustomizationPanel: React.FC<CustomizationPanelProps> = ({ isOpen, 
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
+    <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="absolute inset-0 bg-black bg-opacity-50" onClick={onClose} />
-      <div className="absolute right-0 top-0 h-full w-96 bg-white dark:bg-gray-900 shadow-xl transform transition-transform duration-300">
-        <div className="flex flex-col h-full">
+      <div className="absolute right-0 top-0 min-h-full w-96 bg-white dark:bg-gray-900 shadow-xl transform transition-transform duration-300">
+        <div className="flex flex-col min-h-full">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Customize Appearance</h2>
             <button
               onClick={onClose}
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
             >
-              <X className="h-5 w-5 text-gray-500" />
+              <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
             </button>
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 min-h-0">
             {/* Company Branding */}
             <div>
               <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Company Branding</h3>

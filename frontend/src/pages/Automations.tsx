@@ -479,7 +479,7 @@ export const Automations: React.FC = () => {
                     onClick={() => handleToggle(preset, !isActive)}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${isActive ? 'bg-brand-primary' : 'bg-brand-text/30'}`}
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${isActive ? 'translate-x-6' : 'translate-x-1'}`} />
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-gray-300 transition ${isActive ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
 

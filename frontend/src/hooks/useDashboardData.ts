@@ -29,7 +29,7 @@ export function useDashboardTimeseries(period: 'week' | 'month' | 'quarter' = 'w
 export function useActivityFeed(limit: number = 10) {
   return useQuery({
     queryKey: ['dashboard', 'activity', limit],
-    queryFn: () => apiClient.getActivity(limit),
+    queryFn: () => apiClient.getActivity(),
     staleTime: 15000, // 15 seconds
     refetchInterval: 30000, // Refetch every 30 seconds
     retry: 2,
@@ -119,7 +119,7 @@ export function usePrefetchDashboardData() {
     
     queryClient.prefetchQuery({
       queryKey: ['dashboard', 'activity', 10],
-      queryFn: () => apiClient.getActivity(10),
+      queryFn: () => apiClient.getActivity(),
       staleTime: 15000,
     });
   };

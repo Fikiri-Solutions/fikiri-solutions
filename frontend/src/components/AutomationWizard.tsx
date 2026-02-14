@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Sparkles, Zap, CheckCircle, X, ArrowRight, Lightbulb } from 'lucide-react'
+import { Sparkles, Zap, CheckCircle, X, Lightbulb } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from './Toast'
 import { apiClient } from '../services/apiClient'
@@ -140,7 +140,6 @@ export const AutomationWizard: React.FC<AutomationWizardProps> = ({ onComplete, 
   const [isSettingUp, setIsSettingUp] = useState(false)
   
   const recommendations = getRecommendations(user?.industry || '')
-  const highPriority = recommendations.filter(r => r.priority === 'high')
   
   const toggleSelection = (presetId: string) => {
     setSelected(prev => {

@@ -18,6 +18,21 @@ interface ChatMessage {
 // Fallback responses for when backend is not available
 const getFallbackResponse = (message: string): string => {
   const lowerMessage = message.toLowerCase()
+
+  if (lowerMessage.trim() === 'hi' || lowerMessage.trim() === 'hello' || lowerMessage.includes('hey')) {
+    return 'Hi! How can I help you today with Fikiri Solutions?'
+  }
+
+  if (lowerMessage.includes('today') && lowerMessage.includes('date')) {
+    const today = new Date()
+    const formatted = today.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+    return `Today is ${formatted}.`
+  }
   
   if (lowerMessage.includes('contact') || lowerMessage.includes('email') || lowerMessage.includes('phone')) {
     return 'You can contact Fikiri Solutions at:\n\n📧 Email: info@fikirisolutions.com\n🌐 Website: https://fikirisolutions.com\n📞 Phone: Available through our contact form\n\nWe specialize in AI-powered business automation for landscaping, restaurants, and medical practices.'
@@ -505,6 +520,12 @@ Response should include a next step and keep tone professional but warm.`
                 placeholder="Ask the AI assistant anything... e.g., 'Draft a response to Acme Corp lead'"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSendMessage()
+                  }
+                }}
               />
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">

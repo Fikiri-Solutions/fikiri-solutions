@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { CheckCircle, AlertCircle, Mail, Shield, Eye, Clock, Loader2, ExternalLink, Info } from 'lucide-react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { CheckCircle, AlertCircle, Mail, Eye, Loader2, Info } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from './Toast'
-import { config } from '../config'
 import { apiClient } from '../services/apiClient'
 
 interface OutlookConnectionProps {
@@ -67,7 +66,7 @@ export const OutlookConnection: React.FC<OutlookConnectionProps> = ({ userId, on
 
     try {
       const data = await apiClient.getOutlookStatus(userId)
-      const status = data?.data || data
+      const status = (data && 'data' in data ? data.data : data) as OutlookStatus | undefined
       
       setOutlookStatus({
         connected: status?.connected === true,
@@ -112,7 +111,7 @@ export const OutlookConnection: React.FC<OutlookConnectionProps> = ({ userId, on
     }
   }, [location.search, checkOutlookStatus, addToast])
 
-  const connectOutlook = () => {
+  const connectOutlook = async () => {
     setIsConnecting(true)
     setError(null)
     
@@ -155,7 +154,7 @@ export const OutlookConnection: React.FC<OutlookConnectionProps> = ({ userId, on
         })
         onConnected() // Notify parent to refresh
       } else {
-        throw new Error(data.error || data.message || 'Failed to disconnect Outlook')
+        throw new Error(data.error || 'Failed to disconnect Outlook')
       }
     } catch (error: any) {
       console.error('Error disconnecting Outlook:', error)

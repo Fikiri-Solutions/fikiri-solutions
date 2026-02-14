@@ -47,11 +47,14 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false)
 
-  const CustomTooltip: React.FC<TooltipProps<ValueType, NameType>> = ({ active, payload, label }) => {
+  const CustomTooltip: React.FC<TooltipProps<ValueType, NameType>> = (props) => {
+    const active = props.active
+    const payload = (props as { payload?: Array<{ color?: string; dataKey?: string; value?: unknown }>; label?: string }).payload
+    const label = (props as { label?: string }).label
     if (active && payload && payload.length) {
       return (
         <div className="bg-white dark:bg-gray-800 p-3 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
-          <p className="font-semibold text-gray-900 dark:text-gray-100 mb-1">{label}</p>
+          <p className="font-semibold text-gray-900 dark:text-gray-100 mb-1">{label ?? ''}</p>
           {payload.map((entry, index) => (
             <div key={index} className="flex items-center gap-2">
               <div 
@@ -59,7 +62,7 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({
                 style={{ backgroundColor: entry?.color }}
               />
               <span className="text-sm text-gray-600 dark:text-gray-300">
-                {entry?.dataKey}: <span className="font-semibold">{entry?.value}</span>
+                {entry?.dataKey}: <span className="font-semibold">{String(entry?.value ?? '')}</span>
               </span>
             </div>
           ))}
@@ -177,7 +180,7 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }: { name: string; percent: number }) => compact ? `${(percent * 100).toFixed(0)}%` : `${name} ${(percent * 100).toFixed(0)}%`}
+                label={({ name, percent }: { name?: string; percent?: number }) => compact ? `${((percent ?? 0) * 100).toFixed(0)}%` : `${name ?? ''} ${((percent ?? 0) * 100).toFixed(0)}%`}
                 outerRadius={compact ? 60 : 80}
                 innerRadius={compact ? 20 : 40}
                 fill="#8884d8"
@@ -203,7 +206,7 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({
     }
   }
 
-  const totalValue = data.reduce((sum, item) => sum + (item[dataKey] || 0), 0)
+  const totalValue = data.reduce((sum, item) => sum + (Number(item[dataKey]) || 0), 0)
   const averageValue = data.length > 0 ? totalValue / data.length : 0
 
   return (
@@ -211,10 +214,10 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({
       <CardHeader className={cn("pb-3", compact && "pb-2")}>
         <div className="flex items-center justify-between">
           <CardTitle className={cn("flex items-center gap-2", compact && "text-sm")}>
-            {chartType === 'line' && <TrendingUp className="h-4 w-4" />}
-            {chartType === 'bar' && <BarChart3 className="h-4 w-4" />}
-            {chartType === 'pie' && <PieChartIcon className="h-4 w-4" />}
-            {chartType === 'area' && <TrendingUp className="h-4 w-4" />}
+            {type === 'line' && <TrendingUp className="h-4 w-4" />}
+            {type === 'bar' && <BarChart3 className="h-4 w-4" />}
+            {type === 'pie' && <PieChartIcon className="h-4 w-4" />}
+            {type === 'area' && <TrendingUp className="h-4 w-4" />}
             {title}
           </CardTitle>
           {showControls && (

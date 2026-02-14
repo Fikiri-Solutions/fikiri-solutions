@@ -1,5 +1,5 @@
 import React from 'react'
-import { Info, TrendingUp, Clock, DollarSign, Target, Zap, AlertCircle } from 'lucide-react'
+import { Info, TrendingUp, AlertCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { cn } from '../lib/utils'

@@ -54,7 +54,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Dashboard', href: '/dashboard', icon: Mail },
     { name: 'Inbox', href: '/inbox', icon: Mail },
     { name: 'Services', href: '/services', icon: Settings },
-    { name: 'Integrations', href: '/integrations', icon: PlugZap },
     { name: 'Automations', href: '/automations', icon: Zap },
     { name: 'CRM', href: '/crm', icon: Users },
     { name: 'AI Assistant', href: '/ai', icon: Brain },

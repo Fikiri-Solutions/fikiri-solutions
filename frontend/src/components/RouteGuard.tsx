@@ -28,14 +28,31 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
       lastPathname.current = location.pathname
     }
     
+    const currentPath = location.pathname
+    
+    // If loading, wait for auth state to initialize
     if (isLoading) {
       return // Wait for auth state to load
     }
-
-    const currentPath = location.pathname
+    
+    // Special case: If we're on a protected route and not authenticated, but localStorage has auth data,
+    // give AuthContext a moment to initialize (race condition after page reload or login redirect)
+    if (requireAuth && !isAuthenticated && typeof window !== 'undefined') {
+      const hasLocalStorageAuth = localStorage.getItem('fikiri-user') && localStorage.getItem('fikiri-user-id')
+      if (hasLocalStorageAuth && currentPath !== '/login' && currentPath !== '/signup' && !currentPath.startsWith('/onboarding-flow')) {
+        // Auth data exists in localStorage but context hasn't initialized yet
+        // Don't redirect immediately - let AuthContext catch up (it will re-render when state updates)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[RouteGuard] Auth data in localStorage but context not initialized yet, waiting for AuthContext...')
+        }
+        return // Return early to allow AuthContext to initialize and re-render
+      }
+    }
     
     // Debug logging for login/dashboard routes
     if (process.env.NODE_ENV === 'development' && (currentPath === '/login' || currentPath === '/dashboard')) {
+      const urlParams = new URLSearchParams(location.search)
+      const redirectParam = urlParams.get('redirect')
       console.log('[RouteGuard]', { 
         currentPath, 
         isAuthenticated, 
@@ -44,7 +61,12 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
         userEmail: user?.email,
         onboarding_completed: user?.onboarding_completed,
         requireAuth,
-        requireOnboarding
+        requireOnboarding,
+        redirectParam,
+        hasLocalStorage: typeof window !== 'undefined' ? {
+          user: !!localStorage.getItem('fikiri-user'),
+          userId: !!localStorage.getItem('fikiri-user-id')
+        } : null
       })
     }
 
@@ -55,7 +77,12 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
       // Only redirect if not already on an auth page or /inbox
       if (currentPath !== '/login' && currentPath !== '/signup' && !currentPath.startsWith('/onboarding-flow')) {
         hasRedirected.current = true
-        navigate('/login', { replace: true })
+        // Preserve current path as redirect param so user returns here after login
+        // Only add redirect param if we're not already coming from a redirect
+        const urlParams = new URLSearchParams(location.search)
+        const existingRedirect = urlParams.get('redirect')
+        const redirectParam = existingRedirect || encodeURIComponent(currentPath)
+        navigate(`/login?redirect=${redirectParam}`, { replace: true })
       }
       return
     }
@@ -95,13 +122,30 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
       const urlParams = new URLSearchParams(location.search)
       const redirectParam = urlParams.get('redirect')
       
-      // If there's a redirect param, login component will handle it with window.location
-      // Don't interfere - just return and let login component do its thing
+      // If there's a redirect param, honor it (user was trying to access a protected route)
       if (redirectParam && currentPath === '/login') {
-        return // Login component handles navigation
+        const safeRedirect = redirectParam.startsWith('/') && !redirectParam.startsWith('//') && 
+                            redirectParam !== '/login' && redirectParam !== '/signup'
+          ? redirectParam
+          : null
+        
+        if (safeRedirect) {
+          // User has completed onboarding - redirect to their intended destination
+          if (user?.onboarding_completed) {
+            hasRedirected.current = true
+            navigate(safeRedirect, { replace: true })
+            return
+          } else {
+            // User hasn't completed onboarding - redirect to onboarding with preserved redirect
+            hasRedirected.current = true
+            navigate(`/onboarding?redirect=${encodeURIComponent(safeRedirect)}`, { replace: true })
+            return
+          }
+        }
+        // Fall through to standard redirect if redirect param is invalid
       }
       
-      // No redirect param - standard redirect logic
+      // No redirect param or invalid redirect - standard redirect logic
       // If user hasn't completed onboarding, redirect to onboarding
       if (!user?.onboarding_completed) {
         hasRedirected.current = true

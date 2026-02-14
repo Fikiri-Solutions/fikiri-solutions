@@ -26,7 +26,7 @@ export const OutlookConnect: React.FC = () => {
   const syncMutation = useMutation({
     mutationFn: () => apiClient.triggerOutlookSync(),
     onSuccess: (data) => {
-      const message = data?.message || data?.data?.message || 'Outlook sync triggered successfully'
+      const message = (data as { message?: string; data?: { message?: string } })?.message || (data as { data?: { message?: string } })?.data?.message || 'Outlook sync triggered successfully'
       addToast({ 
         type: 'success', 
         title: 'Outlook Sync Started', 

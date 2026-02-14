@@ -92,7 +92,7 @@ export const PrivacySettings: React.FC = () => {
         setSuccess('Privacy settings updated successfully')
         setTimeout(() => setSuccess(null), 3000)
       } else {
-        setError(data.error || 'Failed to update settings')
+        setError((data as { error?: string }).error || 'Failed to update settings')
       }
     } catch (error) {
       setError('Failed to update privacy settings')

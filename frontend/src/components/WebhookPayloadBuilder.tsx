@@ -15,7 +15,7 @@ import {
   Info
 } from 'lucide-react'
 import { webhookTemplates, webhookVariables, WebhookTemplate, replaceVariables } from '../utils/webhookTemplates'
-import { Button } from './ui/button'
+import { Button } from './ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { useToast } from './Toast'

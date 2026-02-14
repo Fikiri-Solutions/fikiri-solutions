@@ -29,6 +29,10 @@ export default defineConfig(({ mode }) => ({
     port: 5174,
     strictPort: true, // Exit if port is already in use instead of trying next port
     host: true, // Listen on all addresses
+    // Proxy API so embedded email images (same-origin /api/...) load in dev
+    proxy: {
+      '/api': { target: 'http://localhost:5000', changeOrigin: true },
+    },
   },
   plugins: [
     react(),

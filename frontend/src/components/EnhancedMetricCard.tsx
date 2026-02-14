@@ -48,13 +48,11 @@ export function EnhancedMetricCard({
   return (
     <Card 
       className={cn(
-        "group cursor-pointer transition-all duration-300 hover:shadow-lg hover:scale-[1.02] relative",
+        "group cursor-pointer transition-all duration-300 hover:shadow-lg hover:scale-[1.02] relative overflow-visible",
         compact && "p-3",
         className
       )}
       onClick={onClick}
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
     >
       <CardHeader className={cn("flex flex-row items-center justify-between space-y-0", compact ? "pb-1" : "pb-2")}>
         <div className="flex items-center gap-3 flex-1">
@@ -69,10 +67,20 @@ export function EnhancedMetricCard({
                 {title}
               </h3>
               {(description || businessImpact || insight) && (
-                <div className="relative">
-                  <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                <div
+                  className="relative inline-flex"
+                  onMouseEnter={(e) => {
+                    e.stopPropagation();
+                    setShowTooltip(true);
+                  }}
+                  onMouseLeave={(e) => {
+                    e.stopPropagation();
+                    setShowTooltip(false);
+                  }}
+                >
+                  <HelpCircle className="h-4 w-4 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 cursor-help shrink-0" />
                   {showTooltip && (description || businessImpact || insight) && (
-                    <div className="absolute z-50 bottom-full left-0 mb-2 w-64 sm:w-72 md:w-80 max-w-[min(calc(100vw-2rem),20rem)] p-3 bg-gray-900 text-white text-xs rounded-lg shadow-xl whitespace-normal break-words">
+                    <div className="absolute z-[100] left-1/2 -translate-x-1/2 bottom-full mb-3 w-64 sm:w-72 md:w-80 max-w-[min(calc(100vw-2rem),20rem)] p-3 bg-gray-900 text-white text-xs rounded-lg shadow-xl whitespace-normal break-words pointer-events-none">
                       <div className="space-y-1.5">
                         {description && (
                           <p className="font-semibold leading-relaxed">{description}</p>
@@ -84,9 +92,9 @@ export function EnhancedMetricCard({
                           <p className="text-gray-300 italic leading-relaxed">{insight}</p>
                         )}
                       </div>
-                      {/* Tooltip arrow */}
-                      <div className="absolute top-full left-4 -mt-1">
-                        <div className="w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                      {/* Tooltip arrow pointing down to the icon */}
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1">
+                        <div className="w-2 h-2 bg-gray-900 transform rotate-45" />
                       </div>
                     </div>
                   )}

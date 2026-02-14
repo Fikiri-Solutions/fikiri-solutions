@@ -7,6 +7,8 @@ interface ChartData {
   emails?: number
   leads?: number
   responses?: number
+  color?: string
+  [key: string]: unknown
 }
 
 interface DashboardChartsProps {
@@ -132,7 +134,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, pieData 
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
-                data={pieData.length > 0 ? pieData : data}
+                data={(pieData.length > 0 ? pieData : data) as ChartData[]}
                 cx="50%"
                 cy="50%"
                 labelLine={false}

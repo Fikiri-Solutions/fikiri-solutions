@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { CheckCircle, AlertCircle, Mail, Shield, Eye, Clock, Loader2, ExternalLink, Info, AlertTriangle } from 'lucide-react'
+import { CheckCircle, AlertCircle, Mail, Shield, Eye, Clock, Loader2 } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from './Toast'
-import { config } from '../config'
 import { apiClient } from '../services/apiClient'
 
 interface GmailConnectionProps {
@@ -26,7 +25,6 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
   const [gmailStatus, setGmailStatus] = useState<GmailStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showDetails, setShowDetails] = useState(false)
-  const [retryCount, setRetryCount] = useState(0)
   const { addToast } = useToast()
   const hasShownOAuthToast = useRef(false) // Prevent duplicate toasts
   
@@ -98,9 +96,10 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
       if (!isMountedRef.current) return
       
       if (data.success) {
-        setGmailStatus(data.data || {})
+        const status = (data.data ?? {}) as GmailStatus
+        setGmailStatus(status)
         setError(null)
-        if (data.data.connected) {
+        if (status.connected) {
           onConnected()
         }
       } else {
@@ -113,7 +112,7 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
         if (process.env.NODE_ENV === 'development' && isMountedRef.current) {
           // This is a timeout, not a cleanup
           setError('Request timed out. Please check your connection.')
-          addToast('Connection timeout. Please try again.', 'error')
+          addToast({ type: 'error', title: 'Connection Timeout', message: 'Please try again.' })
         }
         return
       }
@@ -123,7 +122,7 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
       
       console.error('Error checking Gmail status:', error)
       setError('Failed to check Gmail connection status')
-      addToast('Unable to check Gmail status. Please try again.', 'error')
+      addToast({ type: 'error', title: 'Gmail Status', message: 'Unable to check. Please try again.' })
     } finally {
       // Clear the controller reference if this was the active request
       if (abortControllerRef.current === controller) {
@@ -182,7 +181,6 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
         message: decodeURIComponent(oauthError) 
       })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search]) // Only depend on location.search to prevent duplicate runs
 
   const connectGmail = async () => {
@@ -213,20 +211,20 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
 
         // Redirect to Google OAuth
         window.location.href = data.url
-        addToast('Redirecting to Gmail authentication...', 'info')
+        addToast({ type: 'info', title: 'Redirecting', message: 'Taking you to Gmail authentication...' })
       } else {
         throw new Error(data.error || 'Failed to initiate Gmail connection')
       }
-    } catch (error) {
-      console.error('Error connecting Gmail:', error)
+    } catch (err: unknown) {
+      console.error('Error connecting Gmail:', err)
       setIsConnecting(false)
-      
-      if (error.name === 'AbortError') {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to connect Gmail. Please try again.'
+      if (err instanceof Error && err.name === 'AbortError') {
         setError('Request timed out. Please try again.')
-        addToast('Connection timeout. Please try again.', 'error')
+        addToast({ type: 'error', title: 'Connection Timeout', message: 'Please try again.' })
       } else {
-        setError(error.message || 'Failed to connect Gmail. Please try again.')
-        addToast('Failed to connect Gmail. Please try again.', 'error')
+        setError(errorMsg)
+        addToast({ type: 'error', title: 'Connection Failed', message: errorMsg })
       }
     }
   }
@@ -251,7 +249,7 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
         })
         onConnected() // Notify parent to refresh
       } else {
-        throw new Error(data.error || data.message || 'Failed to disconnect Gmail')
+        throw new Error(data.error || 'Failed to disconnect Gmail')
       }
     } catch (error: any) {
       console.error('Error disconnecting Gmail:', error)

@@ -31,29 +31,126 @@ interface Email {
 }
 
 // Component to safely render email body (HTML or plain text)
-const EmailBodyRenderer: React.FC<{ content: string }> = ({ content }) => {
+const EmailBodyRenderer: React.FC<{ content: string; emailId?: string }> = ({ content, emailId }) => {
+  const containerRef = React.useRef<HTMLDivElement>(null)
+  
   // Check if content is HTML (contains HTML tags)
   const isHTML = /<[a-z][\s\S]*>/i.test(content)
   
+  // Handle image loading errors after render
+  React.useEffect(() => {
+    if (!containerRef.current || !isHTML) return
+    
+    const images = containerRef.current.querySelectorAll('img')
+    const handleImageError = (e: Event) => {
+      const img = e.target as HTMLImageElement
+      const originalSrc = img.getAttribute('src') || img.src
+      console.warn('Image failed to load:', originalSrc, 'Error:', e)
+      
+      // Try to proxy external images if they're failing due to CORS
+      if (originalSrc.startsWith('http://') || originalSrc.startsWith('https://')) {
+        // Don't retry if we already tried proxying
+        if (!img.dataset.proxyAttempted) {
+          img.dataset.proxyAttempted = 'true'
+          // Could proxy through backend, but for now just hide
+          img.style.display = 'none'
+          const placeholder = document.createElement('div')
+          placeholder.className = 'inline-block px-2 py-1 bg-gray-100 dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400 rounded my-2'
+          placeholder.textContent = '[Image not available - external image blocked]'
+          img.parentNode?.insertBefore(placeholder, img)
+          return
+        }
+      }
+      
+      // Hide broken images
+      img.style.display = 'none'
+      // Add a placeholder
+      if (!img.parentElement?.querySelector('.image-placeholder')) {
+        const placeholder = document.createElement('div')
+        placeholder.className = 'image-placeholder inline-block px-2 py-1 bg-gray-100 dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400 rounded my-2'
+        placeholder.textContent = '[Image not available]'
+        img.parentNode?.insertBefore(placeholder, img)
+      }
+    }
+    
+    images.forEach(img => {
+      img.addEventListener('error', handleImageError)
+      // Add loading="lazy" for performance
+      if (!img.hasAttribute('loading')) {
+        img.setAttribute('loading', 'lazy')
+      }
+      // Only add crossorigin for external images (not our proxy)
+      const isExternalImage = img.src.startsWith('http://') || img.src.startsWith('https://')
+      const isOurProxy = img.src.includes('/api/business/email/') || img.src.includes('/embedded-image/')
+      if (isExternalImage && !isOurProxy && !img.hasAttribute('crossorigin')) {
+        img.setAttribute('crossorigin', 'anonymous')
+      }
+      // Remove crossorigin from our proxy images (not needed and can cause issues)
+      if (isOurProxy && img.hasAttribute('crossorigin')) {
+        img.removeAttribute('crossorigin')
+      }
+      // Ensure proxy URLs are absolute
+      if (img.src.startsWith('/api/business/email/') && emailId) {
+        const baseUrl = window.location.origin
+        if (!img.src.startsWith(baseUrl)) {
+          img.src = baseUrl + img.src
+        }
+      }
+      // Handle relative URLs that should be absolute
+      if (img.src.startsWith('/api/') && !img.src.startsWith(window.location.origin)) {
+        img.src = window.location.origin + img.src
+      }
+      // Try to fix broken src attributes
+      const imgSrc = img.getAttribute('src') || img.src
+      if (!imgSrc || imgSrc === 'undefined' || imgSrc === 'null' || imgSrc === '') {
+        console.warn('Image has invalid src:', imgSrc)
+        img.style.display = 'none'
+      }
+    })
+    
+    return () => {
+      images.forEach(img => {
+        img.removeEventListener('error', handleImageError)
+      })
+    }
+  }, [content, emailId, isHTML])
+  
   if (isHTML) {
+    // Process HTML to handle images properly
+    let processedHTML = content
+    
+    // Replace relative image URLs with absolute URLs if needed
+    // Handle cid: references (these should already be replaced by backend, but handle edge cases)
+    if (emailId) {
+      processedHTML = processedHTML.replace(
+        /src=["']cid:([^"']+)["']/gi,
+        (match, cid) => {
+          // If backend didn't replace it, we'll need to handle it client-side
+          // For now, keep the cid: reference - backend should handle this
+          return match
+        }
+      )
+    }
+    
     // Sanitize HTML content - allow safe HTML tags and attributes
-    const sanitizedHTML = DOMPurify.sanitize(content, {
+    // ALLOWED_URI_REGEXP must allow: https?, data:, cid:, and relative paths (/api/...)
+    // so internal/embedded email images (proxy URLs) are not stripped
+    const sanitizedHTML = DOMPurify.sanitize(processedHTML, {
       ALLOWED_TAGS: [
         'p', 'br', 'div', 'span', 'strong', 'em', 'b', 'i', 'u', 'a',
         'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li',
         'img', 'table', 'thead', 'tbody', 'tr', 'td', 'th',
-        'blockquote', 'pre', 'code', 'hr'
+        'blockquote', 'pre', 'code', 'hr', 'style'
       ],
       ALLOWED_ATTR: [
         'href', 'title', 'alt', 'src', 'width', 'height', 'style',
-        'class', 'id', 'align', 'colspan', 'rowspan'
+        'class', 'id', 'align', 'colspan', 'rowspan', 'loading'
       ],
-      ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
-      // Allow data URIs for inline images (base64 encoded)
+      // Allow http/https, data:, cid:, and relative paths (e.g. /api/business/email/.../embedded-image/...)
+      ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|data|blob):|\/)/i,
+      ALLOW_UNKNOWN_PROTOCOLS: true,
       ALLOW_DATA_ATTR: true,
-      // Keep relative URLs for images
       KEEP_CONTENT: true,
-      // Add target="_blank" and rel="noopener" to links for security
       ADD_ATTR: ['target', 'rel'],
       ADD_TAGS: []
     })
@@ -71,6 +168,25 @@ const EmailBodyRenderer: React.FC<{ content: string }> = ({ content }) => {
             height: auto;
             border-radius: 4px;
             margin: 8px 0;
+            display: block;
+            object-fit: contain;
+          }
+          .email-body-html img[src^="http"] {
+            /* Allow external images - browser will handle CORS */
+            image-rendering: auto;
+          }
+          .email-body-html img[loading="lazy"] {
+            /* Lazy load images */
+            content-visibility: auto;
+          }
+          .email-body-html img[src^="/api/business/email"] {
+            /* Embedded images from our proxy */
+            image-rendering: auto;
+          }
+          /* Handle broken images */
+          .email-body-html img[src=""],
+          .email-body-html img:not([src]) {
+            display: none;
           }
           .email-body-html a {
             color: #3b82f6;
@@ -110,6 +226,7 @@ const EmailBodyRenderer: React.FC<{ content: string }> = ({ content }) => {
           }
         `}</style>
         <div 
+          ref={containerRef}
           className="email-body-html prose dark:prose-invert max-w-none text-brand-text dark:text-white"
           dangerouslySetInnerHTML={{ __html: sanitizedHTML }}
         />
@@ -146,6 +263,13 @@ export const EmailInbox: React.FC = () => {
   const [showReplyComposer, setShowReplyComposer] = useState(false)
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [loadingAttachments, setLoadingAttachments] = useState(false)
+  const [emailLimit, setEmailLimit] = useState(25) // Start with 25 emails
+  const [loadingMore, setLoadingMore] = useState(false)
+  
+  // Reset email limit when filter changes
+  useEffect(() => {
+    setEmailLimit(25)
+  }, [filter])
 
   // Load attachments when email is selected
   useEffect(() => {
@@ -207,12 +331,12 @@ export const EmailInbox: React.FC = () => {
     isFetching,
     refetch: refetchEmails 
   } = useQuery({
-    queryKey: ['emails', user?.id, filter],
+    queryKey: ['emails', user?.id, filter, emailLimit],
     queryFn: async () => {
       // Try synced emails first (faster), fallback to Gmail API
       try {
         // First try synced emails
-        const syncedData = await apiClient.getEmails({ filter, limit: 50, use_synced: true })
+        const syncedData = await apiClient.getEmails({ filter, limit: emailLimit, use_synced: true })
         if (syncedData?.emails && syncedData.emails.length > 0) {
           return { ...syncedData, source: 'synced' }
         }
@@ -221,7 +345,7 @@ export const EmailInbox: React.FC = () => {
       }
       
       // Fallback to Gmail API
-      const data = await apiClient.getEmails({ filter, limit: 50 })
+      const data = await apiClient.getEmails({ filter, limit: emailLimit })
       return { ...data, source: 'gmail_api' }
     },
     enabled: !!user && gmailConnected === true,
@@ -235,6 +359,25 @@ export const EmailInbox: React.FC = () => {
   })
 
   const emails = emailsData?.emails || emailsData || []
+  const hasMore = emailsData?.pagination?.has_more || (emails.length >= emailLimit && emails.length % emailLimit === 0)
+  
+  // Load more emails function
+  const loadMoreEmails = useCallback(async () => {
+    if (loadingMore || !hasMore) return
+    
+    setLoadingMore(true)
+    try {
+      const newLimit = emailLimit + 25
+      setEmailLimit(newLimit)
+      // Query will automatically refetch with new limit
+      await refetchEmails()
+    } catch (error) {
+      console.error('Failed to load more emails:', error)
+      addToast({ type: 'error', title: 'Failed to load more emails' })
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [emailLimit, hasMore, loadingMore, refetchEmails, addToast])
 
   // Manual refresh function
   const handleRefresh = useCallback(() => {
@@ -377,7 +520,7 @@ export const EmailInbox: React.FC = () => {
     if (!searchQuery && filter === 'all') return emails
     
     const searchLower = searchQuery.toLowerCase()
-    return emails.filter(email => {
+    return emails.filter((email: Email) => {
       const matchesSearch = !searchQuery || 
         email.subject.toLowerCase().includes(searchLower) ||
         email.from.toLowerCase().includes(searchLower) ||
@@ -448,7 +591,7 @@ export const EmailInbox: React.FC = () => {
   }
 
   return (
-    <div className="flex h-full bg-brand-background dark:bg-gray-900">
+    <div className="flex h-full max-h-screen bg-brand-background dark:bg-gray-900 overflow-hidden">
       {/* Email List Sidebar */}
       <div className="w-1/3 border-r border-brand-text/10 dark:border-gray-700 flex flex-col">
         {/* Header */}
@@ -530,50 +673,72 @@ export const EmailInbox: React.FC = () => {
               }
             />
           ) : (
-            <div className="divide-y divide-brand-text/10 dark:divide-gray-700">
-              {filteredEmails.map((email) => (
-                <button
-                  key={email.id}
-                  onClick={() => {
-                    setSelectedEmail(email)
-                    setAiAnalysis(null)
-                  }}
-                  className={`w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
-                    selectedEmail?.id === email.id ? 'bg-brand-primary/10 dark:bg-brand-primary/20 border-l-4 border-brand-primary' : ''
-                  } ${email.unread ? 'font-semibold' : ''}`}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm truncate ${email.unread ? 'text-brand-text dark:text-white font-semibold' : 'text-brand-text/80 dark:text-gray-300'}`}>
-                        {email.from_name || email.from}
-                      </p>
-                      <p className={`text-xs mt-1 truncate ${email.unread ? 'text-brand-text dark:text-white' : 'text-brand-text/60 dark:text-gray-400'}`}>
-                        {email.subject || '(No subject)'}
-                      </p>
+            <>
+              <div className="divide-y divide-brand-text/10 dark:divide-gray-700">
+                {filteredEmails.map((email: Email) => (
+                  <button
+                    key={email.id}
+                    onClick={() => {
+                      setSelectedEmail(email)
+                      setAiAnalysis(null)
+                    }}
+                    className={`w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
+                      selectedEmail?.id === email.id ? 'bg-brand-primary/10 dark:bg-brand-primary/20 border-l-4 border-brand-primary' : ''
+                    } ${email.unread ? 'font-semibold' : ''}`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm truncate ${email.unread ? 'text-brand-text dark:text-white font-semibold' : 'text-brand-text/80 dark:text-gray-300'}`}>
+                          {email.from_name || email.from}
+                        </p>
+                        <p className={`text-xs mt-1 truncate ${email.unread ? 'text-brand-text dark:text-white' : 'text-brand-text/60 dark:text-gray-400'}`}>
+                          {email.subject || '(No subject)'}
+                        </p>
+                      </div>
+                      {email.unread && (
+                        <div className="ml-2 h-2 w-2 rounded-full bg-brand-primary flex-shrink-0 mt-1.5" />
+                      )}
                     </div>
-                    {email.unread && (
-                      <div className="ml-2 h-2 w-2 rounded-full bg-brand-primary flex-shrink-0 mt-1.5" />
+                    <p className="text-xs text-brand-text/60 dark:text-gray-500 line-clamp-2 mt-1">
+                      {email.snippet}
+                    </p>
+                    <p className="text-xs text-brand-text/50 dark:text-gray-600 mt-2">
+                      {new Date(email.date).toLocaleDateString()}
+                    </p>
+                  </button>
+                ))}
+              </div>
+              
+              {/* Load More Button */}
+              {hasMore && (
+                <div className="p-4 border-t border-brand-text/10 dark:border-gray-700">
+                  <button
+                    onClick={loadMoreEmails}
+                    disabled={loadingMore || isFetching}
+                    className="w-full py-2 px-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-brand-text dark:text-white rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loadingMore || isFetching ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Loading more...</span>
+                      </>
+                    ) : (
+                      <span>Load More Emails</span>
                     )}
-                  </div>
-                  <p className="text-xs text-brand-text/60 dark:text-gray-500 line-clamp-2 mt-1">
-                    {email.snippet}
-                  </p>
-                  <p className="text-xs text-brand-text/50 dark:text-gray-600 mt-2">
-                    {new Date(email.date).toLocaleDateString()}
-                  </p>
-                </button>
-              ))}
-            </div>
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
 
       {/* Email View & AI Assistant */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0 max-h-screen">
         {selectedEmail ? (
           <>
             {/* Email Header */}
-            <div className="p-6 border-b border-brand-text/10 dark:border-gray-700">
+            <div className="p-6 border-b border-brand-text/10 dark:border-gray-700 flex-shrink-0">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <h3 className="text-xl font-bold text-brand-text dark:text-white mb-2">
@@ -639,7 +804,7 @@ export const EmailInbox: React.FC = () => {
 
             {/* Email Body or Reply Composer */}
             {showReplyComposer ? (
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="flex-1 overflow-y-auto p-6 min-h-0" style={{ maxHeight: 'calc(100vh - 250px)' }}>
                 <div className="bg-white dark:bg-gray-800 border border-brand-text/20 dark:border-gray-700 rounded-lg p-4">
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-brand-text dark:text-white mb-2">
@@ -676,9 +841,9 @@ export const EmailInbox: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="flex-1 overflow-y-auto p-6 min-h-0" style={{ maxHeight: 'calc(100vh - 250px)' }}>
                 {selectedEmail.body ? (
-                  <EmailBodyRenderer content={selectedEmail.body} />
+                  <EmailBodyRenderer content={selectedEmail.body} emailId={selectedEmail.id} />
                 ) : (
                   <div className="text-brand-text/70 dark:text-gray-400">
                     {selectedEmail.snippet}

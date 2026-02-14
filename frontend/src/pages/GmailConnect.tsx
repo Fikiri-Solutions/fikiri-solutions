@@ -77,7 +77,7 @@ export const GmailConnect: React.FC = () => {
   const syncMutation = useMutation({
     mutationFn: () => apiClient.triggerGmailSync(),
     onSuccess: (data) => {
-      const message = data?.message || data?.data?.message || 'Gmail sync triggered successfully'
+      const message = (data as { message?: string; data?: { message?: string } })?.message || (data as { data?: { message?: string } })?.data?.message || 'Gmail sync triggered successfully'
       addToast({ 
         type: 'success', 
         title: 'Gmail Sync Started', 

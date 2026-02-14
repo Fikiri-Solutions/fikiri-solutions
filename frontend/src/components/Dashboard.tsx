@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Mail, Users, Zap, TrendingUp, ArrowRight, Plus, Clock, CheckCircle, AlertCircle } from 'lucide-react'
+import { Mail, Users, Zap, ArrowRight, AlertCircle } from 'lucide-react'
 import { apiClient } from '../services/apiClient'
 
 interface DashboardData {

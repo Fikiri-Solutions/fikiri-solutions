@@ -63,7 +63,7 @@ export const GettingStartedWizard: React.FC<{ onComplete?: () => void }> = ({ on
       // Get leads count
       try {
         const leads = await apiClient.getLeads()
-        leadsData = leads?.data || leads || []
+        leadsData = Array.isArray(leads) ? leads : (leads as { data?: unknown[] })?.data ?? []
         debugInfo.leads.raw = leads
         setLeadsCount(Array.isArray(leadsData) ? leadsData.length : 0)
       } catch (error: any) {
@@ -276,7 +276,7 @@ export const GettingStartedWizard: React.FC<{ onComplete?: () => void }> = ({ on
       case 'good': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300'
       case 'needs_improvement': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300'
       case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300'
-      default: return 'bg-gray-100 text-gray-800'
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
     }
   }
 
@@ -286,7 +286,7 @@ export const GettingStartedWizard: React.FC<{ onComplete?: () => void }> = ({ on
       case 'good': return <CheckCircle className="h-5 w-5 text-blue-600" />
       case 'needs_improvement': return <AlertCircle className="h-5 w-5 text-yellow-600" />
       case 'critical': return <AlertCircle className="h-5 w-5 text-red-600" />
-      default: return <AlertCircle className="h-5 w-5 text-gray-600" />
+      default: return <AlertCircle className="h-5 w-5 text-gray-600 dark:text-gray-400" />
     }
   }
 
