@@ -1,0 +1,118 @@
+.fikiri-chatbot {
+  --fikiri-accent: #0f766e;
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 9999;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+}
+
+.fikiri-chatbot__button {
+  background: var(--fikiri-accent);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.fikiri-chatbot__panel {
+  position: absolute;
+  right: 0;
+  bottom: 54px;
+  width: 320px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  display: none;
+  border: 1px solid #e5e7eb;
+}
+
+.fikiri-chatbot__panel.is-open {
+  display: block;
+}
+
+.fikiri-chatbot__header {
+  background: #0f172a;
+  color: #fff;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fikiri-chatbot__title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.fikiri-chatbot__close {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.fikiri-chatbot__log {
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.fikiri-chatbot__msg {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.fikiri-chatbot__msg[data-author="user"] {
+  background: #dbeafe;
+  color: #1e3a8a;
+  margin-left: 24px;
+}
+
+.fikiri-chatbot__msg[data-author="bot"] {
+  background: #ecfeff;
+  color: #0f172a;
+  margin-right: 24px;
+}
+
+.fikiri-chatbot__input {
+  display: flex;
+  border-top: 1px solid #e2e8f0;
+}
+
+.fikiri-chatbot__field {
+  flex: 1;
+  border: none;
+  padding: 10px;
+  font-size: 13px;
+  outline: none;
+}
+
+.fikiri-chatbot__send {
+  background: var(--fikiri-accent);
+  color: #fff;
+  border: none;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+@media (max-width: 480px) {
+  .fikiri-chatbot {
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .fikiri-chatbot__panel {
+    width: 90vw;
+  }
+}
