@@ -304,13 +304,16 @@ class AutomationSafetyManager:
         try:
             result = self.db_optimizer.execute_query(
                 """
-                SELECT COUNT(*) FROM automation_action_log 
+                SELECT COUNT(*) as count FROM automation_action_log 
                 WHERE user_id = ? AND target_contact = ? AND action_type = ? 
                 AND created_at > datetime('now', '-{} hours')
                 """.format(hours),
                 (user_id, target_contact, action_type)
             )
-            return result[0][0] if result else 0
+            if not result:
+                return 0
+            row = result[0]
+            return row.get("count", 0) if isinstance(row, dict) else row[0]
         except Exception as e:
             logger.error(f"Failed to get contact action count: {e}")
             return 0
@@ -320,12 +323,15 @@ class AutomationSafetyManager:
         try:
             result = self.db_optimizer.execute_query(
                 """
-                SELECT COUNT(*) FROM automation_action_log 
+                SELECT COUNT(*) as count FROM automation_action_log 
                 WHERE user_id = ? AND created_at > datetime('now', '-{} minutes')
                 """.format(minutes),
                 (user_id,)
             )
-            return result[0][0] if result else 0
+            if not result:
+                return 0
+            row = result[0]
+            return row.get("count", 0) if isinstance(row, dict) else row[0]
         except Exception as e:
             logger.error(f"Failed to get user action count: {e}")
             return 0
@@ -338,13 +344,17 @@ class AutomationSafetyManager:
             # Count failures in the window
             result = self.db_optimizer.execute_query(
                 """
-                SELECT COUNT(*) FROM oauth_failure_log 
+                SELECT COUNT(*) as count FROM oauth_failure_log 
                 WHERE user_id = ? AND created_at > datetime('now', '-{} minutes')
                 """.format(config.oauth_failure_window_minutes),
                 (user_id,)
             )
             
-            failure_count = result[0][0] if result else 0
+            if not result:
+                failure_count = 0
+            else:
+                row = result[0]
+                failure_count = row.get("count", 0) if isinstance(row, dict) else row[0]
             
             if failure_count >= config.oauth_failure_threshold:
                 # Pause user's automations

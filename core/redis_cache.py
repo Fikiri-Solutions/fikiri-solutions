@@ -64,7 +64,8 @@ class FikiriCache:
         try:
             self.redis_client.ping()
             return True
-        except:
+        except Exception as ping_error:
+            logger.debug("Redis cache ping failed: %s", ping_error)
             return False
     
     def _generate_cache_key(self, prefix: str, identifier: str, *args) -> str:

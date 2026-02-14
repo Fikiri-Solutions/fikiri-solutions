@@ -8,6 +8,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from core.database_optimization import db_optimizer
+from crm.service import enhanced_crm_service
 from core.integrations.calendar.calendar_manager import CalendarManager
 from core.integrations.integration_framework import integration_manager
 
@@ -140,6 +141,17 @@ class AppointmentsService:
                 # Don't fail appointment creation if calendar sync fails
         
         logger.info(f"✅ Created appointment {appointment_id} for user {self.user_id}")
+        if appointment.get("contact_id"):
+            try:
+                enhanced_crm_service.add_lead_activity(
+                    appointment["contact_id"],
+                    self.user_id,
+                    "meeting_scheduled",
+                    f"Appointment scheduled: {appointment.get('title')}",
+                    metadata={"appointment_id": appointment_id, "start_time": appointment.get("start_time")}
+                )
+            except Exception as e:
+                logger.warning(f"Failed to log appointment activity: {e}")
         return appointment
     
     def get_appointment(self, appointment_id: int) -> Optional[Dict]:
@@ -295,6 +307,17 @@ class AppointmentsService:
                 logger.warning(f"⚠️ Calendar sync failed for appointment {appointment_id}: {e}")
         
         logger.info(f"✅ Updated appointment {appointment_id} for user {self.user_id}")
+        if updated_appointment.get("contact_id"):
+            try:
+                enhanced_crm_service.add_lead_activity(
+                    updated_appointment["contact_id"],
+                    self.user_id,
+                    "meeting_scheduled",
+                    f"Appointment updated: {updated_appointment.get('title')}",
+                    metadata={"appointment_id": appointment_id}
+                )
+            except Exception as e:
+                logger.warning(f"Failed to log appointment update activity: {e}")
         return updated_appointment
     
     def cancel_appointment(self, appointment_id: int) -> Dict:
@@ -314,6 +337,17 @@ class AppointmentsService:
                 self._sync_to_calendar(canceled, 'cancel')
             except Exception as e:
                 logger.warning(f"⚠️ Calendar sync failed for appointment {appointment_id}: {e}")
+        if canceled.get("contact_id"):
+            try:
+                enhanced_crm_service.add_lead_activity(
+                    canceled["contact_id"],
+                    self.user_id,
+                    "meeting_scheduled",
+                    f"Appointment canceled: {canceled.get('title')}",
+                    metadata={"appointment_id": appointment_id}
+                )
+            except Exception as e:
+                logger.warning(f"Failed to log appointment cancel activity: {e}")
         
         return canceled
     
@@ -365,6 +399,7 @@ class AppointmentsService:
     def calculate_free_slots(self, start: datetime, end: datetime,
                              busy_periods: List[Dict], slot_duration_minutes: int = DEFAULT_SLOT_DURATION_MINUTES) -> List[Dict]:
         """Calculate free time slots (public method for API)"""
+        max_slots = SUGGESTED_SLOTS_COUNT
         if not busy_periods:
             # All free
             free_slots = []

@@ -77,8 +77,10 @@ class JSONFormatter(logging.Formatter):
             # If record.msg is already JSON, return it
             if isinstance(record.msg, str) and record.msg.startswith('{'):
                 return record.msg
-        except:
-            pass
+        except Exception as exc:
+            logging.getLogger(__name__).debug(
+                "Structured logging JSON detection failed: %s", exc
+            )
         
         # Create structured log entry
         log_entry = {

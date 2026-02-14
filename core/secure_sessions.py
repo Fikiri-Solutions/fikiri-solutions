@@ -9,7 +9,7 @@ import json
 import time
 import secrets
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, Tuple
 from functools import wraps
 
@@ -35,6 +35,17 @@ except ImportError:
 from core.database_optimization import db_optimizer
 
 logger = logging.getLogger(__name__)
+
+def _is_test_mode() -> bool:
+    return (
+        os.getenv("FIKIRI_TEST_MODE") == "1"
+        or os.getenv("FLASK_ENV") == "test"
+        or bool(os.getenv("PYTEST_CURRENT_TEST"))
+    )
+
+
+def _utcnow_naive() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 class SecureSessionManager:
     """Secure session management with Redis persistence and cookie security"""
@@ -66,6 +77,9 @@ class SecureSessionManager:
     
     def _connect_redis(self):
         """Connect to Redis for session storage"""
+        if _is_test_mode():
+            self.redis_client = None
+            return
         if not REDIS_AVAILABLE:
             logger.warning("Redis not available, using in-memory sessions")
             self.redis_client = None
@@ -126,7 +140,7 @@ class SecureSessionManager:
         try:
             # Generate secure session ID
             session_id = secrets.token_urlsafe(32)
-            current_time = datetime.utcnow()
+            current_time = _utcnow_naive()
             expires_at = current_time + timedelta(seconds=self.session_ttl)
             
             # Prepare session data
@@ -191,7 +205,7 @@ class SecureSessionManager:
                     data = json.loads(session_data)
                     
                     # Update last accessed time
-                    data['last_accessed'] = datetime.utcnow().isoformat()
+                    data['last_accessed'] = _utcnow_naive().isoformat()
                     self.redis_client.setex(
                         session_key, 
                         self.session_ttl, 
@@ -250,7 +264,7 @@ class SecureSessionManager:
                 if session_data:
                     data = json.loads(session_data)
                     data.update(updates)
-                    data['last_accessed'] = datetime.utcnow().isoformat()
+                    data['last_accessed'] = _utcnow_naive().isoformat()
                     
                     self.redis_client.setex(
                         session_key, 
@@ -358,7 +372,7 @@ class SecureSessionManager:
             # Clean Redis
             if self.redis_client:
                 # Redis TTL handles expiration automatically
-                pass
+                logger.debug("Redis session TTL handles expiration cleanup")
             
             # Clean database
             db_optimizer.execute_query("""
@@ -416,7 +430,7 @@ def init_secure_sessions(app):
             auth_header = request.headers.get('Authorization')
             if auth_header.startswith('Bearer '):
                 # This is for JWT tokens, not session tokens
-                pass
+                logger.debug("Authorization header contains JWT, skipping session token parsing")
         
         if session_id:
             session_data = secure_session_manager.get_session(session_id)

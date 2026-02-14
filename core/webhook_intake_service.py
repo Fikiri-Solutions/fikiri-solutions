@@ -13,6 +13,8 @@ import hmac
 from flask import request, jsonify
 from core.minimal_config import get_config
 from core.database_optimization import db_optimizer
+from core.idempotency_manager import idempotency_manager, generate_deterministic_key
+from core.lead_scoring_service import get_lead_scoring_service
 from core.google_sheets_connector import get_sheets_connector
 # notion_connector archived - feature not currently implemented
 # from core.notion_connector import get_notion_connector
@@ -209,19 +211,49 @@ class WebhookIntakeService:
     def _process_lead(self, lead_data: Dict[str, Any]) -> Dict[str, Any]:
         """Process and store lead data across all systems"""
         try:
+            key = None
             # Validate required fields
             if not lead_data.get('email'):
                 return {"success": False, "error": "Email is required"}
+
+            # Idempotency key (prefer submission_id if present)
+            metadata = lead_data.get('metadata', {}) or {}
+            submission_id = metadata.get('submission_id') or metadata.get('submissionId')
+            idempotency_payload = {
+                'source': lead_data.get('source'),
+                'submission_id': submission_id,
+                'email': lead_data.get('email')
+            }
+            key = generate_deterministic_key(
+                'webhook_lead',
+                lead_data.get('user_id', 1),
+                idempotency_payload
+            )
+            if key:
+                cached = idempotency_manager.check_key(key)
+                if cached and cached.get('status') == 'completed':
+                    return cached.get('response_data') or {"success": True, "lead_id": None}
+                idempotency_manager.store_key(key, 'webhook_lead', lead_data.get('user_id', 1), idempotency_payload)
             
             # Generate unique lead ID
             lead_id = f"lead_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{hashlib.md5(lead_data['email'].encode()).hexdigest()[:8]}"
             lead_data['id'] = lead_id
             lead_data['created_at'] = datetime.now().isoformat()
+
+            # Score lead + quality
+            scoring = get_lead_scoring_service().score_lead(lead_data, activity_count=0, last_activity=None)
+            lead_data['score'] = scoring.score
+            lead_data['metadata'] = {
+                **(lead_data.get('metadata', {}) or {}),
+                'lead_quality': scoring.quality,
+                'score_breakdown': scoring.breakdown
+            }
             
             # Store in database
             db_result = self._store_lead_in_db(lead_data)
             if not db_result['success']:
                 return db_result
+            lead_id = db_result.get('lead_id', lead_id)
             
             # Sync to Google Sheets
             if self.sheets_connector:
@@ -237,19 +269,48 @@ class WebhookIntakeService:
             # else: notion_connector is None (feature not implemented)
             
             logger.info(f"✅ Successfully processed lead: {lead_data['email']}")
-            return {
+            result = {
                 "success": True,
                 "lead_id": lead_id,
                 "message": "Lead processed successfully"
             }
+            if key:
+                idempotency_manager.update_key_result(key, 'completed', result)
+            return result
             
         except Exception as e:
             logger.error(f"❌ Failed to process lead: {e}")
+            if key:
+                idempotency_manager.update_key_result(key, 'failed', {"success": False, "error": str(e)})
             return {"success": False, "error": str(e)}
     
     def _store_lead_in_db(self, lead_data: Dict[str, Any]) -> Dict[str, Any]:
         """Store lead data in the database"""
         try:
+            # Upsert by email (idempotent for replays)
+            existing = db_optimizer.execute_query(
+                "SELECT id FROM leads WHERE user_id = ? AND email = ?",
+                (lead_data.get('user_id', 1), lead_data['email'])
+            )
+            if existing:
+                lead_id = existing[0]['id']
+                db_optimizer.execute_query(
+                    """UPDATE leads SET name = ?, phone = ?, company = ?, source = ?, status = ?, notes = ?, tags = ?, metadata = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (
+                        lead_data.get('name'),
+                        lead_data.get('phone'),
+                        lead_data.get('company'),
+                        lead_data.get('source'),
+                        lead_data.get('status'),
+                        lead_data.get('notes'),
+                        json.dumps(lead_data.get('tags', [])),
+                        json.dumps(lead_data.get('metadata', {})),
+                        lead_id
+                    ),
+                    fetch=False
+                )
+                return {"success": True, "lead_id": lead_id}
+
             # Insert lead into database
             query = """
                 INSERT INTO leads (

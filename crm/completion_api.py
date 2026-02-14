@@ -296,20 +296,30 @@ def create_pipeline_stage():
 
 @crm_bp.route('/pipeline/leads/<int:user_id>', methods=['GET'])
 def get_pipeline_leads(user_id):
-    """Get leads organized by pipeline stage"""
+    """Get leads organized by pipeline stage with filters and pagination"""
     try:
+        stage_filter = request.args.get('stage')
+        limit = min(max(request.args.get('limit', 100, type=int), 1), 500)
+        offset = request.args.get('offset', 0, type=int)
+        
         query = """
-            SELECT l.*, 
+            SELECT l.id, l.user_id, l.email, l.name, l.phone, l.company, l.source, l.stage, l.score, l.created_at, l.updated_at, l.last_contact, l.notes, l.tags, l.metadata,
                    COUNT(la.id) as activity_count,
                    MAX(la.timestamp) as last_activity
             FROM leads l
             LEFT JOIN lead_activities la ON l.id = la.lead_id
             WHERE l.user_id = ?
-            GROUP BY l.id
-            ORDER BY l.created_at DESC
         """
+        params = [user_id]
         
-        leads = db_optimizer.execute_query(query, (user_id,))
+        if stage_filter:
+            query += " AND l.stage = ?"
+            params.append(stage_filter)
+        
+        query += " GROUP BY l.id ORDER BY l.created_at DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+        
+        leads = db_optimizer.execute_query(query, tuple(params))
         
         # Group leads by stage
         pipeline_data = {}
@@ -318,6 +328,8 @@ def get_pipeline_leads(user_id):
             if stage not in pipeline_data:
                 pipeline_data[stage] = []
             
+            metadata = json.loads(lead.get('metadata', '{}'))
+            lead_quality = metadata.get('lead_quality')
             pipeline_data[stage].append({
                 'id': lead['id'],
                 'name': lead['name'],
@@ -325,13 +337,14 @@ def get_pipeline_leads(user_id):
                 'company': lead['company'],
                 'stage': lead['stage'],
                 'score': lead['score'],
+                'lead_quality': lead_quality,
                 'created_at': lead['created_at'],
                 'last_contact': lead['last_contact'],
                 'activity_count': lead['activity_count'],
                 'last_activity': lead['last_activity']
             })
         
-        return jsonify({"success": True, "pipeline": pipeline_data}), 200
+        return jsonify({"success": True, "pipeline": pipeline_data, "limit": limit, "offset": offset}), 200
         
     except Exception as e:
         logger.error(f"❌ Get pipeline leads error: {e}")

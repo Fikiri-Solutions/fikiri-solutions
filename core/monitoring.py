@@ -14,6 +14,14 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 from pathlib import Path
 
+def _is_test_mode() -> bool:
+    return (
+        os.getenv("FIKIRI_TEST_MODE") == "1"
+        or os.getenv("FLASK_ENV") == "test"
+        or bool(os.getenv("PYTEST_CURRENT_TEST"))
+    )
+
+
 # Optional imports with fallbacks
 try:
     import sentry_sdk
@@ -24,7 +32,8 @@ try:
     SENTRY_AVAILABLE = True
 except ImportError:
     SENTRY_AVAILABLE = False
-    logging.warning("sentry-sdk not available. Install with: pip install sentry-sdk[flask]")
+    if os.getenv("SENTRY_DSN") and os.getenv("FLASK_ENV") == "production" and not _is_test_mode():
+        logging.warning("sentry-sdk not available. Install with: pip install sentry-sdk[flask]")
 
 try:
     from flask import Flask, request, g, jsonify
@@ -33,15 +42,22 @@ except ImportError:
     FLASK_AVAILABLE = False
     logging.warning("Flask not available. Install with: pip install flask")
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('logs/fikiri.log'),
-        logging.StreamHandler()
-    ]
-)
+def _configure_logging():
+    if getattr(logging, "_fikiri_monitoring_configured", False):
+        return
+    handlers = [logging.StreamHandler()]
+    if not _is_test_mode():
+        Path("logs").mkdir(parents=True, exist_ok=True)
+        handlers.insert(0, logging.FileHandler("logs/fikiri.log", delay=True))
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=handlers,
+    )
+    logging._fikiri_monitoring_configured = True
+
+
+_configure_logging()
 
 logger = logging.getLogger(__name__)
 

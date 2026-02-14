@@ -62,10 +62,7 @@ class AppleiCloudProvider:
             
             # Load private key
             private_key = self.private_key
-            if private_key.startswith('-----BEGIN'):
-                # Key is already in PEM format
-                pass
-            else:
+            if not private_key.startswith('-----BEGIN'):
                 # Assume it's base64 encoded
                 private_key = base64.b64decode(private_key).decode('utf-8')
             

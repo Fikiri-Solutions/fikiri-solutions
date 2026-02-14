@@ -154,7 +154,7 @@ def _verify_subscription_owned_by_user(subscription_id):
     except Exception as e:
         logger.warning(f"DB check for subscription ownership: {e}")
     try:
-        sub = stripe.Subscription.retrieve(subscription_id, timeout=10)
+        sub = stripe.Subscription.retrieve(subscription_id)
         our_customer_id, _ = _get_current_user_customer_id()
         return our_customer_id and sub.customer == our_customer_id
     except stripe.error.StripeError:
@@ -164,8 +164,8 @@ def _verify_subscription_owned_by_user(subscription_id):
         return False
 
 def _fetch_customer_from_stripe(user_email):
-    """Fetch customer ID from Stripe API"""
-    customers = stripe.Customer.list(email=user_email, limit=1, timeout=10)
+    """Fetch customer ID from Stripe API (do not pass timeout - Stripe API rejects it as param)"""
+    customers = stripe.Customer.list(email=user_email, limit=1)
     if customers.data and len(customers.data) > 0:
         return customers.data[0].id
     return None
@@ -381,10 +381,9 @@ def get_current_subscription():
         if customer_id:
             try:
                 subscriptions = stripe.Subscription.list(
-                    customer=customer_id, 
-                    status='active', 
-                    limit=1,
-                    timeout=10
+                    customer=customer_id,
+                    status='active',
+                    limit=1
                 )
                 if subscriptions.data and len(subscriptions.data) > 0:
                     subscription = stripe_manager.get_subscription(subscriptions.data[0].id)
@@ -516,7 +515,7 @@ def remove_payment_method(payment_method_id):
     try:
         if STRIPE_AVAILABLE:
             try:
-                pm = stripe.PaymentMethod.retrieve(payment_method_id, timeout=10)
+                pm = stripe.PaymentMethod.retrieve(payment_method_id)
                 customer_id = getattr(pm, 'customer', None) or (pm.get('customer') if isinstance(pm, dict) else None)
                 if customer_id and not _verify_customer_owned_by_user(customer_id):
                     return jsonify({'success': False, 'error': 'Payment method not found'}), 404
@@ -558,7 +557,7 @@ def get_customer_details():
         if not user_email:
             return jsonify({'success': False, 'error': 'User not found'}), 404
         
-        customer_id = get_stripe_customer_id(user_email)
+        customer_id = get_stripe_customer_id(user_email, user_id)
         if not customer_id:
             return jsonify({'success': False, 'error': 'No customer found. Please create a subscription first.'}), 400
         

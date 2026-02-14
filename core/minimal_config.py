@@ -6,8 +6,11 @@ Lightweight configuration management without heavy dependencies.
 
 import os
 import json
+import logging
 from pathlib import Path
 from typing import Optional, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 class MinimalConfig:
     """Minimal configuration class - no dataclasses, no heavy imports."""
@@ -57,7 +60,7 @@ class MinimalConfig:
         try:
             self.gmail_max_results = int(os.getenv("GMAIL_MAX_RESULTS", str(self.gmail_max_results)))
         except ValueError:
-            print(f"⚠️ Invalid GMAIL_MAX_RESULTS value, using default: {self.gmail_max_results}")
+            logger.warning("Invalid GMAIL_MAX_RESULTS value, using default: %s", self.gmail_max_results)
         self.auto_reply_enabled = os.getenv("AUTO_REPLY_ENABLED", "false").lower() == "true"
         self.log_level = os.getenv("LOG_LEVEL", self.log_level)
         
@@ -80,7 +83,7 @@ class MinimalConfig:
                         if hasattr(self, key):
                             setattr(self, key, value)
             except Exception as e:
-                print(f"Warning: Could not load config.json: {e}")
+                logger.warning("Could not load config.json: %s", e)
     
     def save(self):
         """Save current configuration to config.json."""
@@ -99,9 +102,9 @@ class MinimalConfig:
             }
             with open(config_file, 'w') as f:
                 json.dump(config_data, f, indent=2)
-            print("✅ Configuration saved to config.json")
+            logger.info("Configuration saved to config.json")
         except Exception as e:
-            print(f"❌ Could not save config.json: {e}")
+            logger.error("Could not save config.json: %s", e)
     
     def get_gmail_scopes(self):
         """Get Gmail scopes as list."""

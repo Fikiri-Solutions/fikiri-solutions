@@ -9,7 +9,7 @@ import json
 import time
 import hashlib
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, Callable
 from functools import wraps
 
@@ -25,6 +25,23 @@ from core.database_optimization import db_optimizer
 
 logger = logging.getLogger(__name__)
 
+def _is_test_mode() -> bool:
+    return (
+        os.getenv("FIKIRI_TEST_MODE") == "1"
+        or os.getenv("FLASK_ENV") == "test"
+        or bool(os.getenv("PYTEST_CURRENT_TEST"))
+    )
+
+
+def _utcnow_naive() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _to_utc_naive(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
 class IdempotencyManager:
     """Idempotency management system for safe operation retries"""
     
@@ -37,6 +54,9 @@ class IdempotencyManager:
     
     def _connect_redis(self):
         """Connect to Redis for idempotency keys"""
+        if _is_test_mode():
+            self.redis_client = None
+            return
         if not REDIS_AVAILABLE:
             logger.warning("Redis not available, using database for idempotency")
             return
@@ -148,7 +168,8 @@ class IdempotencyManager:
                 
                 # Cache in Redis
                 if self.redis_client:
-                    ttl = int((datetime.fromisoformat(key_record['expires_at']) - datetime.utcnow()).total_seconds())
+                    expires_at = datetime.fromisoformat(key_record['expires_at'])
+                    ttl = int((_to_utc_naive(expires_at) - _utcnow_naive()).total_seconds())
                     if ttl > 0:
                         self.redis_client.setex(
                             f"{self.key_prefix}{key}",
@@ -169,7 +190,7 @@ class IdempotencyManager:
         """Store an idempotency key"""
         try:
             ttl = ttl or self.default_ttl
-            expires_at = datetime.utcnow() + timedelta(seconds=ttl)
+            expires_at = _utcnow_naive() + timedelta(seconds=ttl)
             
             # Store in database
             db_optimizer.execute_query("""
@@ -193,7 +214,7 @@ class IdempotencyManager:
                         'key': key,
                         'status': 'pending',
                         'response_data': None,
-                        'created_at': datetime.utcnow().isoformat(),
+                        'created_at': _utcnow_naive().isoformat(),
                         'expires_at': expires_at.isoformat()
                     })
                 )
@@ -254,7 +275,7 @@ class IdempotencyManager:
             # Clean Redis (TTL handles expiration automatically)
             if self.redis_client:
                 # Redis TTL handles expiration automatically
-                pass
+                logger.debug("Redis TTL handles idempotency key cleanup")
             
             logger.info("✅ Expired idempotency keys cleaned up")
             
@@ -354,7 +375,23 @@ def generate_user_operation_key(operation_type: str, user_id: int,
                                additional_data: Dict[str, Any] = None) -> str:
     """Generate idempotency key for user operations"""
     request_data = additional_data or {}
-    return idempotency_manager.generate_key(operation_type, user_id, request_data)
+    return generate_deterministic_key(operation_type, user_id, request_data)
+
+
+def generate_deterministic_key(operation_type: str, user_id: int = None,
+                              request_data: Dict[str, Any] = None) -> str:
+    """Generate a deterministic idempotency key for stable replays."""
+    try:
+        payload = {
+            "operation_type": operation_type,
+            "user_id": user_id,
+            "request_data": request_data or {}
+        }
+        payload_str = json.dumps(payload, sort_keys=True)
+        return hashlib.sha256(payload_str.encode()).hexdigest()
+    except Exception as e:
+        logger.error(f"❌ Deterministic key generation failed: {e}")
+        return idempotency_manager.generate_key(operation_type, user_id, request_data)
 
 def generate_email_operation_key(operation_type: str, user_id: int, 
                                 email_id: str, action: str) -> str:
@@ -363,7 +400,7 @@ def generate_email_operation_key(operation_type: str, user_id: int,
         'email_id': email_id,
         'action': action
     }
-    return idempotency_manager.generate_key(operation_type, user_id, request_data)
+    return generate_deterministic_key(operation_type, user_id, request_data)
 
 def generate_contact_operation_key(operation_type: str, user_id: int, 
                                   contact_email: str, action: str) -> str:
@@ -372,4 +409,4 @@ def generate_contact_operation_key(operation_type: str, user_id: int,
         'contact_email': contact_email,
         'action': action
     }
-    return idempotency_manager.generate_key(operation_type, user_id, request_data)
+    return generate_deterministic_key(operation_type, user_id, request_data)

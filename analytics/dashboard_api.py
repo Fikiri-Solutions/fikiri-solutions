@@ -191,7 +191,7 @@ def get_dashboard_metrics():
         # Try to check Gmail connection
         try:
             oauth_data = db_optimizer.execute_query(
-                "SELECT COUNT(*) as count FROM oauth_tokens WHERE user_id = ? AND provider = 'gmail' AND expires_at > datetime('now')",
+                "SELECT COUNT(*) as count FROM oauth_tokens WHERE user_id = ? AND service = 'gmail' AND expires_at > datetime('now')",
                 (user_id,)
             )
             if oauth_data and len(oauth_data) > 0:
@@ -458,7 +458,8 @@ def get_email_metrics():
                 """, (user_id, day_start.isoformat(), day_end.isoformat()))
                 
                 count = day_result[0]['count'] if day_result and len(day_result) > 0 else 0
-            except:
+            except Exception as day_error:
+                logger.debug("Email trends query failed for %s: %s", day_start.date(), day_error)
                 count = 0
             
             trends.append({

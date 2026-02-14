@@ -8,7 +8,7 @@ import os
 import json
 import time
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 
@@ -33,6 +33,17 @@ except ImportError:
 from core.database_optimization import db_optimizer
 
 logger = logging.getLogger(__name__)
+
+def _is_test_mode() -> bool:
+    return (
+        os.getenv("FIKIRI_TEST_MODE") == "1"
+        or os.getenv("FLASK_ENV") == "test"
+        or bool(os.getenv("PYTEST_CURRENT_TEST"))
+    )
+
+
+def _utcnow_naive() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 @dataclass
 class EmailJob:
@@ -67,6 +78,9 @@ class EmailJobManager:
     
     def _connect_redis(self):
         """Connect to Redis for job queues"""
+        if _is_test_mode():
+            self.redis_client = None
+            return
         if not REDIS_AVAILABLE:
             logger.warning("Redis not available, email jobs will be processed synchronously")
             return
@@ -133,7 +147,7 @@ class EmailJobManager:
                 'name': name,
                 'email': email,
                 'company_name': company_name or 'Your Company',
-                'signup_date': datetime.utcnow().isoformat(),
+                'signup_date': _utcnow_naive().isoformat(),
                 'dashboard_url': 'https://fikirisolutions.com/dashboard',
                 'support_email': 'support@fikirisolutions.com'
             }
@@ -352,7 +366,7 @@ class EmailJobManager:
                         else:
                             # Schedule retry
                             retry_delay = min(300 * (2 ** attempts), 3600)  # Exponential backoff, max 1 hour
-                            retry_time = datetime.utcnow() + timedelta(seconds=retry_delay)
+                            retry_time = _utcnow_naive() + timedelta(seconds=retry_delay)
                             
                             db_optimizer.execute_query("""
                                 UPDATE email_jobs 
@@ -607,7 +621,7 @@ class EmailJobManager:
     def cleanup_old_jobs(self, days: int = 30):
         """Clean up old email jobs"""
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            cutoff_date = _utcnow_naive() - timedelta(days=days)
             
             db_optimizer.execute_query("""
                 DELETE FROM email_jobs 

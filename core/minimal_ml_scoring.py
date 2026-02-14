@@ -413,7 +413,8 @@ class MinimalMLScoring:
                 return 0.4
             else:
                 return 0.2
-        except:
+        except Exception as parse_error:
+            logger.debug("Response time scoring failed: %s", parse_error)
             return 0.5
     
     def _score_email_length(self, content: str) -> float:
@@ -494,7 +495,8 @@ class MinimalMLScoring:
                 return 0.6
             else:
                 return 0.4
-        except:
+        except Exception as parse_error:
+            logger.debug("Time of day scoring failed: %s", parse_error)
             return 0.5
     
     def _determine_priority(self, total_score: float) -> str:

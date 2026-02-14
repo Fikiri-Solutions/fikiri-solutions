@@ -40,8 +40,8 @@ def handle_tally_webhook():
                     "error": "Invalid signature"
                 }), 401
         
-        # Process webhook data
-        data = request.get_json()
+        # Process webhook data (silent=True so invalid/empty body yields None, not 400 raise)
+        data = request.get_json(silent=True)
         if not data:
             return jsonify({
                 "success": False,

@@ -64,22 +64,22 @@ class IntegrationProvider(ABC):
     @abstractmethod
     def get_auth_url(self, state: str, redirect_uri: str) -> str:
         """Generate OAuth authorization URL"""
-        pass
+        raise NotImplementedError("get_auth_url must be implemented by integration providers")
     
     @abstractmethod
     def exchange_code_for_tokens(self, code: str, redirect_uri: str) -> Dict[str, Any]:
         """Exchange authorization code for tokens"""
-        pass
+        raise NotImplementedError("exchange_code_for_tokens must be implemented by integration providers")
     
     @abstractmethod
     def refresh_access_token(self, refresh_token: str) -> Dict[str, Any]:
         """Refresh expired access token"""
-        pass
+        raise NotImplementedError("refresh_access_token must be implemented by integration providers")
     
     @abstractmethod
     def revoke_token(self, access_token: str) -> bool:
         """Revoke access token"""
-        pass
+        raise NotImplementedError("revoke_token must be implemented by integration providers")
 
 
 class IntegrationManager:

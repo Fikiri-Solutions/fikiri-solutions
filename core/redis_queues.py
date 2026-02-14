@@ -90,7 +90,8 @@ class RedisQueue:
         try:
             self.redis_client.ping()
             return True
-        except:
+        except Exception as ping_error:
+            logger.debug("Redis queue ping failed: %s", ping_error)
             return False
     
     def register_task(self, task_name: str, task_func: Callable):
@@ -533,11 +534,11 @@ def process_webhook(webhook_data: Dict[str, Any], **kwargs):
     webhook_type = webhook_data.get("type")
     
     if webhook_type == "stripe.payment.succeeded":
-        # Handle successful payment
-        pass
+        logger.info("Stripe payment succeeded webhook received")
     elif webhook_type == "stripe.subscription.created":
-        # Handle new subscription
-        pass
+        logger.info("Stripe subscription created webhook received")
+    else:
+        logger.info("Unhandled webhook type: %s", webhook_type)
     
     return {
         "success": True,

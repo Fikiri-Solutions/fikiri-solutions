@@ -36,6 +36,14 @@ def _resolve_redis_url() -> Optional[str]:
     return None
 
 
+def _is_test_mode() -> bool:
+    return (
+        os.getenv("FIKIRI_TEST_MODE") == "1"
+        or os.getenv("FLASK_ENV") == "test"
+        or bool(os.getenv("PYTEST_CURRENT_TEST"))
+    )
+
+
 def get_redis_client(decode_responses: bool = True, db: int = 0) -> Optional[redis.Redis]:
     """
     Get a Redis client with proper SSL handling for Upstash Redis
@@ -48,6 +56,9 @@ def get_redis_client(decode_responses: bool = True, db: int = 0) -> Optional[red
         Redis client or None if connection fails
     """
     if not REDIS_AVAILABLE:
+        return None
+
+    if _is_test_mode():
         return None
     
     try:
@@ -64,7 +75,6 @@ def get_redis_client(decode_responses: bool = True, db: int = 0) -> Optional[red
                 db=db,
                 socket_connect_timeout=5,
                 socket_timeout=5,
-                retry_on_timeout=True,
             )
             
             # Test connection
@@ -91,7 +101,6 @@ def get_redis_client(decode_responses: bool = True, db: int = 0) -> Optional[red
                 decode_responses=decode_responses,
                 socket_connect_timeout=5,
                 socket_timeout=5,
-                retry_on_timeout=True
             )
             client.ping()
             logger.info(f"✅ Redis connection established (local): {redis_host}:{redis_port}")
@@ -123,7 +132,7 @@ def is_redis_available() -> bool:
         try:
             client.ping()
             return True
-        except:
+        except Exception as ping_error:
+            logger.debug("Redis ping failed: %s", ping_error)
             return False
     return False
-

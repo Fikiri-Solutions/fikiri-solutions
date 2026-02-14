@@ -109,35 +109,30 @@ def log_redis_usage_report():
 
 
 def print_redis_usage_report():
-    """Print a formatted Redis usage report (CLI only, e.g. python -m core.redis_monitor)."""
+    """Log a formatted Redis usage report (CLI only, e.g. python -m core.redis_monitor)."""
     stats = get_redis_usage_stats()
     if not stats:
-        print("❌ Redis not available or connection failed")
+        logger.warning("Redis not available or connection failed")
         return
     mem = stats['memory']
     keys = stats['keys']
     cmd = stats['commands']
     conn = stats['connection']
-    print("\n" + "="*60)
-    print("REDIS USAGE REPORT")
-    print("="*60)
-    print(f"\n📦 STORAGE\n   Used: {mem['used_mb']} MB / {mem['limit_mb']} MB ({mem['usage_percent']}%)")
-    print(f"   Status: {mem['status']}")
-    print(f"\n🔑 KEYS\n   Total: {keys['total']}\n   With TTL: {keys['with_ttl']}\n   Without TTL: {keys['without_ttl']}")
+    logger.info("REDIS USAGE REPORT")
+    logger.info("STORAGE used=%s MB / %s MB (%s%%) status=%s", mem['used_mb'], mem['limit_mb'], mem['usage_percent'], mem['status'])
+    logger.info("KEYS total=%s with_ttl=%s without_ttl=%s", keys['total'], keys['with_ttl'], keys['without_ttl'])
     if keys['without_ttl'] > 0:
-        print(f"   ⚠️  Warning: {keys['without_ttl']} keys have no expiration!")
-    print("   By Prefix:")
+        logger.warning("Redis keys without TTL: %s", keys['without_ttl'])
+    logger.info("KEYS by_prefix:")
     for prefix, count in sorted(keys['by_prefix'].items(), key=lambda x: x[1], reverse=True):
-        print(f"      {prefix}: {count}")
-    print(f"\n⚡ COMMANDS\n   Processed: {cmd['total_processed']:,} / {cmd['limit']:,} ({cmd['usage_percent']}%)")
-    print(f"   Status: {cmd['status']}")
-    print(f"\n🔌 CONNECTION\n   Connected clients: {conn['connected_clients']}\n   Uptime: {conn['uptime_seconds'] // 3600} hours")
-    print("\n" + "="*60 + "\n")
+        logger.info("  %s: %s", prefix, count)
+    logger.info("COMMANDS processed=%s / %s (%s%%) status=%s", f"{cmd['total_processed']:,}", f"{cmd['limit']:,}", cmd['usage_percent'], cmd['status'])
+    logger.info("CONNECTION clients=%s uptime_h=%s", conn['connected_clients'], conn['uptime_seconds'] // 3600)
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
     print_redis_usage_report()
-
 
 
 

@@ -77,6 +77,8 @@ from core.webhook_api import webhook_bp
 from crm.completion_api import crm_bp
 from core.docs_forms_api import docs_forms_bp
 from core.chatbot_smart_faq_api import chatbot_bp
+from core.public_chatbot_api import public_chatbot_bp
+from core.ai_analysis_api import ai_analysis_bp
 from core.workflow_templates_api import workflow_templates_bp
 from analytics.monitoring_api import monitoring_dashboard_bp
 from core.ai_chat_api import ai_bp
@@ -278,8 +280,10 @@ def initialize_services(app):
         services['gmail'] = MinimalGmailService()
         services['actions'] = MinimalEmailActions()
         services['ai_assistant'] = MinimalAIEmailAssistant(api_key=os.getenv("OPENAI_API_KEY"))
-        services['ml_scoring'] = MinimalMLScoring()
-        services['vector_search'] = MinimalVectorSearch()
+        services['ml_scoring'] = MinimalMLScoring(services=services)
+        # Lazy-load vector search to avoid mutex contention (will be created on first use)
+        # Don't create here - let get_vector_search() handle it
+        services['vector_search'] = None  # Will be initialized lazily
         services['feature_flags'] = get_feature_flags()
         services['email_manager'] = EmailServiceManager()
 
@@ -447,6 +451,8 @@ def register_blueprints(app):
         (crm_bp, 'crm'),
         (docs_forms_bp, 'docs_forms'),
         (chatbot_bp, 'chatbot'),
+        (public_chatbot_bp, 'public_chatbot'),
+        (ai_analysis_bp, 'ai_analysis'),
         (workflow_templates_bp, 'workflow_templates'),
         (monitoring_dashboard_bp, 'monitoring_dashboard'),
         (ai_bp, 'ai'),
@@ -563,7 +569,30 @@ def ai_response_direct():
         if not message:
             return jsonify({'success': False, 'error': 'Message is required'}), 400
         
-        # Simple AI response logic
+        # Prefer real LLM response; fall back to demo response
+        try:
+            from core.ai.llm_router import LLMRouter
+            router = LLMRouter()
+            if router and router.client and router.client.is_enabled():
+                llm_result = router.process(
+                    input_data=message,
+                    intent='general',
+                    context={'channel': 'ai_response_direct'}
+                )
+                if llm_result.get('success'):
+                    return jsonify({
+                        'success': True,
+                        'data': {
+                            'response': llm_result.get('content', ''),
+                            'confidence': 0.75,
+                            'intent': 'general_inquiry',
+                            'suggested_actions': []
+                        },
+                        'message': 'AI response generated successfully'
+                    })
+        except Exception as llm_error:
+            logger.error("AI response direct LLM failed: %s", llm_error)
+
         response_data = {
             'success': True,
             'data': {
@@ -583,11 +612,10 @@ def ai_response_direct():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
-    # Development server configuration
-    app = create_app()
-    port = int(os.getenv('PORT', 5000))
+    # Use app already created at module level (create_app() above) — avoid duplicate init
+    port = int(os.getenv('PORT') or os.getenv('FLASK_RUN_PORT', 8081))
     debug = os.getenv('FLASK_ENV') == 'development'
-    
+
     if app.socketio:
         logger.info(f"🚀 Starting Flask server with SocketIO on port {port}")
         app.socketio.run(app, host='0.0.0.0', port=port, debug=debug, use_reloader=False)

@@ -26,11 +26,11 @@ class CleanupScheduler:
         self.log_retention_days = int(os.getenv('CLEANUP_LOG_RETENTION_DAYS', '30'))
     
     def start(self):
-        """Start the cleanup scheduler"""
+        """Start the cleanup scheduler (idempotent: safe to call multiple times)."""
         if self.running:
-            logger.warning("⚠️ Cleanup scheduler already running")
+            logger.debug("Cleanup scheduler already running, skipping start")
             return
-        
+
         self.running = True
         self.thread = threading.Thread(target=self._run_scheduler, daemon=True)
         self.thread.start()

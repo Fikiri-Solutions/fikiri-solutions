@@ -16,6 +16,29 @@ from core.ai.llm_router import LLMRouter
 
 logger = logging.getLogger(__name__)
 
+CLASSIFICATION_SCHEMA = {
+    "type": "object",
+    "required": ["intent", "confidence", "urgency", "suggested_action"],
+    "properties": {
+        "intent": {"type": "string"},
+        "confidence": {"type": "number"},
+        "urgency": {"type": "string"},
+        "suggested_action": {"type": "string"},
+    },
+}
+
+CONTACT_SCHEMA = {
+    "type": "object",
+    "required": ["phone", "company", "website", "location", "budget", "timeline"],
+    "properties": {
+        "phone": {"type": "string"},
+        "company": {"type": "string"},
+        "website": {"type": "string"},
+        "location": {"type": "string"},
+        "budget": {"type": "string"},
+        "timeline": {"type": "string"},
+    },
+}
 class MinimalAIEmailAssistant:
     """Minimal AI email assistant with production enhancements."""
     
@@ -23,6 +46,7 @@ class MinimalAIEmailAssistant:
         """Initialize AI email assistant with enhanced features."""
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.services = services or {}
+        test_mode = os.getenv("FIKIRI_TEST_MODE") == "1"
         
         # Initialize LLM router (required by rulepack - all LLM calls go through router)
         self.router = LLMRouter(api_key=self.api_key)
@@ -39,7 +63,8 @@ class MinimalAIEmailAssistant:
         if self.enabled:
             logger.info("✅ AI assistant initialized with LLM router")
         else:
-            logger.warning("⚠️ AI assistant disabled - no OpenAI API key found")
+            if not test_mode:
+                logger.warning("⚠️ AI assistant disabled - no OpenAI API key found")
     
     def _initialize_redis(self):
         """Initialize Redis client for analytics."""
@@ -121,10 +146,11 @@ class MinimalAIEmailAssistant:
             result = self.router.process(
                 input_data=prompt,
                 intent='classification',
+                output_schema=CLASSIFICATION_SCHEMA,
                 context={'operation': 'email_classification', 'subject': subject}
             )
             
-            if result['success']:
+            if result['success'] and result.get('validated'):
                 try:
                     parsed_result = json.loads(result['content'])
                     # Track usage
@@ -247,6 +273,11 @@ class MinimalAIEmailAssistant:
             logger.error(f"❌ AI response generation failed: {e}")
             self._track_ai_usage("generate_response", False)
             return self._fallback_response(sender_name, subject)
+
+    def generate_reply(self, sender_name: str, subject: str, email_content: str = "", email_body: str = "") -> str:
+        """Generate a reply for email automation actions."""
+        combined = "\n".join([part for part in [email_content, email_body] if part])
+        return self.generate_response(combined, sender_name, subject, intent="email_reply")
     
     def extract_contact_info(self, email_content: str) -> Dict[str, Any]:
         """Extract contact information from email with enhanced tracking."""
@@ -274,10 +305,11 @@ class MinimalAIEmailAssistant:
             result = self.router.process(
                 input_data=prompt,
                 intent='extraction',
+                output_schema=CONTACT_SCHEMA,
                 context={'operation': 'contact_extraction'}
             )
             
-            if result['success']:
+            if result['success'] and result.get('validated'):
                 try:
                     parsed_result = json.loads(result['content'])
                     # Track usage
@@ -358,23 +390,13 @@ class MinimalAIEmailAssistant:
         """Get AI usage statistics."""
         stats = {
             "enabled": self.is_enabled(),
-            "openai_version": "unknown",
+            "llm_provider": "openai" if self.router.client.is_enabled() else "missing",
             "redis_available": self.redis_client is not None,
             "crm_integration": self.crm_service is not None,
             "total_operations": 0,
             "successful_operations": 0,
             "total_tokens": 0
         }
-        
-        # Get OpenAI version
-        try:
-            import openai
-            if hasattr(openai, 'OpenAI'):
-                stats["openai_version"] = "1.0+"
-            else:
-                stats["openai_version"] = "0.x"
-        except ImportError:
-            stats["openai_version"] = "not_installed"
         
         # Get usage stats from Redis
         if self.redis_client:
@@ -391,7 +413,8 @@ class MinimalAIEmailAssistant:
                         if data.get("success"):
                             successful_count += 1
                         total_tokens += data.get("tokens_used", 0)
-                    except:
+                    except Exception as parse_error:
+                        logger.debug("Failed to parse AI usage record: %s", parse_error)
                         continue
                 
                 stats["successful_operations"] = successful_count
@@ -404,22 +427,23 @@ class MinimalAIEmailAssistant:
     
     def _load_business_context(self) -> Dict[str, str]:
         """Load business context from file or use defaults."""
-        try:
-            business_file = Path("data/business_profile.json")
-            if business_file.exists():
-                with open(business_file, 'r') as f:
-                    context = json.load(f)
-                    logger.info("✅ Business context loaded from file")
-                    return context
-        except Exception as e:
-            logger.warning(f"Failed to load business context: {e}")
-        
-        # Default business context
-        return {
+        defaults = {
             "company_name": "Fikiri Solutions",
             "services": "Gmail automation and lead management",
             "tone": "professional and helpful"
         }
+        try:
+            business_file = Path("data/business_profile.json")
+            if business_file.exists():
+                with open(business_file, 'r') as f:
+                    context = json.load(f) or {}
+                    merged = {**defaults, **context}
+                    logger.info("✅ Business context loaded from file")
+                    return merged
+        except Exception as e:
+            logger.warning(f"Failed to load business context: {e}")
+        
+        return defaults
     
     def _fallback_classification(self, email_content: str, subject: str) -> Dict[str, Any]:
         """Fallback classification when AI is not available."""

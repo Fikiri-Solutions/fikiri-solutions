@@ -6,9 +6,12 @@ Smart feature flags for heavy dependencies with fallbacks.
 
 import os
 import json
+import logging
 from typing import Dict, Any, Optional, Callable
 from pathlib import Path
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 class FeatureLevel(Enum):
     """Feature capability levels."""
@@ -99,9 +102,9 @@ class FeatureFlags:
                     for flag_name, flag_config in config_data.items():
                         if flag_name in self.flags:
                             self.flags[flag_name].update(flag_config)
-                print(f"✅ Loaded feature flags from {self.config_path}")
+                logger.info("Loaded feature flags from %s", self.config_path)
         except Exception as e:
-            print(f"⚠️  Could not load feature flags: {e}")
+            logger.warning("Could not load feature flags: %s", e)
     
     def save_config(self):
         """Save feature flags to config file."""
@@ -109,9 +112,9 @@ class FeatureFlags:
             self.config_path.parent.mkdir(exist_ok=True)
             with open(self.config_path, 'w') as f:
                 json.dump(self.flags, f, indent=2, default=str)
-            print(f"✅ Saved feature flags to {self.config_path}")
+            logger.info("Saved feature flags to %s", self.config_path)
         except Exception as e:
-            print(f"❌ Could not save feature flags: {e}")
+            logger.error("Could not save feature flags: %s", e)
     
     def _check_heavy_dependencies(self):
         """Check which heavy dependencies are available."""
@@ -155,7 +158,7 @@ class FeatureFlags:
         except ImportError:
             return False
         except Exception as e:
-            print(f"⚠️  Import check failed for {module_name}: {e}")
+            logger.warning("Import check failed for %s: %s", module_name, e)
             return False
     
     def _auto_adjust_features(self):
@@ -206,13 +209,13 @@ class FeatureFlags:
             if level:
                 self.flags[feature_name]["level"] = level
             self._auto_adjust_features()
-            print(f"✅ Enabled feature: {feature_name}")
+            logger.info("Enabled feature: %s", feature_name)
     
     def disable_feature(self, feature_name: str):
         """Disable a feature."""
         if feature_name in self.flags:
             self.flags[feature_name]["enabled"] = False
-            print(f"❌ Disabled feature: {feature_name}")
+            logger.info("Disabled feature: %s", feature_name)
     
     def set_strategic_mode(self, mode: str):
         """Set strategic mode for all features."""
@@ -230,7 +233,7 @@ class FeatureFlags:
                 flag_config["level"] = target_level
         
         self._auto_adjust_features()
-        print(f"🎯 Set strategic mode: {mode} ({target_level.value})")
+        logger.info("Set strategic mode: %s (%s)", mode, target_level.value)
     
     def get_strategic_recommendations(self) -> Dict[str, Any]:
         """Get strategic recommendations based on current setup."""
@@ -271,17 +274,17 @@ class FeatureFlags:
         """Execute function with heavy dependencies, fallback to lightweight if needed."""
         if self.is_enabled(feature_name) and self.can_use_heavy_deps(feature_name):
             try:
-                print(f"🚀 Using heavy implementation for {feature_name}")
+                logger.info("Using heavy implementation for %s", feature_name)
                 return heavy_func(*args, **kwargs)
             except Exception as e:
-                print(f"⚠️  Heavy implementation failed for {feature_name}: {e}")
+                logger.warning("Heavy implementation failed for %s: %s", feature_name, e)
                 if self.flags[feature_name].get("fallback", False):
-                    print(f"🔄 Falling back to lightweight implementation")
+                    logger.info("Falling back to lightweight implementation")
                     return fallback_func(*args, **kwargs)
                 else:
                     raise
         else:
-            print(f"⚡ Using lightweight implementation for {feature_name}")
+            logger.info("Using lightweight implementation for %s", feature_name)
             return fallback_func(*args, **kwargs)
     
     def get_status_report(self) -> Dict[str, Any]:
@@ -321,47 +324,47 @@ def with_feature_flag(feature_name: str):
             if flags.is_enabled(feature_name):
                 return func(*args, **kwargs)
             else:
-                print(f"⚠️  Feature {feature_name} is disabled")
+                logger.warning("Feature %s is disabled", feature_name)
                 return None
         return wrapper
     return decorator
 
 if __name__ == "__main__":
     # Test the feature flag system
-    print("🧪 Testing Strategic Feature Flag System")
-    print("=" * 60)
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
+    logger.info("Testing Strategic Feature Flag System")
     
     flags = FeatureFlags()
     
     # Test basic functionality
-    print("Testing basic functionality...")
-    print(f"✅ Gmail integration enabled: {flags.is_enabled('gmail_integration')}")
-    print(f"✅ AI responses enabled: {flags.is_enabled('ai_email_responses')}")
-    print(f"✅ Advanced NLP enabled: {flags.is_enabled('advanced_nlp')}")
+    logger.info("Testing basic functionality...")
+    logger.info("Gmail integration enabled: %s", flags.is_enabled('gmail_integration'))
+    logger.info("AI responses enabled: %s", flags.is_enabled('ai_email_responses'))
+    logger.info("Advanced NLP enabled: %s", flags.is_enabled('advanced_nlp'))
     
     # Test dependency checking
-    print(f"\nTesting dependency status...")
+    logger.info("Testing dependency status...")
     for dep, available in flags._heavy_deps_status.items():
         status = "✅" if available else "❌"
-        print(f"{status} {dep}: {'Available' if available else 'Not available'}")
+        logger.info("%s %s: %s", status, dep, "Available" if available else "Not available")
     
     # Test strategic recommendations
-    print(f"\nTesting strategic recommendations...")
+    logger.info("Testing strategic recommendations...")
     recommendations = flags.get_strategic_recommendations()
-    print(f"✅ Current capabilities: {len(recommendations['current_capabilities'])}")
-    print(f"✅ Available upgrades: {len(recommendations['available_upgrades'])}")
-    print(f"✅ Missing dependencies: {len(recommendations['missing_dependencies'])}")
+    logger.info("Current capabilities: %s", len(recommendations['current_capabilities']))
+    logger.info("Available upgrades: %s", len(recommendations['available_upgrades']))
+    logger.info("Missing dependencies: %s", len(recommendations['missing_dependencies']))
     
     # Test strategic modes
-    print(f"\nTesting strategic modes...")
+    logger.info("Testing strategic modes...")
     flags.set_strategic_mode("balanced")
-    print(f"✅ Set to balanced mode")
+    logger.info("Set to balanced mode")
     
     # Test status report
-    print(f"\nTesting status report...")
+    logger.info("Testing status report...")
     status = flags.get_status_report()
-    print(f"✅ Total features: {status['total_features']}")
-    print(f"✅ Enabled features: {status['enabled_features']}")
-    print(f"✅ Heavy deps available: {status['heavy_deps_available']}")
+    logger.info("Total features: %s", status['total_features'])
+    logger.info("Enabled features: %s", status['enabled_features'])
+    logger.info("Heavy deps available: %s", status['heavy_deps_available'])
     
-    print("\n🎉 All feature flag tests completed!")
+    logger.info("All feature flag tests completed!")

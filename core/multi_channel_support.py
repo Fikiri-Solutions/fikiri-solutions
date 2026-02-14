@@ -95,17 +95,17 @@ class ChannelHandler(ABC):
     @abstractmethod
     def process_incoming_message(self, raw_message: Dict[str, Any]) -> ChannelMessage:
         """Process incoming message from channel"""
-        pass
+        raise NotImplementedError("process_incoming_message must be implemented by channel handlers")
     
     @abstractmethod
     def format_outgoing_response(self, response: ChannelResponse) -> Dict[str, Any]:
         """Format response for channel"""
-        pass
+        raise NotImplementedError("format_outgoing_response must be implemented by channel handlers")
     
     @abstractmethod
     def send_response(self, formatted_response: Dict[str, Any]) -> bool:
         """Send response through channel"""
-        pass
+        raise NotImplementedError("send_response must be implemented by channel handlers")
     
     def validate_message(self, message: ChannelMessage) -> bool:
         """Validate incoming message"""

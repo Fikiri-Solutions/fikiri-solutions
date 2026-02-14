@@ -18,7 +18,7 @@ try:
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False
-    print("psutil not available for system monitoring")
+    logging.getLogger(__name__).warning("psutil not available for system monitoring")
 
 logger = logging.getLogger(__name__)
 
@@ -492,4 +492,3 @@ class PerformanceMonitor:
 
 # Global performance monitor instance
 performance_monitor = PerformanceMonitor()
-

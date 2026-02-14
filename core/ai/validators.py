@@ -18,7 +18,7 @@ class SchemaValidator:
     
     def __init__(self):
         """Initialize schema validator."""
-        pass
+        self._initialized = True
     
     def validate_schema(self, output: Union[str, Dict[str, Any]], schema: Dict[str, Any]) -> bool:
         """

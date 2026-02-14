@@ -136,6 +136,6 @@ def reset_redis_client():
     if _redis_client:
         try:
             _redis_client.close()
-        except Exception:
-            pass
+        except Exception as close_error:
+            logger.debug("Failed to close Redis client: %s", close_error)
     _redis_client = None

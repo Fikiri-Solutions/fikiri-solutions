@@ -8,7 +8,7 @@ import os
 import json
 import time
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 from enum import Enum
@@ -34,6 +34,17 @@ from core.database_optimization import db_optimizer
 from integrations.gmail.gmail_client import gmail_client
 
 logger = logging.getLogger(__name__)
+
+def _is_test_mode() -> bool:
+    return (
+        os.getenv("FIKIRI_TEST_MODE") == "1"
+        or os.getenv("FLASK_ENV") == "test"
+        or bool(os.getenv("PYTEST_CURRENT_TEST"))
+    )
+
+
+def _utcnow_naive() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 class SyncStatus(Enum):
     """Sync status enumeration"""
@@ -80,6 +91,9 @@ class GmailSyncJobManager:
     
     def _connect_redis(self):
         """Connect to Redis for job queues"""
+        if _is_test_mode():
+            self.redis_client = None
+            return
         if not REDIS_AVAILABLE:
             logger.warning("Redis not available, Gmail sync jobs will be processed synchronously")
             return
@@ -357,8 +371,8 @@ class GmailSyncJobManager:
                     SET status = 'failed', error_message = ?
                     WHERE job_id = ?
                 """, (str(e), job_id), fetch=False)
-            except:
-                pass
+            except Exception as update_error:
+                logger.warning("⚠️ Could not update gmail_sync_jobs failure status: %s", update_error)
             
             # Update user_sync_status to reflect failed sync
             try:
@@ -408,6 +422,22 @@ class GmailSyncJobManager:
             emails_synced = 0
             contacts_found = 0
             leads_identified = 0
+            mailbox_automation_enabled = os.getenv("MAILBOX_AUTOMATION_ENABLED", "").lower() in {"1", "true", "yes"}
+            actions = None
+            parser = None
+            if mailbox_automation_enabled:
+                try:
+                    from email_automation.actions import MinimalEmailActions
+                    from email_automation.ai_assistant import MinimalAIEmailAssistant
+                    from email_automation.parser import MinimalEmailParser
+                    actions = MinimalEmailActions(services={
+                        "gmail": service,
+                        "ai_assistant": MinimalAIEmailAssistant()
+                    })
+                    parser = MinimalEmailParser()
+                except Exception as init_error:
+                    logger.warning("Mailbox automation init failed: %s", init_error)
+                    mailbox_automation_enabled = False
             
             for message in messages:
                 try:
@@ -415,6 +445,14 @@ class GmailSyncJobManager:
                     email_id = self._store_email(user_id, message)
                     if email_id:
                         emails_synced += 1
+
+                        if mailbox_automation_enabled and parser and actions:
+                            try:
+                                from email_automation.pipeline import orchestrate_incoming
+                                parsed = parser.parse_message(message)
+                                orchestrate_incoming(parsed, user_id=user_id, actions=actions)
+                            except Exception as automation_error:
+                                logger.warning("Mailbox automation failed for message %s: %s", message.get("id"), automation_error)
                         
                         # Trigger automation: EMAIL_RECEIVED
                         try:
@@ -497,7 +535,7 @@ class GmailSyncJobManager:
         """Get messages from Gmail API"""
         try:
             # Calculate date range
-            end_date = datetime.utcnow()
+            end_date = _utcnow_naive()
             start_date = end_date - timedelta(days=self.sync_days)
             
             # Build query
@@ -548,8 +586,9 @@ class GmailSyncJobManager:
             try:
                 from email.utils import parsedate_to_datetime
                 date = parsedate_to_datetime(date_str)
-            except:
-                date = datetime.utcnow()
+            except Exception as parse_error:
+                logger.debug("Failed to parse email date '%s': %s", date_str, parse_error)
+                date = _utcnow_naive()
             
             # Extract body
             body = self._extract_email_body(message.get('payload', {}))
@@ -597,8 +636,8 @@ class GmailSyncJobManager:
                         import base64
                         try:
                             body_text = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
-                        except:
-                            pass
+                        except Exception as decode_error:
+                            logger.debug("Failed to decode text/plain part: %s", decode_error)
                 
                 elif mime_type == 'text/html':
                     data = part.get('body', {}).get('data', '')
@@ -606,8 +645,8 @@ class GmailSyncJobManager:
                         import base64
                         try:
                             body_html = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
-                        except:
-                            pass
+                        except Exception as decode_error:
+                            logger.debug("Failed to decode text/html part: %s", decode_error)
                 
                 # Recursively check nested parts
                 if 'parts' in part:
@@ -690,7 +729,7 @@ class GmailSyncJobManager:
                 email=email,
                 name=name,
                 company=company,
-                last_contact=datetime.utcnow(),
+                last_contact=_utcnow_naive(),
                 contact_count=1,
                 lead_score=0
             )

@@ -5,17 +5,10 @@ Handles automated follow-ups using OpenAI + Gmail integration
 
 import json
 import logging
+import os
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-
-# Optional dependencies
-try:
-    import openai
-    OPENAI_AVAILABLE = True
-except ImportError:
-    OPENAI_AVAILABLE = False
-    openai = None
 
 try:
     from core.minimal_config import get_config
@@ -39,6 +32,13 @@ try:
 except ImportError:
     DB_OPTIMIZER_AVAILABLE = False
     db_optimizer = None
+
+try:
+    from core.idempotency_manager import idempotency_manager
+    IDEMPOTENCY_AVAILABLE = True
+except ImportError:
+    IDEMPOTENCY_AVAILABLE = False
+    idempotency_manager = None
 
 try:
     from services.email_action_handlers import get_email_action_handler
@@ -239,6 +239,19 @@ Best regards,
     def _send_follow_up(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
         """Send a follow-up email"""
         try:
+            key = None
+            if IDEMPOTENCY_AVAILABLE and idempotency_manager:
+                key = idempotency_manager.generate_key(
+                    'followup_send',
+                    task_data.get('user_id'),
+                    {'task_id': task_data.get('id')}
+                )
+                if key:
+                    cached = idempotency_manager.check_key(key)
+                    if cached and cached.get('status') == 'completed':
+                        return {'success': True, 'message': 'Follow-up already sent'}
+                    idempotency_manager.store_key(key, 'followup_send', task_data.get('user_id'), {'task_id': task_data.get('id')})
+
             # Get template
             template = self._get_template_by_id(task_data['template_id'])
             if not template:
@@ -262,12 +275,18 @@ Best regards,
             if result['success']:
                 # Log the follow-up activity
                 self._log_follow_up_activity(task_data, email_content)
+                if key:
+                    idempotency_manager.update_key_result(key, 'completed', {'success': True})
                 return {"success": True}
             else:
+                if key:
+                    idempotency_manager.update_key_result(key, 'failed', {'success': False, 'error': result.get('error')})
                 return {"success": False, "error": result.get('error')}
                 
         except Exception as e:
             logger.error(f"❌ Failed to send follow-up: {e}")
+            if 'key' in locals() and key:
+                idempotency_manager.update_key_result(key, 'failed', {'success': False, 'error': str(e)})
             return {"success": False, "error": str(e)}
     
     def _prepare_email_content(self, template: FollowUpTemplate, task_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -277,8 +296,10 @@ Best regards,
             lead_meta = json.loads(task_data.get('meta', '{}'))
             
             # Prepare context for OpenAI
+            lead_name = task_data.get('name', '')
             context = {
-                "lead_name": task_data.get('name', ''),
+                "lead_name": lead_name,
+                "name": lead_name,
                 "company_name": task_data.get('company', ''),
                 "lead_stage": task_data.get('stage', ''),
                 "service_type": lead_meta.get('service_type', 'our services'),

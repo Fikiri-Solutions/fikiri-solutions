@@ -24,7 +24,8 @@ class LLMClient:
         """Initialize LLM client with OpenAI API key."""
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.client = None
-        self.enabled = bool(self.api_key)
+        test_mode = os.getenv("FIKIRI_TEST_MODE") == "1"
+        self.enabled = bool(self.api_key) and not test_mode
         
         if self.enabled:
             try:
@@ -46,7 +47,8 @@ class LLMClient:
                 logger.error(f"⚠️ LLM client initialization failed: {e}")
                 self.enabled = False
         else:
-            logger.warning("⚠️ No OpenAI API key found. Set OPENAI_API_KEY environment variable")
+            if not test_mode:
+                logger.warning("⚠️ No OpenAI API key found. Set OPENAI_API_KEY environment variable")
     
     def is_enabled(self) -> bool:
         """Check if LLM client is enabled."""
@@ -267,4 +269,3 @@ class LLMClient:
                (output_tokens / 1000 * model_pricing['output'])
         
         return round(cost, 6)
-

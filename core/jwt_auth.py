@@ -112,8 +112,7 @@ class JWTAuthManager:
                 else:
                     logger.info("ℹ️ device_id column already exists in refresh_tokens")
             except Exception as e:
-                # Column already exists, ignore
-                pass
+                logger.debug("Skipping device_id column migration: %s", e)
             
             # Create indexes for faster lookups
             db_optimizer.execute_query("""

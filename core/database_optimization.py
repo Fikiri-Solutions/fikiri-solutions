@@ -227,6 +227,16 @@ class DatabaseOptimizer:
             if 'stripe_customer_id' not in columns:
                 cursor.execute("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT")
                 logger.info("✅ Added stripe_customer_id column to users table")
+
+            # Migration: Add missing lead columns if they don't exist
+            cursor.execute("PRAGMA table_info(leads)")
+            lead_columns = [row[1] for row in cursor.fetchall()]
+            if 'external_id' not in lead_columns:
+                cursor.execute("ALTER TABLE leads ADD COLUMN external_id TEXT")
+                logger.info("✅ Added external_id column to leads table")
+            if 'subject' not in lead_columns:
+                cursor.execute("ALTER TABLE leads ADD COLUMN subject TEXT")
+                logger.info("✅ Added subject column to leads table")
         except Exception as e:
             logger.warning(f"Migration warning: {e}")
     
@@ -803,6 +813,123 @@ class DatabaseOptimizer:
                 FOREIGN KEY (contact_id) REFERENCES leads (id) ON DELETE SET NULL
             )
         """)
+
+        # Follow-up tasks (email follow-ups)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS follow_up_tasks (
+                id TEXT PRIMARY KEY,
+                lead_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                template_id TEXT NOT NULL,
+                scheduled_for TIMESTAMP NOT NULL,
+                status TEXT DEFAULT 'pending',  -- pending, sent, failed
+                idempotency_key TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                sent_at TIMESTAMP,
+                FOREIGN KEY (lead_id) REFERENCES leads (id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+
+        # Scheduled follow-ups (SMS or custom follow-ups)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS scheduled_follow_ups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                lead_id INTEGER,
+                follow_up_date TIMESTAMP NOT NULL,
+                follow_up_type TEXT NOT NULL,  -- email, sms
+                message TEXT,
+                status TEXT DEFAULT 'scheduled',  -- scheduled, sent, failed
+                idempotency_key TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                sent_at TIMESTAMP,
+                FOREIGN KEY (lead_id) REFERENCES leads (id) ON DELETE SET NULL,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+
+        # Calendar events (for workflow scheduling)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS calendar_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                lead_id INTEGER,
+                title TEXT NOT NULL,
+                event_date TIMESTAMP NOT NULL,
+                duration INTEGER DEFAULT 60,
+                description TEXT,
+                status TEXT DEFAULT 'scheduled',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (lead_id) REFERENCES leads (id) ON DELETE SET NULL,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+
+        # SMS messages log
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sms_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                lead_id INTEGER,
+                phone_number TEXT NOT NULL,
+                message TEXT NOT NULL,
+                status TEXT DEFAULT 'sent',
+                sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (lead_id) REFERENCES leads (id) ON DELETE SET NULL,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+
+        # Invoices (workflow generated)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS invoices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                lead_id INTEGER,
+                amount REAL DEFAULT 0,
+                description TEXT,
+                due_date TIMESTAMP,
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (lead_id) REFERENCES leads (id) ON DELETE SET NULL,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+
+        # Generated documents metadata
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS generated_documents (
+                id TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                lead_id INTEGER,
+                template_id TEXT NOT NULL,
+                format TEXT NOT NULL,
+                content TEXT,
+                metadata TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (lead_id) REFERENCES leads (id) ON DELETE SET NULL,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+
+        # Table/sheet exports metadata
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS table_exports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                lead_id INTEGER,
+                name TEXT,
+                columns TEXT,  -- JSON array
+                row_count INTEGER DEFAULT 0,
+                format TEXT DEFAULT 'csv',
+                data TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (lead_id) REFERENCES leads (id) ON DELETE SET NULL,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
         
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_email_actions_timestamp 
@@ -1018,6 +1145,7 @@ class DatabaseOptimizer:
         """Get database connection with retry logic"""
         conn = None
         last_error = None
+        yielded = False
         
         try:
             for attempt in range(retries):
@@ -1037,15 +1165,19 @@ class DatabaseOptimizer:
                         # Remove integrity check from every connection (too expensive)
                         # Integrity is checked once during initialization
                     
+                    yielded = True
                     yield conn
                     return
                     
                 except (sqlite3.DatabaseError, sqlite3.OperationalError) as e:
+                    if yielded:
+                        # Exception raised from within the with-body; do not retry here
+                        raise
                     if conn:
                         try:
                             conn.close()
-                        except:
-                            pass
+                        except Exception as close_error:
+                            logger.debug("Failed to close SQLite connection: %s", close_error)
                         conn = None
                     
                     last_error = e
@@ -1058,11 +1190,14 @@ class DatabaseOptimizer:
                     else:
                         break
                 except Exception as e:
+                    if yielded:
+                        # Exception raised from within the with-body; do not retry here
+                        raise
                     if conn:
                         try:
                             conn.close()
-                        except:
-                            pass
+                        except Exception as close_error:
+                            logger.debug("Failed to close SQLite connection: %s", close_error)
                     last_error = e
                     break
             
@@ -1073,13 +1208,13 @@ class DatabaseOptimizer:
             if conn and self.db_type != "postgresql":
                 try:
                     conn.close()
-                except:
-                    pass
+                except Exception as close_error:
+                    logger.debug("Failed to close SQLite connection: %s", close_error)
             elif conn and self.db_type == "postgresql" and self.connection_pool:
                 try:
                     self.connection_pool.putconn(conn)
-                except:
-                    pass
+                except Exception as pool_error:
+                    logger.debug("Failed to return PostgreSQL connection to pool: %s", pool_error)
     
     def encrypt_sensitive_data(self, data: str) -> str:
         """Encrypt sensitive data using Fernet encryption"""

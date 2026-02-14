@@ -88,12 +88,22 @@ def api_login():
             'last_login': datetime.now().isoformat()
         },
         'access_token': jwt_tokens['access_token'] if jwt_tokens else None,
+        'refresh_token': jwt_tokens['refresh_token'] if jwt_tokens else None,
         'expires_in': jwt_tokens['expires_in'] if jwt_tokens else None,
         'token_type': 'Bearer'
     }
 
     response, status_code = create_success_response(response_data, "Login successful")
-    response.set_cookie(**cookie_data)
+    try:
+        if cookie_data and isinstance(cookie_data, dict):
+            # Extract cookie name and value (Flask set_cookie uses first positional arg for name)
+            cookie_name = cookie_data.pop('key', cookie_data.pop('name', 'fikiri_session'))
+            cookie_value = cookie_data.pop('value', '')
+            # Remove None values to avoid passing them to set_cookie
+            cookie_kwargs = {k: v for k, v in cookie_data.items() if v is not None}
+            response.set_cookie(cookie_name, cookie_value, **cookie_kwargs)
+    except Exception as e:
+        logger.warning(f"Failed to set session cookie: {e}")
     return response, status_code
 
 @auth_bp.route('/signup', methods=['POST'])
@@ -153,8 +163,8 @@ def api_signup():
                 event_type="user_registration",
                 severity="info",
                 details={
-                    "user_id": user.id,
-                    "email": user.email
+                    "user_id": user_data['id'],
+                    "email": user_data['email']
                 }
             )
         except Exception as e:
@@ -162,8 +172,8 @@ def api_signup():
 
         try:
             business_analytics.track_event('user_signup', {
-                'user_id': user.id,
-                'email': user.email,
+                'user_id': user_data['id'],
+                'email': user_data['email'],
                 'industry': data.get('industry'),
                 'team_size': data.get('team_size')
             })
@@ -172,9 +182,9 @@ def api_signup():
 
         try:
             email_job_manager.queue_welcome_email(
-                user_id=user.id,
-                email=user.email,
-                name=user.name,
+                user_id=user_data['id'],
+                email=user_data['email'],
+                name=user_data['name'],
                 company_name=data.get('business_name', 'My Company')
             )
         except Exception as e:
@@ -193,18 +203,22 @@ def api_signup():
             'session_id': session_id
         }
 
-        response = create_success_response(response_data, "Account created successfully")
+        response, status_code = create_success_response(response_data, "Account created successfully")
         
         # Set secure session cookie safely
         try:
             if cookie_data and isinstance(cookie_data, dict):
-                cookie_name = cookie_data.pop('name', 'fikiri_session')
-                response.set_cookie(cookie_name, **cookie_data)
+                # Extract cookie name and value (Flask set_cookie uses first positional arg for name)
+                cookie_name = cookie_data.pop('key', cookie_data.pop('name', 'fikiri_session'))
+                cookie_value = cookie_data.pop('value', '')
+                # Remove None values to avoid passing them to set_cookie
+                cookie_kwargs = {k: v for k, v in cookie_data.items() if v is not None}
+                response.set_cookie(cookie_name, cookie_value, **cookie_kwargs)
         except Exception as e:
             logger.warning(f"Failed to set session cookie: {e}")
         
         logger.info(f"✅ User registration successful: {user_data['email']}")
-        return response
+        return response, status_code
         
     except Exception as e:
         logger.error(f"Signup error: {e}")
@@ -297,15 +311,27 @@ def refresh_token():
         token = auth_header.split(' ')[1]
         
         # Verify current token
-        from core.jwt_auth import jwt_auth_manager
         payload = jwt_auth_manager.verify_access_token(token)
         
-        if not payload:
+        if not payload or payload.get('error'):
             return create_error_response("Invalid or expired token", 401, 'INVALID_TOKEN')
         
         # Generate new tokens
         user_id = payload['user_id']
-        user_data = payload.get('user_data', {})
+        user_data = None
+        try:
+            user_rows = db_optimizer.execute_query(
+                "SELECT id, email, name, role FROM users WHERE id = ? AND is_active = 1",
+                (user_id,)
+            )
+            if user_rows:
+                user_row = user_rows[0]
+                user_data = dict(user_row) if hasattr(user_row, 'keys') else user_row
+        except Exception as user_error:
+            logger.warning("Failed to load user for token refresh: %s", user_error)
+        
+        if not user_data:
+            return create_error_response("User not found", 404, 'USER_NOT_FOUND')
         
         new_tokens = jwt_auth_manager.generate_tokens(
             user_id=user_id,
@@ -404,8 +430,8 @@ def api_gmail_status():
                         try:
                             import json
                             scopes = json.loads(scopes_json)
-                        except:
-                            pass
+                        except Exception as parse_error:
+                            logger.debug("Failed to parse Gmail scopes: %s", parse_error)
                     
                     # Check if expired
                     is_expired = False
@@ -413,8 +439,8 @@ def api_gmail_status():
                         try:
                             expiry_time = int(expiry_timestamp)
                             is_expired = time.time() >= expiry_time
-                        except:
-                            pass
+                        except Exception as parse_error:
+                            logger.debug("Failed to parse Gmail expiry timestamp: %s", parse_error)
                     
                     return create_success_response({
                         'connected': True,
@@ -527,8 +553,8 @@ def api_outlook_status():
                         try:
                             import json
                             scopes = json.loads(scopes_json) if isinstance(scopes_json, str) else scopes_json
-                        except:
-                            pass
+                        except Exception as parse_error:
+                            logger.debug("Failed to parse Outlook scopes: %s", parse_error)
                     
                     # Check if expired
                     is_expired = False
@@ -536,8 +562,8 @@ def api_outlook_status():
                         try:
                             expiry_time = int(expiry_timestamp)
                             is_expired = time.time() >= expiry_time
-                        except:
-                            pass
+                        except Exception as parse_error:
+                            logger.debug("Failed to parse Outlook expiry timestamp: %s", parse_error)
                     
                     updated_at = token_row.get('updated_at') if isinstance(token_row, dict) else (token_row[6] if len(token_row) > 6 else None)
                     
@@ -821,21 +847,22 @@ def api_whoami():
             jwt_manager = get_jwt_manager()
             token_data = jwt_manager.verify_access_token(token)
         
-        # Get user data if authenticated
+        # Get user data if authenticated (always from database for latest state)
         user_data = None
+        user_id = None
         if session_data:
-            user_data = session_data.get('user_data', {})
+            user_id = session_data.get('user_id')
         elif token_data and 'error' not in token_data:
-            # Get user from database
             user_id = token_data.get('user_id')
-            if user_id:
-                from core.database_optimization import db_optimizer
-                users = db_optimizer.execute_query(
-                    "SELECT id, email, name, role, onboarding_completed, onboarding_step FROM users WHERE id = ?",
-                    (user_id,)
-                )
-                if users:
-                    user_data = users[0]
+
+        if user_id:
+            from core.database_optimization import db_optimizer
+            users = db_optimizer.execute_query(
+                "SELECT id, email, name, role, onboarding_completed, onboarding_step FROM users WHERE id = ?",
+                (user_id,)
+            )
+            if users:
+                user_data = users[0]
         
         response_data = {
             'authenticated': bool(user_data),

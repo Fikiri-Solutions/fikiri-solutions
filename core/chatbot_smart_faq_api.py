@@ -21,12 +21,50 @@ logger = logging.getLogger(__name__)
 # Create Blueprint
 chatbot_bp = Blueprint('chatbot', __name__, url_prefix='/api/chatbot')
 
-# Initialize systems
+# Initialize systems (lighter loads first)
 faq_system = get_smart_faq()
 knowledge_base = get_knowledge_base()
 context_system = get_context_system()
 multi_channel = get_multi_channel_system()
-vector_search = MinimalVectorSearch()
+
+# Lazy-load vector search to avoid mutex contention at startup (sentence_transformers/Pinecone)
+_vector_search: Optional[MinimalVectorSearch] = None
+
+
+def get_vector_search() -> MinimalVectorSearch:
+    """Lazy-initialize vector search on first use to avoid startup mutex hang.
+    Reuses instance from app.services if available to avoid duplicate initialization."""
+    global _vector_search
+    
+    # First, try to get from app services (if already initialized)
+    try:
+        # Import here to avoid circular dependency
+        import sys
+        if 'app' in sys.modules:
+            from app import services
+            if 'vector_search' in services and services['vector_search'] is not None:
+                logger.info("Reusing vector search from app services")
+                _vector_search = services['vector_search']  # Cache locally too
+                return _vector_search
+    except (ImportError, AttributeError, KeyError):
+        pass  # Fall through to create new instance
+    
+    # Create new instance if not in services
+    if _vector_search is None:
+        logger.info("Loading vector search (first use)...")
+        _vector_search = MinimalVectorSearch()
+        
+        # Store in app.services if available (for MinimalMLScoring and other consumers)
+        try:
+            import sys
+            if 'app' in sys.modules:
+                from app import services
+                services['vector_search'] = _vector_search
+                logger.info("Stored vector search instance in app.services")
+        except (ImportError, AttributeError):
+            pass  # Not critical if we can't store it
+    
+    return _vector_search
 
 # Smart FAQ Endpoints
 
@@ -162,9 +200,32 @@ def create_faq_entry():
             priority=priority
         )
 
+        # Persist FAQ to vector index for semantic search
+        try:
+            # Combine question and answer for better searchability
+            faq_content = f"Question: {question}\nAnswer: {answer}"
+            if keywords:
+                faq_content += f"\nKeywords: {', '.join(keywords)}"
+            
+            vector_id = get_vector_search().add_document(
+                content=faq_content,
+                metadata={
+                    "type": "faq",
+                    "faq_id": faq_id,
+                    "question": question,
+                    "category": category,
+                    "priority": priority
+                }
+            )
+            logger.info(f"✅ FAQ {faq_id} persisted to vector index: {vector_id}")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to persist FAQ to vector index: {e}")
+            # Don't fail the request if vectorization fails
+
         return jsonify({
             "success": True,
             "faq_id": faq_id,
+            "vector_id": vector_id if 'vector_id' in locals() else None,
             "message": "FAQ entry created successfully"
         })
 
@@ -292,9 +353,33 @@ def create_knowledge_document():
             author=author
         )
 
+        # Persist document to vector index for semantic search
+        try:
+            # Combine title and content for better searchability
+            doc_content = f"Title: {title}\n{content}"
+            if summary:
+                doc_content = f"{summary}\n\n{doc_content}"
+            
+            vector_id = get_vector_search().add_document(
+                content=doc_content,
+                metadata={
+                    "type": "knowledge_base",
+                    "document_id": doc_id,
+                    "title": title,
+                    "category": category,
+                    "tags": tags,
+                    "author": author
+                }
+            )
+            logger.info(f"✅ Knowledge document {doc_id} persisted to vector index: {vector_id}")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to persist document to vector index: {e}")
+            # Don't fail the request if vectorization fails
+
         return jsonify({
             "success": True,
             "document_id": doc_id,
+            "vector_id": vector_id if 'vector_id' in locals() else None,
             "message": "Knowledge document added"
         })
 
@@ -356,7 +441,7 @@ def vectorize_document_content():
         if not isinstance(metadata, dict):
             metadata = {}
 
-        doc_id = vector_search.add_document(content, metadata)
+        doc_id = get_vector_search().add_document(content, metadata)
 
         return jsonify({
             "success": True,

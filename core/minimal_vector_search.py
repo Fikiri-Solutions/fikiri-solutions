@@ -60,38 +60,107 @@ class MinimalVectorSearch:
         try:
             from pinecone import Pinecone, ServerlessSpec
             index_name = os.getenv("PINECONE_INDEX_NAME", "fikiri-vectors")
+            pinecone_model = os.getenv("PINECONE_EMBEDDING_MODEL")  # e.g., "llama-text-embed-v2"
             
             self.pinecone_client = Pinecone(api_key=api_key)
             
-            # Create index if needed
-            existing = [idx.name for idx in self.pinecone_client.list_indexes()]
-            if index_name not in existing:
-                self.pinecone_client.create_index(
-                    name=index_name,
-                    dimension=384,
-                    metric="cosine",
-                    spec=ServerlessSpec(cloud="aws", region="us-east-1")
-                )
+            # Check if index exists
+            existing_indexes = [idx.name for idx in self.pinecone_client.list_indexes()]
+            
+            if index_name not in existing_indexes:
+                # Try model-based index creation first (newer Pinecone API)
+                if pinecone_model:
+                    try:
+                        logger.info(f"Creating Pinecone index '{index_name}' with model '{pinecone_model}'...")
+                        self.pinecone_client.create_index_for_model(
+                            name=index_name,
+                            cloud="aws",
+                            region="us-east-1",
+                            embed={
+                                "model": pinecone_model,
+                                "field_map": {"text": "text"}  # Match Pinecone UI configuration
+                            }
+                        )
+                        # Get dimension from model (llama-text-embed-v2 is 1024 dimensions)
+                        if "llama" in pinecone_model.lower():
+                            self.dimension = 1024
+                        else:
+                            self.dimension = 384  # Default fallback
+                        logger.info(f"✅ Created Pinecone index '{index_name}' with model '{pinecone_model}' (dimension: {self.dimension})")
+                    except Exception as model_error:
+                        logger.warning(f"Model-based index creation failed: {model_error}, falling back to manual creation")
+                        # Fall back to manual index creation
+                        self.pinecone_client.create_index(
+                            name=index_name,
+                            dimension=384,
+                            metric="cosine",
+                            spec=ServerlessSpec(cloud="aws", region="us-east-1")
+                        )
+                        self.dimension = 384
+                else:
+                    # Manual index creation (original approach)
+                    logger.info(f"Creating Pinecone index '{index_name}' with manual configuration...")
+                    self.pinecone_client.create_index(
+                        name=index_name,
+                        dimension=384,
+                        metric="cosine",
+                        spec=ServerlessSpec(cloud="aws", region="us-east-1")
+                    )
+                    self.dimension = 384
             
             self.pinecone_index = self.pinecone_client.Index(index_name)
             self.use_pinecone = True
-            self.dimension = 384
-            logger.info(f"✅ Pinecone initialized: {index_name}")
+            
+            # Get actual dimension from existing index if we didn't set it
+            if not hasattr(self, 'dimension') or self.dimension is None:
+                try:
+                    index_stats = self.pinecone_index.describe_index_stats()
+                    # Try to get dimension from index info
+                    index_info = self.pinecone_client.describe_index(index_name)
+                    if hasattr(index_info, 'dimension'):
+                        self.dimension = index_info.dimension
+                    else:
+                        self.dimension = 384  # Default fallback
+                except:
+                    self.dimension = 384  # Default fallback
+            # If index already exists, trust its dimension
+            if self.use_pinecone and self.dimension:
+                self.pinecone_dimension = self.dimension
+                logger.info(f"ℹ️ Pinecone index dimension detected: {self.dimension}")
+            
+            logger.info(f"✅ Pinecone initialized: {index_name} (dimension: {self.dimension})")
         except ImportError:
-            pass  # Pinecone not installed, use local storage
+            logger.info("ℹ️ Pinecone SDK not installed, using local storage")
         except Exception as e:
             logger.warning(f"Pinecone failed: {e}, using local storage")
     
     def _initialize_embedding_models(self):
         """Initialize available embedding models (lazy loading to avoid mutex contention)."""
+        # If Pinecone index is configured with a model, avoid overriding dimension here.
+        if self.use_pinecone and os.getenv("PINECONE_EMBEDDING_MODEL"):
+            # We'll use hash embeddings unless an explicit compatible model is configured.
+            self._SentenceTransformer = None
+            self._use_embedding_client = False
+            self.embedding_model = "hash"
+            logger.info("ℹ️ Pinecone model configured; using hash embeddings to match index dimension")
+            return
+        
         # Try sentence-transformers first (lazy load - don't initialize model until needed)
         try:
             from sentence_transformers import SentenceTransformer
             # Store class, not instance (lazy initialization)
             self._SentenceTransformer = SentenceTransformer
-            self.dimension = 384  # all-MiniLM-L6-v2 dimension
+            # Only override dimension if not already set (e.g., by Pinecone)
+            if not self.dimension:
+                self.dimension = 384  # all-MiniLM-L6-v2 dimension
             self.embedding_model = "sentence_transformers"
-            logger.info("✅ Sentence-transformers available (lazy loading)")
+            # If Pinecone dimension mismatches, avoid using this model
+            if self.use_pinecone and self.dimension not in (384, None):
+                logger.warning("Sentence-transformers dimension (384) mismatches Pinecone index. Falling back to hash embeddings.")
+                self._SentenceTransformer = None
+                self.embedding_model = "hash"
+            else:
+                logger.info("✅ Sentence-transformers available (lazy loading)")
         except ImportError:
             logger.info("ℹ️ Sentence-transformers not available")
             self._SentenceTransformer = None
@@ -107,7 +176,13 @@ class MinimalVectorSearch:
                     self._use_embedding_client = True
                     self.dimension = get_embedding_dimension()
                     self.embedding_model = "openai"
-                    logger.info("✅ OpenAI embeddings initialized (core.ai.embedding_client)")
+                    if self.use_pinecone and getattr(self, "pinecone_dimension", None) and self.dimension != self.pinecone_dimension:
+                        logger.warning("OpenAI embedding dimension mismatches Pinecone index. Falling back to hash embeddings.")
+                        self._use_embedding_client = False
+                        self.embedding_model = "hash"
+                        self.dimension = self.pinecone_dimension
+                    else:
+                        logger.info("✅ OpenAI embeddings initialized (core.ai.embedding_client)")
             except ImportError:
                 logger.info("ℹ️ core.ai.embedding_client not available")
             except Exception as e:
@@ -125,7 +200,8 @@ class MinimalVectorSearch:
                 try:
                     with gzip.open(self.vector_db_path, 'rb') as f:
                         data = pickle.load(f)
-                except:
+                except Exception as gzip_error:
+                    logger.debug("Gzip load failed, trying raw pickle: %s", gzip_error)
                     with open(self.vector_db_path, 'rb') as f:
                         data = pickle.load(f)
                 

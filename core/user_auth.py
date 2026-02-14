@@ -463,6 +463,11 @@ class UserAuthManager:
             
             # Revoke all existing sessions
             self.revoke_all_user_sessions(user_id)
+            try:
+                from core.jwt_auth import get_jwt_manager
+                get_jwt_manager().revoke_all_refresh_tokens(user_id)
+            except Exception as revoke_error:
+                logger.warning("Failed to revoke refresh tokens on password reset: %s", revoke_error)
             
             logger.info(f"Password reset completed for user {user_id}")
             
@@ -513,6 +518,11 @@ class UserAuthManager:
             
             # Revoke all existing sessions
             self.revoke_all_user_sessions(user_id)
+            try:
+                from core.jwt_auth import get_jwt_manager
+                get_jwt_manager().revoke_all_refresh_tokens(user_id)
+            except Exception as revoke_error:
+                logger.warning("Failed to revoke refresh tokens on password change: %s", revoke_error)
             
             logger.info(f"Password changed for user {user_id}")
             

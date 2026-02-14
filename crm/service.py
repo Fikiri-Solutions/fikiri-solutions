@@ -9,6 +9,7 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from core.database_optimization import db_optimizer
+from core.lead_scoring_service import get_lead_scoring_service
 # Gmail OAuth functionality - disabled pending OAuth refactor
 # from core.gmail_oauth import gmail_oauth_manager, gmail_sync_manager
 gmail_oauth_manager = None
@@ -127,14 +128,20 @@ class EnhancedCRMService:
         if existing:
             return {'success': False, 'error': 'Lead with this email already exists', 'error_code': 'LEAD_EXISTS'}
         
-        score = self._calculate_lead_score(lead_data)
+        score_result = self._score_lead_data(lead_data, activity_count=0, last_activity=None)
+        lead_data['score'] = score_result['score']
+        lead_data['metadata'] = {
+            **lead_data.get('metadata', {}),
+            'lead_quality': score_result['quality'],
+            'score_breakdown': score_result['breakdown']
+        }
         lead_id = db_optimizer.execute_query(
             """INSERT INTO leads (user_id, email, name, phone, company, source, stage, score, notes, tags, metadata) 
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (user_id, lead_data['email'], lead_data['name'],
              lead_data.get('phone'), lead_data.get('company'),
              lead_data.get('source', 'manual'), lead_data.get('stage', 'new'),
-             score, lead_data.get('notes'), json.dumps(lead_data.get('tags', [])),
+             lead_data.get('score', 0), lead_data.get('notes'), json.dumps(lead_data.get('tags', [])),
              json.dumps(lead_data.get('metadata', {}))),
             fetch=False
         )
@@ -146,7 +153,7 @@ class EnhancedCRMService:
             automation_engine.execute_automation_rules(
                 TriggerType.LEAD_CREATED,
                 {'lead_id': lead_id, 'email': lead_data['email'], 'name': lead_data['name'],
-                 'source': lead_data.get('source', 'manual'), 'score': score},
+                 'source': lead_data.get('source', 'manual'), 'score': lead_data.get('score', 0)},
                 user_id
             )
         except Exception as auto_error:
@@ -210,6 +217,20 @@ class EnhancedCRMService:
                 "SELECT id, user_id, email, name, phone, company, source, stage, score, created_at, updated_at, last_contact, notes, tags, metadata FROM leads WHERE id = ? AND user_id = ?",
                 (lead_id, user_id)
             )[0]
+
+            updated_lead_dict = dict(updated_lead)
+            activity_count, last_activity = self._get_lead_activity_metrics(lead_id)
+            score_result = self._score_lead_data(updated_lead_dict, activity_count, last_activity)
+            metadata = json.loads(updated_lead_dict.get('metadata', '{}'))
+            metadata['lead_quality'] = score_result['quality']
+            metadata['score_breakdown'] = score_result['breakdown']
+            db_optimizer.execute_query(
+                "UPDATE leads SET score = ?, metadata = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?",
+                (score_result['score'], json.dumps(metadata), lead_id, user_id),
+                fetch=False
+            )
+            updated_lead_dict['score'] = score_result['score']
+            updated_lead_dict['metadata'] = json.dumps(metadata)
             
             # Trigger automation: LEAD_STAGE_CHANGED (if stage was updated)
             if 'stage' in updates and updates['stage'] != old_stage:
@@ -231,7 +252,7 @@ class EnhancedCRMService:
             return {
                 'success': True,
                 'data': {
-                    'lead': self._format_lead(updated_lead),
+                    'lead': self._format_lead(updated_lead_dict),
                     'message': 'Lead updated successfully'
                 }
             }
@@ -517,38 +538,78 @@ class EnhancedCRMService:
             fetch=False
         )
     
-    def _calculate_lead_score(self, lead_data: Dict[str, Any]) -> int:
-        """Calculate lead score based on available data"""
-        score = 0
-        
-        # Base score
-        score += 10
-        
-        # Company information
-        if lead_data.get('company'):
-            score += 20
-        
-        # Phone number
-        if lead_data.get('phone'):
-            score += 15
-        
-        # Source scoring
-        source_scores = {
-            'gmail': 25,
-            'website': 20,
-            'referral': 30,
-            'manual': 10
+    def _score_lead_data(self, lead_data: Dict[str, Any], activity_count: int, last_activity: Optional[datetime]) -> Dict[str, Any]:
+        service = get_lead_scoring_service()
+        result = service.score_lead(lead_data, activity_count=activity_count, last_activity=last_activity)
+        return {'score': result.score, 'quality': result.quality, 'breakdown': result.breakdown}
+
+    def _get_lead_activity_metrics(self, lead_id: int) -> tuple:
+        try:
+            result = db_optimizer.execute_query(
+                "SELECT COUNT(*) as count, MAX(timestamp) as last_activity FROM lead_activities WHERE lead_id = ?",
+                (lead_id,)
+            )
+            if result:
+                row = result[0]
+                last = row.get('last_activity')
+                last_dt = datetime.fromisoformat(last) if last else None
+                return int(row.get('count', 0) or 0), last_dt
+        except Exception as e:
+            logger.warning(f"Failed to compute lead activity metrics: {e}")
+        return 0, None
+
+    def recalculate_lead_score(self, lead_id: int, user_id: int) -> Dict[str, Any]:
+        lead_data = db_optimizer.execute_query(
+            "SELECT id, user_id, email, name, phone, company, source, stage, score, created_at, updated_at, last_contact, notes, tags, metadata FROM leads WHERE id = ? AND user_id = ?",
+            (lead_id, user_id)
+        )
+        if not lead_data:
+            return {'success': False, 'error': 'Lead not found', 'error_code': 'LEAD_NOT_FOUND'}
+        lead = dict(lead_data[0])
+        activity_count, last_activity = self._get_lead_activity_metrics(lead_id)
+        score_result = self._score_lead_data(lead, activity_count, last_activity)
+        metadata = json.loads(lead.get('metadata', '{}'))
+        metadata['lead_quality'] = score_result['quality']
+        metadata['score_breakdown'] = score_result['breakdown']
+        db_optimizer.execute_query(
+            "UPDATE leads SET score = ?, metadata = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?",
+            (score_result['score'], json.dumps(metadata), lead_id, user_id),
+            fetch=False
+        )
+        lead['score'] = score_result['score']
+        lead['metadata'] = json.dumps(metadata)
+        return {'success': True, 'data': {'lead': self._format_lead(lead)}}
+
+    def import_leads(self, user_id: int, leads: List[Dict[str, Any]]) -> Dict[str, Any]:
+        created = 0
+        updated = 0
+        errors = []
+        for item in leads:
+            email = item.get('email')
+            name = item.get('name')
+            if not email or not name:
+                errors.append({'lead': item, 'error': 'Missing required field: email/name'})
+                continue
+            existing = db_optimizer.execute_query(
+                "SELECT id FROM leads WHERE user_id = ? AND email = ?",
+                (user_id, email)
+            )
+            if existing:
+                lead_id = existing[0]['id']
+                self.update_lead(lead_id, user_id, item)
+                updated += 1
+            else:
+                self.create_lead(user_id, item)
+                created += 1
+        return {
+            'success': True,
+            'data': {
+                'created': created,
+                'updated': updated,
+                'errors': errors,
+                'total': len(leads)
+            }
         }
-        score += source_scores.get(lead_data.get('source', 'manual'), 10)
-        
-        # Email domain scoring (basic)
-        email = lead_data.get('email', '')
-        if '@' in email:
-            domain = email.split('@')[1].lower()
-            if any(corp in domain for corp in ['corp', 'inc', 'llc', 'ltd']):
-                score += 10
-        
-        return min(score, 100)  # Cap at 100
     
     def _get_cutoff_date(self, time_period: str) -> datetime:
         """Get cutoff date for time period filter"""

@@ -211,7 +211,7 @@ def get_automation_status():
 def get_dashboard_data():
     """Get aggregated dashboard data for user"""
     try:
-        user_id = set_current_user_id()
+        user_id = get_current_user_id()
         if not user_id:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
 

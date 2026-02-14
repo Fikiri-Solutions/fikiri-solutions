@@ -501,8 +501,8 @@ class AutomationEngine:
                         'rule_name': rule.name,
                         'status': 'success' if result['success'] else 'error'
                     }, room=f"user:{rule.user_id}")
-            except Exception:
-                pass  # WebSocket not available, continue silently
+            except Exception as ws_error:
+                logger.debug("WebSocket emit failed: %s", ws_error)
             
             return result
             

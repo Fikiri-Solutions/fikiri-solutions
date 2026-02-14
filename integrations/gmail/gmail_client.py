@@ -14,6 +14,14 @@ from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
+# Test-mode guard to reduce noisy warnings
+def _is_test_mode() -> bool:
+    return (
+        os.getenv("FIKIRI_TEST_MODE") == "1"
+        or os.getenv("FLASK_ENV") == "test"
+        or bool(os.getenv("PYTEST_CURRENT_TEST"))
+    )
+
 # Try to import Google API libraries
 try:
     from google.oauth2.credentials import Credentials
@@ -22,7 +30,8 @@ try:
     GOOGLE_API_AVAILABLE = True
 except ImportError:
     GOOGLE_API_AVAILABLE = False
-    logger.warning("⚠️ Google API libraries not available")
+    if not _is_test_mode():
+        logger.warning("⚠️ Google API libraries not available")
 
 # Try to import cryptography for token encryption
 try:
@@ -46,7 +55,8 @@ class GmailClient:
         else:
             self.fernet = None
             self.encryption_enabled = False
-            logger.warning("⚠️ Token encryption disabled")
+            if not _is_test_mode():
+                logger.warning("⚠️ Token encryption disabled")
     
     @staticmethod
     def _dec(s: str, fernet: Optional[Fernet], enabled: bool) -> str:

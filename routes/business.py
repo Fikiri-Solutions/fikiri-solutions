@@ -4,10 +4,13 @@ Business and CRM Routes
 Extracted from app.py for better maintainability
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from functools import wraps
 import logging
 import os
+import io
+import csv
+import json
 from datetime import datetime
 
 # Import business logic modules
@@ -21,11 +24,30 @@ from core.automation_safety import automation_safety_manager
 from core.oauth_token_manager import oauth_token_manager
 from core.secure_sessions import get_current_user_id
 from core.user_auth import user_auth_manager
+from core.workflow_followups import schedule_follow_up, execute_due_follow_ups
+from core.workflow_documents import generate_document
 
 logger = logging.getLogger(__name__)
 
 # Create business blueprint
 business_bp = Blueprint("business_routes", __name__, url_prefix="/api")
+
+
+def _require_paid_plan(user_id: int) -> bool:
+    if not db_optimizer.table_exists("subscriptions"):
+        return True
+    try:
+        sub = db_optimizer.execute_query(
+            "SELECT status FROM subscriptions WHERE user_id = ? ORDER BY current_period_end DESC LIMIT 1",
+            (user_id,)
+        )
+        if not sub:
+            return False
+        status = (sub[0].get("status") or "").lower()
+        return status in {"active", "trialing"}
+    except Exception as e:
+        logger.warning("Plan check failed: %s", e)
+        return True
 
 # CRM Routes
 @business_bp.route('/crm/leads', methods=['GET'])
@@ -98,6 +120,24 @@ def create_lead():
     
     return create_success_response({'lead': lead}, 'Lead created successfully')
 
+
+@business_bp.route('/crm/leads/import', methods=['POST'])
+@handle_api_errors
+def import_leads():
+    """Import/migrate leads via JSON payload"""
+    user_id = get_current_user_id() or request.args.get('user_id', type=int)
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+    data = request.get_json()
+    if not data or 'leads' not in data or not isinstance(data['leads'], list):
+        return create_error_response("leads[] is required", 400, 'MISSING_FIELDS')
+
+    result = enhanced_crm_service.import_leads(user_id, data['leads'])
+    if not result.get('success'):
+        return create_error_response(result.get('error', 'Import failed'), 500, 'CRM_IMPORT_ERROR')
+    return create_success_response(result.get('data', {}), 'Leads imported successfully')
+
 @business_bp.route('/crm/leads/<int:lead_id>', methods=['PUT'])
 @handle_api_errors
 def update_lead(lead_id):
@@ -119,6 +159,20 @@ def update_lead(lead_id):
         return create_error_response("Failed to update lead", 500, 'CRM_UPDATE_ERROR')
     
     return create_success_response({'lead': updated_lead}, 'Lead updated successfully')
+
+
+@business_bp.route('/crm/leads/<int:lead_id>/score', methods=['POST'])
+@handle_api_errors
+def recalculate_lead_score(lead_id):
+    """Recalculate lead score and quality"""
+    user_id = get_current_user_id() or request.args.get('user_id', type=int)
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+    result = enhanced_crm_service.recalculate_lead_score(lead_id, user_id)
+    if not result.get('success'):
+        return create_error_response(result.get('error', 'Score recalculation failed'), 404, result.get('error_code', 'LEAD_NOT_FOUND'))
+    return create_success_response(result.get('data', {}), 'Lead score recalculated')
 
 @business_bp.route('/crm/leads/<int:lead_id>/activities', methods=['POST'])
 @handle_api_errors
@@ -562,22 +616,97 @@ def get_emails():
                     from_header = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown')
                     date = next((h['value'] for h in headers if h['name'] == 'Date'), '')
                     
-                    # Extract body
-                    body = ''
+                    # Extract body - prefer HTML, fallback to plain text
+                    body_html = ''
+                    body_text = ''
+                    embedded_images = {}  # Map of cid -> attachment_id for embedded images
+                    
+                    def extract_from_part(part):
+                        """Recursively extract body from part"""
+                        nonlocal body_html, body_text, embedded_images
+                        import base64
+                        mime_type = part.get('mimeType', '')
+                        
+                        # Check for embedded images (Content-ID)
+                        headers = part.get('headers', [])
+                        content_id = None
+                        for header in headers:
+                            if header.get('name', '').lower() == 'content-id':
+                                content_id = header.get('value', '').strip('<>')
+                                break
+                        
+                        if content_id and part.get('body', {}).get('attachmentId'):
+                            # This is an embedded image
+                            embedded_images[content_id] = {
+                                'attachment_id': part['body']['attachmentId'],
+                                'mime_type': mime_type,
+                                'filename': part.get('filename', '')
+                            }
+                        
+                        if mime_type == 'text/html':
+                            data = part.get('body', {}).get('data', '')
+                            if data and not body_html:
+                                try:
+                                    body_html = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+                                except Exception as e:
+                                    logger.debug(f"Failed to decode HTML part: {e}")
+                        elif mime_type == 'text/plain':
+                            data = part.get('body', {}).get('data', '')
+                            if data and not body_text:
+                                try:
+                                    body_text = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+                                except Exception as e:
+                                    logger.debug(f"Failed to decode text part: {e}")
+                        
+                        # Recursively check nested parts
+                        if 'parts' in part:
+                            for subpart in part['parts']:
+                                extract_from_part(subpart)
+                    
                     payload = msg_detail.get('payload', {})
                     if 'parts' in payload:
                         for part in payload['parts']:
-                            if part['mimeType'] == 'text/plain':
-                                data = part['body'].get('data', '')
-                                if data:
-                                    import base64
-                                    body = base64.urlsafe_b64decode(data).decode('utf-8')
-                                    break
-                    elif payload.get('mimeType') == 'text/plain':
-                        data = payload['body'].get('data', '')
-                        if data:
-                            import base64
-                            body = base64.urlsafe_b64decode(data).decode('utf-8')
+                            extract_from_part(part)
+                    else:
+                        extract_from_part(payload)
+                    
+                    # Prefer HTML over plain text
+                    body = body_html if body_html else body_text
+                    
+                    # Replace cid: references with proxy URLs for embedded images.
+                    # Use relative path so the frontend loads images from the same origin as the page
+                    # (avoids CSP img-src blocking and CORS; frontend rewrites to absolute as needed).
+                    if body_html and embedded_images:
+                        import re
+                        for cid, img_info in embedded_images.items():
+                            proxy_url = f"/api/business/email/{msg['id']}/embedded-image/{img_info['attachment_id']}"
+                            
+                            # Escape the CID for regex (remove angle brackets if present)
+                            cid_escaped = re.escape(cid.strip('<>'))
+                            
+                            # Replace in src attributes: src="cid:..." or src='cid:...'
+                            body = re.sub(
+                                rf'src=["\']cid:{cid_escaped}["\']',
+                                f'src="{proxy_url}"',
+                                body,
+                                flags=re.IGNORECASE
+                            )
+                            
+                            # Replace standalone cid: references (for background images, etc.)
+                            body = re.sub(
+                                rf'cid:{cid_escaped}',
+                                proxy_url,
+                                body,
+                                flags=re.IGNORECASE
+                            )
+                            
+                            # Also handle Content-ID without cid: prefix (some email clients)
+                            body = re.sub(
+                                rf'src=["\']{cid_escaped}["\']',
+                                f'src="{proxy_url}"',
+                                body,
+                                flags=re.IGNORECASE
+                            )
                     
                     emails.append({
                         'id': msg['id'],
@@ -1105,6 +1234,8 @@ def execute_automation():
         user_id = get_current_user_id()
         if not user_id:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+        if not _require_paid_plan(user_id):
+            return create_error_response("Plan limit exceeded", 402, 'PLAN_LIMIT_EXCEEDED')
 
         data = request.get_json()
         if not data:
@@ -1235,6 +1366,256 @@ def test_automation():
         logger.error(f"❌ Automation test failed: {e}")
         return create_error_response(str(e), 500, 'AUTOMATION_TEST_FAILED')
 
+# Workflow Routes
+@business_bp.route('/workflows/followups/schedule', methods=['POST'])
+@handle_api_errors
+def schedule_followup_workflow():
+    """Schedule a follow-up (email or SMS)"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+    if not _require_paid_plan(user_id):
+        return create_error_response("Plan limit exceeded", 402, 'PLAN_LIMIT_EXCEEDED')
+
+    data = request.get_json() or {}
+    lead_id = data.get('lead_id')
+    follow_up_date = data.get('follow_up_date')
+    follow_up_type = data.get('follow_up_type', 'email')
+    message = data.get('message', '')
+
+    if not follow_up_date:
+        return create_error_response("follow_up_date is required", 400, 'MISSING_DATE')
+
+    result = schedule_follow_up(user_id, lead_id, follow_up_date, follow_up_type, message)
+    if result.get('success') and lead_id:
+        try:
+            enhanced_crm_service.add_lead_activity(
+                lead_id,
+                user_id,
+                'follow_up',
+                f"Follow-up scheduled ({follow_up_type})",
+                metadata={'follow_up_date': follow_up_date, 'message': message}
+            )
+        except Exception as e:
+            logger.warning("Failed to log follow-up schedule activity: %s", e)
+    if result.get('success'):
+        automation_safety_manager.log_automation_action(
+            user_id=user_id,
+            rule_id=0,
+            action_type=f"follow_up_schedule_{follow_up_type}",
+            target_contact=str(lead_id or user_id),
+            idempotency_key=f"followup_schedule_{result.get('follow_up_id')}",
+            status='completed'
+        )
+
+    return create_success_response(result, 'Follow-up scheduled')
+
+
+@business_bp.route('/workflows/followups/execute', methods=['POST'])
+@handle_api_errors
+def execute_followup_workflow():
+    """Execute due follow-ups for the authenticated user"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+    if not _require_paid_plan(user_id):
+        return create_error_response("Plan limit exceeded", 402, 'PLAN_LIMIT_EXCEEDED')
+
+    result = execute_due_follow_ups(user_id)
+    return create_success_response(result, 'Follow-ups executed')
+
+
+@business_bp.route('/workflows/appointments/reminders/run', methods=['POST'])
+@handle_api_errors
+def run_appointment_reminders():
+    """Run appointment reminder job"""
+    # Admin/internal use only; still require auth
+    user_id = get_current_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+    if not _require_paid_plan(user_id):
+        return create_error_response("Plan limit exceeded", 402, 'PLAN_LIMIT_EXCEEDED')
+
+    from core.appointment_reminders import run_reminder_job
+    result = run_reminder_job()
+    return create_success_response(result, 'Appointment reminders executed')
+
+
+@business_bp.route('/workflows/documents/generate', methods=['POST'])
+@handle_api_errors
+def generate_workflow_document():
+    """Generate a document and return file response"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+    if not _require_paid_plan(user_id):
+        return create_error_response("Plan limit exceeded", 402, 'PLAN_LIMIT_EXCEEDED')
+
+    data = request.get_json() or {}
+    template_id = data.get('template_id')
+    variables = data.get('variables', {})
+    lead_id = data.get('lead_id')
+    output_format = data.get('format', 'txt').lower()
+
+    if not template_id:
+        return create_error_response("template_id is required", 400, 'MISSING_TEMPLATE')
+
+    safety = automation_safety_manager.check_rate_limits(
+        user_id=user_id,
+        action_type='workflow_document',
+        target_contact=str(lead_id or user_id)
+    )
+    if not safety.get('allowed'):
+        return create_error_response("Rate limit exceeded", 429, 'RATE_LIMIT_EXCEEDED')
+
+    result = generate_document(template_id, variables, user_id, output_format)
+    document = result['document']
+    automation_safety_manager.log_automation_action(
+        user_id=user_id,
+        rule_id=0,
+        action_type='workflow_document',
+        target_contact=str(lead_id or user_id),
+        idempotency_key=f"doc_{document.id}",
+        status='completed'
+    )
+
+    try:
+        content_to_store = result['content_bytes']
+        if output_format == 'pdf':
+            import base64
+            content_to_store = base64.b64encode(content_to_store).decode('utf-8')
+        else:
+            content_to_store = content_to_store.decode('utf-8', errors='ignore')
+
+        db_optimizer.execute_query(
+            """
+            INSERT INTO generated_documents (id, user_id, lead_id, template_id, format, content, metadata, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (document.id, user_id, lead_id, template_id, output_format, content_to_store,
+             json.dumps({'variables': variables}), datetime.utcnow().isoformat()),
+            fetch=False
+        )
+    except Exception as e:
+        logger.warning("Failed to store document metadata: %s", e)
+
+    if lead_id:
+        try:
+            enhanced_crm_service.add_lead_activity(
+                lead_id,
+                user_id,
+                'document_generated',
+                f"Generated document {template_id}",
+                metadata={'document_id': document.id, 'format': output_format}
+            )
+        except Exception as e:
+            logger.warning("Failed to log document activity: %s", e)
+
+    return send_file(
+        io.BytesIO(result['content_bytes']),
+        mimetype=result['content_type'],
+        as_attachment=True,
+        download_name=result['filename']
+    )
+
+
+@business_bp.route('/workflows/tables/export', methods=['POST'])
+@handle_api_errors
+def export_workflow_table():
+    """Export a table/sheet as CSV or JSON"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+    if not _require_paid_plan(user_id):
+        return create_error_response("Plan limit exceeded", 402, 'PLAN_LIMIT_EXCEEDED')
+
+    data = request.get_json() or {}
+    name = data.get('name', 'export')
+    columns = data.get('columns') or []
+    rows = data.get('rows') or []
+    output_format = (data.get('format') or 'csv').lower()
+    lead_id = data.get('lead_id')
+
+    if not columns or not isinstance(columns, list):
+        return create_error_response("columns must be a non-empty list", 400, 'MISSING_COLUMNS')
+
+    safety = automation_safety_manager.check_rate_limits(
+        user_id=user_id,
+        action_type='workflow_table',
+        target_contact=str(lead_id or user_id)
+    )
+    if not safety.get('allowed'):
+        return create_error_response("Rate limit exceeded", 429, 'RATE_LIMIT_EXCEEDED')
+
+    if output_format not in {'csv', 'json'}:
+        return create_error_response("format must be csv or json", 400, 'INVALID_FORMAT')
+
+    if output_format == 'json':
+        payload = []
+        for row in rows:
+            if isinstance(row, dict):
+                payload.append({col: row.get(col) for col in columns})
+            else:
+                payload.append({col: row[idx] if idx < len(row) else None for idx, col in enumerate(columns)})
+        content_bytes = json.dumps(payload, indent=2).encode('utf-8')
+        content_type = 'application/json'
+        filename = f"{name}.json"
+        data_to_store = json.dumps({'columns': columns, 'rows': payload})
+    else:
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(columns)
+        for row in rows:
+            if isinstance(row, dict):
+                writer.writerow([row.get(col, '') for col in columns])
+            else:
+                writer.writerow(row)
+        content = output.getvalue()
+        content_bytes = content.encode('utf-8')
+        content_type = 'text/csv'
+        filename = f"{name}.csv"
+        data_to_store = content
+
+    try:
+        db_optimizer.execute_query(
+            """
+            INSERT INTO table_exports (user_id, lead_id, name, columns, row_count, format, data, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (user_id, lead_id, name, json.dumps(columns), len(rows), output_format, data_to_store, datetime.utcnow().isoformat()),
+            fetch=False
+        )
+    except Exception as e:
+        logger.warning("Failed to store table export metadata: %s", e)
+
+    automation_safety_manager.log_automation_action(
+        user_id=user_id,
+        rule_id=0,
+        action_type='workflow_table_export',
+        target_contact=str(lead_id or user_id),
+        idempotency_key=f"table_{name}_{datetime.utcnow().isoformat()}",
+        status='completed'
+    )
+
+    if lead_id:
+        try:
+            enhanced_crm_service.add_lead_activity(
+                lead_id,
+                user_id,
+                'note_added',
+                f"Exported table {name}",
+                metadata={'format': output_format, 'row_count': len(rows)}
+            )
+        except Exception as e:
+            logger.warning("Failed to log table export activity: %s", e)
+
+    return send_file(
+        io.BytesIO(content_bytes),
+        mimetype=content_type,
+        as_attachment=True,
+        download_name=filename
+    )
+
 # Services API Routes
 @business_bp.route('/services', methods=['GET'])
 @handle_api_errors
@@ -1261,7 +1642,8 @@ def get_services():
                 try:
                     import json
                     service_dict['settings'] = json.loads(service_dict['settings'])
-                except:
+                except Exception as parse_error:
+                    logger.debug("Failed to parse service settings JSON: %s", parse_error)
                     service_dict['settings'] = {}
             result.append(service_dict)
         
@@ -1442,7 +1824,56 @@ def download_attachment(email_id, attachment_id):
         logger.error(f"❌ Download attachment failed: {e}")
         return create_error_response(str(e), 500, 'DOWNLOAD_FAILED')
 
-@business_bp.route('/automation/test', methods=['POST'])
+@business_bp.route('/email/<email_id>/embedded-image/<attachment_id>', methods=['GET'])
+@handle_api_errors
+def get_embedded_image(email_id, attachment_id):
+    """Get embedded image from email (for cid: references)"""
+    try:
+        user_id = get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+        
+        # Fetch embedded image from Gmail API
+        try:
+            from integrations.gmail.gmail_client import gmail_client
+            gmail_service = gmail_client.get_gmail_service_for_user(user_id)
+            
+            # Get attachment from Gmail API
+            attachment = gmail_service.users().messages().attachments().get(
+                userId='me',
+                messageId=email_id,
+                id=attachment_id
+            ).execute()
+            
+            if attachment:
+                import base64
+                # Decode attachment data
+                attachment_data = base64.urlsafe_b64decode(attachment['data'])
+                
+                # Get content type from attachment or default to image
+                content_type = attachment.get('mimeType', 'image/png')
+                
+                from flask import Response
+                response = Response(
+                    attachment_data,
+                    mimetype=content_type,
+                    headers={
+                        'Cache-Control': 'public, max-age=3600',  # Cache for 1 hour
+                        'Content-Security-Policy': "default-src 'self'",
+                        'Access-Control-Allow-Origin': '*'  # Allow CORS for images
+                    }
+                )
+                return response
+            
+            return create_error_response("Failed to fetch embedded image", 500, 'FETCH_FAILED')
+        except Exception as e:
+            logger.error(f"❌ Get embedded image failed: {e}")
+            return create_error_response(str(e), 500, 'DOWNLOAD_FAILED')
+    except Exception as e:
+        logger.error(f"❌ Get embedded image failed: {e}")
+        return create_error_response(str(e), 500, 'DOWNLOAD_FAILED')
+
+@business_bp.route('/automation/test/preset', methods=['POST'])
 @handle_api_errors
 def test_automation_preset():
     """Trigger an automation preset with sample data"""

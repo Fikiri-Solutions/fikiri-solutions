@@ -7,8 +7,20 @@ import logging
 import traceback
 from typing import Dict, Any, Optional, Union
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 import os
+
+def _is_test_mode() -> bool:
+    return (
+        os.getenv("FIKIRI_TEST_MODE") == "1"
+        or os.getenv("FLASK_ENV") == "test"
+        or bool(os.getenv("PYTEST_CURRENT_TEST"))
+    )
+
+
+def _utcnow_naive() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 
 # Optional imports with fallbacks
 try:
@@ -17,24 +29,33 @@ try:
     FLASK_AVAILABLE = True
 except ImportError:
     FLASK_AVAILABLE = False
-    print("Warning: Flask not available. Install with: pip install flask")
+    if not _is_test_mode():
+        logging.warning("Flask not available. Install with: pip install flask")
 
 try:
     import sentry_sdk
     SENTRY_AVAILABLE = True
 except ImportError:
     SENTRY_AVAILABLE = False
-    print("Warning: sentry-sdk not available. Install with: pip install sentry-sdk[flask]")
+    if os.getenv("SENTRY_DSN") and os.getenv("FLASK_ENV") == "production" and not _is_test_mode():
+        logging.warning("sentry-sdk not available. Install with: pip install sentry-sdk[flask]")
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('logs/fikiri.log'),
-        logging.StreamHandler()
-    ]
-)
+def _configure_logging():
+    if getattr(logging, "_fikiri_error_handling_configured", False):
+        return
+    handlers = [logging.StreamHandler()]
+    if not _is_test_mode():
+        os.makedirs("logs", exist_ok=True)
+        handlers.insert(0, logging.FileHandler("logs/fikiri.log", delay=True))
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=handlers,
+    )
+    logging._fikiri_error_handling_configured = True
+
+
+_configure_logging()
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +75,7 @@ class FikiriError(Exception):
         self.status_code = status_code
         self.details = details or {}
         self.user_message = user_message or message
-        self.timestamp = datetime.utcnow().isoformat()
+        self.timestamp = _utcnow_naive().isoformat()
         self.error_id = str(uuid.uuid4())
         
         super().__init__(self.message)

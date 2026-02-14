@@ -21,7 +21,7 @@ try:
     CRYPTOGRAPHY_AVAILABLE = True
 except ImportError:
     CRYPTOGRAPHY_AVAILABLE = False
-    print("cryptography not available for token encryption")
+    logging.getLogger(__name__).warning("cryptography not available for token encryption")
 
 logger = logging.getLogger(__name__)
 
@@ -602,7 +602,8 @@ class OAuthTokenManager:
             token_hash = hashlib.sha256(token.encode()).hexdigest()[:8]
             last_4 = token[-4:] if len(token) > 4 else token
             return f"{last_4}...{token_hash}"
-        except Exception:
+        except Exception as hash_error:
+            logger.debug("Token hash failed: %s", hash_error)
             return "***"
 
 # Initialize OAuth token manager

@@ -10,7 +10,7 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify
 
 from core.api_validation import handle_api_errors, create_success_response, create_error_response
-from email_automation.ai_assistant import MinimalAIEmailAssistant
+from core.ai.llm_router import LLMRouter
 from core.secure_sessions import get_current_user_id
 from core.jwt_auth import jwt_required, get_current_user
 
@@ -18,6 +18,14 @@ logger = logging.getLogger(__name__)
 
 # Create Blueprint
 ai_bp = Blueprint('ai', __name__, url_prefix='/api/ai')
+
+_llm_router: Optional[LLMRouter] = None
+
+def _get_llm_router() -> Optional[LLMRouter]:
+    global _llm_router
+    if _llm_router is None:
+        _llm_router = LLMRouter(api_key=None)
+    return _llm_router
 
 def _generate_contextual_fallback(message: str, user_id: int) -> str:
     """Generate a context-aware fallback response based on user message"""
@@ -136,9 +144,9 @@ def ai_chat():
             user_data = get_current_user()
             if user_data:
                 user_id = user_data.get('user_id')
-        except Exception:
+        except Exception as auth_error:
             # JWT not available, continue to fallback
-            pass
+            logger.debug("JWT lookup failed, falling back to session auth: %s", auth_error)
         
         # Fallback to session-based auth
         if not user_id:
@@ -150,10 +158,35 @@ def ai_chat():
             if not user_id:
                 return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
         
-        # Generate a context-aware response based on the message
+        # Try real LLM first; fall back to contextual response on failure
+        try:
+            router = _get_llm_router()
+            if router and router.client and router.client.is_enabled():
+                llm_result = router.process(
+                    input_data=message,
+                    intent='general',
+                    context={
+                        'user_id': user_id,
+                        'channel': 'ai_chat',
+                        'suggested_actions': _get_suggested_actions(message),
+                    }
+                )
+                if llm_result.get('success'):
+                    response_data = {
+                        'response': llm_result.get('content', ''),
+                        'service_queries': [],
+                        'suggested_actions': _get_suggested_actions(message),
+                        'confidence': 0.75,
+                        'success': True
+                    }
+                    return create_success_response(response_data, "AI response generated")
+                logger.warning("LLM router failed, falling back: %s", llm_result.get('error'))
+        except Exception as llm_error:
+            logger.error("LLM chat failed, falling back: %s", llm_error)
+
+        # Contextual fallback
         try:
             response = _generate_contextual_fallback(message, user_id)
-            
             response_data = {
                 'response': response,
                 'service_queries': [],
@@ -161,13 +194,9 @@ def ai_chat():
                 'confidence': 0.6,
                 'success': True
             }
-            
             return create_success_response(response_data, "AI response generated")
-            
         except Exception as fallback_error:
             logger.error(f"Response generation failed: {fallback_error}")
-            
-            # Final fallback - simple response
             response_data = {
                 'response': _generate_simple_fallback(message),
                 'service_queries': [],
@@ -175,7 +204,6 @@ def ai_chat():
                 'confidence': 0.4,
                 'success': True
             }
-            
             return create_success_response(response_data, "AI response generated (simple fallback)")
         
     except Exception as e:

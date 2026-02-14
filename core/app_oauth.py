@@ -128,19 +128,20 @@ def gmail_start():
         if hasattr(g, 'session_data') and g.session_data:
             g.session_data['oauth_state'] = state
             g.session_data['post_connect_redirect'] = request.args.get("redirect", "/onboarding-flow/2")
-        else:
-            # Fallback to database for OAuth state storage
-            from core.database_optimization import db_optimizer
-            db_optimizer.execute_query("""
-                INSERT OR REPLACE INTO oauth_states 
-                (state, user_id, provider, redirect_url, expires_at, metadata)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                state, user_id or 0, 'gmail', 
-                request.args.get("redirect", "/onboarding-flow/2"),
-                int(time.time()) + 600,  # 10 minutes
-                json.dumps({'oauth_state': state, 'onboarding': user_id is None})
-            ), fetch=False)
+
+        # Always persist state in DB to survive missing/cleared sessions
+        from core.database_optimization import db_optimizer
+        db_optimizer.execute_query("""
+            INSERT OR REPLACE INTO oauth_states 
+            (state, user_id, provider, redirect_url, expires_at, metadata)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            state, user_id or 0, 'gmail', 
+            request.args.get("redirect", "/onboarding-flow/2"),
+            int(time.time()) + 600,  # 10 minutes
+            json.dumps({'oauth_state': state, 'onboarding': user_id is None, 'user_id': user_id})
+        ), fetch=False)
+        logger.info("🧪 OAuth state persisted (gmail) state=%s user_id=%s", state, user_id)
 
         # Use manual URL construction for full control over OAuth parameters
         # This ensures we send exactly what Google expects
@@ -179,8 +180,9 @@ def gmail_callback():
         if hasattr(g, 'session_data') and g.session_data:
             expected_state = g.session_data.get('oauth_state')
             redirect_url = g.session_data.get('post_connect_redirect', "/onboarding-flow/2")
-        else:
-            # Fallback: check database for OAuth state
+
+        # Fallback: check database for OAuth state if session missing/empty
+        if not expected_state:
             from core.database_optimization import db_optimizer
             state_data = db_optimizer.execute_query("""
                 SELECT state, redirect_url, user_id, metadata FROM oauth_states 
@@ -191,6 +193,14 @@ def gmail_callback():
                 expected_state = state_data[0]['state']
                 redirect_url = state_data[0]['redirect_url']
                 stored_user_id = state_data[0].get('user_id')
+                logger.info(
+                    "🧪 OAuth state loaded (gmail) state=%s user_id=%s redirect=%s",
+                    expected_state,
+                    stored_user_id,
+                    redirect_url,
+                )
+            else:
+                logger.warning("🧪 OAuth state not found in DB (gmail) state=%s", state)
                 # Also try to get user_id from metadata if stored there
                 if not stored_user_id or stored_user_id == 0:
                     metadata_str = state_data[0].get('metadata', '{}')
@@ -198,8 +208,8 @@ def gmail_callback():
                         metadata = json.loads(metadata_str) if isinstance(metadata_str, str) else metadata_str
                         if metadata and 'user_id' in metadata:
                             stored_user_id = metadata.get('user_id')
-                    except:
-                        pass
+                    except Exception as parse_error:
+                        logger.debug("Failed to parse oauth state metadata: %s", parse_error)
         
         if not state or state != expected_state:
             logger.error(f"❌ State mismatch: {state} != {expected_state}")
@@ -497,18 +507,18 @@ def outlook_start():
         if hasattr(g, 'session_data') and g.session_data:
             g.session_data['oauth_state'] = state
             g.session_data['post_connect_redirect'] = request.args.get("redirect", "/onboarding-flow/2")
-        else:
-            from core.database_optimization import db_optimizer
-            db_optimizer.execute_query("""
-                INSERT OR REPLACE INTO oauth_states 
-                (state, user_id, provider, redirect_url, expires_at, metadata)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                state, user_id or 0, 'outlook', 
-                request.args.get("redirect", "/onboarding-flow/2"),
-                int(time.time()) + 600,  # 10 minutes
-                json.dumps({'oauth_state': state, 'onboarding': user_id is None})
-            ), fetch=False)
+
+        from core.database_optimization import db_optimizer
+        db_optimizer.execute_query("""
+            INSERT OR REPLACE INTO oauth_states 
+            (state, user_id, provider, redirect_url, expires_at, metadata)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            state, user_id or 0, 'outlook', 
+            request.args.get("redirect", "/onboarding-flow/2"),
+            int(time.time()) + 600,  # 10 minutes
+            json.dumps({'oauth_state': state, 'onboarding': user_id is None, 'user_id': user_id})
+        ), fetch=False)
 
         # Microsoft OAuth 2.0 authorization URL
         auth_base = f"https://login.microsoftonline.com/{MICROSOFT_TENANT_ID}/oauth2/v2.0"

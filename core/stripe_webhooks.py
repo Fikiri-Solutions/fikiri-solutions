@@ -42,7 +42,7 @@ class StripeWebhookHandler:
         if not STRIPE_AVAILABLE or not customer_id:
             return ''
         try:
-            customer = stripe.Customer.retrieve(customer_id, timeout=10)
+            customer = stripe.Customer.retrieve(customer_id)
             return (customer.email or '') if hasattr(customer, 'email') else (customer.get('email') or '')
         except Exception as e:
             logger.warning(f"Could not get customer email for {customer_id}: {e}")
@@ -630,10 +630,10 @@ class StripeWebhookHandler:
                 logger.warning("Stripe not available, cannot update subscription")
                 return
             
-            subscription = stripe.Subscription.retrieve(subscription_id, timeout=10)
+            subscription = stripe.Subscription.retrieve(subscription_id)
             
             # Get customer details to find user
-            customer = stripe.Customer.retrieve(customer_id, timeout=10)
+            customer = stripe.Customer.retrieve(customer_id)
             user_email = customer.email
             
             if not user_email:
@@ -659,7 +659,7 @@ class StripeWebhookHandler:
             if subscription.items.data and len(subscription.items.data) > 0:
                 product_id = subscription.items.data[0].price.product
                 try:
-                    product = stripe.Product.retrieve(product_id, timeout=10)
+                    product = stripe.Product.retrieve(product_id)
                     tier = product.metadata.get('tier', 'starter')
                     
                     # Get billing period from price

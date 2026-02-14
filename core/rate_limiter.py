@@ -8,7 +8,7 @@ import os
 import json
 import time
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List, Tuple, Callable
 from dataclasses import dataclass
 from enum import Enum
@@ -24,6 +24,17 @@ except ImportError:
 from core.database_optimization import db_optimizer
 
 logger = logging.getLogger(__name__)
+
+def _is_test_mode() -> bool:
+    return (
+        os.getenv("FIKIRI_TEST_MODE") == "1"
+        or os.getenv("FLASK_ENV") == "test"
+        or bool(os.getenv("PYTEST_CURRENT_TEST"))
+    )
+
+
+def _utcnow_naive() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 class RateLimitType(Enum):
     """Rate limit type enumeration"""
@@ -73,6 +84,9 @@ class EnhancedRateLimiter:
     
     def _connect_redis(self):
         """Connect to Redis for rate limiting"""
+        if _is_test_mode():
+            self.redis_client = None
+            return
         if not REDIS_AVAILABLE:
             logger.warning("Redis not available, using in-memory rate limiting")
             return
@@ -245,7 +259,7 @@ class EnhancedRateLimiter:
     def _check_database_rate_limit(self, key: str, rate_limit: RateLimit) -> RateLimitResult:
         """Check rate limit using database (fallback)"""
         try:
-            current_time = datetime.utcnow()
+            current_time = _utcnow_naive()
             window_start = current_time - timedelta(seconds=rate_limit.window_seconds)
             
             # Count requests in window
@@ -348,7 +362,7 @@ class EnhancedRateLimiter:
                 }
             else:
                 # Database fallback
-                current_time = datetime.utcnow()
+                current_time = _utcnow_naive()
                 window_start = current_time - timedelta(seconds=rate_limit.window_seconds)
                 
                 count_result = db_optimizer.execute_query("""
@@ -403,7 +417,7 @@ class EnhancedRateLimiter:
         """Clean up expired rate limit violations"""
         try:
             # Clean database violations older than 7 days
-            cutoff_date = datetime.utcnow() - timedelta(days=7)
+            cutoff_date = _utcnow_naive() - timedelta(days=7)
             
             db_optimizer.execute_query("""
                 DELETE FROM rate_limit_violations 

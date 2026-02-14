@@ -209,31 +209,31 @@ def create_gmail_service(credentials_path: str = "auth/credentials.json", token_
 
 if __name__ == "__main__":
     # Test the Gmail service
-    print("🧪 Testing Minimal Gmail Service")
-    print("=" * 40)
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
+    logger.info("Testing Minimal Gmail Service")
     
     service = MinimalGmailService()
     
     # Test authentication
-    print("Testing authentication...")
+    logger.info("Testing authentication...")
     if service.authenticate():
-        print("✅ Authentication successful")
+        logger.info("Authentication successful")
         
         # Test getting labels
-        print("\nTesting labels...")
+        logger.info("Testing labels...")
         labels = service.get_labels()
         if labels:
-            print(f"✅ Found {len(labels)} labels")
+            logger.info("Found %s labels", len(labels))
             for label in labels[:3]:  # Show first 3
-                print(f"   - {label.get('name', 'Unknown')}")
+                logger.info("  - %s", label.get('name', 'Unknown'))
         
         # Test getting unread count
-        print("\nTesting unread count...")
+        logger.info("Testing unread count...")
         unread_count = service.get_unread_count()
-        print(f"✅ Unread messages: {unread_count}")
+        logger.info("Unread messages: %s", unread_count)
         
     else:
-        print("❌ Authentication failed")
-        print("📝 Make sure you have:")
-        print("1. Gmail API credentials in auth/credentials.json")
-        print("2. Run authentication first")
+        logger.error("Authentication failed")
+        logger.info("Make sure you have:")
+        logger.info("1. Gmail API credentials in auth/credentials.json")
+        logger.info("2. Run authentication first")

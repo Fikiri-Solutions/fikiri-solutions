@@ -11,6 +11,8 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 from datetime import datetime, timezone
 from functools import wraps
+from core.idempotency_manager import idempotency_manager, generate_email_operation_key
+from core.automation_safety import automation_safety_manager
 
 # Optional Gmail API integration
 try:
@@ -92,6 +94,44 @@ class MinimalEmailActions:
     def process_email(self, parsed_email: Dict[str, Any], action_type: str = "auto_reply", 
                      user_id: int = None) -> Dict[str, Any]:
         """Process an email with specified action."""
+        key = None
+        message_id = parsed_email.get("message_id", "")
+        if user_id and message_id:
+            key = generate_email_operation_key("email_action", user_id, message_id, action_type)
+            cached = idempotency_manager.check_key(key)
+            if cached and cached.get("status") == "completed":
+                response = cached.get("response_data") or {
+                    "success": True,
+                    "action": action_type,
+                    "message_id": message_id,
+                    "details": {"idempotent": True}
+                }
+                if isinstance(response, dict):
+                    details = response.get("details") or {}
+                    details["idempotent"] = True
+                    response["details"] = details
+                return response
+            idempotency_manager.store_key(key, "email_action", user_id, {"email_id": message_id, "action": action_type})
+
+        sender = parsed_email.get("headers", {}).get("from", "")
+        safety = automation_safety_manager.check_rate_limits(
+            user_id=user_id or 0,
+            action_type=action_type,
+            target_contact=sender or "unknown"
+        )
+        if not safety.get("allowed"):
+            result = {
+                "success": False,
+                "action": action_type,
+                "message_id": message_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "user_id": user_id,
+                "details": {"error": "safety_blocked", **safety},
+            }
+            if user_id and message_id:
+                idempotency_manager.update_key_result(key, "failed", result)
+            return result
+
         action_handlers = {
             "auto_reply": self._auto_reply,
             "mark_read": self._mark_read,
@@ -116,6 +156,9 @@ class MinimalEmailActions:
         self.action_log.append(result)
         self.processed_count += 1
         self._persist_action_log(result)
+        if user_id and message_id:
+            status = "completed" if result.get("success", True) else "failed"
+            idempotency_manager.update_key_result(key, status, result)
         return result
     
     def _auto_reply(self, parsed_email: Dict[str, Any], user_id: int = None) -> Dict[str, Any]:
@@ -134,6 +177,7 @@ class MinimalEmailActions:
             # Send reply via Gmail API if available
             reply_sent = False
             reply_message_id = None
+            classification = None
             
             if self.gmail_service:
                 try:
@@ -143,11 +187,12 @@ class MinimalEmailActions:
                     reply_sent = True
                     logger.info(f"✅ Auto-reply sent via Gmail API: {reply_message_id}")
                 except Exception as e:
+                    classification = self._classify_gmail_error(e)
                     logger.error(f"❌ Failed to send Gmail reply: {e}")
                     reply_sent = False
             
             result = {
-                "success": True,
+                "success": reply_sent if self.gmail_service else True,
                 "action": "auto_reply",
                 "message_id": message_id,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -159,7 +204,8 @@ class MinimalEmailActions:
                     "reply_content": reply_content,
                     "reply_generated": True,
                     "reply_sent": reply_sent,
-                    "reply_message_id": reply_message_id
+                    "reply_message_id": reply_message_id,
+                    "error_classification": classification if not reply_sent else None
                 }
             }
             
@@ -216,7 +262,7 @@ class MinimalEmailActions:
             
         except HttpError as e:
             logger.error(f"Gmail API error: {e}")
-            raise Exception(f"Gmail API error: {e}")
+            raise
         except Exception as e:
             logger.error(f"Failed to send Gmail reply: {e}")
             raise
@@ -306,6 +352,15 @@ Fikiri Solutions Support Team"""
                     logger.info(f"✅ Marked message {message_id} as read via Gmail API")
                 except Exception as e:
                     logger.error(f"❌ Failed to mark as read via Gmail API: {e}")
+                    classification = self._classify_gmail_error(e)
+                    return {
+                        "success": False,
+                        "action": "mark_read",
+                        "message_id": message_id,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "user_id": user_id,
+                        "details": {"error": str(e), "error_classification": classification},
+                    }
             
             result = {
                 "success": True,
@@ -353,6 +408,15 @@ Fikiri Solutions Support Team"""
                     logger.info(f"✅ Added label '{label}' to message {message_id} via Gmail API")
                 except Exception as e:
                     logger.error(f"❌ Failed to add label via Gmail API: {e}")
+                    classification = self._classify_gmail_error(e)
+                    return {
+                        "success": False,
+                        "action": "add_label",
+                        "message_id": message_id,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "user_id": user_id,
+                        "details": {"error": str(e), "error_classification": classification},
+                    }
             
             result = {
                 "success": True,
@@ -391,6 +455,7 @@ Fikiri Solutions Support Team"""
             
             # Try to forward via Gmail API
             forwarded = False
+            classification = None
             if self.gmail_service and forward_to:
                 try:
                     # Get the original message
@@ -420,9 +485,18 @@ Fikiri Solutions Support Team"""
                     logger.info(f"✅ Forwarded message {message_id} to {forward_to} via Gmail API")
                 except Exception as e:
                     logger.error(f"❌ Failed to forward via Gmail API: {e}")
+                    classification = self._classify_gmail_error(e)
+                    return {
+                        "success": False,
+                        "action": "forward",
+                        "message_id": message_id,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "user_id": user_id,
+                        "details": {"error": str(e), "error_classification": classification},
+                    }
             
             result = {
-                "success": True,
+                "success": forwarded if self.gmail_service else True,
                 "action": "forward",
                 "message_id": message_id,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -432,7 +506,8 @@ Fikiri Solutions Support Team"""
                     "original_sender": sender,
                     "subject": subject,
                     "forward_generated": True,
-                    "forwarded_via_api": forwarded
+                    "forwarded_via_api": forwarded,
+                    "error_classification": classification if not forwarded else None
                 }
             }
             
@@ -468,6 +543,15 @@ Fikiri Solutions Support Team"""
                     logger.info(f"✅ Archived message {message_id} via Gmail API")
                 except Exception as e:
                     logger.error(f"❌ Failed to archive via Gmail API: {e}")
+                    classification = self._classify_gmail_error(e)
+                    return {
+                        "success": False,
+                        "action": "archive",
+                        "message_id": message_id,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "user_id": user_id,
+                        "details": {"error": str(e), "error_classification": classification},
+                    }
             
             result = {
                 "success": True,
@@ -538,6 +622,23 @@ Fikiri Solutions Support Team"""
             ), fetch=False)
         except Exception as e:
             logger.warning(f"Failed to persist action log: {e}")
+
+    def _classify_gmail_error(self, error: Exception) -> Dict[str, Any]:
+        """Classify Gmail API errors as retryable or permanent."""
+        status = None
+        reason = str(error)
+        if hasattr(error, "status_code"):
+            status = getattr(error, "status_code")
+        elif hasattr(error, "resp") and hasattr(error.resp, "status"):
+            status = error.resp.status
+
+        retryable_statuses = {429, 500, 502, 503, 504}
+        retryable = status in retryable_statuses if status is not None else False
+        return {
+            "retryable": retryable,
+            "status": status,
+            "reason": reason
+        }
     
     def get_action_log(self) -> List[Dict[str, Any]]:
         """Get the action log."""

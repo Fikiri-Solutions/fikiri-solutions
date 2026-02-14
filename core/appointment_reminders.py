@@ -5,9 +5,13 @@ Simple poller job for email reminders (24h and 2h before appointment)
 """
 
 import logging
+import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict
 from core.database_optimization import db_optimizer
+from core.idempotency_manager import idempotency_manager
+from core.automation_safety import automation_safety_manager
+from crm.service import enhanced_crm_service
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +69,21 @@ def run_reminder_job():
         # Send 24h reminders
         for apt in appointments_24h:
             try:
+                key = None
+                key = hashlib.sha256(f"appointment_reminder|24h|{apt['id']}".encode("utf-8")).hexdigest()
+                cached = idempotency_manager.check_key(key)
+                if cached and cached.get("status") == "completed":
+                    continue
+                idempotency_manager.store_key(key, "appointment_reminder", apt["user_id"], {"appointment_id": apt["id"], "hours": 24})
+
+                safety = automation_safety_manager.check_rate_limits(
+                    user_id=apt["user_id"],
+                    action_type="appointment_reminder",
+                    target_contact=apt.get("contact_email") or apt.get("user_email") or "unknown"
+                )
+                if not safety.get("allowed"):
+                    raise ValueError("automation_blocked")
+
                 # Send email
                 send_appointment_reminder_email(apt['user_email'], apt, REMINDER_24H_WINDOW_START_HOURS)
                 
@@ -74,15 +93,51 @@ def run_reminder_job():
                     SET reminder_24h_sent = 1, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
                 """, (apt['id'],), fetch=False)
+
+                if apt.get("contact_id"):
+                    enhanced_crm_service.add_lead_activity(
+                        apt["contact_id"],
+                        apt["user_id"],
+                        "meeting_scheduled",
+                        "Appointment reminder sent (24h)",
+                        metadata={"appointment_id": apt["id"], "hours_before": 24}
+                    )
+
+                automation_safety_manager.log_automation_action(
+                    user_id=apt["user_id"],
+                    rule_id=0,
+                    action_type="appointment_reminder_24h",
+                    target_contact=apt.get("contact_email") or apt.get("user_email") or "unknown",
+                    idempotency_key=key,
+                    status="completed"
+                )
+                idempotency_manager.update_key_result(key, "completed", {"success": True})
                 
                 sent_count += 1
                 logger.info(f"✅ Sent 24h reminder for appointment {apt['id']}")
             except Exception as e:
+                if key:
+                    idempotency_manager.update_key_result(key, "failed", {"success": False, "error": str(e)})
                 logger.error(f"❌ Failed to send 24h reminder for appointment {apt['id']}: {e}")
         
         # Send 2h reminders
         for apt in appointments_2h:
             try:
+                key = None
+                key = hashlib.sha256(f"appointment_reminder|2h|{apt['id']}".encode("utf-8")).hexdigest()
+                cached = idempotency_manager.check_key(key)
+                if cached and cached.get("status") == "completed":
+                    continue
+                idempotency_manager.store_key(key, "appointment_reminder", apt["user_id"], {"appointment_id": apt["id"], "hours": 2})
+
+                safety = automation_safety_manager.check_rate_limits(
+                    user_id=apt["user_id"],
+                    action_type="appointment_reminder",
+                    target_contact=apt.get("contact_email") or apt.get("user_email") or "unknown"
+                )
+                if not safety.get("allowed"):
+                    raise ValueError("automation_blocked")
+
                 # Send email
                 send_appointment_reminder_email(apt['user_email'], apt, REMINDER_2H_WINDOW_START_HOURS)
                 
@@ -92,10 +147,31 @@ def run_reminder_job():
                     SET reminder_2h_sent = 1, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
                 """, (apt['id'],), fetch=False)
+
+                if apt.get("contact_id"):
+                    enhanced_crm_service.add_lead_activity(
+                        apt["contact_id"],
+                        apt["user_id"],
+                        "meeting_scheduled",
+                        "Appointment reminder sent (2h)",
+                        metadata={"appointment_id": apt["id"], "hours_before": 2}
+                    )
+
+                automation_safety_manager.log_automation_action(
+                    user_id=apt["user_id"],
+                    rule_id=0,
+                    action_type="appointment_reminder_2h",
+                    target_contact=apt.get("contact_email") or apt.get("user_email") or "unknown",
+                    idempotency_key=key,
+                    status="completed"
+                )
+                idempotency_manager.update_key_result(key, "completed", {"success": True})
                 
                 sent_count += 1
                 logger.info(f"✅ Sent 2h reminder for appointment {apt['id']}")
             except Exception as e:
+                if key:
+                    idempotency_manager.update_key_result(key, "failed", {"success": False, "error": str(e)})
                 logger.error(f"❌ Failed to send 2h reminder for appointment {apt['id']}: {e}")
         
         if sent_count > 0:
