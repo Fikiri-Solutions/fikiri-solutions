@@ -15,25 +15,24 @@ Before you begin, ensure you have the following installed:
 ## 🏗️ Project Structure
 
 ```
-fikiri-solutions/
-├── frontend/                 # React/TypeScript frontend
+Fikiri/
+├── frontend/                 # React + Vite + TypeScript
 │   ├── src/
-│   │   ├── components/      # Reusable UI components
-│   │   ├── pages/          # Page components
-│   │   ├── hooks/          # Custom React hooks
-│   │   ├── contexts/       # React contexts
-│   │   ├── lib/            # Utilities and configurations
-│   │   └── styles/         # CSS and styling
-│   ├── public/             # Static assets
-│   └── dist/               # Build output
-├── core/                   # Python backend core
-│   ├── routes/             # API routes
-│   ├── services/           # Business logic
-│   └── utils/              # Utilities
-├── data/                   # Database and data files
-├── tests/                  # Test files
-├── scripts/                # Build and deployment scripts
-└── docs/                   # Documentation
+│   │   ├── components/      # UI components (radiant, layout, etc.)
+│   │   ├── pages/           # Page components
+│   │   ├── hooks/           # Custom hooks
+│   │   ├── contexts/        # Auth, theme
+│   │   └── services/        # API client (single backend entry)
+│   └── dist/                # Build output
+├── routes/                   # API routes (auth, business, user)
+├── core/                     # Shared backend (ai, jwt, redis, webhooks)
+├── crm/                      # CRM service (crm/service.py canonical)
+├── email_automation/         # Email pipeline, jobs
+├── integrations/            # Gmail, Outlook, iCloud connectors
+├── analytics/                # Dashboard API
+├── tests/                    # Backend tests (pytest)
+├── scripts/                  # Automation readiness, DB tools
+└── docs/                     # Documentation
 ```
 
 ## ⚡ Quick Start
@@ -49,10 +48,9 @@ cd fikiri-solutions
 
 ```bash
 # Copy environment template
-cp env.template .env.local
+cp env.template .env
 
-# Edit environment variables
-# Update the .env.local file with your local settings
+# Edit .env with your local settings (see env.template section comments)
 ```
 
 ### 3. Backend Setup
@@ -70,13 +68,10 @@ venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Initialize database
-python -c "from core.database import init_db; init_db()"
-
-# Start Redis (in a separate terminal)
+# Start Redis (in a separate terminal) if using Redis for cache/queues
 redis-server
 
-# Start backend server
+# Start backend server (database initializes on first run)
 python app.py
 ```
 
@@ -95,9 +90,9 @@ npm run dev
 
 ### 5. Verify Installation
 
-- **Frontend**: http://localhost:3000
+- **Frontend**: http://localhost:5173 (Vite default)
 - **Backend**: http://localhost:8081
-- **API Docs**: http://localhost:8081/api/docs
+- **API**: http://localhost:8081/api
 
 ## 🛠️ Development Workflow
 

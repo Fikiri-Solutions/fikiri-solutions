@@ -1,198 +1,104 @@
 # Fikiri Solutions - AI-Powered Business Automation
 
-We help small and large businesses save money through automation. Gmail lead management, AI-powered responses, CRM integration, and strategic feature flags, all in one platform.
+We help small and large businesses save money through automation. Gmail and Outlook lead management, AI-powered responses, CRM integration, and workflow automation, all in one platform.
 
 ## 🚀 Quick Start
 
-1. **Install dependencies:**
+1. **Copy environment and install backend:**
    ```bash
+   cp env.template .env
+   # Edit .env with your keys (see Configuration below)
    pip install -r requirements.txt
    ```
 
-2. **Configure Google OAuth:**
-   - Follow the [Google OAuth Setup Guide](docs/GOOGLE_OAUTH_SETUP.md)
-   - Configure required scopes in Google Cloud Console
-   - Set environment variables in `.env` file
-
-3. **Setup authentication:**
-   ```bash
-   python main_minimal.py setup
-   ```
-
-4. **Start the web dashboard:**
+2. **Start the backend:**
    ```bash
    python app.py
    ```
+   Backend runs at `http://localhost:8081` by default (set `PORT` or `FLASK_RUN_PORT` to override). Database initializes on first run.
 
-5. **Access the dashboard:**
-   - Open `http://localhost:8081` in your browser (set `PORT` or `FLASK_RUN_PORT` to override)
-   - Test all services through the web interface
+3. **Start the frontend (separate terminal):**
+   ```bash
+   cd frontend && npm install && npm run dev
+   ```
+   Frontend runs at `http://localhost:5173` (Vite). Use the web UI to sign up, connect Gmail/Outlook, and use the dashboard.
+
+4. **Optional – Google OAuth for Gmail:**  
+   Follow [Google OAuth Setup](docs/GOOGLE_OAUTH_SETUP.md) and set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` in `.env`.
 
 ## 🔧 Configuration
 
-### Google OAuth Setup
-
-Fikiri requires Google OAuth configuration for Gmail integration. Required scopes:
-
-- **Gmail API**: `https://www.googleapis.com/auth/gmail.readonly`, `https://www.googleapis.com/auth/gmail.send`, `https://www.googleapis.com/auth/gmail.modify`
-- **User Info**: `https://www.googleapis.com/auth/userinfo.email`, `https://www.googleapis.com/auth/userinfo.profile`
-
-See [Google OAuth Setup Guide](docs/GOOGLE_OAUTH_SETUP.md) for detailed configuration steps.
-
 ### Environment Variables
 
-Copy `env.template` to `.env` and configure:
+Copy `env.template` to `.env`. Key variables:
 
-- `GOOGLE_CLIENT_ID` - Google OAuth client ID
-- `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
-- `GOOGLE_REDIRECT_URI` - OAuth callback URL
-- `OPENAI_API_KEY` - OpenAI API key for AI responses
+- **Auth / API:** `JWT_SECRET_KEY`, `OPENAI_API_KEY`
+- **Gmail:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`
+- **Outlook:** `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID`, `MICROSOFT_REDIRECT_URI`
+- **Database:** `SQLITE_DATABASE_URL` (dev) or `DATABASE_URL` (production)
+- **Redis:** `REDIS_URL` (caching, rate limits, queues)
+- **Stripe (billing):** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
+
+See `env.template` for the full list and section comments.
+
+### Google OAuth (Gmail)
+
+Required scopes: Gmail read/send/modify, userinfo email/profile. See [Google OAuth Setup](docs/GOOGLE_OAUTH_SETUP.md).
 
 ## 📁 Project Structure
 
 ```
 Fikiri/
-├── core/                          # Core services
-│   ├── minimal_config.py         # Configuration management
-│   ├── minimal_auth.py           # Gmail authentication
-│   ├── minimal_email_parser.py   # Email parsing
-│   ├── minimal_gmail_utils.py    # Gmail operations
-│   ├── minimal_email_actions.py  # Email automation
-│   ├── minimal_crm_service.py    # CRM management
-│   ├── minimal_ai_assistant.py   # AI responses
-│   ├── minimal_ml_scoring.py     # Lead scoring
-│   ├── minimal_vector_search.py  # Document search
-│   └── feature_flags.py          # Feature management
-├── auth/                          # Authentication
-│   ├── credentials.json.template
-│   └── token.pkl
-├── data/                          # Data storage
-│   ├── business_profile.json
-│   ├── faq_knowledge.json
-│   ├── leads.json
-│   └── leads.csv
-├── templates/                     # Email templates
-│   ├── general_response.txt
-│   ├── lead_response.txt
-│   ├── support_response.txt
-│   └── urgent_response.txt
-├── app.py                        # Flask web application
-├── main_minimal.py               # CLI interface
-├── test_minimal_setup.py         # Test suite
-├── requirements.txt              # Dependencies
-└── mcp_config.json              # MCP configuration
+├── app.py                    # Flask app entry (backend)
+├── routes/                   # API routes (auth, business, user)
+├── core/                     # Shared backend (ai, jwt, redis, webhooks, etc.)
+├── crm/                      # CRM models and service (crm/service.py canonical)
+├── email_automation/         # Email pipeline, jobs, Gmail sync
+├── integrations/             # External connectors (Gmail, Outlook, iCloud)
+├── analytics/                # Reporting, dashboard API
+├── frontend/                 # React + Vite + TypeScript
+│   └── src/
+│       ├── components/       # UI components (radiant, layout, etc.)
+│       ├── pages/            # Page components
+│       ├── hooks/            # Custom hooks
+│       ├── contexts/         # Auth, theme
+│       └── services/         # API client (single backend entry)
+├── tests/                    # Backend tests (pytest)
+├── scripts/                  # Automation readiness, DB tools
+├── docs/                     # Documentation
+├── env.template              # Env template (copy to .env)
+└── requirements.txt
 ```
 
 ## 🛠️ Commands
 
-### CLI Commands
-- `python main_minimal.py setup` - Setup Gmail authentication
-- `python main_minimal.py status` - Check system status
-- `python main_minimal.py test` - Test core functionality
-- `python main_minimal.py config` - Show configuration
-- `python main_minimal.py crm` - View CRM statistics
-- `python main_minimal.py process` - Process emails
-
-### Web Application
-- `python app.py` - Start Flask web dashboard
-- Access `http://localhost:8081` for full interface (set `PORT` or `FLASK_RUN_PORT` to override)
+- **Backend:** `python app.py` — starts API (and SocketIO if configured) on port 8081.
+- **Frontend:** `cd frontend && npm run dev` — Vite dev server (default 5173).
+- **Tests:** `pytest tests/ -v` (backend); `cd frontend && npm run test` (frontend).
+- **Optional CLI:** `python main_minimal.py setup` / `status` / `config` for Gmail auth and status.
 
 ## ✅ Features
 
-### Core Services
-- **Email Parser** - Extract and structure Gmail messages
-- **Email Actions** - Auto-reply, mark as read, add labels
-- **CRM Service** - Lead management and contact tracking
-- **AI Assistant** - OpenAI-powered intelligent responses
-- **ML Scoring** - Lead prioritization and scoring
-- **Vector Search** - Document retrieval and context
-
-### Strategic Features
-- **Feature Flags** - Enable/disable capabilities dynamically
-- **Lightweight Core** - Minimal dependencies by default
-- **Heavy Dependencies** - Optional ML libraries via feature flags
-- **Web Dashboard** - Complete testing and management interface
-- **MCP Integration** - AI assistant tool integration
-
-### Architecture
-- **Modular Design** - Independent core services
-- **Strategic Hybrid** - Lightweight with optional enhancements
-- **Production Ready** - Flask web application
-- **Fully Tested** - Comprehensive test suite
-
-## 🔧 Configuration
-
-### Environment Variables
-- `OPENAI_API_KEY` - OpenAI API key for AI responses
-- `GMAIL_CREDENTIALS_PATH` - Path to Gmail credentials
-- `GMAIL_TOKEN_PATH` - Path to Gmail token
-
-### Feature Flags
-Control which features are enabled:
-- `ai_email_responses` - AI-powered email responses
-- `ml_lead_scoring` - Machine learning lead scoring
-- `vector_search` - Vector-based document search
-- `document_processing` - Advanced document processing
-- `advanced_nlp` - Advanced natural language processing
+- **Email:** Gmail/Outlook integration, parsing, classification, embedded images, auto-replies.
+- **CRM:** Contact and lead management (`crm/service.py`), scoring, pipelines.
+- **AI:** LLM via `core/ai/` (router, client, validators), chatbot and public API.
+- **Automation:** Workflows, follow-ups, appointment reminders, webhooks.
+- **Billing:** Stripe subscriptions and 7-day free trial.
+- **Frontend:** Dashboard, inbox, CRM, automations, billing, landing (responsive, dark mode, safe-area).
 
 ## 🧪 Testing
 
-### Web Interface Testing
-1. Start the Flask app: `python app.py`
-2. Open `http://localhost:8081` (set `PORT` or `FLASK_RUN_PORT` to override)
-3. Click "Test" buttons for each service
-4. Verify all services return successful responses
-
-### CLI Testing
-```bash
-python test_minimal_setup.py
-```
-
-### Service Tests
-All services are tested and working:
-- ✅ Email Parser - Parsing Gmail messages
-- ✅ Email Actions - Auto-reply, mark as read, add labels
-- ✅ CRM Service - Lead management and tracking
-- ✅ AI Assistant - Intelligent response generation
-- ✅ ML Scoring - Lead prioritization
-- ✅ Vector Search - Document retrieval
+- **Backend:** `pytest tests/ -v`
+- **Public API:** `python tests/run_public_api_tests.py` (see docs for env)
+- **Frontend:** `cd frontend && npm run test`
 
 ## 🚀 Deployment
 
-### Production Setup
-1. Install dependencies: `pip install -r requirements.txt`
-2. Set up Gmail authentication: `python main_minimal.py setup`
-3. Configure environment variables
-4. Start the web application: `python app.py`
-5. Access dashboard at `http://localhost:8081` (set `PORT` or `FLASK_RUN_PORT` to override)
-
-### MCP Integration
-The project includes MCP configuration for AI assistant integration:
-- Copy `mcp_config.json` to your MCP settings
-- Restart your AI assistant to load Fikiri tools
-
-## 📊 Status
-
-**Current Status: FULLY OPERATIONAL** ✅
-
-All core services are working and tested:
-- Web dashboard running on port 8081 (default)
-- All API endpoints responding correctly
-- Feature flags system operational
-- MCP integration ready
-
-## 🎯 Next Steps
-
-1. **Configure Gmail API** - Set up OAuth credentials
-2. **Set OpenAI API Key** - Enable AI responses
-3. **Customize Templates** - Modify email response templates
-4. **Add Heavy Dependencies** - Uncomment optional ML libraries as needed
-5. **Deploy to Production** - Use production WSGI server
+1. Set production env vars (do not commit `.env`); use Render/Vercel env or Doppler/Infisical.
+2. Backend: `pip install -r requirements.txt`, then run with gunicorn or similar (see `PORT`).
+3. Frontend: `cd frontend && npm run build`; serve `dist/` or deploy to Vercel.
+4. Ensure Redis and (for production) PostgreSQL are configured.
 
 ## 📝 License
 
-This project is part of Fikiri Solutions - AI-powered business automation.# Deployment Trigger - Tue Sep 16 18:21:11 EDT 2025
-# Vercel Deployment Trigger - Tue Sep 16 19:39:41 EDT 2025
-# VERCEL DEPLOYMENT TRIGGER - Tue Sep 16 22:24:08 EDT 2025
-# VERCEL DNS RESOLVED - TESTING DEPLOYMENT - Wed Sep 17 08:40:50 EDT 2025
-# Force deployment refresh - Sat Sep 27 17:30:51 EDT 2025
+This project is part of Fikiri Solutions - AI-powered business automation.
