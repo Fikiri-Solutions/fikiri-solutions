@@ -19,6 +19,7 @@ import SimpleAnimatedBackground from '@/components/SimpleAnimatedBackground'
 import DemoVideoModal from '@/components/DemoVideoModal'
 import LogoTicker from '@/components/LogoTicker'
 import { useAuth } from '@/contexts/AuthContext'
+import { PublicChatbotWidget } from '../components/PublicChatbotWidget'
 
 const LandingPage: React.FC = () => {
   // State for mobile menu and demo video
@@ -123,7 +124,7 @@ const LandingPage: React.FC = () => {
       localStorage.removeItem('fikiri-onboarding-data')
       localStorage.removeItem('fikiri-onboarding-completed')
     }
-    window.location.href = '/onboarding-flow'
+    window.location.href = '/signup'
   }
 
   const handleSignIn = () => {
@@ -595,6 +596,7 @@ const LandingPage: React.FC = () => {
         onClose={() => setIsDemoVideoOpen(false)}
         videoUrl="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" // Replace with your Kling AI generated video URL
       />
+      <PublicChatbotWidget />
     </div>
   )
 }

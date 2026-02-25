@@ -612,3 +612,33 @@ def get_alerts():
     except Exception as e:
         logger.error(f"Get alerts error: {e}")
         return create_error_response("Failed to get alerts", 500, 'ALERTS_ERROR')
+
+@monitoring_bp.route('/admin/circuit-breakers', methods=['GET'])
+@handle_api_errors
+def get_circuit_breaker_status():
+    """Get circuit breaker status for all services"""
+    try:
+        # Check if user is admin (add admin check if needed)
+        user_id = get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+        
+        try:
+            from core.circuit_breaker import circuit_breaker_manager
+            status = circuit_breaker_manager.get_all_status()
+            
+            return create_success_response({
+                'circuit_breakers': status,
+                'summary': {
+                    'total': len(status),
+                    'closed': sum(1 for s in status.values() if s['state'] == 'closed'),
+                    'open': sum(1 for s in status.values() if s['state'] == 'open'),
+                    'half_open': sum(1 for s in status.values() if s['state'] == 'half_open')
+                }
+            }, 'Circuit breaker status retrieved')
+        except ImportError:
+            return create_error_response("Circuit breaker not available", 503, 'CIRCUIT_BREAKER_UNAVAILABLE')
+        
+    except Exception as e:
+        logger.error(f"Circuit breaker status error: {e}")
+        return create_error_response("Failed to get circuit breaker status", 500, 'CIRCUIT_BREAKER_STATUS_ERROR')

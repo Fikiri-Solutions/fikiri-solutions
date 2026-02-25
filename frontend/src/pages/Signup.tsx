@@ -29,7 +29,9 @@ const Signup: React.FC = () => {
     password: '',
     confirmPassword: '',
     agreeToTerms: false,
-    subscribeNewsletter: false
+    subscribeNewsletter: false,
+    phone: '',
+    smsConsent: false,
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -173,11 +175,6 @@ const Signup: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleSocialSignup = (provider: string) => {
-    // TODO: Implement social signup logic
-    setErrors({ submit: `${provider} signup not yet implemented` });
   };
 
   return (
@@ -469,6 +466,40 @@ const Signup: React.FC = () => {
                   <p className="mt-2 text-sm text-red-300">{errors.company}</p>
                 )}
               </div>
+
+              {/* Optional Phone + SMS Consent (CTIA/TCPA express consent) */}
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-200 mb-2">
+                  Phone Number <span className="text-gray-500 font-normal">(optional)</span>
+                </label>
+                <div className="relative">
+                  <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    autoComplete="tel"
+                    className="w-full pl-4 pr-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200"
+                    placeholder="+1 (555) 123-4567"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                <div className="mt-3 flex items-start">
+                  <div className="flex items-center h-5">
+                    <input
+                      id="smsConsent"
+                      name="smsConsent"
+                      type="checkbox"
+                      checked={formData.smsConsent}
+                      onChange={handleInputChange}
+                      className="w-4 h-4 text-brand-accent bg-white/10 border-white/20 rounded focus:ring-brand-accent focus:ring-2"
+                    />
+                  </div>
+                  <label htmlFor="smsConsent" className="ml-3 text-sm text-gray-300">
+                    I agree to receive account and security-related SMS messages from Fikiri Solutions. Reply STOP to opt out. Reply HELP for help. Msg &amp; data rates may apply. Consent is not a condition of purchase.
+                  </label>
+                </div>
+              </div>
               
               {/* Password Fields */}
               <div className="grid grid-cols-2 gap-4">
@@ -628,20 +659,22 @@ const Signup: React.FC = () => {
               <div className="mt-6 grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => handleSocialSignup('gmail')}
-                  className="w-full inline-flex justify-center py-3 px-4 border border-white/20 rounded-xl shadow-sm bg-white/10 text-sm font-medium text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent transition-all duration-200"
+                  disabled
+                  title="Coming soon"
+                  className="w-full inline-flex justify-center py-3 px-4 border border-white/10 rounded-xl bg-white/5 text-sm font-medium text-gray-400 cursor-not-allowed"
                 >
                   <Chrome className="h-5 w-5 mr-2" />
-                  Gmail
+                  Gmail (coming soon)
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => handleSocialSignup('github')}
-                  className="w-full inline-flex justify-center py-3 px-4 border border-white/20 rounded-xl shadow-sm bg-white/10 text-sm font-medium text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent transition-all duration-200"
+                  disabled
+                  title="Coming soon"
+                  className="w-full inline-flex justify-center py-3 px-4 border border-white/10 rounded-xl bg-white/5 text-sm font-medium text-gray-400 cursor-not-allowed"
                 >
                   <Github className="h-5 w-5 mr-2" />
-                  GitHub
+                  GitHub (coming soon)
                 </button>
               </div>
             </div>

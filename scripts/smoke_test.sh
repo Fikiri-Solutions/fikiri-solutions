@@ -212,7 +212,7 @@ try:
         # Update user completion status
         update_user_sql = '''
         UPDATE users 
-        SET onboarding_completed = 1, onboarding_step = -1, updated_at = CURRENT_TIMESTAMP
+        SET onboarding_completed = 1, onboarding_step = 4, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         '''
         db_optimizer.execute_query(update_user_sql, (user_id,))

@@ -20,6 +20,8 @@ The script loads `.env` from the project root when run locally, so keys in `.env
 
 Service status is derived from `details.integration_health` in the JSON output. Each service (e.g. chatbot, mailbox_automation, billing) requires its listed integrations to be `"connected"` for SELLABLE.
 
+**Chatbot and KB↔vector sync:** KB update/delete now sync to the vector index (see `docs/CRUD_RAG_ARCHITECTURE.md`). The previous “ghost context” caveat is closed: if you update or delete knowledge base content, the chatbot stops using the old info. With `vector_search` and LLM/vector keys configured, Chatbot can move to SELLABLE when revenue-flow tests are stable, guardrails are in place, and integration health is green—without a ghost-context caveat.
+
 What it does:
 - Runs the revenue-flow test suite 3x to detect flakiness
 - Scans for forbidden patterns:

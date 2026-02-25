@@ -23,6 +23,8 @@ automation_engine = AutomationEngine()
 from core.automation_safety import automation_safety_manager
 from core.oauth_token_manager import oauth_token_manager
 from core.secure_sessions import get_current_user_id
+from core.activity_logger import log_activity_event
+from email_automation.service_manager import IMAPProvider
 from core.user_auth import user_auth_manager
 from core.workflow_followups import schedule_follow_up, execute_due_follow_ups
 from core.workflow_documents import generate_document
@@ -160,6 +162,34 @@ def update_lead(lead_id):
     
     return create_success_response({'lead': updated_lead}, 'Lead updated successfully')
 
+@business_bp.route('/crm/contacts/<int:contact_id>', methods=['DELETE'])
+@business_bp.route('/crm/leads/<int:contact_id>', methods=['DELETE'])
+@handle_api_errors
+def delete_contact(contact_id):
+    """Delete a contact/lead"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+    
+    # Check if soft_delete is requested (query parameter)
+    soft_delete = request.args.get('soft_delete', 'false').lower() == 'true'
+    
+    result = enhanced_crm_service.delete_contact(contact_id, user_id, soft_delete=soft_delete)
+    
+    if not result.get('success'):
+        error_code = result.get('error_code', 'DELETE_ERROR')
+        status_code = 404 if error_code == 'CONTACT_NOT_FOUND' else 500
+        return create_error_response(
+            result.get('error', 'Failed to delete contact'),
+            status_code,
+            error_code
+        )
+    
+    return create_success_response(
+        result.get('data', {}),
+        'Contact deleted successfully'
+    )
+
 
 @business_bp.route('/crm/leads/<int:lead_id>/score', methods=['POST'])
 @handle_api_errors
@@ -276,39 +306,56 @@ def sync_gmail():
         if not gmail_connected:
             return create_error_response("Gmail connection required. Please connect your Gmail account first.", 403, 'OAUTH_REQUIRED')
 
-        # Try to trigger a Gmail sync job if available
+        # Queue Gmail sync job using RQ (Redis Queue)
         sync_job_queued = False
         job_id = None
         try:
             from email_automation.gmail_sync_jobs import GmailSyncJobManager
-            import threading
+            from core.redis_queues import get_email_queue
             
             sync_job_manager = GmailSyncJobManager()
             job_id = sync_job_manager.queue_sync_job(user_id, sync_type='manual')
+            
             if job_id:
                 sync_job_queued = True
                 logger.info(f"Queued Gmail sync job {job_id} for user {user_id}")
                 
-                # Always process in background thread (whether Redis is available or not)
-                # This ensures sync happens immediately
-                logger.info(f"Processing sync job {job_id} in background thread (Redis available: {bool(sync_job_manager.redis_client)})")
-                def process_in_background():
+                # Enqueue job to RQ for background processing
+                email_queue = get_email_queue()
+                if email_queue.is_connected():
+                    # Register the sync job task if not already registered
+                    if 'process_gmail_sync' not in email_queue._registered_tasks:
+                        email_queue.register_task('process_gmail_sync', sync_job_manager.process_sync_job)
+                    
+                    # Enqueue job to RQ with trace ID
                     try:
-                        logger.info(f"🔄 Background thread started for sync job {job_id}")
-                        result = sync_job_manager.process_sync_job(job_id)
-                        if result.get('success'):
-                            logger.info(f"✅ Background sync job {job_id} completed successfully")
-                        else:
-                            logger.warning(f"⚠️ Background sync job {job_id} failed: {result.get('error')}")
-                    except Exception as bg_error:
-                        logger.error(f"❌ Background sync job {job_id} error: {bg_error}")
-                        import traceback
-                        logger.error(f"Background sync traceback: {traceback.format_exc()}")
-                
-                # Start background thread (daemon=True so it doesn't block app shutdown)
-                thread = threading.Thread(target=process_in_background, daemon=True)
-                thread.start()
-                logger.info(f"✅ Started background thread for sync job {job_id}")
+                        from core.trace_context import get_trace_id
+                        trace_id = get_trace_id()
+                    except ImportError:
+                        trace_id = None
+                    
+                    rq_job_id = email_queue.enqueue_job(
+                        'process_gmail_sync',
+                        {'job_id': job_id, 'trace_id': trace_id},
+                        max_retries=3
+                    )
+                    logger.info(f"✅ Enqueued Gmail sync job {job_id} to RQ (RQ job ID: {rq_job_id})")
+                else:
+                    # Fallback: process synchronously if Redis not available (not ideal but works)
+                    logger.warning("⚠️ Redis not available, processing sync synchronously")
+                    import threading
+                    def process_in_background():
+                        try:
+                            result = sync_job_manager.process_sync_job(job_id)
+                            if result.get('success'):
+                                logger.info(f"✅ Sync job {job_id} completed")
+                            else:
+                                logger.error(f"❌ Sync job {job_id} failed: {result.get('error')}")
+                        except Exception as e:
+                            logger.error(f"❌ Sync job {job_id} error: {e}")
+                    thread = threading.Thread(target=process_in_background, daemon=True)
+                    thread.start()
+                    logger.info(f"✅ Started fallback thread for sync job {job_id}")
         except Exception as job_error:
             logger.warning(f"Could not queue sync job (will try direct sync): {job_error}")
             import traceback
@@ -778,16 +825,18 @@ def analyze_email():
             
             # Classify email intent
             classification = ai_assistant.classify_email_intent(content, subject)
-            
-            # Generate summary (simple extraction for now)
-            summary = content[:200] + "..." if len(content) > 200 else content
-            
+
+            # AI summary + contact extraction
+            summary = ai_assistant.summarize_email(content, subject)
+            contact_info = ai_assistant.extract_contact_info(content)
+
             analysis = {
                 'intent': classification.get('intent', 'general_info') if classification else 'general_info',
                 'urgency': classification.get('urgency', 'medium') if classification else 'medium',
                 'suggested_action': classification.get('suggested_action', 'Review and respond') if classification else 'Review and respond',
                 'summary': summary,
-                'confidence': classification.get('confidence', 0.8) if classification else 0.8
+                'confidence': classification.get('confidence', 0.8) if classification else 0.8,
+                'contact_info': contact_info
             }
             
             return create_success_response(analysis, 'Email analyzed successfully')
@@ -1121,6 +1170,18 @@ def create_automation_rule():
         
         if result.get('success'):
             rule_id = result.get('data', {}).get('rule_id')
+            log_activity_event(
+                user_id,
+                'automation_rule_created',
+                message=f"Automation rule created: {rule_data.get('name')}",
+                metadata={
+                    'rule_id': rule_id,
+                    'trigger_type': rule_data.get('trigger_type'),
+                    'action_type': rule_data.get('action_type'),
+                    'status': rule_data.get('status')
+                },
+                request=request
+            )
             # Fetch the created rule to return full data
             rules_result = automation_engine.get_automation_rules(user_id)
             if rules_result.get('success'):
@@ -1191,7 +1252,35 @@ def update_automation_rule(rule_id):
         result = automation_engine.update_automation_rule(rule_id, user_id, updates)
         
         if result.get('success'):
-            return create_success_response(result.get('data', {}), 'Automation rule updated successfully')
+            data = result.get('data', {})
+            rule_obj = data.get('rule')
+            rule_name = updates.get('name')
+            if rule_obj and not rule_name:
+                try:
+                    rule_name = getattr(rule_obj, 'name', None)
+                except Exception:
+                    rule_name = None
+            log_activity_event(
+                user_id,
+                'automation_rule_updated',
+                message=f"Automation rule updated: {rule_name or f'#{rule_id}'}",
+                metadata={'rule_id': rule_id, 'updates': list(updates.keys())},
+                request=request
+            )
+            if rule_obj:
+                from dataclasses import asdict
+                rule_dict = asdict(rule_obj)
+                rule_dict['trigger_type'] = rule_dict['trigger_type'].value if hasattr(rule_dict['trigger_type'], 'value') else str(rule_dict['trigger_type'])
+                rule_dict['action_type'] = rule_dict['action_type'].value if hasattr(rule_dict['action_type'], 'value') else str(rule_dict['action_type'])
+                rule_dict['status'] = rule_dict['status'].value if hasattr(rule_dict['status'], 'value') else str(rule_dict['status'])
+                if rule_dict.get('created_at'):
+                    rule_dict['created_at'] = rule_dict['created_at'].isoformat() if hasattr(rule_dict['created_at'], 'isoformat') else str(rule_dict['created_at'])
+                if rule_dict.get('updated_at'):
+                    rule_dict['updated_at'] = rule_dict['updated_at'].isoformat() if hasattr(rule_dict['updated_at'], 'isoformat') else str(rule_dict['updated_at'])
+                if rule_dict.get('last_executed'):
+                    rule_dict['last_executed'] = rule_dict['last_executed'].isoformat() if hasattr(rule_dict['last_executed'], 'isoformat') else str(rule_dict['last_executed'])
+                data = {**data, 'rule': rule_dict}
+            return create_success_response(data, 'Automation rule updated successfully')
         else:
             error_msg = result.get('error', 'Failed to update automation rule')
             error_code = result.get('error_code', 'AUTOMATION_UPDATE_ERROR')
@@ -1265,6 +1354,14 @@ def automation_kill_switch():
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
 
         automation_safety_manager.disable_all_automations(user_id)
+
+        log_activity_event(
+            user_id,
+            'automation_kill_switch',
+            message="Automation kill switch activated",
+            metadata={'action': 'disable_all'},
+            request=request
+        )
         
         return create_success_response(
             {'message': 'All automations have been disabled'}, 
@@ -1679,6 +1776,15 @@ def create_service():
             (user_id, service_id, service_name, enabled, status, settings, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         """, (user_id, service_id, service_name, enabled, 'active' if enabled else 'inactive', settings_json), fetch=False)
+
+        status_label = 'enabled' if enabled else 'disabled'
+        log_activity_event(
+            user_id,
+            'service_created',
+            message=f"Service {service_name} {status_label}",
+            metadata={'service_id': service_id, 'service_name': service_name, 'enabled': enabled},
+            request=request
+        )
         
         return create_success_response({'service_id': service_id}, "Service saved successfully")
     except Exception as e:
@@ -1725,6 +1831,26 @@ def update_service(service_id):
         """
         
         result = db_optimizer.execute_query(query, tuple(params), fetch=False)
+
+        service_row = db_optimizer.execute_query(
+            "SELECT service_name, enabled FROM user_services WHERE user_id = ? AND service_id = ?",
+            (user_id, service_id)
+        )
+        service_name = service_row[0].get('service_name') if service_row else service_id
+        enabled_val = service_row[0].get('enabled') if service_row else enabled
+        changes = []
+        if enabled is not None:
+            changes.append(f"enabled={bool(enabled)}")
+        if settings is not None:
+            changes.append("settings updated")
+        changes_text = ", ".join(changes) if changes else "updated"
+        log_activity_event(
+            user_id,
+            'service_updated',
+            message=f"Service {service_name} updated ({changes_text})",
+            metadata={'service_id': service_id, 'service_name': service_name, 'enabled': enabled_val},
+            request=request
+        )
         
         return create_success_response({'service_id': service_id}, "Service updated successfully")
     except Exception as e:
@@ -1740,15 +1866,125 @@ def delete_service(service_id):
         if not user_id:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
         
+        service_row = db_optimizer.execute_query(
+            "SELECT service_name FROM user_services WHERE user_id = ? AND service_id = ?",
+            (user_id, service_id)
+        )
+        service_name = service_row[0].get('service_name') if service_row else service_id
+
         db_optimizer.execute_query("""
             DELETE FROM user_services 
             WHERE user_id = ? AND service_id = ?
         """, (user_id, service_id), fetch=False)
+
+        log_activity_event(
+            user_id,
+            'service_deleted',
+            message=f"Service {service_name} deleted",
+            metadata={'service_id': service_id, 'service_name': service_name},
+            request=request
+        )
         
         return create_success_response({'service_id': service_id}, "Service deleted successfully")
     except Exception as e:
         logger.error(f"❌ Delete service failed: {e}")
         return create_error_response(str(e), 500, 'DELETE_SERVICE_FAILED')
+
+# IMAP/SMTP configuration (legacy providers)
+@business_bp.route('/email/imap-config', methods=['GET'])
+@handle_api_errors
+def get_imap_config():
+    """Get saved IMAP/SMTP configuration (without secrets)"""
+    try:
+        user_id = get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+        row = db_optimizer.execute_query(
+            "SELECT settings, enabled, status FROM user_services WHERE user_id = ? AND service_id = ?",
+            (user_id, 'imap')
+        )
+        if not row:
+            return create_success_response({'configured': False}, "No IMAP configuration found")
+
+        service = dict(row[0]) if hasattr(row[0], 'keys') else row[0]
+        settings = {}
+        if service.get('settings'):
+            try:
+                settings = json.loads(service.get('settings'))
+            except Exception:
+                settings = {}
+        # Never return raw password
+        if 'password' in settings:
+            settings['password'] = '********'
+
+        return create_success_response({
+            'configured': True,
+            'enabled': bool(service.get('enabled')),
+            'status': service.get('status'),
+            'settings': settings
+        }, "IMAP configuration retrieved")
+    except Exception as e:
+        logger.error(f"❌ Get IMAP config failed: {e}")
+        return create_error_response(str(e), 500, 'GET_IMAP_CONFIG_FAILED')
+
+
+@business_bp.route('/email/imap-config', methods=['POST'])
+@handle_api_errors
+def save_imap_config():
+    """Save IMAP/SMTP configuration for legacy providers"""
+    try:
+        user_id = get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+        data = request.get_json() or {}
+        required = ['username', 'password', 'imap_server', 'smtp_server']
+        missing = [field for field in required if not data.get(field)]
+        if missing:
+            return create_error_response(f"Missing fields: {', '.join(missing)}", 400, 'MISSING_FIELDS')
+
+        settings = {
+            'service_name': data.get('service_name', 'IMAP/SMTP'),
+            'username': data.get('username'),
+            'password': data.get('password'),
+            'imap_server': data.get('imap_server'),
+            'imap_port': int(data.get('imap_port', 993)),
+            'imap_ssl': bool(data.get('imap_ssl', True)),
+            'smtp_server': data.get('smtp_server'),
+            'smtp_port': int(data.get('smtp_port', 587)),
+            'smtp_ssl': bool(data.get('smtp_ssl', False)),
+            'smtp_tls': bool(data.get('smtp_tls', True))
+        }
+
+        # Validate credentials before saving
+        provider = IMAPProvider(settings)
+        if not provider.authenticate():
+            return create_error_response("Failed to authenticate IMAP/SMTP credentials", 400, 'IMAP_AUTH_FAILED')
+
+        settings_json = json.dumps(settings)
+        db_optimizer.execute_query(
+            """
+            INSERT OR REPLACE INTO user_services
+              (user_id, service_id, service_name, enabled, status, settings, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """,
+            (user_id, 'imap', settings.get('service_name', 'IMAP/SMTP'), True, 'active', settings_json),
+            fetch=False
+        )
+
+        log_activity_event(
+            user_id,
+            'service_updated',
+            message="IMAP/SMTP settings updated",
+            metadata={'service_id': 'imap', 'service_name': settings.get('service_name', 'IMAP/SMTP')},
+            request=request
+        )
+
+        return create_success_response({'configured': True}, "IMAP configuration saved")
+    except Exception as e:
+        logger.error(f"❌ Save IMAP config failed: {e}")
+        return create_error_response(str(e), 500, 'SAVE_IMAP_CONFIG_FAILED')
 
 # Email Attachments API Routes
 @business_bp.route('/email/<email_id>/attachments', methods=['GET'])

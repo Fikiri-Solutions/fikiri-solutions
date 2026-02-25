@@ -38,12 +38,20 @@ class StructuredLogger:
     
     def log(self, level: str, message: str, **kwargs):
         """Log a structured message."""
+        # Import trace context
+        try:
+            from core.trace_context import get_trace_id
+            trace_id = get_trace_id()
+        except ImportError:
+            trace_id = None
+        
         log_data = {
             'timestamp': datetime.utcnow().isoformat(),
             'level': level.upper(),
             'message': message,
-            'service': 'fikiri-backend',
-            **kwargs
+            'service': kwargs.get('service', 'fikiri-backend'),
+            'trace_id': trace_id,
+            **{k: v for k, v in kwargs.items() if k != 'service'}
         }
         
         getattr(self.logger, level.lower())(json.dumps(log_data))
@@ -74,7 +82,8 @@ class JSONFormatter(logging.Formatter):
     def format(self, record):
         """Format log record as JSON."""
         try:
-            # If record.msg is already JSON, return it
+            # If record.msg is already JSON, return it unchanged
+            # Note: This means pre-formatted JSON logs may not include trace_id
             if isinstance(record.msg, str) and record.msg.startswith('{'):
                 return record.msg
         except Exception as exc:
@@ -82,16 +91,35 @@ class JSONFormatter(logging.Formatter):
                 "Structured logging JSON detection failed: %s", exc
             )
         
+        # Try to get trace_id from context
+        trace_id = None
+        try:
+            from core.trace_context import get_trace_id
+            trace_id = get_trace_id()
+        except (ImportError, Exception):
+            pass
+        
         # Create structured log entry
         log_entry = {
             'timestamp': datetime.utcnow().isoformat(),
             'level': record.levelname,
             'message': record.getMessage(),
-            'service': 'fikiri-backend',
+            'service': getattr(record, 'service', 'fikiri-backend'),
             'module': record.module,
             'function': record.funcName,
             'line': record.lineno
         }
+        
+        # Add trace_id only if available (may be None)
+        if trace_id:
+            log_entry['trace_id'] = trace_id
+        
+        # Add extra fields from record (only if present)
+        for key in ['user_id', 'latency_ms', 'cost_usd', 'endpoint', 'method', 'status_code']:
+            if hasattr(record, key):
+                value = getattr(record, key)
+                if value is not None:  # Only include non-None values
+                    log_entry[key] = value
         
         # Add exception info if present
         if record.exc_info:

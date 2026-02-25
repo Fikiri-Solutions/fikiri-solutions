@@ -42,10 +42,10 @@ export const OutlookConnection: React.FC<OutlookConnectionProps> = ({ userId, on
       return redirectParam
     }
     
-    if (location.pathname.startsWith('/onboarding-flow') || location.pathname.startsWith('/onboarding')) {
+    if (location.pathname.startsWith('/onboarding')) {
       const redirectPath = getRedirectParam()
       const redirectQuery = redirectPath ? `?redirect=${encodeURIComponent(redirectPath)}` : ''
-      return `/onboarding-flow/2${redirectQuery}`
+      return `/onboarding/2${redirectQuery}`
     }
     
     if (user?.onboarding_completed) {
@@ -55,7 +55,7 @@ export const OutlookConnection: React.FC<OutlookConnectionProps> = ({ userId, on
       return '/integrations/outlook'
     }
     
-    return '/onboarding-flow/2'
+    return '/onboarding/2'
   }
 
   const checkOutlookStatus = useCallback(async () => {
@@ -281,4 +281,3 @@ export const OutlookConnection: React.FC<OutlookConnectionProps> = ({ userId, on
     </div>
   )
 }
-

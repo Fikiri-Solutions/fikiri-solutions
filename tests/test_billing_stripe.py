@@ -43,6 +43,30 @@ class TestBillingAPI(unittest.TestCase):
             self.assertIn("success", data or {})
             self.assertIn("pricing_tiers", data or {})
 
+    @patch("core.jwt_auth.get_jwt_manager")
+    @patch("core.billing_api.get_user_email")
+    @patch("core.billing_api.get_stripe_customer_id")
+    @patch("core.billing_api.stripe_manager")
+    def test_customer_details_creates_customer_if_missing(
+        self, mock_stripe_manager, mock_get_customer_id, mock_get_email, mock_jwt_manager
+    ):
+        mock_jwt_manager.return_value.verify_access_token.return_value = {"user_id": 1}
+        mock_get_email.return_value = "samepassive.co@gmail.com"
+        mock_get_customer_id.return_value = None
+        mock_stripe_manager.create_customer.return_value = {"id": "cus_123"}
+        mock_stripe_manager.get_customer_details.return_value = {"id": "cus_123", "email": "samepassive.co@gmail.com"}
+
+        response = self.client.get(
+            "/api/billing/customer/details",
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data.get("success"))
+        self.assertEqual(data.get("customer", {}).get("id"), "cus_123")
+        mock_stripe_manager.create_customer.assert_called_once()
+
 
 class TestStripeWebhookHandler(unittest.TestCase):
     """Test stripe_webhooks module (handler) with mocked Stripe events."""

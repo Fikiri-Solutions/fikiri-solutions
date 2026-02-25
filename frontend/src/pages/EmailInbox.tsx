@@ -248,6 +248,14 @@ interface AIAnalysis {
   suggested_action?: string
   summary?: string
   suggested_reply?: string
+  contact_info?: {
+    phone?: string | null
+    company?: string | null
+    website?: string | null
+    location?: string | null
+    budget?: string | null
+    timeline?: string | null
+  }
 }
 
 export const EmailInbox: React.FC = () => {
@@ -946,6 +954,35 @@ export const EmailInbox: React.FC = () => {
                     </div>
                   )}
 
+                  {aiAnalysis.contact_info && (
+                    (() => {
+                      const entries = [
+                        { label: 'Phone', value: aiAnalysis.contact_info?.phone },
+                        { label: 'Company', value: aiAnalysis.contact_info?.company },
+                        { label: 'Website', value: aiAnalysis.contact_info?.website },
+                        { label: 'Location', value: aiAnalysis.contact_info?.location },
+                        { label: 'Budget', value: aiAnalysis.contact_info?.budget },
+                        { label: 'Timeline', value: aiAnalysis.contact_info?.timeline }
+                      ].filter(entry => entry.value)
+
+                      if (entries.length === 0) return null
+
+                      return (
+                        <div>
+                          <p className="text-sm font-medium text-brand-text dark:text-white mb-2">Extracted Contact Info</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-brand-text/70 dark:text-gray-400">
+                            {entries.map(entry => (
+                              <div key={entry.label} className="flex gap-2">
+                                <span className="font-medium text-brand-text dark:text-white">{entry.label}:</span>
+                                <span className="truncate">{entry.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })()
+                  )}
+
                   {aiAnalysis.suggested_reply && (
                     <div className="mt-4 p-4 bg-white dark:bg-gray-800 border border-brand-text/20 dark:border-gray-700 rounded-lg">
                       <p className="text-sm font-medium text-brand-text dark:text-white mb-2">Suggested Reply</p>
@@ -981,4 +1018,3 @@ export const EmailInbox: React.FC = () => {
     </div>
   )
 }
-

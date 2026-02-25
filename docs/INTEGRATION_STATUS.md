@@ -1,385 +1,118 @@
-# Fikiri Integration Status & User-Friendliness
+# Integration Implementation Status
 
-**Last Updated:** December 26, 2025
-
-## Current Integration Capabilities
-
-### Email Providers
-
-| Integration Type | Status | User-Friendliness | Notes |
-|-----------------|--------|-------------------|-------|
-| **Gmail** | ✅ **Production Ready** | **9/10** (One-click OAuth) | Fully functional with OAuth flow, email sync, and automation triggers |
-| **Outlook** | ✅ **Production Ready** | **8/10** (One-click OAuth) | Fully functional with OAuth flow, email sync, and automation triggers. Requires Azure AD app registration. |
-| **Yahoo Mail** | ⚠️ **OAuth2 Ready** | **2/10** (Needs Approval) | OAuth2 client implemented. Requires Yahoo approval via mail-api@yahooinc.com. See docs/YAHOO_INTEGRATION.md |
-
-### CRM Integrations
-
-| Integration Type | Status | User-Friendliness | Notes |
-|-----------------|--------|-------------------|-------|
-| **HubSpot CRM** | ❌ **Not Implemented** | **0/10** | Would require OAuth flow, API integration, and bidirectional sync |
-| **Salesforce** | ❌ **Not Implemented** | **0/10** | Would require OAuth flow, API integration, and bidirectional sync |
-| **Internal CRM** | ✅ **Production Ready** | **9/10** | Built-in CRM with leads, pipeline, and activity tracking |
-
-### Data & Automation Integrations
-
-| Integration Type | Status | User-Friendliness | Notes |
-|-----------------|--------|-------------------|-------|
-| **Google Sheets** | ⚠️ **Via Webhook** | **4/10** (Technical) | Can send data via webhooks to Google Sheets. Direct API integration not implemented. |
-| **Slack** | ⚠️ **Via Webhook** | **4/10** (Technical) | Can send notifications via webhooks. Direct Slack API integration not implemented. |
-| **Zapier** | ⚠️ **Via Webhook** | **5/10** (Moderate) | Webhook support allows Zapier integration. Users need to configure Zapier webhook triggers. |
-| **Generic Webhooks** | ✅ **Production Ready** | **6/10** (Moderate) | Full webhook support in automation engine. Users configure webhook URLs in automation presets. |
-
-### E-Commerce Integrations
-
-| Integration Type | Status | User-Friendliness | Notes |
-|-----------------|--------|-------------------|-------|
-| **Shopify** | ❌ **Not Implemented** | **0/10** | Would require OAuth flow and Shopify API integration |
-| **Stripe** | ❌ **Not Implemented** | **0/10** | Would require API key setup and Stripe API integration |
+**Date:** February 2026  
+**Last Updated:** February 2026
 
 ---
 
-## Detailed Status
+## ✅ Implemented Features
 
-### ✅ Gmail Integration (Production Ready)
+### 1. Universal JavaScript SDK
+- **File:** `integrations/universal/fikiri-sdk.js`
+- **Status:** ✅ Complete
+- **Features:**
+  - API key authentication
+  - Chatbot integration
+  - Lead capture
+  - Form submission handling
+  - Retry logic with exponential backoff
+  - Auto-initialization from data attributes
+  - Error handling
 
-**User-Friendliness: 9/10**
+### 2. Webhook Endpoints
+- **Files:** `core/webhook_api.py`
+- **Status:** ✅ Complete with security features
+- **Endpoints:**
+  - `POST /api/webhooks/forms/submit` - Generic form submissions
+  - `POST /api/webhooks/leads/capture` - Lead capture
+- **Security Features:**
+  - ✅ API key authentication
+  - ✅ Scope-based permissions
+  - ✅ Origin allowlist (optional)
+  - ✅ Idempotency (prevents duplicates)
+  - ✅ Deduplication detection
+  - ✅ Consistent response contract
 
-**Features:**
-- One-click OAuth connection
-- Automatic email sync
-- Real-time email processing
-- Automation triggers (EMAIL_RECEIVED)
-- Attachment support
-- Email sending capability
+### 3. Documentation
+- **Files:**
+  - `docs/UNIVERSAL_INTEGRATION_STRATEGY.md` - Complete integration strategy
+  - `docs/INTEGRATION_QUICK_START.md` - Quick start guide
+  - `docs/WEBHOOK_SECURITY.md` - Security documentation
+- **Status:** ✅ Complete
 
-**Setup Required:**
-1. Google Cloud Console OAuth credentials
-2. Gmail API enabled
-3. Redirect URI configured
-
-**User Experience:**
-- Click "Connect Gmail" button
-- Authorize in Google popup
-- Automatic redirect back to app
-- Status visible in Integrations page
-
----
-
-### ✅ Outlook Integration (Production Ready)
-
-**User-Friendliness: 8/10**
-
-**Features:**
-- One-click OAuth connection
-- Automatic email sync
-- Real-time email processing
-- Automation triggers (EMAIL_RECEIVED)
-- Attachment support
-- Multi-tenant support
-
-**Setup Required:**
-1. Azure AD app registration
-2. Client ID, Client Secret, Tenant ID
-3. Redirect URI configured
-4. API permissions granted (Mail.Read, Mail.ReadWrite)
-
-**User Experience:**
-- Click "Connect Outlook" button
-- Authorize in Microsoft popup
-- Automatic redirect back to app
-- Status visible in Integrations page
-
-**Why 8/10 instead of 9/10:**
-- Requires Azure AD app registration (more technical than Google)
-- Multi-tenant setup can be confusing
-- Token refresh handling is more complex
+### 4. Example Implementations
+- **Files:**
+  - `examples/wordpress-integration.php` - WordPress plugin example
+  - `examples/replit-integration.py` - Replit Flask app example
+  - `examples/custom-site-integration.html` - Custom HTML site example
+- **Status:** ✅ Complete
 
 ---
 
-### ⚠️ Yahoo Mail Integration (OAuth2 Ready - Needs Approval)
+## ⚠️ Planned Features (Not Yet Implemented)
 
-**User-Friendliness: 2/10** (Requires Yahoo approval process)
+### 1. Standalone Widget Scripts
+- **Status:** ⚠️ Planned
+- **Note:** Widget functionality exists in SDK, but standalone scripts (`chatbot.js`, `lead-capture.js`) are not yet created
 
-**Status:** OAuth2 client implemented. Requires Yahoo approval before use.
+### 2. WordPress Plugin
+- **Status:** ⚠️ Planned
+- **Note:** Example PHP code exists in `examples/`, but full WordPress plugin package not yet created
 
-**What's Complete:**
-- ✅ OAuth2 authorization flow
-- ✅ Token exchange and refresh
-- ✅ IMAP/SMTP OAuth2 authentication
-- ✅ Documentation (docs/YAHOO_INTEGRATION.md)
+### 3. SquareSpace Widget/Block
+- **Status:** ⚠️ Planned
+- **Note:** Can use SDK via Code block, but native SquareSpace widget not yet created
 
-**What's Required:**
-- ⚠️ Yahoo approval via mail-api@yahooinc.com
-- ⚠️ OAuth2 credentials from Yahoo
-- ⚠️ Frontend connection component (can be built after approval)
-- ⚠️ API endpoints (can be built after approval)
+### 4. Replit Package
+- **Status:** ⚠️ Planned
+- **Note:** Example code exists in `examples/`, but pip-installable package not yet created
 
-**Yahoo Requirements:**
-- Must use OAuth2 (not password auth)
-- Must request access through Yahoo's form
-- Must comply with Yahoo's data usage policies
-- Must demonstrate security and privacy measures
-
-**Next Steps:**
-1. Request access from Yahoo (mail-api@yahooinc.com)
-2. Provide application details and compliance info
-3. Wait for approval
-4. Complete frontend integration
-5. Test with approved credentials
-
-**See:** `docs/YAHOO_INTEGRATION.md` for full details
+### 5. API Versioning
+- **Status:** ⚠️ Not versioned
+- **Current:** `/api/webhooks/...`
+- **Planned:** `/api/v1/webhooks/...` (when needed)
 
 ---
 
-### ✅ Webhook Integration (Production Ready)
+## 🔐 Security Implementation Status
 
-**User-Friendliness: 6/10**
-
-**Features:**
-- Generic webhook support in automation engine
-- Configurable webhook URLs
-- Custom payloads
-- Error handling and retries
-
-**Supported Use Cases:**
-- Google Sheets (via Zapier or Make.com)
-- Slack notifications
-- Custom API endpoints
-- Third-party automation tools
-
-**User Experience:**
-- Configure webhook URL in automation preset
-- Customize payload structure
-- Test webhook delivery
-- View execution logs
-
-**Why 6/10:**
-- Requires technical knowledge of webhook URLs
-- Payload customization is JSON-based
-- No visual payload builder
-- Error debugging requires technical skills
+| Feature | Status | Notes |
+|---------|--------|-------|
+| API Key Authentication | ✅ | Required for all webhook endpoints |
+| Scope Enforcement | ✅ | Checks `webhooks:forms`, `webhooks:leads`, `leads:create` |
+| Origin Allowlist | ✅ | Optional - validates `Origin` header if configured |
+| Idempotency | ✅ | Prevents duplicate submissions |
+| Deduplication Detection | ✅ | Returns `deduplicated: true` in responses |
+| Response Contract | ✅ | Consistent format with error codes |
+| Rate Limiting | ✅ | Per API key (60/min, 1000/hour default) |
 
 ---
 
-### ❌ HubSpot CRM Integration (Not Implemented)
+## 📊 Current Capabilities
 
-**User-Friendliness: 0/10**
+### What Works Today:
+- ✅ JavaScript SDK integration on any website
+- ✅ Chatbot widget (via SDK)
+- ✅ Lead capture (via SDK)
+- ✅ Form submissions via webhooks
+- ✅ WordPress integration (via SDK in theme/functions.php)
+- ✅ SquareSpace integration (via SDK in Code block)
+- ✅ Replit integration (via REST API or SDK)
+- ✅ Custom site integration (via SDK or REST API)
 
-**What Would Be Needed:**
-- OAuth 2.0 flow for HubSpot
-- HubSpot API integration
-- Contact/Deal sync (bidirectional)
-- Pipeline mapping
-- Activity tracking sync
-
-**Estimated Implementation Time:** 5-7 days
-
-**User-Friendliness Potential:** 8/10 (if implemented with one-click OAuth)
-
----
-
-### ❌ Salesforce Integration (Not Implemented)
-
-**User-Friendliness: 0/10**
-
-**What Would Be Needed:**
-- OAuth 2.0 flow for Salesforce
-- Salesforce API integration
-- Lead/Contact sync (bidirectional)
-- Opportunity tracking
-- Custom field mapping
-
-**Estimated Implementation Time:** 7-10 days
-
-**User-Friendliness Potential:** 7/10 (Salesforce setup is more complex)
+### What's Coming:
+- ⚠️ Standalone widget scripts (easier integration)
+- ⚠️ WordPress plugin package (native plugin)
+- ⚠️ SquareSpace native widget
+- ⚠️ Replit pip package
+- ⚠️ API versioning (`/api/v1/...`)
 
 ---
 
-### ❌ Shopify Integration (Not Implemented)
+## 🚀 Getting Started
 
-**User-Friendliness: 0/10**
-
-**What Would Be Needed:**
-- OAuth flow for Shopify
-- Shopify API integration
-- Order sync
-- Customer sync
-- Product sync (optional)
-
-**Estimated Implementation Time:** 4-6 days
-
-**User-Friendliness Potential:** 8/10 (if implemented with one-click OAuth)
+See `docs/INTEGRATION_QUICK_START.md` for quick integration instructions.
 
 ---
 
-### ❌ Stripe Integration (Not Implemented)
-
-**User-Friendliness: 0/10**
-
-**What Would Be Needed:**
-- API key authentication
-- Payment sync
-- Customer sync
-- Subscription tracking
-- Webhook handling for events
-
-**Estimated Implementation Time:** 3-5 days
-
-**User-Friendliness Potential:** 7/10 (API key setup is straightforward)
-
----
-
-## Improvement Roadmap
-
-### High Priority (Improve User-Friendliness)
-
-1. **Webhook Payload Builder** (2-3 days)
-   - Visual interface for building webhook payloads
-   - Template library for common services
-   - Drag-and-drop field mapping
-   - **Target User-Friendliness: 8/10**
-
-2. **Google Sheets Direct Integration** (3-4 days)
-   - OAuth flow for Google Sheets
-   - Direct API integration
-   - One-click spreadsheet selection
-   - **Target User-Friendliness: 9/10**
-
-3. **Slack Direct Integration** (3-4 days)
-   - OAuth flow for Slack
-   - Direct API integration
-   - Channel selection UI
-   - **Target User-Friendliness: 9/10**
-
-### Medium Priority (New Integrations)
-
-4. **HubSpot CRM Integration** (5-7 days)
-   - One-click OAuth
-   - Bidirectional sync
-   - **Target User-Friendliness: 8/10**
-
-5. **Yahoo Mail Integration** (2-3 days)
-   - Complete OAuth flow
-   - Email sync
-   - **Target User-Friendliness: 8/10**
-
-### Low Priority (Nice to Have)
-
-6. **Salesforce Integration** (7-10 days)
-7. **Shopify Integration** (4-6 days)
-8. **Stripe Integration** (3-5 days)
-
----
-
-## Integration Architecture
-
-### Current Architecture
-
-```
-Frontend (React)
-    ↓
-API Endpoints (Flask)
-    ↓
-Integration Layer
-    ├── OAuth Handlers (Gmail, Outlook)
-    ├── Sync Services (Gmail, Outlook)
-    └── Webhook Engine
-    ↓
-Database (SQLite)
-    ├── oauth_tokens
-    ├── outlook_tokens
-    └── synced_emails
-```
-
-### OAuth Flow (Gmail/Outlook)
-
-1. User clicks "Connect" button
-2. Frontend calls `/api/oauth/{provider}/start`
-3. Backend generates OAuth URL
-4. User authorizes in provider popup
-5. Provider redirects to `/api/oauth/{provider}/callback`
-6. Backend exchanges code for tokens
-7. Tokens stored in database (encrypted)
-8. Frontend redirected to success page
-
-### Webhook Flow
-
-1. User configures webhook URL in automation preset
-2. Automation trigger fires (e.g., EMAIL_RECEIVED)
-3. Automation engine executes action
-4. Webhook payload constructed from trigger data
-5. HTTP POST sent to webhook URL
-6. Response logged for debugging
-
----
-
-## Testing Status
-
-| Integration | Unit Tests | Integration Tests | E2E Tests |
-|------------|-----------|-------------------|-----------|
-| Gmail | ✅ | ✅ | ✅ |
-| Outlook | ✅ | ✅ | ✅ |
-| Webhooks | ✅ | ⚠️ Partial | ❌ |
-| Yahoo | ❌ | ❌ | ❌ |
-| HubSpot | ❌ | ❌ | ❌ |
-| Salesforce | ❌ | ❌ | ❌ |
-
----
-
-## Documentation
-
-- **Gmail Setup:** See `GOOGLE_APIS_REQUIRED.md`
-- **Outlook Setup:** See `docs/OUTLOOK_SETUP.md`
-- **Webhook Guide:** See automation preset documentation
-- **API Documentation:** See `COMPLETE_CODEBASE_WALKTHROUGH.md`
-
----
-
-## Support & Troubleshooting
-
-### Common Issues
-
-1. **OAuth Redirect Errors**
-   - Check redirect URI matches exactly
-   - Verify OAuth credentials are correct
-   - Check CORS settings
-
-2. **Token Expiration**
-   - Tokens auto-refresh when possible
-   - Manual reconnection required if refresh fails
-   - Check token expiry in database
-
-3. **Webhook Failures**
-   - Verify webhook URL is accessible
-   - Check payload format
-   - Review execution logs
-
----
-
-## Summary
-
-**Production Ready (9/10+ User-Friendliness):**
-- ✅ Gmail (9/10)
-- ✅ Outlook (8/10)
-- ✅ Internal CRM (9/10)
-
-**Functional but Technical (4-6/10 User-Friendliness):**
-- ⚠️ Webhooks (6/10)
-- ⚠️ Google Sheets via Webhook (4/10)
-- ⚠️ Slack via Webhook (4/10)
-- ⚠️ Zapier via Webhook (5/10)
-
-**Not Implemented (0/10 User-Friendliness):**
-- ❌ Yahoo Mail
-- ❌ HubSpot CRM
-- ❌ Salesforce
-- ❌ Shopify
-- ❌ Stripe
-
-**Next Steps:**
-1. Improve webhook user-friendliness with visual builder
-2. Add direct Google Sheets integration
-3. Add direct Slack integration
-4. Complete Yahoo Mail integration
-5. Add HubSpot CRM integration
-
+*Last updated: February 2026*

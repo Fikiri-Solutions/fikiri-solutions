@@ -333,9 +333,23 @@ class UserAuthManager:
             return False
     
     def update_user_profile(self, user_id: int, **updates) -> Dict[str, Any]:
-        """Update user profile information"""
+        """Update user profile information. updates may include metadata_updates dict for phone/sms_consent."""
         try:
-            # Build update query dynamically
+            metadata_updates = updates.pop('metadata_updates', None)
+            if metadata_updates is not None:
+                row = db_optimizer.execute_query(
+                    "SELECT metadata FROM users WHERE id = ? AND is_active = 1",
+                    (user_id,)
+                )
+                meta = json.loads((row[0].get('metadata') or '{}') if row else '{}')
+                meta.update(metadata_updates)
+                db_optimizer.execute_query(
+                    "UPDATE users SET metadata = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (json.dumps(meta), user_id),
+                    fetch=False
+                )
+
+            # Build update query dynamically for column fields
             update_fields = []
             update_values = []
             
@@ -349,18 +363,10 @@ class UserAuthManager:
                     update_fields.append(f"{field} = ?")
                     update_values.append(value)
             
-            if not update_fields:
-                return {
-                    'success': False,
-                    'error': 'No valid fields to update',
-                    'error_code': 'NO_UPDATES'
-                }
-            
-            update_values.append(user_id)
-            
-            query = f"UPDATE users SET {', '.join(update_fields)}, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-            
-            db_optimizer.execute_query(query, tuple(update_values), fetch=False)
+            if update_fields:
+                update_values.append(user_id)
+                query = f"UPDATE users SET {', '.join(update_fields)}, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+                db_optimizer.execute_query(query, tuple(update_values), fetch=False)
             
             # Get updated user data (rulepack compliance: specific columns, not SELECT *)
             user_data = db_optimizer.execute_query(

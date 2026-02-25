@@ -99,6 +99,8 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
     description: ''
   })
 
+  const [smsConsent, setSmsConsent] = useState(false)
+
   // Update accountData when user changes
   React.useEffect(() => {
     if (user) {
@@ -114,6 +116,18 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
       }))
     }
   }, [user])
+
+  // Load profile (phone, sms_consent) when modal opens
+  React.useEffect(() => {
+    if (isOpen && user?.id) {
+      import('../services/apiClient').then(({ apiClient }) => {
+        apiClient.getProfile().then(({ user: profile }) => {
+          setAccountData(prev => ({ ...prev, phone: profile?.phone || '' }))
+          setSmsConsent(!!profile?.sms_consent)
+        }).catch(() => {})
+      })
+    }
+  }, [isOpen, user?.id])
 
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
     currentPassword: '',
@@ -181,24 +195,29 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
   const handleSaveProfile = async () => {
     setIsLoading(true)
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Update user in context
-      if (user) {
+      const { apiClient } = await import('../services/apiClient')
+      const payload = {
+        name: accountData.username,
+        business_name: accountData.businessName,
+        business_email: accountData.businessEmail,
+        industry: accountData.industry,
+        team_size: accountData.teamSize,
+        phone: accountData.phone?.trim() || undefined,
+        sms_consent: smsConsent,
+      }
+      const { user: updated } = await apiClient.updateProfile(payload)
+      if (user && updated) {
         const updatedUser = {
           ...user,
-          name: accountData.username,
-          email: accountData.email,
-          business_name: accountData.businessName,
-          business_email: accountData.businessEmail,
-          industry: accountData.industry,
-          team_size: accountData.teamSize,
-          timezone: accountData.timezone
+          name: updated.name ?? user.name,
+          business_name: updated.business_name ?? user.business_name,
+          business_email: updated.business_email ?? user.business_email,
+          industry: updated.industry ?? user.industry,
+          team_size: updated.team_size ?? user.team_size,
+          metadata: { ...(user.metadata || {}), phone: updated.phone, sms_consent: updated.sms_consent, sms_consent_at: updated.sms_consent_at },
         }
         updateUser(updatedUser)
       }
-      
       setIsEditing(false)
       addToast({ type: 'success', title: 'Profile updated successfully!' })
     } catch (_error) {
@@ -342,6 +361,21 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
               disabled={!isEditing}
               className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-800"
             />
+            <div className="mt-3 flex items-start">
+              <div className="flex items-center h-5">
+                <input
+                  id="smsConsent"
+                  type="checkbox"
+                  checked={smsConsent}
+                  onChange={(e) => setSmsConsent(e.target.checked)}
+                  disabled={!isEditing}
+                  className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                />
+              </div>
+              <label htmlFor="smsConsent" className="ml-3 text-sm text-gray-600 dark:text-gray-400">
+                I agree to receive account and security-related SMS messages from Fikiri Solutions. Reply STOP to opt out. Reply HELP for help. Msg &amp; data rates may apply. Consent is not a condition of purchase.
+              </label>
+            </div>
           </div>
 
           <div>
@@ -676,7 +710,11 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             <Smartphone className="w-5 h-5 mr-2" />
             SMS Notifications
           </h4>
-          
+          {!smsConsent && (
+            <p className="text-sm text-amber-700 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 mb-4">
+              To enable SMS, add your phone number in the Profile tab and check the consent box there. You must agree to receive account and security-related SMS (Reply STOP to opt out, HELP for help. Msg &amp; data rates may apply).
+            </p>
+          )}
           <div className="space-y-4">
             {Object.entries(notificationSettings.sms).map(([key, value]) => (
               <div key={key} className="flex items-center justify-between">
@@ -689,14 +727,15 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
                     {key === 'urgent' && 'Urgent notifications that require immediate attention'}
                   </p>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
+                <label className={`relative inline-flex items-center cursor-pointer ${!smsConsent ? 'opacity-50' : ''}`}>
                   <input
                     type="checkbox"
-                    checked={value}
-                    onChange={(e) => setNotificationSettings(prev => ({
+                    checked={smsConsent ? value : false}
+                    onChange={(e) => smsConsent && setNotificationSettings(prev => ({
                       ...prev,
                       sms: { ...prev.sms, [key]: e.target.checked }
                     }))}
+                    disabled={!smsConsent}
                     className="sr-only peer"
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 dark:peer-focus:ring-orange-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-orange-500"></div>

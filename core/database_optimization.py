@@ -237,6 +237,20 @@ class DatabaseOptimizer:
             if 'subject' not in lead_columns:
                 cursor.execute("ALTER TABLE leads ADD COLUMN subject TEXT")
                 logger.info("✅ Added subject column to leads table")
+
+            # Chatbot query log: confidence breakdown for eval
+            cursor.execute("PRAGMA table_info(chatbot_query_log)")
+            qlog_columns = [row[1] for row in cursor.fetchall()]
+            if qlog_columns and 'metadata' not in qlog_columns:
+                cursor.execute("ALTER TABLE chatbot_query_log ADD COLUMN metadata TEXT")
+                logger.info("✅ Added metadata column to chatbot_query_log")
+
+            # Conversation feedback: store confidence etc. with feedback
+            cursor.execute("PRAGMA table_info(conversation_feedback)")
+            cf_columns = [row[1] for row in cursor.fetchall()]
+            if cf_columns and 'metadata' not in cf_columns:
+                cursor.execute("ALTER TABLE conversation_feedback ADD COLUMN metadata TEXT")
+                logger.info("✅ Added metadata column to conversation_feedback")
         except Exception as e:
             logger.warning(f"Migration warning: {e}")
     
@@ -611,6 +625,164 @@ class DatabaseOptimizer:
                 error_message TEXT,
                 FOREIGN KEY (rule_id) REFERENCES automation_rules (id) ON DELETE CASCADE,
                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+        
+        # Expert teams table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS expert_teams (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tenant_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(tenant_id, name)
+            )
+        """)
+        
+        # Expert team members table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS expert_team_members (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                team_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                role TEXT DEFAULT 'expert',  -- 'expert', 'admin'
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (team_id) REFERENCES expert_teams (id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                UNIQUE(team_id, user_id)
+            )
+        """)
+        
+        # Escalated questions table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS escalated_questions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                conversation_id TEXT NOT NULL,
+                tenant_id TEXT NOT NULL,
+                user_id TEXT,  -- End user who asked
+                question TEXT NOT NULL,
+                original_answer TEXT,
+                confidence REAL,
+                assigned_to INTEGER,  -- Expert user_id
+                team_id INTEGER,
+                status TEXT DEFAULT 'pending',  -- 'pending', 'assigned', 'in_progress', 'resolved', 'closed'
+                resolution TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                assigned_at TIMESTAMP,
+                resolved_at TIMESTAMP,
+                FOREIGN KEY (assigned_to) REFERENCES users (id),
+                FOREIGN KEY (team_id) REFERENCES expert_teams (id)
+            )
+        """)
+        
+        # Expert responses table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS expert_responses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                escalated_question_id INTEGER NOT NULL,
+                expert_user_id INTEGER NOT NULL,
+                response_text TEXT NOT NULL,
+                added_to_kb BOOLEAN DEFAULT 0,
+                faq_id INTEGER,  -- If added as FAQ
+                kb_document_id TEXT,  -- If added as KB doc
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (escalated_question_id) REFERENCES escalated_questions (id) ON DELETE CASCADE,
+                FOREIGN KEY (expert_user_id) REFERENCES users (id)
+            )
+        """)
+        
+        # Conversation feedback table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS conversation_feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                conversation_id TEXT NOT NULL,
+                message_id TEXT,
+                helpful BOOLEAN,
+                feedback_text TEXT,
+                user_id TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Chatbot query log: each turn (query + response) for feedback evaluation
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS chatbot_query_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                conversation_id TEXT NOT NULL,
+                message_id TEXT NOT NULL,
+                query TEXT NOT NULL,
+                response TEXT NOT NULL,
+                confidence REAL,
+                fallback_used BOOLEAN,
+                sources_json TEXT,
+                tenant_id TEXT,
+                user_id TEXT,
+                llm_trace_id TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Chatbot feedback: ratings on answers (question, answer, retrieved_doc_ids, rating)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS chatbot_feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                session_id TEXT,
+                question TEXT NOT NULL,
+                answer TEXT NOT NULL,
+                retrieved_doc_ids TEXT,
+                rating TEXT NOT NULL CHECK(rating IN ('correct', 'somewhat_correct', 'somewhat_incorrect', 'incorrect')),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                metadata TEXT,
+                prompt_version TEXT,
+                retriever_version TEXT
+            )
+        """)
+        
+        # KPI tracking table for historical KPI data
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS kpi_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                snapshot_date DATE NOT NULL,
+                company_stage TEXT NOT NULL,  -- 'early_stage' or 'mid_stage'
+                kpi_type TEXT NOT NULL,  -- 'cac', 'clv', 'burn_rate', 'gross_margin', 'retention_rate', 'arpu', 'sales_efficiency', 'nrr'
+                kpi_value REAL NOT NULL,
+                metadata TEXT,  -- JSON object with additional context
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(snapshot_date, company_stage, kpi_type)
+            )
+        """)
+        
+        # Marketing and sales costs tracking table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS acquisition_costs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cost_date DATE NOT NULL,
+                cost_type TEXT NOT NULL,  -- 'marketing', 'sales', 'advertising', 'other'
+                amount REAL NOT NULL,
+                description TEXT,
+                channel TEXT,  -- 'organic', 'paid', 'referral', 'direct', etc.
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Revenue tracking table (for detailed revenue analysis)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS revenue_tracking (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                revenue_date DATE NOT NULL,
+                user_id INTEGER,
+                subscription_id INTEGER,
+                revenue_type TEXT NOT NULL,  -- 'subscription', 'upsell', 'expansion', 'one_time'
+                amount REAL NOT NULL,
+                tier TEXT,
+                billing_period TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id),
+                FOREIGN KEY (subscription_id) REFERENCES subscriptions (id)
             )
         """)
         

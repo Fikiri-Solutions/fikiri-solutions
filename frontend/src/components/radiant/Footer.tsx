@@ -9,10 +9,8 @@ import { AnimatedFikiriLogo } from './AnimatedFikiriLogo'
 import { ExternalLink } from 'lucide-react'
 
 const SOCIAL_LINKS = [
-  { label: 'Twitter', href: 'https://twitter.com/fikirisolutions', aria: 'Fikiri on Twitter' },
-  { label: 'Instagram', href: 'https://www.instagram.com/fikirisolutions', aria: 'Fikiri on Instagram' },
-  { label: 'Facebook', href: 'https://www.facebook.com/fikirisolutions', aria: 'Fikiri on Facebook' },
-  { label: 'LinkedIn', href: 'https://www.linkedin.com/company/fikirisolutions', aria: 'Fikiri on LinkedIn' },
+  { label: 'X', href: 'https://x.com/FikiriSolutions', aria: 'Fikiri on X' },
+  { label: 'Instagram', href: 'https://www.instagram.com/fikirisolutions/?hl=en', aria: 'Fikiri on Instagram' },
 ] as const
 
 function CallToAction() {
@@ -68,6 +66,7 @@ function Sitemap() {
         <SitemapHeading>Company</SitemapHeading>
         <SitemapLinks>
           <SitemapLink to="/about">About</SitemapLink>
+          <SitemapLink to="/contact">Contact us</SitemapLink>
         </SitemapLinks>
       </div>
       <div>
@@ -79,7 +78,7 @@ function Sitemap() {
       </div>
       <div>
         <SitemapHeading>Follow us</SitemapHeading>
-        <ul className="mt-6 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+        <ul className="mt-6 flex flex-col gap-y-2 text-sm">
           {SOCIAL_LINKS.map(({ label, href, aria }) => (
             <li key={label}>
               <a

@@ -74,7 +74,8 @@ export const Dashboard: React.FC = () => {
     }
   })
 
-  const { data: activityData = mockActivity, isLoading: activityLoading } = useQuery({
+  const emptyActivity: any[] = []
+  const { data: activityData = (features.useMockData ? mockActivity : emptyActivity), isLoading: activityLoading } = useQuery({
     queryKey: ['activity'],
     queryFn: () => features.useMockData ? Promise.resolve(mockActivity) : apiClient.getActivity(),
     staleTime: 30 * 1000, // 30 seconds - activity updates frequently
@@ -347,6 +348,10 @@ export const Dashboard: React.FC = () => {
             </h3>
             {activityLoading ? (
               <ActivitySkeleton />
+            ) : activity.length === 0 ? (
+              <div className="text-sm text-brand-text/60 dark:text-gray-400">
+                No activity yet.
+              </div>
             ) : (
               <div className="space-y-3">
                 {activity.slice(0, 5).map((item) => (

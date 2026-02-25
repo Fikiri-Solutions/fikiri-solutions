@@ -21,6 +21,16 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 os.environ.setdefault("FLASK_ENV", "test")
 
+# Load .env so contract and other tests see GMAIL_*, STRIPE_*, etc. (pytest -m contract does not import app)
+try:
+    from dotenv import load_dotenv
+    # Use path relative to this file so we always find repo root .env regardless of cwd
+    _env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
+    _env_path = os.path.normpath(os.path.abspath(_env_path))
+    load_dotenv(_env_path, override=True)
+except ImportError:
+    pass
+
 
 class FakeRedis:
     """In-memory Redis stub for unit tests. No real Redis required."""

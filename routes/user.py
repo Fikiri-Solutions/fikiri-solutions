@@ -16,6 +16,8 @@ from core.secure_sessions import get_current_user_id
 from core.jwt_auth import jwt_required, get_current_user
 from core.automation_safety import automation_safety_manager
 from core.database_optimization import db_optimizer
+from core.api_key_manager import api_key_manager
+from core.activity_logger import log_activity_event
 
 logger = logging.getLogger(__name__)
 
@@ -54,21 +56,27 @@ def get_user_profile():
         
         metadata = json.loads(user_dict.get('metadata', '{}'))
         
+        out = {
+            'id': user_dict.get('id'),
+            'email': user_dict.get('email'),
+            'name': user_dict.get('name'),
+            'role': user_dict.get('role', 'user'),
+            'onboarding_completed': user_dict.get('onboarding_completed', False),
+            'onboarding_step': user_dict.get('onboarding_step', 0),
+            'business_name': user_dict.get('business_name'),
+            'business_email': user_dict.get('business_email'),
+            'industry': user_dict.get('industry'),
+            'team_size': user_dict.get('team_size'),
+            'created_at': user_dict.get('created_at'),
+            'last_login': user_dict.get('last_login'),
+        }
+        if isinstance(metadata, dict):
+            out['phone'] = metadata.get('phone') or None
+            out['sms_consent'] = bool(metadata.get('sms_consent'))
+            out['sms_consent_at'] = metadata.get('sms_consent_at')
+        
         return create_success_response({
-            'user': {
-                'id': user_dict.get('id'),
-                'email': user_dict.get('email'),
-                'name': user_dict.get('name'),
-                'role': user_dict.get('role', 'user'),
-                'onboarding_completed': user_dict.get('onboarding_completed', False),
-                'onboarding_step': user_dict.get('onboarding_step', 0),
-                'business_name': user_dict.get('business_name'),
-                'business_email': user_dict.get('business_email'),
-                'industry': user_dict.get('industry'),
-                'team_size': user_dict.get('team_size'),
-                'created_at': user_dict.get('created_at'),
-                'last_login': user_dict.get('last_login')
-            }
+            'user': out
         }, "User profile retrieved")
         
     except Exception as e:
@@ -89,18 +97,57 @@ def update_user_profile():
             return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
 
         # Validate allowed fields
-        allowed_fields = ['name', 'business_name', 'business_email', 'industry', 'team_size']
+        allowed_fields = ['name', 'business_name', 'business_email', 'industry', 'team_size', 'phone', 'sms_consent']
         update_data = {k: v for k, v in data.items() if k in allowed_fields}
         
-        if not update_data:
+        if not update_data and not metadata_updates:
             return create_error_response("No valid fields to update", 400, 'NO_VALID_FIELDS')
 
-        # Update user profile
-        result = user_auth_manager.update_user_profile(user_id, update_data)
+        # phone and sms_consent go into metadata; rest into columns
+        metadata_updates = {}
+        if 'phone' in update_data:
+            metadata_updates['phone'] = (update_data.pop('phone') or '').strip() or None
+        if 'sms_consent' in update_data:
+            metadata_updates['sms_consent'] = bool(update_data.get('sms_consent'))
+            metadata_updates['sms_consent_at'] = datetime.utcnow().isoformat() + 'Z' if metadata_updates['sms_consent'] else None
+            update_data.pop('sms_consent')
+
+        # Update user profile (columns + metadata)
+        result = user_auth_manager.update_user_profile(
+            user_id,
+            metadata_updates=metadata_updates if metadata_updates else None,
+            **update_data
+        )
         
         if result['success']:
+            log_activity_event(
+                user_id,
+                'profile_updated',
+                message="Profile settings updated",
+                metadata={'fields': list(update_data.keys()) + (list(metadata_updates.keys()) if metadata_updates else [])},
+                request=request
+            )
+            u = result['user']
+            meta = getattr(u, 'metadata', None) or {}
+            user_payload = {
+                'id': u.id,
+                'email': u.email,
+                'name': u.name,
+                'role': getattr(u, 'role', 'user'),
+                'business_name': getattr(u, 'business_name', None),
+                'business_email': getattr(u, 'business_email', None),
+                'industry': getattr(u, 'industry', None),
+                'team_size': getattr(u, 'team_size', None),
+                'onboarding_completed': getattr(u, 'onboarding_completed', False),
+                'onboarding_step': getattr(u, 'onboarding_step', 0),
+                'created_at': u.created_at.isoformat() if hasattr(u.created_at, 'isoformat') else str(u.created_at),
+                'last_login': getattr(u, 'last_login', None),
+                'phone': meta.get('phone'),
+                'sms_consent': bool(meta.get('sms_consent')),
+                'sms_consent_at': meta.get('sms_consent_at'),
+            }
             return create_success_response(
-                {'user': result['user']}, 
+                {'user': user_payload},
                 'Profile updated successfully'
             )
         else:
@@ -125,7 +172,7 @@ def update_onboarding_step():
             return create_error_response("Step number is required", 400, 'MISSING_STEP')
 
         step = data['step']
-        if not isinstance(step, int) or step < 1 or step > 5:
+        if not isinstance(step, int) or step < 1 or step > 4:
             return create_error_response("Invalid step number", 400, 'INVALID_STEP')
 
         # Update onboarding step
@@ -205,6 +252,67 @@ def get_automation_status():
     except Exception as e:
         logger.error(f"Automation status error: {e}")
         return create_error_response("Failed to get automation status", 500, 'AUTOMATION_STATUS_ERROR')
+
+@user_bp.route('/user/api-keys', methods=['GET'])
+@handle_api_errors
+def list_user_api_keys():
+    """List API keys for the current user (metadata only)."""
+    try:
+        user_id = get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+        keys = api_key_manager.list_api_keys(user_id)
+        return create_success_response({'keys': keys}, 'API keys retrieved successfully')
+    except Exception as e:
+        logger.error(f"List API keys error: {e}")
+        return create_error_response("Failed to list API keys", 500, 'API_KEYS_ERROR')
+
+@user_bp.route('/user/api-keys', methods=['POST'])
+@handle_api_errors
+def create_user_api_key():
+    """Create a new API key for the current user (returns full key once)."""
+    try:
+        user_id = get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+        data = request.get_json(silent=True) or {}
+        name = (data.get('name') or 'Install Page Key').strip()
+        description = (data.get('description') or 'Generated for SDK install flow').strip()
+        scopes = data.get('scopes') or ["chatbot:query", "webhooks:forms", "webhooks:leads", "leads:create"]
+        allowed_origins = data.get('allowed_origins')
+
+        # Normalize allowed_origins to list if provided as string
+        if isinstance(allowed_origins, str):
+            allowed_origins = [allowed_origins]
+
+        result = api_key_manager.generate_api_key(
+            user_id=user_id,
+            name=name,
+            description=description,
+            tenant_id=str(user_id),
+            scopes=scopes,
+            allowed_origins=allowed_origins
+        )
+
+        log_activity_event(
+            user_id,
+            'api_key_created',
+            message="API key created",
+            metadata={'key_id': (result.get('key_info') or {}).get('id'), 'name': name},
+            request=request
+        )
+        return create_success_response(
+            {
+                'api_key': result.get('api_key'),
+                'key_info': result.get('key_info')
+            },
+            'API key created successfully'
+        )
+    except Exception as e:
+        logger.error(f"Create API key error: {e}")
+        return create_error_response("Failed to create API key", 500, 'API_KEY_CREATE_ERROR')
 
 @user_bp.route('/user/dashboard-data', methods=['GET'])
 @handle_api_errors

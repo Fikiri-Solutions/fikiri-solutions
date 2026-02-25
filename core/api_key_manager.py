@@ -35,6 +35,7 @@ class APIKeyManager:
                     description TEXT,
                     tenant_id TEXT,  -- Optional tenant identifier for multi-tenant isolation
                     scopes TEXT DEFAULT '["chatbot:query"]',  -- JSON array of allowed scopes
+                    allowed_origins TEXT,  -- JSON array of allowed CORS origins (null = all)
                     rate_limit_per_minute INTEGER DEFAULT 60,
                     rate_limit_per_hour INTEGER DEFAULT 1000,
                     is_active BOOLEAN DEFAULT 1,
@@ -82,6 +83,20 @@ class APIKeyManager:
                 ON api_key_usage (api_key_id, created_at)
             """, fetch=False)
             
+            # Migration: Add allowed_origins column if it doesn't exist
+            try:
+                info = db_optimizer.execute_query(
+                    "PRAGMA table_info(api_keys)", fetch=True
+                )
+                columns = [r.get("name") for r in (info or []) if isinstance(r, dict)]
+                if "allowed_origins" not in columns:
+                    db_optimizer.execute_query("""
+                        ALTER TABLE api_keys ADD COLUMN allowed_origins TEXT
+                    """, fetch=False)
+                    logger.info("✅ Added allowed_origins column to api_keys table")
+            except Exception as e:
+                logger.debug("allowed_origins migration skip or error: %s", e)
+            
             logger.info("✅ API key management tables initialized")
             
         except Exception as e:
@@ -89,6 +104,7 @@ class APIKeyManager:
     
     def generate_api_key(self, user_id: int, name: str, description: str = None,
                         tenant_id: str = None, scopes: List[str] = None,
+                        allowed_origins: List[str] = None,
                         rate_limit_per_minute: int = 60,
                         rate_limit_per_hour: int = 1000,
                         expires_days: int = None) -> Dict[str, Any]:
@@ -119,13 +135,13 @@ class APIKeyManager:
             db_optimizer.execute_query("""
                 INSERT INTO api_keys (
                     user_id, key_hash, key_prefix, name, description,
-                    tenant_id, scopes, rate_limit_per_minute, rate_limit_per_hour,
+                    tenant_id, scopes, allowed_origins, rate_limit_per_minute, rate_limit_per_hour,
                     expires_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 user_id, key_hash, key_prefix, name, description,
-                tenant_id, json.dumps(scopes), rate_limit_per_minute, rate_limit_per_hour,
-                expires_at
+                tenant_id, json.dumps(scopes), json.dumps(allowed_origins) if allowed_origins else None,
+                rate_limit_per_minute, rate_limit_per_hour, expires_at.isoformat() if expires_at else None
             ), fetch=False)
             
             logger.info(f"✅ Generated API key for user {user_id}: {key_prefix}...")
@@ -167,7 +183,7 @@ class APIKeyManager:
             # Look up key
             result = db_optimizer.execute_query("""
                 SELECT id, user_id, key_prefix, name, description, tenant_id,
-                       scopes, rate_limit_per_minute, rate_limit_per_hour,
+                       scopes, allowed_origins, rate_limit_per_minute, rate_limit_per_hour,
                        is_active, expires_at, last_used_at
                 FROM api_keys
                 WHERE key_hash = ? AND is_active = 1
@@ -188,6 +204,9 @@ class APIKeyManager:
             # Parse scopes
             import json
             scopes = json.loads(key_data['scopes']) if isinstance(key_data['scopes'], str) else key_data['scopes']
+            allowed_origins = None
+            if key_data.get('allowed_origins'):
+                allowed_origins = json.loads(key_data['allowed_origins']) if isinstance(key_data['allowed_origins'], str) else key_data['allowed_origins']
             
             return {
                 "api_key_id": key_data['id'],
@@ -196,6 +215,7 @@ class APIKeyManager:
                 "name": key_data['name'],
                 "tenant_id": key_data.get('tenant_id'),
                 "scopes": scopes,
+                "allowed_origins": allowed_origins,
                 "rate_limit_per_minute": key_data['rate_limit_per_minute'],
                 "rate_limit_per_hour": key_data['rate_limit_per_hour']
             }

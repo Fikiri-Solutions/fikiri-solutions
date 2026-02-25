@@ -14,6 +14,17 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
+# Import circuit breaker
+try:
+    from core.circuit_breaker import get_circuit_breaker, CircuitBreakerOpenError
+    CIRCUIT_BREAKER_AVAILABLE = True
+except ImportError:
+    CIRCUIT_BREAKER_AVAILABLE = False
+    logger.warning("Circuit breaker not available")
+
+# Default timeout for OpenAI API calls (seconds)
+DEFAULT_OPENAI_TIMEOUT = int(os.getenv("OPENAI_TIMEOUT", "30"))
+
 class LLMClient:
     """
     Centralized LLM client with exponential backoff, cost tracking, and error handling.
@@ -114,25 +125,47 @@ class LLMClient:
                 messages.append({"role": "system", "content": system_message})
             messages.append({"role": "user", "content": prompt})
         
+        # Get circuit breaker for OpenAI
+        breaker = None
+        if CIRCUIT_BREAKER_AVAILABLE:
+            breaker = get_circuit_breaker(
+                "openai",
+                failure_threshold=5,
+                success_threshold=2,
+                timeout_seconds=60,
+                fail_open=True  # Fail open: allow requests but return error
+            )
+        
         # Retry with exponential backoff
         max_retries = 3
         base_delay = 1.0
         
-        for attempt in range(max_retries):
-            try:
-                # Call OpenAI API
-                if hasattr(self.client, 'chat'):
-                    # OpenAI >= 1.0.0
-                    response = self.client.chat.completions.create(
-                        model=model,
-                        messages=messages,
-                        max_tokens=max_tokens,
-                        temperature=temperature
-                    )
-                    content = response.choices[0].message.content.strip()
-                    tokens_used = response.usage.total_tokens if response.usage else 0
-                else:
-                    # Legacy OpenAI < 1.0.0
+        def _call_openai():
+            """Inner function to call OpenAI API with timeout"""
+            # Call OpenAI API with timeout
+            if hasattr(self.client, 'chat'):
+                # OpenAI >= 1.0.0 - use timeout parameter
+                response = self.client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    timeout=DEFAULT_OPENAI_TIMEOUT
+                )
+                content = response.choices[0].message.content.strip()
+                tokens_used = response.usage.total_tokens if response.usage else 0
+            else:
+                # Legacy OpenAI < 1.0.0 - wrap in timeout manually
+                import signal
+                def timeout_handler(signum, frame):
+                    raise TimeoutError(f"OpenAI API call timed out after {DEFAULT_OPENAI_TIMEOUT}s")
+                
+                # Set timeout signal (Unix only)
+                if hasattr(signal, 'SIGALRM'):
+                    signal.signal(signal.SIGALRM, timeout_handler)
+                    signal.alarm(DEFAULT_OPENAI_TIMEOUT)
+                
+                try:
                     response = self.client.ChatCompletion.create(
                         model=model,
                         messages=messages,
@@ -141,6 +174,19 @@ class LLMClient:
                     )
                     content = response.choices[0].message.content.strip()
                     tokens_used = response.usage.total_tokens if response.usage else 0
+                finally:
+                    if hasattr(signal, 'SIGALRM'):
+                        signal.alarm(0)  # Cancel alarm
+            
+            return content, tokens_used
+        
+        for attempt in range(max_retries):
+            try:
+                # Use circuit breaker if available
+                if breaker:
+                    content, tokens_used = breaker.call(_call_openai)
+                else:
+                    content, tokens_used = _call_openai()
                 
                 # Calculate cost and latency
                 latency_ms = (time.time() - start_time) * 1000
@@ -173,6 +219,45 @@ class LLMClient:
                     'error': None
                 }
                 
+            except TimeoutError as e:
+                # Timeout error
+                latency_ms = (time.time() - start_time) * 1000
+                error_msg = str(e)
+                logger.warning(f"LLM call timed out after {DEFAULT_OPENAI_TIMEOUT}s")
+                
+                if attempt < max_retries - 1:
+                    delay = base_delay * (2 ** attempt) + random.uniform(0, 0.5)
+                    time.sleep(delay)
+                    continue
+                else:
+                    return {
+                        'success': False,
+                        'content': '',
+                        'tokens_used': 0,
+                        'cost_usd': 0.0,
+                        'latency_ms': latency_ms,
+                        'model': model,
+                        'trace_id': trace_id,
+                        'error': error_msg,
+                        'error_type': 'timeout'
+                    }
+            except CircuitBreakerOpenError as e:
+                # Circuit breaker is open
+                latency_ms = (time.time() - start_time) * 1000
+                error_msg = str(e)
+                logger.warning(f"Circuit breaker OPEN for OpenAI: {error_msg}")
+                
+                return {
+                    'success': False,
+                    'content': '',
+                    'tokens_used': 0,
+                    'cost_usd': 0.0,
+                    'latency_ms': latency_ms,
+                    'model': model,
+                    'trace_id': trace_id,
+                    'error': 'Service temporarily unavailable (circuit breaker open)',
+                    'error_type': 'circuit_breaker_open'
+                }
             except Exception as e:
                 error_msg = str(e)
                 error_lower = error_msg.lower()

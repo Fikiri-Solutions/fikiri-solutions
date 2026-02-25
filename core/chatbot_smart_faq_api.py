@@ -7,14 +7,18 @@ import json
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 
 from core.smart_faq_system import get_smart_faq, FAQCategory
 from core.knowledge_base_system import get_knowledge_base, DocumentType
 from core.context_aware_responses import get_context_system, MessageType
 from core.multi_channel_support import get_multi_channel_system, ChannelType
-from core.minimal_vector_search import MinimalVectorSearch
+from core.minimal_vector_search import MinimalVectorSearch, get_vector_search as _get_vector_search
 from core.api_validation import handle_api_errors, create_error_response
+from core.public_chatbot_api import require_api_key
+from core.chatbot_auth import require_api_key_or_jwt
+from core.database_optimization import db_optimizer
+from core.secure_sessions import get_current_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -27,44 +31,26 @@ knowledge_base = get_knowledge_base()
 context_system = get_context_system()
 multi_channel = get_multi_channel_system()
 
-# Lazy-load vector search to avoid mutex contention at startup (sentence_transformers/Pinecone)
-_vector_search: Optional[MinimalVectorSearch] = None
-
-
+# Lazy-load vector search via singleton in minimal_vector_search (shared with KB layer)
 def get_vector_search() -> MinimalVectorSearch:
-    """Lazy-initialize vector search on first use to avoid startup mutex hang.
-    Reuses instance from app.services if available to avoid duplicate initialization."""
-    global _vector_search
-    
-    # First, try to get from app services (if already initialized)
+    """Return shared vector search singleton. Prefer app.services if set; else use minimal_vector_search.get_vector_search()."""
     try:
-        # Import here to avoid circular dependency
         import sys
         if 'app' in sys.modules:
             from app import services
             if 'vector_search' in services and services['vector_search'] is not None:
-                logger.info("Reusing vector search from app services")
-                _vector_search = services['vector_search']  # Cache locally too
-                return _vector_search
+                return services['vector_search']
     except (ImportError, AttributeError, KeyError):
-        pass  # Fall through to create new instance
-    
-    # Create new instance if not in services
-    if _vector_search is None:
-        logger.info("Loading vector search (first use)...")
-        _vector_search = MinimalVectorSearch()
-        
-        # Store in app.services if available (for MinimalMLScoring and other consumers)
-        try:
-            import sys
-            if 'app' in sys.modules:
-                from app import services
-                services['vector_search'] = _vector_search
-                logger.info("Stored vector search instance in app.services")
-        except (ImportError, AttributeError):
-            pass  # Not critical if we can't store it
-    
-    return _vector_search
+        pass
+    vs = _get_vector_search()
+    try:
+        import sys
+        if 'app' in sys.modules:
+            from app import services
+            services['vector_search'] = vs
+    except (ImportError, AttributeError):
+        pass
+    return vs
 
 # Smart FAQ Endpoints
 
@@ -208,7 +194,7 @@ def create_faq_entry():
                 faq_content += f"\nKeywords: {', '.join(keywords)}"
             
             vector_id = get_vector_search().add_document(
-                content=faq_content,
+                text=faq_content,
                 metadata={
                     "type": "faq",
                     "faq_id": faq_id,
@@ -246,6 +232,22 @@ def search_knowledge_base():
         
         if not query:
             return jsonify({"success": False, "error": "Query is required"}), 400
+        
+        # Extract tenant_id for multi-tenant isolation
+        tenant_id = None
+        try:
+            from flask import g
+            if hasattr(g, 'api_key_info') and g.api_key_info:
+                tenant_id = g.api_key_info.get('tenant_id')
+            elif hasattr(g, 'user_id') and g.user_id:
+                # For session-based auth, use user_id as tenant_id
+                tenant_id = str(g.user_id)
+        except Exception:
+            pass
+        
+        # Ensure tenant_id is in filters for multi-tenant isolation
+        if tenant_id and 'tenant_id' not in filters:
+            filters['tenant_id'] = tenant_id
         
         # Search knowledge base
         response = knowledge_base.search(query, filters, limit)
@@ -342,6 +344,39 @@ def create_knowledge_document():
         if not isinstance(keywords, list):
             keywords = [keywords]
 
+        # Extract tenant_id and user_id for multi-tenant isolation
+        tenant_id = None
+        user_id = None
+        
+        # Try API key auth first (for public API)
+        try:
+            from flask import g
+            if hasattr(g, 'api_key_info') and g.api_key_info:
+                tenant_id = g.api_key_info.get('tenant_id')
+                user_id = g.api_key_info.get('user_id')
+        except Exception:
+            pass
+        
+        # Fallback to session auth (for authenticated users)
+        if not tenant_id and not user_id:
+            try:
+                from flask import g
+                from core.secure_sessions import get_current_user_id
+                user_id = get_current_user_id()
+                # For session-based auth, tenant_id might be same as user_id or derived from user
+                # For now, use user_id as tenant_id if no explicit tenant_id exists
+                if user_id:
+                    tenant_id = str(user_id)  # Use user_id as tenant_id for single-tenant users
+            except Exception:
+                pass
+
+        # Build metadata with tenant isolation
+        kb_metadata = {}
+        if tenant_id:
+            kb_metadata['tenant_id'] = tenant_id
+        if user_id:
+            kb_metadata['user_id'] = user_id
+
         doc_id = knowledge_base.add_document(
             title=title,
             content=content,
@@ -350,42 +385,388 @@ def create_knowledge_document():
             tags=tags,
             keywords=keywords,
             category=category,
-            author=author
+            author=author,
+            metadata=kb_metadata
         )
 
-        # Persist document to vector index for semantic search
+        # Persist document to vector index for semantic search; store vector_id for future sync on update/delete
+        vector_id = None
         try:
-            # Combine title and content for better searchability
             doc_content = f"Title: {title}\n{content}"
             if summary:
                 doc_content = f"{summary}\n\n{doc_content}"
             
-            vector_id = get_vector_search().add_document(
-                content=doc_content,
-                metadata={
-                    "type": "knowledge_base",
-                    "document_id": doc_id,
-                    "title": title,
-                    "category": category,
-                    "tags": tags,
-                    "author": author
-                }
-            )
+            # Include tenant_id in vector metadata for multi-tenant isolation
+            vector_metadata = {
+                "type": "knowledge_base",
+                "document_id": doc_id,
+                "title": title,
+                "category": category,
+                "tags": tags,
+                "author": author
+            }
+            if tenant_id:
+                vector_metadata['tenant_id'] = tenant_id
+            if user_id:
+                vector_metadata['user_id'] = user_id
+            
+            vs = get_vector_search()
+            if getattr(vs, "use_pinecone", False):
+                ok = vs.upsert_document(doc_id, doc_content, vector_metadata)
+                vector_id = doc_id if ok else None
+            else:
+                vector_id = vs.add_document(text=doc_content, metadata=vector_metadata)
+                vector_id = vector_id if (vector_id is not None and vector_id >= 0) else None
             logger.info(f"✅ Knowledge document {doc_id} persisted to vector index: {vector_id}")
+            # Store vector_id in KB document metadata so update/delete can sync to vector index (see docs/CRUD_RAG_ARCHITECTURE.md)
+            doc = knowledge_base.get_document(doc_id)
+            if doc is not None and vector_id is not None:
+                new_meta = dict(doc.metadata) if getattr(doc, "metadata", None) else {}
+                new_meta["vector_id"] = vector_id
+                knowledge_base.update_document(doc_id, {"metadata": new_meta})
         except Exception as e:
             logger.warning(f"⚠️ Failed to persist document to vector index: {e}")
-            # Don't fail the request if vectorization fails
 
         return jsonify({
             "success": True,
             "document_id": doc_id,
-            "vector_id": vector_id if 'vector_id' in locals() else None,
+            "vector_id": vector_id,
             "message": "Knowledge document added"
         })
 
     except Exception as e:
         logger.error(f"❌ Failed to add knowledge document: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+@chatbot_bp.route('/knowledge/import', methods=['POST'])
+@handle_api_errors
+@require_api_key_or_jwt
+def import_knowledge_document():
+    """Import a knowledge document or FAQ using API key context (tenant-scoped)."""
+    try:
+        data = request.json or {}
+        title = (data.get('title') or '').strip()
+        content = (data.get('content') or '').strip()
+        question = (data.get('question') or '').strip()
+        answer = (data.get('answer') or '').strip()
+        category = (data.get('category') or 'general')
+        document_type = data.get('document_type', DocumentType.FAQ.value)
+        tags = data.get('tags') or []
+        keywords = data.get('keywords') or []
+
+        if not content and not (question and answer):
+            return create_error_response("Provide content or question/answer", 400, 'MISSING_CONTENT')
+
+        if question and answer:
+            title = title or question
+            content = f"Question: {question}\nAnswer: {answer}"
+            if keywords:
+                content += f"\nKeywords: {', '.join(keywords)}"
+
+        try:
+            document_type_enum = DocumentType(document_type)
+        except ValueError:
+            document_type_enum = DocumentType.FAQ
+
+        if not isinstance(tags, list):
+            tags = [tags]
+        if not isinstance(keywords, list):
+            keywords = [keywords]
+
+        tenant_id = None
+        user_id = None
+        if hasattr(g, 'api_key_info') and g.api_key_info:
+            tenant_id = g.api_key_info.get('tenant_id')
+            user_id = g.api_key_info.get('user_id')
+
+        kb_metadata: Dict[str, Any] = {}
+        if tenant_id:
+            kb_metadata['tenant_id'] = tenant_id
+        if user_id:
+            kb_metadata['user_id'] = user_id
+
+        doc_id = knowledge_base.add_document(
+            title=title or "Imported Knowledge",
+            content=content,
+            summary=(content or "")[:500] or "Imported",
+            document_type=document_type_enum,
+            category=category,
+            tags=tags,
+            keywords=keywords,
+            author="import",
+            metadata=kb_metadata
+        )
+
+        vector_id = None
+        try:
+            vs = get_vector_search()
+            if getattr(vs, "use_pinecone", False):
+                ok = vs.upsert_document(doc_id, content, {
+                    "type": "knowledge_base",
+                    "document_id": doc_id,
+                    "title": title or "Imported Knowledge",
+                    "category": category,
+                    "tenant_id": tenant_id,
+                    "user_id": user_id
+                })
+                vector_id = doc_id if ok else None
+            else:
+                vector_id = vs.add_document(
+                    text=content,
+                    metadata={
+                        "type": "knowledge_base",
+                        "document_id": doc_id,
+                        "title": title or "Imported Knowledge",
+                        "category": category,
+                        "tenant_id": tenant_id,
+                        "user_id": user_id
+                    }
+                )
+                vector_id = vector_id if (vector_id is not None and vector_id >= 0) else None
+            if vector_id is not None:
+                doc = knowledge_base.get_document(doc_id)
+                if doc:
+                    new_meta = dict(doc.metadata or {})
+                    new_meta["vector_id"] = vector_id
+                    knowledge_base.update_document(doc_id, {"metadata": new_meta})
+        except Exception as e:
+            logger.warning("⚠️ Failed to persist imported knowledge to vector index: %s", e)
+
+        return jsonify({
+            "success": True,
+            "document_id": doc_id,
+            "vector_id": vector_id,
+            "message": "Knowledge imported successfully"
+        })
+    except Exception as e:
+        logger.error(f"❌ Failed to import knowledge: {e}")
+        return create_error_response("Failed to import knowledge document", 500, 'KNOWLEDGE_IMPORT_ERROR')
+
+
+@chatbot_bp.route('/knowledge/import/bulk', methods=['POST'])
+@handle_api_errors
+@require_api_key_or_jwt
+def import_knowledge_bulk():
+    """Import multiple knowledge documents in one request. Body: { "documents": [ { title?, content? | question?, answer?, category?, document_type?, tags?, keywords? }, ... ] }."""
+    try:
+        data = request.json or {}
+        documents = data.get('documents')
+        if not documents or not isinstance(documents, list):
+            return create_error_response("documents array is required", 400, 'MISSING_DOCUMENTS')
+
+        results = []
+        for i, item in enumerate(documents):
+            if not isinstance(item, dict):
+                results.append({"index": i, "success": False, "error": "Each item must be an object"})
+                continue
+            title = (item.get('title') or '').strip()
+            content = (item.get('content') or '').strip()
+            question = (item.get('question') or '').strip()
+            answer = (item.get('answer') or '').strip()
+            category = (item.get('category') or 'general')
+            document_type = item.get('document_type', DocumentType.FAQ.value)
+            tags = item.get('tags') or []
+            keywords = item.get('keywords') or []
+
+            if not content and not (question and answer):
+                results.append({"index": i, "success": False, "error": "Provide content or question/answer"})
+                continue
+
+            if question and answer:
+                title = title or question
+                content = f"Question: {question}\nAnswer: {answer}"
+                if keywords:
+                    content += f"\nKeywords: {', '.join(keywords)}"
+
+            try:
+                document_type_enum = DocumentType(document_type)
+            except ValueError:
+                document_type_enum = DocumentType.FAQ
+            if not isinstance(tags, list):
+                tags = [tags]
+            if not isinstance(keywords, list):
+                keywords = [keywords]
+
+            tenant_id = None
+            user_id = None
+            if hasattr(g, 'api_key_info') and g.api_key_info:
+                tenant_id = g.api_key_info.get('tenant_id')
+                user_id = g.api_key_info.get('user_id')
+            kb_metadata: Dict[str, Any] = {}
+            if tenant_id:
+                kb_metadata['tenant_id'] = tenant_id
+            if user_id:
+                kb_metadata['user_id'] = user_id
+
+            try:
+                doc_id = knowledge_base.add_document(
+                    title=title or "Imported Knowledge",
+                    content=content,
+                    summary=(content or "")[:500] or "Imported",
+                    document_type=document_type_enum,
+                    category=category,
+                    tags=tags,
+                    keywords=keywords,
+                    author="import",
+                    metadata=kb_metadata
+                )
+                vector_id = None
+                try:
+                    vs = get_vector_search()
+                    if getattr(vs, "use_pinecone", False):
+                        ok = vs.upsert_document(doc_id, content, {
+                            "type": "knowledge_base",
+                            "document_id": doc_id,
+                            "title": title or "Imported Knowledge",
+                            "category": category,
+                            "tenant_id": tenant_id,
+                            "user_id": user_id
+                        })
+                        vector_id = doc_id if ok else None
+                    else:
+                        vector_id = get_vector_search().add_document(
+                            text=content,
+                            metadata={
+                                "type": "knowledge_base",
+                                "document_id": doc_id,
+                                "title": title or "Imported Knowledge",
+                                "category": category,
+                                "tenant_id": tenant_id,
+                                "user_id": user_id
+                            }
+                        )
+                        vector_id = vector_id if (vector_id is not None and vector_id >= 0) else None
+                    if vector_id is not None:
+                        doc = knowledge_base.get_document(doc_id)
+                        if doc:
+                            new_meta = dict(doc.metadata or {})
+                            new_meta["vector_id"] = vector_id
+                            knowledge_base.update_document(doc_id, {"metadata": new_meta})
+                except Exception as e:
+                    logger.warning("⚠️ Bulk import: vector index failed for doc %s: %s", doc_id, e)
+                results.append({"index": i, "success": True, "document_id": doc_id, "vector_id": vector_id})
+            except Exception as e:
+                logger.warning("Bulk import item %s failed: %s", i, e)
+                results.append({"index": i, "success": False, "error": str(e)})
+
+        success_count = sum(1 for r in results if r.get("success"))
+        return jsonify({
+            "success": True,
+            "imported": success_count,
+            "total": len(documents),
+            "results": results
+        })
+    except Exception as e:
+        logger.exception("Bulk import failed")
+        return create_error_response("Bulk import failed", 500, 'BULK_IMPORT_ERROR')
+
+
+@chatbot_bp.route('/knowledge/revectorize', methods=['POST'])
+@handle_api_errors
+@require_api_key_or_jwt
+def revectorize_knowledge():
+    """Re-index all KB documents into the vector store (e.g. after Pinecone dimension change). Tenant-scoped."""
+    try:
+        tenant_id = None
+        user_id = None
+        if hasattr(g, 'api_key_info') and g.api_key_info:
+            tenant_id = g.api_key_info.get('tenant_id')
+            user_id = g.api_key_info.get('user_id')
+        docs = knowledge_base.list_documents(tenant_id)
+        vs = get_vector_search()
+        results = []
+        for doc in docs:
+            text = (doc.content or "").strip()
+            if not text:
+                results.append({"document_id": doc.id, "success": False, "error": "Empty content"})
+                continue
+            meta = dict(doc.metadata or {})
+            vector_meta = {
+                "type": "knowledge_base",
+                "document_id": doc.id,
+                "title": doc.title,
+                "category": doc.category,
+                "tenant_id": tenant_id,
+                "user_id": user_id,
+                **{k: v for k, v in meta.items() if k in ("tenant_id", "user_id")}
+            }
+            ok = vs.upsert_document(doc.id, text, vector_meta)
+            if ok:
+                new_meta = dict(doc.metadata or {})
+                new_meta["vector_id"] = doc.id
+                knowledge_base.update_document(doc.id, {"metadata": new_meta})
+            results.append({"document_id": doc.id, "success": ok})
+        revectorized = sum(1 for r in results if r.get("success"))
+        return jsonify({
+            "success": True,
+            "revectorized": revectorized,
+            "total": len(docs),
+            "results": results
+        })
+    except Exception as e:
+        logger.exception("Revectorize failed")
+        return create_error_response("Revectorize failed", 500, 'REVECTORIZE_ERROR')
+
+
+CHATBOT_FEEDBACK_RATINGS = frozenset({'correct', 'somewhat_correct', 'somewhat_incorrect', 'incorrect'})
+
+
+@chatbot_bp.route('/feedback', methods=['POST'])
+@handle_api_errors
+def submit_chatbot_feedback():
+    """
+    Submit feedback for a chatbot answer.
+    Body: { question, answer, retrieved_doc_ids, rating, metadata?, session_id?, prompt_version?, retriever_version? }
+    rating must be one of: correct, somewhat_correct, somewhat_incorrect, incorrect.
+    user_id is set from session when authenticated.
+    """
+    try:
+        data = request.json or {}
+        question = (data.get('question') or '').strip()
+        answer = (data.get('answer') or '').strip()
+        retrieved_doc_ids = data.get('retrieved_doc_ids')
+        rating = (data.get('rating') or '').strip().lower()
+        session_id = (data.get('session_id') or '').strip() or None
+        metadata = data.get('metadata')
+        prompt_version = (data.get('prompt_version') or '').strip() or None
+        retriever_version = (data.get('retriever_version') or '').strip() or None
+
+        if not question:
+            return create_error_response("question is required", 400, 'MISSING_QUESTION')
+        if not answer:
+            return create_error_response("answer is required", 400, 'MISSING_ANSWER')
+        if rating not in CHATBOT_FEEDBACK_RATINGS:
+            return create_error_response(
+                "rating must be one of: correct, somewhat_correct, somewhat_incorrect, incorrect",
+                400,
+                'INVALID_RATING'
+            )
+
+        if retrieved_doc_ids is not None and not isinstance(retrieved_doc_ids, list):
+            return create_error_response("retrieved_doc_ids must be an array", 400, 'INVALID_RETRIEVED_DOC_IDS')
+        if metadata is not None and not isinstance(metadata, dict):
+            return create_error_response("metadata must be an object", 400, 'INVALID_METADATA')
+
+        user_id = get_current_user_id()
+
+        retrieved_json = json.dumps(retrieved_doc_ids if isinstance(retrieved_doc_ids, list) else [])
+        metadata_json = json.dumps(metadata) if isinstance(metadata, dict) else None
+
+        if not db_optimizer.table_exists("chatbot_feedback"):
+            return create_error_response("Chatbot feedback table not available", 503, 'SERVICE_UNAVAILABLE')
+
+        db_optimizer.execute_query(
+            """INSERT INTO chatbot_feedback
+               (user_id, session_id, question, answer, retrieved_doc_ids, rating, metadata, prompt_version, retriever_version)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (user_id, session_id, question, answer, retrieved_json, rating, metadata_json, prompt_version, retriever_version),
+            fetch=False,
+        )
+        return jsonify({"success": True, "message": "Feedback recorded"})
+    except Exception as e:
+        logger.exception("Chatbot feedback failed")
+        return create_error_response("Failed to record feedback", 500, 'FEEDBACK_ERROR')
+
 
 @chatbot_bp.route('/knowledge/categories', methods=['GET'])
 def get_knowledge_categories():
@@ -441,7 +822,7 @@ def vectorize_document_content():
         if not isinstance(metadata, dict):
             metadata = {}
 
-        doc_id = get_vector_search().add_document(content, metadata)
+        doc_id = get_vector_search().add_document(text=content, metadata=metadata)
 
         return jsonify({
             "success": True,

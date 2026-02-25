@@ -128,6 +128,7 @@ def get_dashboard_metrics():
                 'uptime': '99.9%',
                 'last_sync': datetime.now().isoformat()
             },
+            'ai': {'total': 0},
             'timestamp': datetime.now().isoformat()
         }
         
@@ -204,6 +205,20 @@ def get_dashboard_metrics():
         except Exception as e:
             logger.warning(f"Could not check Gmail connection: {e}")
         
+        # Try to get AI response count from analytics_events
+        try:
+            ai_result = db_optimizer.execute_query(
+                """SELECT COUNT(*) as count FROM analytics_events
+                   WHERE user_id = ? AND (event_type LIKE '%ai%' OR event_type LIKE '%llm%' OR event_type LIKE '%response%')""",
+                (user_id,)
+            )
+            if ai_result and len(ai_result) > 0:
+                row = ai_result[0]
+                count = row.get('count', 0) if isinstance(row, dict) else (getattr(row, 'count', 0) if hasattr(row, 'count') else 0)
+                metrics_data['ai'] = {'total': count}
+        except Exception as e:
+            logger.warning(f"Could not get AI metrics: {e}")
+        
         return create_success_response(metrics_data, "Dashboard metrics retrieved")
         
     except Exception as e:
@@ -221,36 +236,131 @@ def get_dashboard_activity():
         user_id = get_current_user_id()
         if not user_id:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
-        
-        # Mock activity data for now
-        activity_data = [
-            {
-                'id': 1,
-                'type': 'lead_created',
-                'message': 'New lead added: John Doe',
-                'timestamp': datetime.now().isoformat(),
-                'icon': 'user-plus',
-                'color': 'green'
-            },
-            {
-                'id': 2,
-                'type': 'email_received',
-                'message': 'Email from jane@example.com',
-                'timestamp': (datetime.now() - timedelta(minutes=30)).isoformat(),
-                'icon': 'mail',
-                'color': 'blue'
-            },
-            {
-                'id': 3,
-                'type': 'automation_triggered',
-                'message': 'Welcome email sent to new lead',
-                'timestamp': (datetime.now() - timedelta(hours=1)).isoformat(),
-                'icon': 'zap',
-                'color': 'purple'
-            }
-        ]
-        
-        return create_success_response({'activities': activity_data}, "Activity data retrieved")
+
+        limit = request.args.get('limit', 10, type=int)
+        if limit < 1:
+            limit = 1
+        if limit > 50:
+            limit = 50
+
+        activities_query = """
+            SELECT la.id, la.activity_type, la.description, la.timestamp, la.metadata,
+                   l.name as lead_name, l.email as lead_email
+              FROM lead_activities la
+              JOIN leads l ON l.id = la.lead_id
+             WHERE l.user_id = ?
+             ORDER BY la.timestamp DESC
+             LIMIT ?
+        """
+        activities_data = db_optimizer.execute_query(activities_query, (user_id, limit))
+
+        def map_type(activity_type: str) -> str:
+            if not activity_type:
+                return 'lead'
+            activity_type = activity_type.lower()
+            if activity_type in ('email_received', 'email_sent'):
+                return 'email'
+            if activity_type in ('follow_up', 'automation'):
+                return 'automation'
+            if 'error' in activity_type or 'fail' in activity_type:
+                return 'error'
+            return 'lead'
+
+        activity_items = []
+        for row in activities_data or []:
+            activity_type = row.get('activity_type') if isinstance(row, dict) else None
+            mapped_type = map_type(activity_type or '')
+            description = row.get('description') if isinstance(row, dict) else None
+            lead_name = row.get('lead_name') if isinstance(row, dict) else None
+            lead_email = row.get('lead_email') if isinstance(row, dict) else None
+            meta_raw = row.get('metadata') if isinstance(row, dict) else None
+            metadata = {}
+            if meta_raw:
+                try:
+                    metadata = json.loads(meta_raw) if isinstance(meta_raw, str) else meta_raw
+                except Exception:
+                    metadata = {}
+
+            if not description:
+                target = lead_name or lead_email or 'lead'
+                if activity_type == 'email_received':
+                    description = f"Email received from {target}"
+                elif activity_type == 'email_sent':
+                    description = f"Email sent to {target}"
+                elif mapped_type == 'automation':
+                    description = f"Automation activity for {target}"
+                else:
+                    description = f"Lead activity for {target}"
+
+            timestamp = row.get('timestamp') if isinstance(row, dict) else None
+            if isinstance(timestamp, datetime):
+                timestamp = timestamp.isoformat()
+
+            status = metadata.get('status') if isinstance(metadata, dict) else None
+            if not status:
+                status = 'error' if mapped_type == 'error' else 'success'
+
+            activity_items.append({
+                'id': row.get('id') if isinstance(row, dict) else None,
+                'type': mapped_type,
+                'message': description,
+                'timestamp': timestamp or datetime.now().isoformat(),
+                'status': status
+            })
+
+        analytics_query = """
+            SELECT id, event_type, event_data, created_at
+              FROM analytics_events
+             WHERE user_id = ?
+             ORDER BY created_at DESC
+             LIMIT ?
+        """
+        analytics_data = db_optimizer.execute_query(analytics_query, (user_id, limit))
+
+        def map_event_type(event_type: str) -> str:
+            if not event_type:
+                return 'lead'
+            event_type = event_type.lower()
+            if 'email' in event_type:
+                return 'email'
+            if 'automation' in event_type:
+                return 'automation'
+            if 'error' in event_type or 'fail' in event_type:
+                return 'error'
+            if 'service' in event_type or 'settings' in event_type or 'profile' in event_type or 'api_key' in event_type:
+                return 'lead'
+            return 'lead'
+
+        for row in analytics_data or []:
+            event_type = row.get('event_type') if isinstance(row, dict) else None
+            mapped_type = map_event_type(event_type or '')
+            event_data_raw = row.get('event_data') if isinstance(row, dict) else None
+            event_data = {}
+            if event_data_raw:
+                try:
+                    event_data = json.loads(event_data_raw) if isinstance(event_data_raw, str) else event_data_raw
+                except Exception:
+                    event_data = {}
+            message = event_data.get('message')
+            if not message:
+                message = (event_type or 'Account activity').replace('_', ' ').title()
+            created_at = row.get('created_at') if isinstance(row, dict) else None
+            if isinstance(created_at, datetime):
+                created_at = created_at.isoformat()
+            status = event_data.get('status', 'success')
+
+            activity_items.append({
+                'id': row.get('id') if isinstance(row, dict) else None,
+                'type': mapped_type,
+                'message': message,
+                'timestamp': created_at or datetime.now().isoformat(),
+                'status': status
+            })
+
+        activity_items.sort(key=lambda item: item.get('timestamp', ''), reverse=True)
+        activity_items = activity_items[:limit]
+
+        return create_success_response({'activities': activity_items}, "Activity data retrieved")
         
     except Exception as e:
         logger.error(f"Dashboard activity error: {e}")

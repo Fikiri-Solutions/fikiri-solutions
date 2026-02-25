@@ -1,8 +1,10 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Mail, CheckCircle, XCircle, Loader2, RefreshCw, PlugZap, AlertCircle } from 'lucide-react'
 import { GmailConnection } from '../components/GmailConnection'
 import { OutlookConnection } from '../components/OutlookConnection'
+import InstallFlow from '../components/InstallFlow'
+import ChatbotPreview from '../components/ChatbotPreview'
 import { useAuth } from '../contexts/AuthContext'
 import { apiClient, GmailConnectionStatus, OutlookConnectionStatus, EmailSyncStatus } from '../services/apiClient'
 import { useToast } from '../components/Toast'
@@ -11,6 +13,50 @@ export const Integrations: React.FC = () => {
   const { user } = useAuth()
   const { addToast } = useToast()
   const queryClient = useQueryClient()
+  const [apiKey, setApiKey] = useState<string | null>(null)
+  const [apiKeyStatus, setApiKeyStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadApiKey = async () => {
+      try {
+        const cached = typeof window !== 'undefined' ? localStorage.getItem('fikiri-public-api-key') : null
+        if (cached) {
+          if (isMounted) {
+            setApiKey(cached)
+            setApiKeyStatus('ready')
+          }
+          return
+        }
+
+        const created = await apiClient.createApiKey({
+          name: 'Install Page Key',
+          description: 'Generated for install flow and chatbot preview'
+        })
+
+        if (isMounted) {
+          setApiKey(created.api_key)
+          setApiKeyStatus('ready')
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('fikiri-public-api-key', created.api_key)
+          }
+        }
+      } catch {
+        if (isMounted) {
+          setApiKeyStatus('error')
+        }
+      }
+    }
+
+    if (user) {
+      loadApiKey()
+    }
+
+    return () => {
+      isMounted = false
+    }
+  }, [user])
 
   // Fetch connection statuses
   const { data: gmailStatus, refetch: refetchGmail } = useQuery<GmailConnectionStatus>({
@@ -126,6 +172,48 @@ export const Integrations: React.FC = () => {
         </div>
       </div>
 
+      {/* Install Flow */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+          Install on Your Website
+        </h2>
+        {apiKeyStatus === 'error' && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
+            Sign in to generate your API key and unlock install instructions.
+          </div>
+        )}
+        {apiKeyStatus === 'loading' ? (
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 flex items-center gap-3">
+            <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+            <span className="text-sm text-gray-600 dark:text-gray-400">Loading your API key…</span>
+          </div>
+        ) : (
+          apiKey && (
+            <InstallFlow apiKey={apiKey} onComplete={() => addToast({ type: 'success', message: 'Install steps completed' })} />
+          )
+        )}
+      </div>
+
+      {/* Chatbot Preview */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+          Customize Your Chatbot
+        </h2>
+        {apiKeyStatus === 'error' && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
+            Sign in to generate your API key and unlock the preview generator.
+          </div>
+        )}
+        {apiKeyStatus === 'loading' ? (
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 flex items-center gap-3">
+            <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+            <span className="text-sm text-gray-600 dark:text-gray-400">Loading your API key…</span>
+          </div>
+        ) : (
+          apiKey && <ChatbotPreview apiKey={apiKey} />
+        )}
+      </div>
+
       {/* Coming Soon */}
       <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
         <div className="flex items-center gap-3">
@@ -141,4 +229,3 @@ export const Integrations: React.FC = () => {
     </div>
   )
 }
-

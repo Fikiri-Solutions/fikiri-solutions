@@ -39,7 +39,7 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
     // give AuthContext a moment to initialize (race condition after page reload or login redirect)
     if (requireAuth && !isAuthenticated && typeof window !== 'undefined') {
       const hasLocalStorageAuth = localStorage.getItem('fikiri-user') && localStorage.getItem('fikiri-user-id')
-      if (hasLocalStorageAuth && currentPath !== '/login' && currentPath !== '/signup' && !currentPath.startsWith('/onboarding-flow')) {
+      if (hasLocalStorageAuth && currentPath !== '/login' && currentPath !== '/signup') {
         // Auth data exists in localStorage but context hasn't initialized yet
         // Don't redirect immediately - let AuthContext catch up (it will re-render when state updates)
         if (process.env.NODE_ENV === 'development') {
@@ -75,7 +75,7 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
     if (requireAuth && !isAuthenticated && !hasRedirected.current && currentPath !== '/inbox') {
       // User needs to be authenticated but isn't
       // Only redirect if not already on an auth page or /inbox
-      if (currentPath !== '/login' && currentPath !== '/signup' && !currentPath.startsWith('/onboarding-flow')) {
+      if (currentPath !== '/login' && currentPath !== '/signup') {
         hasRedirected.current = true
         // Preserve current path as redirect param so user returns here after login
         // Only add redirect param if we're not already coming from a redirect
@@ -90,7 +90,7 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
     // Handle onboarding requirements (only for authenticated users)
     if (requireOnboarding && isAuthenticated && !user?.onboarding_completed && !hasRedirected.current) {
       // User is authenticated but hasn't completed onboarding
-      if (!currentPath.startsWith('/onboarding') && currentPath !== '/onboarding-flow') {
+      if (!currentPath.startsWith('/onboarding')) {
         // Preserve redirect parameter if present
         const urlParams = new URLSearchParams(location.search)
         const redirectParam = urlParams.get('redirect')
@@ -177,7 +177,7 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
     }
 
     // For AuthRoute (requireAuth=false), don't redirect unauthenticated users
-    // They should be able to stay on login/signup/onboarding-flow pages
+    // They should be able to stay on login/signup pages
     if (!requireAuth && !isAuthenticated) {
       // Allow unauthenticated users to stay on auth pages
       return

@@ -17,8 +17,20 @@ os.environ.setdefault("FLASK_ENV", "test")
 class TestGmailClient(unittest.TestCase):
     def setUp(self):
         import importlib
-        self.module = importlib.import_module("integrations.gmail.gmail_client")
-        self.client = self.module.GmailClient()
+        # GmailClient() reads FERNET_KEY; avoid invalid key from .env breaking tests
+        self._saved_fernet = os.environ.pop("FERNET_KEY", None)
+        try:
+            self.module = importlib.import_module("integrations.gmail.gmail_client")
+            self.client = self.module.GmailClient()
+        finally:
+            if self._saved_fernet is not None:
+                os.environ["FERNET_KEY"] = self._saved_fernet
+
+    def tearDown(self):
+        if getattr(self, "_saved_fernet", None) is not None:
+            os.environ["FERNET_KEY"] = self._saved_fernet
+        elif "FERNET_KEY" in os.environ:
+            os.environ.pop("FERNET_KEY", None)
 
     def test_get_credentials_returns_none_without_tokens(self):
         with patch.object(self.client, "_get_gmail_tokens", return_value=None):

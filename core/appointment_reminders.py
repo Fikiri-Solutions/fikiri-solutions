@@ -6,12 +6,14 @@ Simple poller job for email reminders (24h and 2h before appointment)
 
 import logging
 import hashlib
+import base64
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict
 from core.database_optimization import db_optimizer
 from core.idempotency_manager import idempotency_manager
 from core.automation_safety import automation_safety_manager
 from crm.service import enhanced_crm_service
+from core.oauth_token_manager import oauth_token_manager
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +24,38 @@ REMINDER_2H_WINDOW_START_HOURS = 2
 REMINDER_2H_WINDOW_END_HOURS = 3
 
 # Email sending (simple implementation - can be replaced with proper email service)
-def send_appointment_reminder_email(user_email: str, appointment: Dict, hours_before: int):
-    """Send appointment reminder email"""
-    # TODO: Integrate with email service
-    logger.info(f"📧 Would send {hours_before}h reminder email to {user_email} for appointment {appointment['id']}")
-    # For now, just log - replace with actual email sending
-    return True
+def send_appointment_reminder_email(user_id: int, to_email: str, appointment: Dict, hours_before: int) -> Dict[str, Any]:
+    """Send appointment reminder email via Gmail integration."""
+    token_status = oauth_token_manager.get_token_status(user_id, "gmail")
+    if not token_status.get('success') or not token_status.get('has_token'):
+        logger.warning("Gmail token missing user_id=%s", user_id)
+        return {"success": False, "error": "Gmail connection required"}
+
+    try:
+        from integrations.gmail.gmail_client import gmail_client
+        gmail_service = gmail_client.get_gmail_service_for_user(user_id)
+        subject = f"Appointment reminder ({hours_before}h)"
+        body = (
+            f"Hi there,\n\n"
+            f"This is a reminder for your appointment (ID: {appointment.get('id')}).\n"
+            f"Start time: {appointment.get('start_time')}\n\n"
+            f"If you need to reschedule, please reply to this email.\n"
+        )
+        raw = base64.urlsafe_b64encode(
+            f"To: {to_email}\r\n"
+            f"Subject: {subject}\r\n"
+            f"Content-Type: text/plain; charset=UTF-8\r\n"
+            f"\r\n"
+            f"{body}".encode('utf-8')
+        ).decode('utf-8')
+        sent_message = gmail_service.users().messages().send(
+            userId='me', body={'raw': raw}
+        ).execute()
+        logger.info("Sent appointment reminder user_id=%s message_id=%s", user_id, sent_message.get("id"))
+        return {"success": True, "message_id": sent_message.get("id"), "thread_id": sent_message.get("threadId")}
+    except Exception as e:
+        logger.error("Appointment reminder send failed user_id=%s error=%s", user_id, e)
+        return {"success": False, "error": str(e)}
 
 
 def run_reminder_job():
@@ -85,7 +113,8 @@ def run_reminder_job():
                     raise ValueError("automation_blocked")
 
                 # Send email
-                send_appointment_reminder_email(apt['user_email'], apt, REMINDER_24H_WINDOW_START_HOURS)
+                to_email = apt.get('contact_email') or apt.get('user_email')
+                send_appointment_reminder_email(apt['user_id'], to_email, apt, REMINDER_24H_WINDOW_START_HOURS)
                 
                 # Mark as sent
                 db_optimizer.execute_query("""
@@ -139,7 +168,8 @@ def run_reminder_job():
                     raise ValueError("automation_blocked")
 
                 # Send email
-                send_appointment_reminder_email(apt['user_email'], apt, REMINDER_2H_WINDOW_START_HOURS)
+                to_email = apt.get('contact_email') or apt.get('user_email')
+                send_appointment_reminder_email(apt['user_id'], to_email, apt, REMINDER_2H_WINDOW_START_HOURS)
                 
                 # Mark as sent
                 db_optimizer.execute_query("""

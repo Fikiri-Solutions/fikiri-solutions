@@ -631,6 +631,100 @@ class EnhancedCRMService:
         else:
             return now - timedelta(days=30)  # Default to 30 days
     
+    def delete_contact(self, contact_id: int, user_id: int, soft_delete: bool = False) -> Dict[str, Any]:
+        """
+        Delete a contact/lead.
+        
+        Args:
+            contact_id: Lead/contact ID to delete
+            user_id: User ID (for ownership verification)
+            soft_delete: If True, mark as deleted instead of hard delete (not yet implemented)
+        
+        Returns:
+            Dict with success status and message
+        """
+        try:
+            # Verify lead ownership
+            lead_data = db_optimizer.execute_query(
+                "SELECT id, user_id, email, name FROM leads WHERE id = ? AND user_id = ?",
+                (contact_id, user_id)
+            )
+            
+            if not lead_data:
+                return {
+                    'success': False,
+                    'error': 'Contact not found or access denied',
+                    'error_code': 'CONTACT_NOT_FOUND'
+                }
+            
+            lead = lead_data[0]
+            lead_email = lead.get('email', '')
+            lead_name = lead.get('name', '')
+            
+            if soft_delete:
+                # Soft delete: mark as deleted (requires deleted_at column)
+                # TODO: Add deleted_at column to leads table for soft delete support
+                logger.warning("Soft delete not yet implemented - performing hard delete")
+            
+            # Delete related activities first (if CASCADE not configured)
+            try:
+                activities_count = db_optimizer.execute_query(
+                    "SELECT COUNT(*) as count FROM lead_activities WHERE lead_id = ?",
+                    (contact_id,)
+                )
+                activity_count = activities_count[0]['count'] if activities_count else 0
+                
+                # Delete activities (CASCADE should handle this, but explicit for safety)
+                db_optimizer.execute_query(
+                    "DELETE FROM lead_activities WHERE lead_id = ?",
+                    (contact_id,),
+                    fetch=False
+                )
+                logger.info(f"Deleted {activity_count} activities for lead {contact_id}")
+            except Exception as activity_error:
+                logger.warning(f"Error deleting activities: {activity_error}")
+                # Continue with lead deletion even if activity deletion fails
+            
+            # Delete the lead
+            db_optimizer.execute_query(
+                "DELETE FROM leads WHERE id = ? AND user_id = ?",
+                (contact_id, user_id),
+                fetch=False
+            )
+            
+            logger.info(f"Deleted contact {contact_id} (email: {lead_email}, name: {lead_name}) for user {user_id}", extra={
+                'event': 'contact_deleted',
+                'service': 'crm',
+                'severity': 'INFO',
+                'contact_id': contact_id,
+                'user_id': user_id,
+                'contact_email': lead_email
+            })
+            
+            return {
+                'success': True,
+                'data': {
+                    'contact_id': contact_id,
+                    'message': 'Contact deleted successfully',
+                    'activities_deleted': activity_count
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error deleting contact: {e}", extra={
+                'event': 'contact_delete_failed',
+                'service': 'crm',
+                'severity': 'ERROR',
+                'contact_id': contact_id,
+                'user_id': user_id,
+                'error': str(e)
+            })
+            return {
+                'success': False,
+                'error': str(e),
+                'error_code': 'DELETE_ERROR'
+            }
+    
     def _get_leads_analytics(self, user_id: int, leads: List[Lead]) -> Dict[str, Any]:
         """Get analytics for leads"""
         if not leads:

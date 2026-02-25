@@ -7,6 +7,8 @@ Background processing for Gmail email synchronization with Redis queues
 import os
 import json
 import time
+import sys
+import uuid
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List
@@ -274,9 +276,25 @@ class GmailSyncJobManager:
             logger.error(f"❌ Gmail sync job queuing failed: {e}")
             return None
     
-    def process_sync_job(self, job_id: str) -> Dict[str, Any]:
+    def process_sync_job(self, job_id: str, trace_id: Optional[str] = None) -> Dict[str, Any]:
         """Process a Gmail sync job"""
-        logger.info(f"🔄 Starting to process sync job: {job_id}")
+        # Set trace ID if provided
+        try:
+            from core.trace_context import set_trace_id, get_trace_id
+            if trace_id:
+                set_trace_id(trace_id)
+            else:
+                trace_id = get_trace_id()
+        except ImportError:
+            trace_id = trace_id or str(uuid.uuid4())
+        
+        logger.info(f"🔄 Starting to process sync job: {job_id}", extra={
+            'event': 'gmail_sync_started',
+            'service': 'email',
+            'severity': 'INFO',
+            'trace_id': trace_id,
+            'job_id': job_id
+        })
         try:
             # Get job details
             job_data = db_optimizer.execute_query("""
@@ -449,8 +467,10 @@ class GmailSyncJobManager:
                         if mailbox_automation_enabled and parser and actions:
                             try:
                                 from email_automation.pipeline import orchestrate_incoming
+                                from core.trace_context import get_trace_id
                                 parsed = parser.parse_message(message)
-                                orchestrate_incoming(parsed, user_id=user_id, actions=actions)
+                                trace_id = get_trace_id() if 'core.trace_context' in sys.modules else None
+                                orchestrate_incoming(parsed, user_id=user_id, actions=actions, trace_id=trace_id)
                             except Exception as automation_error:
                                 logger.warning("Mailbox automation failed for message %s: %s", message.get("id"), automation_error)
                         

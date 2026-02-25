@@ -1,8 +1,10 @@
 import React from 'react';
 import { VerticalLanding } from '../components/VerticalLanding';
+import { PublicChatbotWidget } from '../components/PublicChatbotWidget';
 
 export const MedicalLanding: React.FC = () => {
   return (
+    <>
     <VerticalLanding
       industry="medical practice"
       title="HIPAA-Compliant Medical Practice Automation"
@@ -64,5 +66,7 @@ export const MedicalLanding: React.FC = () => {
       ctaText="Ensure HIPAA Compliance"
       ctaLink="/signup?industry=medical"
     />
+    <PublicChatbotWidget />
+    </>
   );
 };

@@ -18,6 +18,12 @@ from core.minimal_config import get_config
 
 logger = logging.getLogger(__name__)
 
+
+def _get_vector_search():
+    """Lazy import to avoid circular import and heavy startup (sentence_transformers/Pinecone)."""
+    from core.minimal_vector_search import get_vector_search
+    return get_vector_search()
+
 class DocumentType(Enum):
     """Knowledge base document types"""
     ARTICLE = "article"
@@ -977,6 +983,12 @@ Need help setting up? Contact our landscaping specialists at landscaping@fikiris
     
     def _matches_filters(self, document: KnowledgeDocument, filters: Dict[str, Any]) -> bool:
         """Check if document matches search filters"""
+        # Tenant isolation (highest priority - security critical)
+        if 'tenant_id' in filters:
+            doc_tenant_id = document.metadata.get('tenant_id')
+            if doc_tenant_id != filters['tenant_id']:
+                return False  # Reject documents from other tenants
+        
         if 'document_type' in filters:
             if document.document_type.value != filters['document_type']:
                 return False
@@ -1142,10 +1154,21 @@ Need help setting up? Contact our landscaping specialists at landscaping@fikiris
         
         return suggestions[:5]  # Limit to 5 suggestions
     
-    def add_document(self, title: str, content: str, summary: str,
-                    document_type: DocumentType, tags: List[str],
-                    keywords: List[str], category: str, author: str) -> str:
-        """Add new document to knowledge base"""
+    def add_document(self, title: str, content: str, summary: Optional[str] = None,
+                    document_type: DocumentType = None, tags: List[str] = None,
+                    keywords: List[str] = None, category: str = "general", author: Optional[str] = None,
+                    metadata: Dict[str, Any] = None) -> str:
+        """Add new document to knowledge base."""
+        if summary is None:
+            summary = (content or "")[:500] or ""
+        if author is None:
+            author = ""
+        if document_type is None:
+            document_type = DocumentType.FAQ
+        if tags is None:
+            tags = []
+        if keywords is None:
+            keywords = []
         try:
             doc_id = str(uuid.uuid4())
             
@@ -1163,7 +1186,7 @@ Need help setting up? Contact our landscaping specialists at landscaping@fikiris
                 version="1.0",
                 created_at=datetime.now(),
                 updated_at=datetime.now(),
-                metadata={}
+                metadata=metadata or {}
             )
             
             self.documents[doc_id] = document
@@ -1179,43 +1202,113 @@ Need help setting up? Contact our landscaping specialists at landscaping@fikiris
             raise
     
     def update_document(self, doc_id: str, updates: Dict[str, Any]) -> bool:
-        """Update existing document"""
+        """Update existing document and sync to vector index when vector_id is present."""
         try:
             if doc_id not in self.documents:
                 return False
-            
+
             document = self.documents[doc_id]
-            
+
             # Update fields
             for field, value in updates.items():
                 if hasattr(document, field):
                     setattr(document, field, value)
-            
+
             document.updated_at = datetime.now()
-            
+
             # Update search index
             self._update_search_index(doc_id, document)
-            
+
+            # Sync to vector index (see docs/CRUD_RAG_ARCHITECTURE.md)
+            new_text = f"Title: {document.title}\n{document.content}"
+            if getattr(document, "summary", None):
+                new_text = f"{document.summary}\n\n{new_text}"
+            vector_meta = {
+                "type": "knowledge_base",
+                "document_id": doc_id,
+                "title": getattr(document, "title", ""),
+                "category": getattr(document, "category", ""),
+                "tags": getattr(document, "tags", []) or [],
+                "author": getattr(document, "author", ""),
+            }
+            # Preserve tenant_id and user_id from document metadata for multi-tenant isolation
+            meta = getattr(document, "metadata", None)
+            if isinstance(meta, dict):
+                vector_id = meta.get("vector_id")
+                # Preserve tenant isolation fields
+                if "tenant_id" in meta:
+                    vector_meta["tenant_id"] = meta["tenant_id"]
+                if "user_id" in meta:
+                    vector_meta["user_id"] = meta["user_id"]
+            else:
+                vector_id = None
+            if vector_id is not None:
+                try:
+                    vs = _get_vector_search()
+                    if getattr(vs, "use_pinecone", False):
+                        vs.upsert_document(str(vector_id), new_text, vector_meta)
+                    else:
+                        vs.update_document(int(vector_id), new_text, vector_meta)
+                    logger.info(f"✅ Synced knowledge document {doc_id} to vector index")
+                except Exception as ve:
+                    logger.warning("Vector index update failed for doc %s: %s", doc_id, ve)
+            else:
+                # Self-heal: re-add to vector and store vector_id so future updates/deletes stay in sync
+                try:
+                    vs = _get_vector_search()
+                    # Ensure tenant_id is preserved when self-healing
+                    if isinstance(meta, dict) and "tenant_id" in meta:
+                        vector_meta["tenant_id"] = meta["tenant_id"]
+                    if isinstance(meta, dict) and "user_id" in meta:
+                        vector_meta["user_id"] = meta["user_id"]
+                    if getattr(vs, "use_pinecone", False):
+                        vs.upsert_document(doc_id, new_text, vector_meta)
+                        new_vid = doc_id
+                    else:
+                        new_vid = vs.add_document(new_text, vector_meta)
+                    if new_vid is not None and (new_vid >= 0 if isinstance(new_vid, int) else True):
+                        new_meta = dict(meta) if isinstance(meta, dict) else {}
+                        new_meta["vector_id"] = new_vid
+                        setattr(document, "metadata", new_meta)
+                        logger.info("✅ Self-healed vector_id for knowledge document %s (was missing)", doc_id)
+                except Exception as ve:
+                    logger.warning("Vector self-heal (re-add) failed for doc %s: %s", doc_id, ve)
+
             logger.info(f"✅ Updated knowledge document: {doc_id}")
             return True
-            
+
         except Exception as e:
             logger.error(f"❌ Failed to update document: {e}")
             return False
     
     def delete_document(self, doc_id: str) -> bool:
-        """Delete document from knowledge base"""
+        """Delete document from knowledge base and remove from vector index when vector_id is present."""
         try:
-            if doc_id in self.documents:
-                del self.documents[doc_id]
-                
-                # Remove from search index
-                self._remove_from_search_index(doc_id)
-                
-                logger.info(f"✅ Deleted knowledge document: {doc_id}")
-                return True
-            return False
-            
+            if doc_id not in self.documents:
+                return False
+
+            document = self.documents[doc_id]
+            vector_id = None
+            meta = getattr(document, "metadata", None)
+            if isinstance(meta, dict):
+                vector_id = meta.get("vector_id")
+
+            if vector_id is not None:
+                try:
+                    vs = _get_vector_search()
+                    if getattr(vs, "use_pinecone", False):
+                        vs.delete_document_by_id(str(vector_id))
+                    else:
+                        vs.delete_document(int(vector_id))
+                    logger.info(f"✅ Removed knowledge document {doc_id} from vector index")
+                except Exception as ve:
+                    logger.warning("Vector index delete failed for doc %s: %s", doc_id, ve)
+
+            del self.documents[doc_id]
+            self._remove_from_search_index(doc_id)
+            logger.info(f"✅ Deleted knowledge document: {doc_id}")
+            return True
+
         except Exception as e:
             logger.error(f"❌ Failed to delete document: {e}")
             return False
@@ -1244,7 +1337,14 @@ Need help setting up? Contact our landscaping specialists at landscaping@fikiris
     def get_document(self, doc_id: str) -> Optional[KnowledgeDocument]:
         """Get document by ID"""
         return self.documents.get(doc_id)
-    
+
+    def list_documents(self, tenant_id: Optional[str] = None) -> List[KnowledgeDocument]:
+        """List all documents, optionally filtered by tenant_id (from metadata)."""
+        docs = list(self.documents.values())
+        if tenant_id is not None:
+            docs = [d for d in docs if (d.metadata or {}).get("tenant_id") == tenant_id]
+        return docs
+
     def get_popular_documents(self, limit: int = 10) -> List[KnowledgeDocument]:
         """Get most popular documents by view count"""
         sorted_docs = sorted(self.documents.values(), 

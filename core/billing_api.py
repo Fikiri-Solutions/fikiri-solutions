@@ -40,6 +40,14 @@ try:
 except ImportError:
     STRIPE_AVAILABLE = False
 
+# Import timeout utilities and circuit breaker
+try:
+    from core.api_timeouts import stripe_call_with_timeout, DEFAULT_STRIPE_TIMEOUT
+    from core.circuit_breaker import get_circuit_breaker
+    TIMEOUT_AVAILABLE = True
+except ImportError:
+    TIMEOUT_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 # Create Blueprint
@@ -154,7 +162,15 @@ def _verify_subscription_owned_by_user(subscription_id):
     except Exception as e:
         logger.warning(f"DB check for subscription ownership: {e}")
     try:
-        sub = stripe.Subscription.retrieve(subscription_id)
+        def _retrieve():
+            return stripe.Subscription.retrieve(subscription_id)
+        
+        if TIMEOUT_AVAILABLE:
+            breaker = get_circuit_breaker("stripe", failure_threshold=5, timeout_seconds=60, fail_open=False)
+            sub = breaker.call(lambda: stripe_call_with_timeout(_retrieve, timeout=DEFAULT_STRIPE_TIMEOUT))
+        else:
+            sub = _retrieve()
+        
         our_customer_id, _ = _get_current_user_customer_id()
         return our_customer_id and sub.customer == our_customer_id
     except stripe.error.StripeError:
@@ -164,8 +180,16 @@ def _verify_subscription_owned_by_user(subscription_id):
         return False
 
 def _fetch_customer_from_stripe(user_email):
-    """Fetch customer ID from Stripe API (do not pass timeout - Stripe API rejects it as param)"""
-    customers = stripe.Customer.list(email=user_email, limit=1)
+    """Fetch customer ID from Stripe API with timeout protection"""
+    def _list():
+        return stripe.Customer.list(email=user_email, limit=1)
+    
+    if TIMEOUT_AVAILABLE:
+        breaker = get_circuit_breaker("stripe", failure_threshold=5, timeout_seconds=60, fail_open=False)
+        customers = breaker.call(lambda: stripe_call_with_timeout(_list, timeout=DEFAULT_STRIPE_TIMEOUT))
+    else:
+        customers = _list()
+    
     if customers.data and len(customers.data) > 0:
         return customers.data[0].id
     return None
@@ -380,11 +404,19 @@ def get_current_subscription():
         customer_id = get_stripe_customer_id(user_email, user_id)
         if customer_id:
             try:
-                subscriptions = stripe.Subscription.list(
-                    customer=customer_id,
-                    status='active',
-                    limit=1
-                )
+                def _list_subscriptions():
+                    return stripe.Subscription.list(
+                        customer=customer_id,
+                        status='active',
+                        limit=1
+                    )
+                
+                if TIMEOUT_AVAILABLE:
+                    breaker = get_circuit_breaker("stripe", failure_threshold=5, timeout_seconds=60, fail_open=False)
+                    subscriptions = breaker.call(lambda: stripe_call_with_timeout(_list_subscriptions, timeout=DEFAULT_STRIPE_TIMEOUT))
+                else:
+                    subscriptions = _list_subscriptions()
+                
                 if subscriptions.data and len(subscriptions.data) > 0:
                     subscription = stripe_manager.get_subscription(subscriptions.data[0].id)
                     return jsonify({'success': True, 'subscription': subscription, 'cached': False})
@@ -559,7 +591,16 @@ def get_customer_details():
         
         customer_id = get_stripe_customer_id(user_email, user_id)
         if not customer_id:
-            return jsonify({'success': False, 'error': 'No customer found. Please create a subscription first.'}), 400
+            try:
+                customer = stripe_manager.create_customer(
+                    email=user_email,
+                    name=f"User {user_id}",
+                    metadata={'user_id': str(user_id)}
+                )
+                customer_id = customer['id']
+            except Exception as e:
+                logger.warning("Failed to create customer for details: %s", e)
+                return jsonify({'success': False, 'error': 'No customer found. Please create a subscription first.'}), 400
         
         details = stripe_manager.get_customer_details(customer_id)
         return jsonify({'success': True, 'customer': details})

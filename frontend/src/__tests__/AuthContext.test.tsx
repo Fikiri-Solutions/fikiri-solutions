@@ -183,7 +183,7 @@ describe('AuthContext', () => {
       email: 'test@example.com',
       name: 'Test User',
       onboarding_completed: true,
-      onboarding_step: -1,
+      onboarding_step: 4,
     }
     
     localStorage.setItem('fikiri-user', JSON.stringify(mockUser))
@@ -203,7 +203,7 @@ describe('AuthContext', () => {
       email: 'test@example.com',
       name: 'Test User',
       onboarding_completed: true,
-      onboarding_step: -1,
+      onboarding_step: 4,
     }
     
     localStorage.setItem('fikiri-user', JSON.stringify(mockUser))
@@ -231,4 +231,3 @@ describe('AuthContext', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/')
   })
 })
-

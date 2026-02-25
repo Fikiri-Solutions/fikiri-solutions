@@ -83,6 +83,33 @@ class TestIntegrationsRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
 
     @patch("core.jwt_auth.get_jwt_manager")
+    @patch("routes.integrations.CalendarManager")
+    def test_list_calendar_events_success(self, mock_manager, mock_mgr):
+        mock_mgr.return_value.verify_access_token.return_value = {"id": 1, "user_id": 1}
+        mock_client = MagicMock()
+        mock_client.list_events.return_value = [{"id": "evt1"}]
+        mock_manager.return_value.get_calendar_client.return_value = mock_client
+        response = self.client.get('/api/integrations/calendar/events', headers=_auth_headers())
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data.get('success'))
+        self.assertEqual(len(data.get('events', [])), 1)
+
+    @patch("core.jwt_auth.get_jwt_manager")
+    @patch("routes.integrations.CalendarManager")
+    def test_calendar_freebusy_success(self, mock_manager, mock_mgr):
+        mock_mgr.return_value.verify_access_token.return_value = {"id": 1, "user_id": 1}
+        mock_manager.return_value.get_calendar_client.return_value = object()
+        mock_manager.return_value.get_freebusy.return_value = {"busy": []}
+        response = self.client.get(
+            '/api/integrations/calendar/freebusy?start=2025-01-01T00:00:00&end=2025-01-01T01:00:00',
+            headers=_auth_headers()
+        )
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data.get('success'))
+
+    @patch("core.jwt_auth.get_jwt_manager")
     def test_create_calendar_event_missing_body(self, mock_mgr):
         mock_mgr.return_value.verify_access_token.return_value = {"id": 1, "user_id": 1}
         response = self.client.post('/api/integrations/calendar/events', headers=_auth_headers(), json={})
@@ -97,6 +124,33 @@ class TestIntegrationsRoutes(unittest.TestCase):
             '/api/integrations/calendar/events',
             headers=_auth_headers(),
             json={"start": "2025-01-01T00:00:00", "end": "2025-01-01T01:00:00", "summary": "Call"}
+        )
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data.get('success'))
+
+    @patch("core.jwt_auth.get_jwt_manager")
+    @patch("routes.integrations.CalendarManager")
+    def test_update_calendar_event_success(self, mock_manager, mock_mgr):
+        mock_mgr.return_value.verify_access_token.return_value = {"id": 1, "user_id": 1}
+        mock_manager.return_value.update_event.return_value = {"id": "evt"}
+        response = self.client.put(
+            '/api/integrations/calendar/events/lead/1',
+            headers=_auth_headers(),
+            json={"start": "2025-01-01T00:00:00", "end": "2025-01-01T01:00:00", "summary": "Call"}
+        )
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data.get('success'))
+
+    @patch("core.jwt_auth.get_jwt_manager")
+    @patch("routes.integrations.CalendarManager")
+    def test_delete_calendar_event_success(self, mock_manager, mock_mgr):
+        mock_mgr.return_value.verify_access_token.return_value = {"id": 1, "user_id": 1}
+        mock_manager.return_value.delete_event.return_value = True
+        response = self.client.delete(
+            '/api/integrations/calendar/events/lead/1',
+            headers=_auth_headers()
         )
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)

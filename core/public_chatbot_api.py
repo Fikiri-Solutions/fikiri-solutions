@@ -7,13 +7,14 @@ import json
 import logging
 import os
 import re
+import uuid
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from flask import Blueprint, request, jsonify, g
 from functools import wraps
 
 from core.api_key_manager import api_key_manager
-from core.chatbot_smart_faq_api import get_vector_search
+from core.minimal_vector_search import get_vector_search
 from core.smart_faq_system import get_smart_faq
 from core.knowledge_base_system import get_knowledge_base
 from core.context_aware_responses import get_context_system
@@ -21,6 +22,8 @@ from core.api_validation import handle_api_errors, create_error_response
 from core.ai.llm_router import LLMRouter
 from core.database_optimization import db_optimizer
 from core.feature_flags import get_feature_flags
+from core.expert_escalation import get_escalation_engine
+from core.chatbot_feedback import get_feedback_system
 from crm.service import enhanced_crm_service
 
 logger = logging.getLogger(__name__)
@@ -132,6 +135,59 @@ def _build_sources(faq_results, kb_results, vector_results: List[Dict[str, Any]]
             "relevance": item.get("similarity")
         })
     return sources
+
+
+def _retrieval_metadata(sources: List[Dict[str, Any]]) -> tuple:
+    """Return (retrieved_doc_ids, retrieval_scores) from sources. Empty arrays if no retrieval."""
+    if not sources:
+        return [], []
+    doc_ids: List[str] = []
+    scores: List[float] = []
+    for s in sources:
+        doc_id = s.get("id") or (s.get("metadata") or {}).get("document_id") or (s.get("metadata") or {}).get("doc_id")
+        doc_ids.append(str(doc_id) if doc_id is not None else "")
+        sc = s.get("confidence") or s.get("relevance")
+        scores.append(round(float(sc), 4) if sc is not None else 0.0)
+    return doc_ids, scores
+
+
+def _retrieval_confidence(sources: List[Dict[str, Any]]) -> float:
+    """Average top-k similarity from retriever (FAQ confidence, KB relevance, vector similarity). 0 if no sources."""
+    _, scores = _retrieval_metadata(sources)
+    if not scores:
+        return 0.0
+    # Normalize KB relevance if it's on 0-10 scale (knowledge_base_system uses 0-10)
+    normalized = []
+    for s in scores:
+        if s <= 1.0:
+            normalized.append(s)
+        else:
+            normalized.append(min(1.0, s / 10.0))
+    return round(sum(normalized) / len(normalized), 4)
+
+
+def _combine_confidence(retrieval_conf: float, llm_conf: Optional[float], weight_retrieval: float = 0.5) -> float:
+    """Combine retriever and LLM confidence. If llm_conf is None, use retrieval only (or low default)."""
+    if llm_conf is None:
+        return round(retrieval_conf if retrieval_conf > 0 else 0.2, 4)
+    combined = weight_retrieval * retrieval_conf + (1.0 - weight_retrieval) * llm_conf
+    return round(min(1.0, max(0.0, combined)), 4)
+
+
+def _low_confidence_message() -> str:
+    """Response when combined confidence is below threshold."""
+    return (
+        "I may be missing some context for that. Could you rephrase or add a few more details? "
+        "If you'd like, I can connect you with our team for more help."
+    )
+
+
+def _confidence_threshold() -> float:
+    """Minimum combined confidence to show the model answer; below this we show clarifying message."""
+    try:
+        return float(os.getenv("CHATBOT_CONFIDENCE_THRESHOLD", "0.4"))
+    except ValueError:
+        return 0.4
 
 
 def _build_context_snippets(sources: List[Dict[str, Any]]) -> str:
@@ -286,14 +342,24 @@ def public_chatbot_query():
         
         # Search FAQs + knowledge base
         faq_results = faq_system.search_faqs(query, max_results=3)
-        kb_results = knowledge_base.search(query, {}, limit=3)
+        # Pass tenant_id filter for multi-tenant isolation
+        kb_filters = {}
+        if tenant_id:
+            kb_filters['tenant_id'] = tenant_id
+        kb_results = knowledge_base.search(query, kb_filters, limit=3)
 
         # Optional vector retrieval (feature flagged)
         vector_results = []
         flags = get_feature_flags()
         if flags.is_enabled("vector_search"):
             try:
-                vector_results = get_vector_search().search_similar(query, top_k=3, threshold=0.6)
+                # Pass tenant_id for multi-tenant isolation
+                vector_results = get_vector_search().search_similar(
+                    query, 
+                    top_k=3, 
+                    threshold=0.6,
+                    tenant_id=tenant_id
+                )
             except Exception as vector_error:
                 logger.warning("Vector search failed: %s", vector_error)
         
@@ -323,7 +389,7 @@ def public_chatbot_query():
             }), 402
 
         answer = _safe_fallback_response()
-        confidence = 0.2
+        llm_confidence: Optional[float] = 0.2
         fallback_used = True
         llm_trace_id = None
         if allow_llm and not fallback_needed:
@@ -346,13 +412,27 @@ def public_chatbot_query():
                 try:
                     parsed = json.loads(llm_result.get("content", "{}"))
                     answer = parsed.get("answer") or answer
-                    confidence = parsed.get("confidence", confidence)
+                    llm_confidence = parsed.get("confidence")
+                    if llm_confidence is not None:
+                        llm_confidence = max(0.0, min(1.0, float(llm_confidence)))
                     fallback_used = bool(parsed.get("fallback_used", False))
-                except json.JSONDecodeError:
+                except (json.JSONDecodeError, TypeError):
                     logger.warning("LLM response not JSON; using fallback")
+                    llm_confidence = 0.2
             else:
                 logger.warning("LLM response invalid: %s", llm_result.get("error"))
+                llm_confidence = 0.2
             llm_trace_id = llm_result.get("trace_id")
+        else:
+            llm_confidence = None
+
+        # Combine retriever similarity and LLM self-check; apply low-confidence override
+        retrieval_conf = _retrieval_confidence(sources)
+        confidence = _combine_confidence(retrieval_conf, llm_confidence)
+        threshold = _confidence_threshold()
+        if confidence < threshold:
+            answer = _low_confidence_message()
+            fallback_used = True
 
         # Lead capture (optional)
         lead_info = _extract_lead_info(query, lead_payload)
@@ -392,6 +472,71 @@ def public_chatbot_query():
             except Exception as lead_error:
                 logger.warning("Lead capture failed: %s", lead_error)
         
+        # Check if escalation is needed
+        escalation_engine = get_escalation_engine()
+        should_escalate = escalation_engine.should_escalate(confidence, fallback_used)
+        escalated_question_id = None
+        
+        if should_escalate:
+            escalation_result = escalation_engine.escalate_question(
+                conversation_id=conversation_id,
+                tenant_id=tenant_id or str(user_id or 'anonymous'),
+                question=query,
+                original_answer=answer,
+                confidence=confidence,
+                user_id=str(user_id) if user_id else None
+            )
+            if escalation_result.get('success'):
+                escalated_question_id = escalation_result.get('escalated_question_id')
+                # Update answer to include escalation option
+                answer = (
+                    f"{answer}\n\n"
+                    f"I've also shared your question with our expert team. "
+                    f"If you'd like to speak with someone directly, they'll be in touch soon."
+                )
+        
+        # Log query/response and confidence breakdown for feedback evaluation
+        message_id = str(uuid.uuid4())
+        log_metadata = {
+            "retrieval_confidence": retrieval_conf,
+            "llm_confidence": llm_confidence,
+            "confidence_threshold": threshold,
+        }
+        try:
+            if db_optimizer.table_exists("chatbot_query_log"):
+                meta_json = json.dumps(log_metadata)[:10000]
+                base_params = (
+                    conversation_id,
+                    message_id,
+                    query[:10000] if query else "",
+                    answer[:50000] if answer else "",
+                    confidence,
+                    fallback_used,
+                    json.dumps(sources)[:50000] if sources else "[]",
+                    str(tenant_id) if tenant_id is not None else None,
+                    str(user_id) if user_id is not None else None,
+                    llm_trace_id,
+                )
+                try:
+                    db_optimizer.execute_query(
+                        """INSERT INTO chatbot_query_log
+                           (conversation_id, message_id, query, response, confidence, fallback_used, sources_json, tenant_id, user_id, llm_trace_id, metadata)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        base_params + (meta_json,),
+                        fetch=False,
+                    )
+                except Exception:
+                    db_optimizer.execute_query(
+                        """INSERT INTO chatbot_query_log
+                           (conversation_id, message_id, query, response, confidence, fallback_used, sources_json, tenant_id, user_id, llm_trace_id)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        base_params,
+                        fetch=False,
+                    )
+        except Exception as log_err:
+            logger.warning("Chatbot query log insert failed: %s", log_err)
+
+        
         # Calculate response time
         response_time_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
         
@@ -399,25 +544,115 @@ def public_chatbot_query():
         record_api_usage(response_status=200, response_time_ms=response_time_ms)
         _record_billing_usage(user_id, "chatbot_queries", 1)
         
+        retrieved_doc_ids, retrieval_scores = _retrieval_metadata(sources)
+        
         return jsonify({
             "success": True,
             "query": query,
             "response": answer,
             "sources": sources,
+            "retrieved_doc_ids": retrieved_doc_ids,
+            "retrieval_scores": retrieval_scores,
             "confidence": confidence,
+            "retrieval_confidence": retrieval_conf,
+            "llm_confidence": llm_confidence,
             "conversation_id": conversation_id,
+            "message_id": message_id,
             "tenant_id": tenant_id,
             "schema_version": "v1",
             "fallback_used": fallback_used,
             "plan": plan_info.get("plan"),
             "llm_trace_id": llm_trace_id,
-            "lead_id": lead_id
+            "lead_id": lead_id,
+            "escalated": should_escalate,
+            "escalated_question_id": escalated_question_id
         })
         
     except Exception as e:
         logger.error(f"❌ Public chatbot query failed: {e}", exc_info=True)
         record_api_usage(response_status=500)
         return create_error_response("Internal server error", 500, 'INTERNAL_ERROR')
+
+
+@public_chatbot_bp.route('/feedback', methods=['POST', 'OPTIONS'])
+@handle_api_errors
+@require_api_key
+def submit_feedback():
+    """Submit feedback on a chatbot answer"""
+    try:
+        data = request.json or {}
+        conversation_id = data.get('conversation_id', '').strip()
+        helpful = data.get('helpful', True)
+        feedback_text = data.get('feedback_text', '').strip()
+        message_id = data.get('message_id')
+        confidence = data.get('confidence')
+        metadata = data.get('metadata')
+        if isinstance(metadata, dict):
+            if confidence is not None:
+                metadata = {**metadata, "confidence_score": confidence}
+        elif confidence is not None:
+            metadata = {"confidence_score": confidence}
+        else:
+            metadata = None
+
+        if not conversation_id:
+            return jsonify({
+                "success": False,
+                "error": "conversation_id is required",
+                "error_code": "MISSING_FIELD"
+            }), 400
+
+        tenant_id = g.api_key_info.get('tenant_id')
+        user_id = g.api_key_info.get('user_id')
+
+        feedback_system = get_feedback_system()
+        result = feedback_system.record_feedback(
+            conversation_id=conversation_id,
+            helpful=helpful,
+            feedback_text=feedback_text,
+            message_id=message_id,
+            user_id=str(user_id) if user_id else None,
+            metadata=metadata,
+        )
+        
+        if not result.get('success'):
+            return jsonify({
+                "success": False,
+                "error": result.get('error', 'Failed to record feedback'),
+                "error_code": result.get('error_code', 'FEEDBACK_ERROR')
+            }), 500
+        
+        return jsonify({
+            "success": True,
+            "feedback_id": result.get('feedback_id'),
+            "message": "Feedback recorded successfully"
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Feedback submission failed: {e}", exc_info=True)
+        return create_error_response("Internal server error", 500, 'INTERNAL_ERROR')
+
+
+@public_chatbot_bp.route('/evaluation', methods=['GET', 'OPTIONS'])
+@handle_api_errors
+@require_api_key
+def get_evaluation():
+    """Get chatbot evaluation stats (query log + feedback joined). Scoped to tenant from API key."""
+    try:
+        tenant_id = g.api_key_info.get('tenant_id')
+        since = request.args.get('since')
+        since_dt = None
+        if since:
+            try:
+                since_dt = datetime.fromisoformat(since.replace('Z', '+00:00'))
+            except ValueError:
+                pass
+        feedback_system = get_feedback_system()
+        stats = feedback_system.get_evaluation_stats(tenant_id=tenant_id, since=since_dt)
+        return jsonify({"success": True, "evaluation": stats})
+    except Exception as e:
+        logger.error("Evaluation endpoint failed: %s", e)
+        return create_error_response("Evaluation failed", 500, 'EVALUATION_ERROR')
 
 
 @public_chatbot_bp.route('/health', methods=['GET', 'OPTIONS'])

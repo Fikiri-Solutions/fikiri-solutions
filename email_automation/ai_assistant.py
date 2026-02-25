@@ -328,6 +328,41 @@ class MinimalAIEmailAssistant:
             logger.error(f"❌ Contact extraction failed: {e}")
             self._track_ai_usage("extract_contact", False)
             return self._fallback_contact_extraction(email_content)
+
+    def summarize_email(self, email_content: str, subject: str = "") -> str:
+        """Summarize a single email with enhanced tracking."""
+        if not self.is_enabled():
+            return self._fallback_summary(email_content)
+
+        try:
+            prompt = f"""
+            Summarize this email in 2-3 concise sentences:
+
+            Subject: {subject}
+            Content: {email_content[:800]}
+
+            Focus on the main request, key details, and any next steps.
+            """
+
+            result = self.router.process(
+                input_data=prompt,
+                intent='summarization',
+                context={'operation': 'email_summary', 'subject': subject}
+            )
+
+            if result['success']:
+                self._track_ai_usage("summarize_email", True, result.get('tokens_used', 0))
+                logger.info("✅ Email summarized via LLM router")
+                return result['content']
+
+            logger.error(f"❌ Email summarization failed: {result.get('error')}")
+            self._track_ai_usage("summarize_email", False)
+            return self._fallback_summary(email_content)
+
+        except Exception as e:
+            logger.error(f"❌ Email summarization failed: {e}")
+            self._track_ai_usage("summarize_email", False)
+            return self._fallback_summary(email_content)
     
     def summarize_email_thread(self, emails: List[Dict[str, Any]]) -> str:
         """Summarize an email thread with enhanced tracking."""
@@ -512,6 +547,12 @@ Fikiri Solutions Team"""
             "budget": None,
             "timeline": None
         }
+
+    def _fallback_summary(self, email_content: str) -> str:
+        """Fallback summary when AI is not available."""
+        if not email_content:
+            return ""
+        return email_content[:200] + "..." if len(email_content) > 200 else email_content
     
 def create_ai_assistant(api_key: Optional[str] = None, services: Dict[str, Any] = None) -> MinimalAIEmailAssistant:
     """Create and return an AI assistant instance."""

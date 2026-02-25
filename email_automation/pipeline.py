@@ -35,6 +35,13 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
+# Import trace context
+try:
+    from core.trace_context import get_trace_id, set_trace_id
+    TRACE_CONTEXT_AVAILABLE = True
+except ImportError:
+    TRACE_CONTEXT_AVAILABLE = False
+
 
 def parse_message(message: dict) -> dict:
     """Parse a raw message via the canonical parser."""
@@ -70,11 +77,18 @@ def _extract_sender_email(from_header: str) -> str:
     return from_header.strip()
 
 
-def orchestrate_incoming(parsed: dict, user_id: int, actions: MinimalEmailActions = None) -> dict:
+def orchestrate_incoming(parsed: dict, user_id: int, actions: MinimalEmailActions = None, trace_id: str = None) -> dict:
     """
     Full mailbox automation:
     parse -> classify -> decide action -> draft response -> execute action -> log to CRM
     """
+    # Set trace ID if provided
+    if TRACE_CONTEXT_AVAILABLE:
+        if trace_id:
+            set_trace_id(trace_id)
+        else:
+            trace_id = get_trace_id()
+    
     actions = actions or MinimalEmailActions(services={"ai_assistant": MinimalAIEmailAssistant()})
 
     parser = MinimalEmailParser()

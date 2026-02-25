@@ -60,14 +60,16 @@ from core.rate_limiter import enhanced_rate_limiter
 from core.redis_sessions import init_flask_sessions
 from core.security import init_security
 
-# Optional limiter import for health check exemptions
+# Optional Flask-Limiter for health check exemptions (single instance, init_app in setup_routes)
 try:
     from flask_limiter import Limiter
     from flask_limiter.util import get_remote_address
     LIMITER_AVAILABLE = True
+    _app_limiter = Limiter(key_func=get_remote_address, default_limits=["200 per hour"])
 except ImportError:
     LIMITER_AVAILABLE = False
     Limiter = None
+    _app_limiter = None
 from services.business_operations import create_business_blueprint
 
 # Blueprint imports
@@ -80,6 +82,7 @@ from core.chatbot_smart_faq_api import chatbot_bp
 from core.public_chatbot_api import public_chatbot_bp
 from core.ai_analysis_api import ai_analysis_bp
 from core.workflow_templates_api import workflow_templates_bp
+from core.contact_api import contact_bp
 from analytics.monitoring_api import monitoring_dashboard_bp
 from core.ai_chat_api import ai_bp
 from analytics.dashboard_api import dashboard_bp
@@ -96,7 +99,7 @@ except ImportError:
     oauth = None
 
 # Route blueprints (extracted modules)
-from routes import auth_bp, business_bp, test_bp, user_bp, monitoring_bp
+from routes import auth_bp, business_bp, test_bp, user_bp, monitoring_bp, jobs_bp, expert_bp, kpi_bp
 from routes.integrations import integrations_bp
 from routes.appointments import appointments_bp
 
@@ -106,31 +109,38 @@ services = {}
 def create_app():
     """Flask Application Factory Pattern with Enhanced Monitoring"""
     app = Flask(__name__)
-    app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
+    env = os.getenv('FLASK_ENV', 'production')
+    secret = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key' if env == 'development' else None)
+    if env in ('production', 'staging') and not secret:
+        raise RuntimeError('FLASK_SECRET_KEY is required in production and staging')
+    app.secret_key = secret or 'dev-secret-key'
     app.socketio = None  # Will be initialized in create_app() if available
     
     # 🔧 Database sanity check and initialization
+    env = os.getenv('FLASK_ENV', 'production')
+    run_startup_checks = env == 'development' or os.getenv('DB_STARTUP_CHECKS') == '1'
     try:
         from core.database_init import init_database, check_database_health
         from core.database_optimization import db_optimizer
         
-        logger.info("Checking database connectivity...")
-        try:
-            logger.info("Database path: %s", db_optimizer.db_path)
-            result = db_optimizer.execute_query("SELECT name FROM sqlite_master WHERE type='table';")
-            logger.info("Existing tables: %s", [r['name'] for r in result])
-        except Exception as e:
-            logger.error("Database connection failed: %s", e)
         logger.info("Running init_database() ...")
         if init_database():
             logger.info("Database initialized.")
         else:
             logger.warning("Database initialization failed")
-        logger.info("Running database health check ...")
-        if check_database_health():
-            logger.info("Health check completed.")
-        else:
-            logger.warning("Health check failed")
+        if run_startup_checks:
+            logger.info("Checking database connectivity...")
+            try:
+                logger.info("Database path: %s", db_optimizer.db_path)
+                result = db_optimizer.execute_query("SELECT name FROM sqlite_master WHERE type='table';")
+                logger.info("Existing tables: %s", [r['name'] for r in result])
+            except Exception as e:
+                logger.error("Database connection failed: %s", e)
+            logger.info("Running database health check ...")
+            if check_database_health():
+                logger.info("Health check completed.")
+            else:
+                logger.warning("Health check failed")
     except Exception as e:
         logger.error("Database startup error: %s", e)
     
@@ -238,6 +248,17 @@ def create_app():
     except Exception as e:
         logger.warning(f"⚠️ SocketIO initialization failed: {e}, continuing without WebSocket support")
         app.socketio = None
+
+    # When SocketIO is not available, handle /socket.io/ explicitly to avoid
+    # Werkzeug "write() before start_response" when frontend attempts WebSocket.
+    if app.socketio is None:
+        @app.route('/socket.io/', defaults={'path': ''})
+        @app.route('/socket.io/<path:path>')
+        def socketio_unavailable(path=''):
+            return jsonify({
+                'error': 'WebSocket support not available',
+                'code': 'SOCKETIO_UNAVAILABLE'
+            }), 503
     
     # Initialize services with app reference
     if initialize_services(app):
@@ -293,6 +314,22 @@ def initialize_services(app):
         init_flask_sessions(app)
         if callable(init_secure_sessions):
             init_secure_sessions(app)
+        
+        # Initialize request timeout middleware
+        try:
+            from core.request_timeout import init_request_timeout
+            init_request_timeout(app)
+            logger.info("✅ Request timeout middleware initialized")
+        except Exception as e:
+            logger.warning(f"⚠️ Request timeout middleware initialization failed: {e}")
+        
+        # Initialize trace context middleware
+        try:
+            from core.trace_context import init_trace_context
+            init_trace_context(app)
+            logger.info("✅ Trace context middleware initialized")
+        except Exception as e:
+            logger.warning(f"⚠️ Trace context middleware initialization failed: {e}")
         init_security(app)
 
         # ✅ Observability layer - Single monitoring initialization
@@ -410,12 +447,12 @@ def setup_routes(app):
             'environment': os.getenv('FLASK_ENV', 'production')
         })
     
-    # Apply limiter exemptions to health check routes
-    if LIMITER_AVAILABLE:
+    # Single limiter attached to app so exemptions apply
+    if LIMITER_AVAILABLE and _app_limiter is not None:
         try:
-            limiter = Limiter(key_func=get_remote_address, default_limits=["200 per hour"])
-            limiter.exempt(health_summary)
-            limiter.exempt(api_health_check)
+            _app_limiter.init_app(app)
+            _app_limiter.exempt(health_summary)
+            _app_limiter.exempt(api_health_check)
         except Exception as e:
             logger.warning(f"⚠️ Failed to exempt health check routes from rate limiting: {e}")
 
@@ -436,6 +473,46 @@ def setup_routes(app):
     def dashboard():
         """Serve dashboard page"""
         return render_template('dashboard.html')
+    
+    # Demo routes
+    @app.route('/demo/chatbot')
+    def chatbot_demo():
+        """Serve chatbot demo page"""
+        try:
+            demo_path = os.path.join(os.path.dirname(__file__), 'demo', 'chatbot-demo.html')
+            if os.path.exists(demo_path):
+                with open(demo_path, 'r', encoding='utf-8') as f:
+                    return f.read()
+            return jsonify({'error': 'Demo file not found'}), 404
+        except Exception as e:
+            logger.error(f"Error serving demo: {e}")
+            return jsonify({'error': str(e)}), 500
+    
+    @app.route('/demo/simple')
+    def simple_chatbot_demo():
+        """Serve simple chatbot demo page"""
+        try:
+            demo_path = os.path.join(os.path.dirname(__file__), 'demo', 'simple-chatbot.html')
+            if os.path.exists(demo_path):
+                with open(demo_path, 'r', encoding='utf-8') as f:
+                    return f.read()
+            return jsonify({'error': 'Demo file not found'}), 404
+        except Exception as e:
+            logger.error(f"Error serving demo: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/demo/widget')
+    def chatbot_widget_demo():
+        """Serve chatbot widget demo (floating button + popup)"""
+        try:
+            demo_path = os.path.join(os.path.dirname(__file__), 'demo', 'chatbot-widget.html')
+            if os.path.exists(demo_path):
+                with open(demo_path, 'r', encoding='utf-8') as f:
+                    return f.read()
+            return jsonify({'error': 'Demo file not found'}), 404
+        except Exception as e:
+            logger.error(f"Error serving demo: {e}")
+            return jsonify({'error': str(e)}), 500
 
 # Register blueprints
 def register_blueprints(app):
@@ -454,14 +531,18 @@ def register_blueprints(app):
         (public_chatbot_bp, 'public_chatbot'),
         (ai_analysis_bp, 'ai_analysis'),
         (workflow_templates_bp, 'workflow_templates'),
+        (contact_bp, 'contact'),
         (monitoring_dashboard_bp, 'monitoring_dashboard'),
         (ai_bp, 'ai'),
         (dashboard_bp, 'dashboard'),
         (auth_bp, 'auth'),
         (business_bp, 'routes_business'),
+        (jobs_bp, 'routes_jobs'),
         (test_bp, 'routes_test'),
         (user_bp, 'routes_user'),
         (monitoring_bp, 'routes_monitoring'),
+        (expert_bp, 'routes_expert'),
+        (kpi_bp, 'routes_kpi'),
         (integrations_bp, 'integrations')
     ]
     
@@ -488,128 +569,122 @@ def register_blueprints(app):
 # Create Flask app instance
 app = create_app()
 
-# Add direct API routes for frontend components
-@app.route('/api/dashboard/test-direct', methods=['GET'])
-def test_dashboard_direct():
-    """Direct test endpoint for dashboard"""
-    return jsonify({'success': True, 'message': 'Direct dashboard route is working'})
+# Dev-only routes (bypass auth/plan gating; not registered in production/staging)
+if os.getenv('FLASK_ENV') == 'development':
+    @app.route('/api/dashboard/test-direct', methods=['GET'])
+    def test_dashboard_direct():
+        """Direct test endpoint for dashboard"""
+        return jsonify({'success': True, 'message': 'Direct dashboard route is working'})
 
-@app.route('/api/dashboard/metrics-direct', methods=['GET'])
-def dashboard_metrics_direct():
-    """Direct dashboard metrics endpoint"""
-    try:
-        metrics_data = {
-            'success': True,
-            'data': {
-                'user': {
-                    'id': 1,
-                    'name': 'Demo User',
-                    'email': 'demo@example.com',
-                    'onboarding_completed': True,
-                    'onboarding_step': -1
-                },
-                'leads': {
-                    'total': 45,
-                    'new_today': 5,
-                    'converted': 12,
-                    'pending': 28
-                },
-                'emails': {
-                    'processed_today': 125,
-                    'replied': 89,
-                    'pending': 36
-                },
-                'automation': {
-                    'active_rules': 8,
-                    'emails_sent': 234,
-                    'success_rate': 94.5
-                }
-            },
-            'message': 'Dashboard metrics retrieved successfully'
-        }
-        return jsonify(metrics_data)
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/test-simple', methods=['GET'])
-def test_simple():
-    """Simple test endpoint"""
-    return jsonify({'success': True, 'message': 'Simple test endpoint working'})
-
-@app.route('/api/repair-database', methods=['POST'])
-def repair_database():
-    """Force database repair endpoint"""
-    try:
-        from core.database_optimization import db_optimizer
-        logger.info("🔧 Forcing database repair...")
-        
-        # Force database repair
-        db_optimizer._repair_database()
-        
-        return jsonify({
-            'success': True, 
-            'message': 'Database repair completed successfully'
-        })
-    except Exception as e:
-        logger.error(f"❌ Database repair failed: {e}")
-        return jsonify({
-            'success': False, 
-            'error': str(e)
-        }), 500
-
-@app.route('/api/ai-response', methods=['POST'])
-def ai_response_direct():
-    """Direct AI response endpoint for frontend"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'success': False, 'error': 'Request body cannot be empty'}), 400
-        
-        message = data.get('message', '')
-        if not message:
-            return jsonify({'success': False, 'error': 'Message is required'}), 400
-        
-        # Prefer real LLM response; fall back to demo response
+    @app.route('/api/dashboard/metrics-direct', methods=['GET'])
+    def dashboard_metrics_direct():
+        """Direct dashboard metrics endpoint"""
         try:
-            from core.ai.llm_router import LLMRouter
-            router = LLMRouter()
-            if router and router.client and router.client.is_enabled():
-                llm_result = router.process(
-                    input_data=message,
-                    intent='general',
-                    context={'channel': 'ai_response_direct'}
-                )
-                if llm_result.get('success'):
-                    return jsonify({
-                        'success': True,
-                        'data': {
-                            'response': llm_result.get('content', ''),
-                            'confidence': 0.75,
-                            'intent': 'general_inquiry',
-                            'suggested_actions': []
-                        },
-                        'message': 'AI response generated successfully'
-                    })
-        except Exception as llm_error:
-            logger.error("AI response direct LLM failed: %s", llm_error)
+            metrics_data = {
+                'success': True,
+                'data': {
+                    'user': {
+                        'id': 1,
+                        'name': 'Demo User',
+                        'email': 'demo@example.com',
+                        'onboarding_completed': True,
+                        'onboarding_step': -1
+                    },
+                    'leads': {
+                        'total': 45,
+                        'new_today': 5,
+                        'converted': 12,
+                        'pending': 28
+                    },
+                    'emails': {
+                        'processed_today': 125,
+                        'replied': 89,
+                        'pending': 36
+                    },
+                    'automation': {
+                        'active_rules': 8,
+                        'emails_sent': 234,
+                        'success_rate': 94.5
+                    }
+                },
+                'message': 'Dashboard metrics retrieved successfully'
+            }
+            return jsonify(metrics_data)
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
 
-        response_data = {
-            'success': True,
-            'data': {
-                'response': f"I understand you said: '{message}'. This is a demo response from the Fikiri AI assistant. The full AI system will be available once authentication is fully configured.",
-                'confidence': 0.85,
-                'intent': 'general_inquiry',
-                'suggested_actions': [
-                    'Connect your Gmail account',
-                    'Set up email automation rules',
-                    'View your dashboard analytics'
-                ]
-            },
-            'message': 'AI response generated successfully'
-        }
-        return jsonify(response_data)
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+    @app.route('/api/test-simple', methods=['GET'])
+    def test_simple():
+        """Simple test endpoint"""
+        return jsonify({'success': True, 'message': 'Simple test endpoint working'})
+
+    @app.route('/api/repair-database', methods=['POST'])
+    def repair_database():
+        """Force database repair endpoint"""
+        try:
+            from core.database_optimization import db_optimizer
+            logger.info("🔧 Forcing database repair...")
+            db_optimizer._repair_database()
+            return jsonify({
+                'success': True,
+                'message': 'Database repair completed successfully'
+            })
+        except Exception as e:
+            logger.error(f"❌ Database repair failed: {e}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+    @app.route('/api/ai-response', methods=['POST'])
+    def ai_response_direct():
+        """Direct AI response endpoint for frontend"""
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({'success': False, 'error': 'Request body cannot be empty'}), 400
+            message = data.get('message', '')
+            if not message:
+                return jsonify({'success': False, 'error': 'Message is required'}), 400
+            try:
+                from core.ai.llm_router import LLMRouter
+                router = LLMRouter()
+                if router and router.client and router.client.is_enabled():
+                    llm_result = router.process(
+                        input_data=message,
+                        intent='general',
+                        context={'channel': 'ai_response_direct'}
+                    )
+                    if llm_result.get('success'):
+                        return jsonify({
+                            'success': True,
+                            'data': {
+                                'response': llm_result.get('content', ''),
+                                'confidence': 0.75,
+                                'intent': 'general_inquiry',
+                                'suggested_actions': []
+                            },
+                            'message': 'AI response generated successfully'
+                        })
+            except Exception as llm_error:
+                logger.error("AI response direct LLM failed: %s", llm_error)
+            response_data = {
+                'success': True,
+                'data': {
+                    'response': f"I understand you said: '{message}'. This is a demo response from the Fikiri AI assistant. The full AI system will be available once authentication is fully configured.",
+                    'confidence': 0.85,
+                    'intent': 'general_inquiry',
+                    'suggested_actions': [
+                        'Connect your Gmail account',
+                        'Set up email automation rules',
+                        'View your dashboard analytics'
+                    ]
+                },
+                'message': 'AI response generated successfully'
+            }
+            return jsonify(response_data)
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Use app already created at module level (create_app() above) — avoid duplicate init

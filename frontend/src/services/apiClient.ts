@@ -158,6 +158,34 @@ export interface KnowledgeSearchResult {
   content_preview: string
 }
 
+export interface ApiKeySummary {
+  id: number
+  key_prefix: string
+  name: string
+  description?: string
+  tenant_id?: string
+  scopes?: string[]
+  rate_limit_per_minute?: number
+  rate_limit_per_hour?: number
+  is_active?: boolean
+  expires_at?: string
+  last_used_at?: string
+  created_at?: string
+}
+
+export interface ApiKeyCreateResponse {
+  api_key: string
+  key_info: {
+    key_prefix: string
+    name: string
+    scopes: string[]
+    tenant_id?: string
+    rate_limit_per_minute?: number
+    rate_limit_per_hour?: number
+    expires_at?: string | null
+  }
+}
+
 class ApiClient {
   private client: AxiosInstance
 
@@ -332,28 +360,38 @@ class ApiClient {
   // Dashboard data endpoints
   async getMetrics(): Promise<MetricData> {
     try {
-      // Use dashboard/metrics endpoint (getMetrics is legacy, use getDashboardMetrics instead)
       const userId = this.getUserId()
-      console.log('[apiClient] Fetching metrics for user:', userId)
       const response = await this.client.get('/dashboard/metrics', {
         params: userId ? { user_id: userId } : undefined
       })
-      console.log('[apiClient] Metrics response:', response.data)
-      // Handle both response formats: { success, data, ... } or direct data
-      return response.data?.data || response.data || {}
+      const raw = response.data?.data || response.data || {}
+      // Map backend shape to frontend MetricData (leads.total, email.total_emails, etc.)
+      const activeLeads = raw.leads?.total ?? 0
+      const totalEmails = raw.email?.total_emails ?? raw.emails?.total ?? 0
+      let avgResponseTime = 0
+      const rt = raw.performance?.response_time
+      if (typeof rt === 'number') avgResponseTime = rt
+      else if (typeof rt === 'string') {
+        const parsed = parseFloat(rt.replace(/[^\d.]/g, ''))
+        if (!Number.isNaN(parsed)) avgResponseTime = parsed
+      }
+      return {
+        activeLeads,
+        totalEmails,
+        aiResponses: raw.ai?.total ?? raw.aiResponses ?? 0,
+        avgResponseTime,
+        // Keep raw for any component that reads nested shape
+        ...raw,
+        leads: raw.leads ?? { total: activeLeads },
+        email: raw.email ?? { total_emails: totalEmails }
+      } as MetricData
     } catch (error: any) {
       console.error('[apiClient] Failed to fetch metrics:', error)
-      console.error('[apiClient] Error details:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data
-      })
-      // Fallback to mock data if API fails
       return {
-        totalEmails: Math.floor(Math.random() * 1000) + 100,
-        activeLeads: Math.floor(Math.random() * 50) + 10,
-        aiResponses: Math.floor(Math.random() * 100) + 50,
-        avgResponseTime: Math.random() * 5 + 1
+        totalEmails: 0,
+        activeLeads: 0,
+        aiResponses: 0,
+        avgResponseTime: 0
       }
     }
   }
@@ -419,38 +457,21 @@ class ApiClient {
   }
 
   async getActivity(): Promise<ActivityItem[]> {
-    // For now, return mock activity data
-    // In the future, this could be a dedicated activity endpoint
-    return [
-      {
-        id: 1,
-        type: 'ai_response',
-        message: 'AI Assistant responded to inquiry from john@acme.com',
-        timestamp: '2 minutes ago',
-        status: 'success'
-      },
-      {
-        id: 2,
-        type: 'lead_added',
-        message: 'New lead added: Jane Smith from Startup Inc',
-        timestamp: '15 minutes ago',
-        status: 'success'
-      },
-      {
-        id: 3,
-        type: 'email_processed',
-        message: 'Email automation triggered for urgent inquiry',
-        timestamp: '1 hour ago',
-        status: 'success'
-      },
-      {
-        id: 4,
-        type: 'service_error',
-        message: 'ML Scoring service temporarily unavailable',
-        timestamp: '2 hours ago',
-        status: 'warning'
-      }
-    ]
+    try {
+      const response = await this.client.get('/dashboard/activity')
+      const data = response.data?.data || response.data
+      const activities = data?.activities ?? (Array.isArray(data) ? data : [])
+      if (!Array.isArray(activities) || activities.length === 0) return []
+      return activities.map((a: any, i: number) => ({
+        id: a.id ?? i + 1,
+        type: a.type ?? 'system_update',
+        message: a.message ?? '',
+        timestamp: a.timestamp ?? new Date().toISOString(),
+        status: (a.status ?? 'info') as ActivityItem['status']
+      }))
+    } catch {
+      return []
+    }
   }
 
   // Service test endpoints
@@ -616,6 +637,18 @@ class ApiClient {
   async updateOnboardingStep(step: number): Promise<any> {
     const response = await this.client.put('/user/onboarding-step', { step })
     return response.data
+  }
+
+  async getProfile(): Promise<{ user: { phone?: string; sms_consent?: boolean; sms_consent_at?: string; [k: string]: any } }> {
+    const response = await this.client.get('/user/profile')
+    const data = response.data?.data ?? response.data
+    return { user: data?.user ?? {} }
+  }
+
+  async updateProfile(payload: { name?: string; business_name?: string; business_email?: string; industry?: string; team_size?: string; phone?: string; sms_consent?: boolean }): Promise<{ user: Record<string, any> }> {
+    const response = await this.client.put('/user/profile', payload)
+    const data = response.data?.data ?? response.data
+    return { user: data?.user ?? {} }
   }
 
   async saveOnboarding(payload: { name: string; company: string; industry?: string }): Promise<any> {
@@ -995,6 +1028,39 @@ class ApiClient {
       client_secret: response.data.client_secret,
       setup_intent_id: response.data.setup_intent_id
     }
+  }
+
+  async getApiKeys(): Promise<ApiKeySummary[]> {
+    const response = await this.client.get('/user/api-keys')
+    return response.data?.data?.keys || []
+  }
+
+  async createApiKey(params?: {
+    name?: string
+    description?: string
+    scopes?: string[]
+    allowed_origins?: string[] | string
+  }): Promise<ApiKeyCreateResponse> {
+    const response = await this.client.post('/user/api-keys', params || {})
+    if (!response.data?.success) {
+      throw new Error(response.data?.error || 'Failed to create API key')
+    }
+    return response.data?.data
+  }
+
+  /** Public contact form → info@fikirisolutions.com. UTF-8, enforced limits on backend. */
+  async submitContact(payload: {
+    name: string
+    email: string
+    phone?: string
+    company?: string
+    subject?: string
+    message: string
+  }): Promise<{ success: boolean; message?: string; error?: string }> {
+    const response = await this.client.post('/contact', payload, {
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    })
+    return response.data
   }
 
   handleError(error: any): string {

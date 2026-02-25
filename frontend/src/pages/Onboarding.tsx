@@ -14,6 +14,7 @@ export const Onboarding: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [checkingEmail, setCheckingEmail] = useState(false);
   const [emailConnected, setEmailConnected] = useState(false);
+  const [statusLoaded, setStatusLoaded] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     company: '',
@@ -26,15 +27,18 @@ export const Onboarding: React.FC = () => {
       if (user?.id && step === 2) {
         setCheckingEmail(true);
         try {
-          const status = await apiClient.getGmailConnectionStatus();
-          if (status?.connected) {
+          const gmailStatus = await apiClient.getGmailConnectionStatus();
+          const outlookStatus = await apiClient.getOutlookStatus(user.id);
+          const gmailConnected = !!gmailStatus?.connected;
+          const outlookConnected = !!outlookStatus?.connected;
+          if (gmailConnected || outlookConnected) {
             setEmailConnected(true);
             toast.success('Email connected successfully!');
             // Auto-advance to next step after 2 seconds, preserving redirect
             setTimeout(() => {
               const redirectPath = getRedirectPath()
               if (redirectPath) {
-                navigate(`/onboarding-flow/3?redirect=${encodeURIComponent(redirectPath)}`, { replace: true })
+                navigate(`/onboarding/3?redirect=${encodeURIComponent(redirectPath)}`, { replace: true })
               } else {
                 setStep(3)
               }
@@ -57,19 +61,47 @@ export const Onboarding: React.FC = () => {
     const stepParam = urlParams.get('step');
     if (stepParam) {
       setStep(parseInt(stepParam) || 1);
-    } else if (location.pathname.includes('/sync')) {
-      // Handle old /onboarding-flow/sync route
-      setStep(2);
-      // Redirect to clean URL
-      navigate('/onboarding-flow/2', { replace: true });
     } else {
-      // Check if step is in the path (e.g., /onboarding-flow/2)
-      const pathMatch = location.pathname.match(/\/onboarding-flow\/(\d+)/);
+      // Check if step is in the path (e.g., /onboarding/2)
+      const pathMatch = location.pathname.match(/\/onboarding\/(\d+)/);
       if (pathMatch) {
         setStep(parseInt(pathMatch[1]) || 1);
       }
     }
   }, [location.search, location.pathname, navigate]);
+
+  // Load onboarding status to resume/prefill (if no explicit step in URL)
+  useEffect(() => {
+    const loadStatus = async () => {
+      if (!user?.id) return;
+      const urlParams = new URLSearchParams(location.search);
+      const stepParam = urlParams.get('step');
+      const pathMatch = location.pathname.match(/\/onboarding\/(\d+)/);
+      const hasExplicitStep = !!stepParam || !!pathMatch;
+      try {
+        const status = await apiClient.getOnboardingStatus(user.id);
+        const data = status?.data || status;
+        const payload = data?.data;
+        if (payload?.name || payload?.company || payload?.industry) {
+          setFormData(prev => ({
+            ...prev,
+            name: payload.name || prev.name,
+            company: payload.company || prev.company,
+            industry: payload.industry || prev.industry
+          }));
+        }
+        if (!hasExplicitStep && typeof data?.step === 'number' && data.step >= 1 && data.step <= 4) {
+          setStep(data.step);
+          navigate(`/onboarding/${data.step}`, { replace: true });
+        }
+      } catch (error) {
+        // If status fails, keep default step and empty form
+      } finally {
+        setStatusLoaded(true);
+      }
+    };
+    loadStatus();
+  }, [user?.id, location.search, location.pathname, navigate]);
 
   // Get redirect parameter from URL
   const getRedirectPath = () => {
@@ -83,15 +115,19 @@ export const Onboarding: React.FC = () => {
   };
 
   const nextStep = () => {
-    if (step === 2 && !formData.name && !formData.company) {
+    if (step === 1 && (!formData.name || !formData.company)) {
       toast.error('Please fill in your name and company');
+      return;
+    }
+    if (step === 2 && !emailConnected) {
+      toast.error('Please connect Gmail or Outlook to continue');
       return;
     }
     // Preserve redirect parameter when moving to next step
     const redirectPath = getRedirectPath()
     const newStep = Math.min(step + 1, 4)
     if (redirectPath) {
-      navigate(`/onboarding-flow/${newStep}?redirect=${encodeURIComponent(redirectPath)}`, { replace: true })
+      navigate(`/onboarding/${newStep}?redirect=${encodeURIComponent(redirectPath)}`, { replace: true })
     } else {
       setStep(newStep)
     }
@@ -110,7 +146,7 @@ export const Onboarding: React.FC = () => {
     // Preserve redirect parameter through OAuth flow
     const redirectPath = getRedirectPath()
     const redirectParam = redirectPath ? `?redirect=${encodeURIComponent(redirectPath)}` : ''
-    const redirectUri = `${window.location.origin}/onboarding-flow/2${redirectParam}`
+    const redirectUri = `${window.location.origin}/onboarding/2${redirectParam}`
     try {
       const data = await apiClient.startGmailOAuth(redirectUri)
       if (data.url) {
@@ -125,9 +161,32 @@ export const Onboarding: React.FC = () => {
     }
   };
 
+  const handleOutlookAuth = async () => {
+    // Preserve redirect parameter through OAuth flow
+    const redirectPath = getRedirectPath()
+    const redirectParam = redirectPath ? `?redirect=${encodeURIComponent(redirectPath)}` : ''
+    const redirectUri = `${window.location.origin}/onboarding/2${redirectParam}`
+    try {
+      const data = await apiClient.startOutlookOAuth(redirectUri)
+      if (data.url) {
+        toast.loading('Redirecting to Outlook...', { id: 'oauth-redirect' })
+        window.location.href = data.url
+      } else {
+        toast.error(data.error || 'Failed to connect to Outlook OAuth')
+      }
+    } catch (error) {
+      console.error('OAuth error:', error)
+      toast.error('Failed to connect to Outlook OAuth')
+    }
+  };
+
   const handleSubmit = async () => {
     if (!formData.name || !formData.company) {
       toast.error('Please fill in required fields');
+      return;
+    }
+    if (!emailConnected) {
+      toast.error('Please connect Gmail or Outlook to continue');
       return;
     }
 
@@ -275,7 +334,7 @@ export const Onboarding: React.FC = () => {
                   Connect Your Email
                 </h2>
                 <p className="text-lg text-gray-600 dark:text-gray-300">
-                  This is the foundation of your automation
+                  Connect Gmail or Outlook to enable automation
                 </p>
             </div>
             
@@ -306,7 +365,7 @@ export const Onboarding: React.FC = () => {
 
               {!emailConnected && !checkingEmail && (
                 <>
-            <div className="space-y-4">
+                  <div className="space-y-4">
                     <div className="p-6 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-brand-primary dark:hover:border-brand-primary transition-all bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900">
                       <div className="flex items-start justify-between mb-4">
                         <div>
@@ -326,23 +385,67 @@ export const Onboarding: React.FC = () => {
                           </svg>
                         </div>
                       </div>
-                <button
-                  onClick={handleGoogleAuth}
+                      <button
+                        onClick={handleGoogleAuth}
                         className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
-                >
+                      >
                         <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                    <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                  </svg>
-                  Connect Gmail
-                </button>
-              </div>
+                          <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                          <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                          <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                          <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                        </svg>
+                        Connect Gmail
+                      </button>
+                    </div>
+
+                    <div className="p-6 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-brand-primary dark:hover:border-brand-primary transition-all bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900">
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <h3 className="font-semibold text-gray-900 dark:text-white text-lg mb-2">
+                            Outlook / Microsoft 365
+                          </h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Connect your Outlook account to enable email automation, lead capture, and AI-powered responses.
+                          </p>
+                        </div>
+                        <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <Mail className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleOutlookAuth}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+                      >
+                        Connect Outlook
+                      </button>
+                    </div>
+
+                    <div className="p-6 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-brand-primary dark:hover:border-brand-primary transition-all bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900">
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <h3 className="font-semibold text-gray-900 dark:text-white text-lg mb-2">
+                            IMAP / SMTP (Advanced)
+                          </h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            For iCloud, Yahoo, or other legacy providers. Setup requires server and app password.
+                          </p>
+                        </div>
+                        <div className="w-12 h-12 bg-gray-100 dark:bg-gray-900/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <Mail className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => toast.error('IMAP/SMTP setup will be available next.')}
+                        className="w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+                      >
+                        Configure IMAP/SMTP
+                      </button>
+                    </div>
 
                     <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border border-yellow-200 dark:border-yellow-800">
                       <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                        <strong>Note:</strong> Email connection is required for Fikiri to work. Without it, you won't be able to automate emails, capture leads, or use AI responses.
+                        <strong>Note:</strong> Email connection is required to continue onboarding. Choose Gmail or Outlook.
                       </p>
                     </div>
                   </div>
@@ -356,9 +459,10 @@ export const Onboarding: React.FC = () => {
                     </button>
                     <button
                       onClick={nextStep}
-                      className="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-xl transition-all font-medium"
+                      disabled={!emailConnected}
+                      className="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-xl transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Skip for now
+                      Continue
                     </button>
                   </div>
                 </>

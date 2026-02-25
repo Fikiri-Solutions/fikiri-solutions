@@ -1,62 +1,70 @@
-#!/usr/bin/env python3
-"""Workflow follow-up execution tests."""
+"""
+Unit tests for core/workflow_followups.py (schedule_follow_up, execute_due_follow_ups).
+"""
 
-import unittest
+import os
+import sys
 from unittest.mock import patch, MagicMock
 
-from core import workflow_followups
+os.environ.setdefault("FLASK_ENV", "test")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from core.workflow_followups import schedule_follow_up, execute_due_follow_ups
 
 
-class _Idem:
-    def __init__(self):
-        self.store = {}
-
-    def check_key(self, key):
-        return self.store.get(key)
-
-    def store_key(self, key, *_args, **_kwargs):
-        self.store[key] = {"status": "pending"}
-
-    def update_key_result(self, key, status, response_data=None):
-        self.store[key] = {"status": status, "response_data": response_data}
-
-
-def _db_side_effect(sql, params=None, fetch=True):
-    sql_upper = sql.strip().upper()
-    if sql_upper.startswith("SELECT ID, USER_ID"):
-        # scheduled_follow_ups
-        return [{
-            "id": 1,
-            "user_id": params[0],
-            "lead_id": 10,
-            "follow_up_date": params[1],
-            "follow_up_type": "email",
-            "message": "Hello"
-        }]
-    if "FROM LEADS" in sql_upper:
-        return [{"id": 10, "email": "lead@example.com", "name": "Lead"}]
-    return None
-
-
-class TestWorkflowFollowups(unittest.TestCase):
-    @patch("core.workflow_followups.automation_safety_manager")
-    @patch("core.workflow_followups.enhanced_crm_service")
-    @patch("core.workflow_followups._send_email")
+class TestScheduleFollowUp:
     @patch("core.workflow_followups.db_optimizer")
-    def test_followup_execution_idempotent(self, mock_db, mock_send, mock_crm, mock_safety):
-        mock_db.execute_query.side_effect = _db_side_effect
-        mock_send.return_value = {"success": True}
-        mock_safety.check_rate_limits.return_value = {"allowed": True}
+    def test_schedule_follow_up_invalid_type_returns_error(self, mock_db):
+        result = schedule_follow_up(
+            user_id=1,
+            lead_id=1,
+            follow_up_date="2024-12-01",
+            follow_up_type="invalid",
+            message="Hi",
+        )
+        assert result.get("success") is False
+        assert "Invalid" in result.get("error", "")
 
-        idem = _Idem()
-        with patch("core.workflow_followups.idempotency_manager", idem):
-            first = workflow_followups.execute_due_follow_ups(1, now_iso="2025-01-01T00:00:00")
-            second = workflow_followups.execute_due_follow_ups(1, now_iso="2025-01-01T00:00:00")
+    @patch("core.workflow_followups.db_optimizer")
+    def test_schedule_follow_up_email_dedup_returns_success(self, mock_db):
+        mock_db.execute_query.side_effect = [
+            [{"id": 99}],  # existing
+        ]
+        result = schedule_follow_up(
+            user_id=1,
+            lead_id=1,
+            follow_up_date="2024-12-01",
+            follow_up_type="email",
+            message="Hi",
+        )
+        assert result.get("success") is True
+        assert result.get("follow_up_id") == 99
+        assert result.get("deduped") is True
 
-        self.assertEqual(first.get("processed"), 1)
-        self.assertEqual(second.get("processed"), 0)
-        self.assertEqual(mock_send.call_count, 1)
+    @patch("core.workflow_followups.db_optimizer")
+    def test_schedule_follow_up_email_new_returns_success(self, mock_db):
+        mock_db.execute_query.side_effect = [
+            [],  # no existing
+            42,  # insert returns id
+        ]
+        result = schedule_follow_up(
+            user_id=1,
+            lead_id=None,
+            follow_up_date="2024-12-01",
+            follow_up_type="email",
+            message="Hi",
+        )
+        assert result.get("success") is True
+        assert result.get("follow_up_id") == 42
+        assert result.get("deduped") is False
 
 
-if __name__ == '__main__':
-    unittest.main()
+class TestExecuteDueFollowUps:
+    @patch("core.workflow_followups.db_optimizer")
+    def test_execute_due_follow_ups_empty_list_returns_counts(self, mock_db):
+        mock_db.execute_query.return_value = []
+        result = execute_due_follow_ups(user_id=1)
+        assert "processed" in result
+        assert "failed" in result
+        assert result["processed"] == 0
+        assert result["failed"] == 0

@@ -276,7 +276,9 @@ class IMAPProvider(EmailServiceProvider):
         self.smtp_port = config.get('smtp_port', 587)
         self.username = config.get('username')
         self.password = config.get('password')
-        self.use_ssl = config.get('use_ssl', True)
+        self.imap_ssl = config.get('imap_ssl', config.get('use_ssl', True))
+        self.smtp_ssl = config.get('smtp_ssl', False)
+        self.smtp_tls = config.get('smtp_tls', True)
     
     def authenticate(self) -> bool:
         """Authenticate with IMAP server."""
@@ -284,7 +286,7 @@ class IMAPProvider(EmailServiceProvider):
             return False
         
         try:
-            if self.use_ssl:
+            if self.imap_ssl:
                 self.imap_conn = imaplib.IMAP4_SSL(self.imap_server, self.imap_port)
             else:
                 self.imap_conn = imaplib.IMAP4(self.imap_server, self.imap_port)
@@ -348,11 +350,12 @@ class IMAPProvider(EmailServiceProvider):
             msg['Subject'] = subject
             msg.attach(MIMEText(body, 'plain'))
             
-            if self.use_ssl:
+            if self.smtp_ssl:
                 server = smtplib.SMTP_SSL(self.smtp_server, self.smtp_port)
             else:
                 server = smtplib.SMTP(self.smtp_server, self.smtp_port)
-                server.starttls()
+                if self.smtp_tls:
+                    server.starttls()
             
             server.login(self.username, self.password)
             server.send_message(msg)

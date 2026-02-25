@@ -110,24 +110,19 @@ class MinimalVectorSearch:
             
             self.pinecone_index = self.pinecone_client.Index(index_name)
             self.use_pinecone = True
-            
-            # Get actual dimension from existing index if we didn't set it
-            if not hasattr(self, 'dimension') or self.dimension is None:
-                try:
-                    index_stats = self.pinecone_index.describe_index_stats()
-                    # Try to get dimension from index info
-                    index_info = self.pinecone_client.describe_index(index_name)
-                    if hasattr(index_info, 'dimension'):
-                        self.dimension = index_info.dimension
-                    else:
-                        self.dimension = 384  # Default fallback
-                except:
-                    self.dimension = 384  # Default fallback
-            # If index already exists, trust its dimension
+
+            # Always trust the actual index dimension if available
+            try:
+                index_info = self.pinecone_client.describe_index(index_name)
+                if hasattr(index_info, 'dimension') and index_info.dimension:
+                    self.dimension = index_info.dimension
+            except Exception as index_error:
+                logger.warning("Failed to read Pinecone index dimension: %s", index_error)
+
             if self.use_pinecone and self.dimension:
                 self.pinecone_dimension = self.dimension
                 logger.info(f"ℹ️ Pinecone index dimension detected: {self.dimension}")
-            
+
             logger.info(f"✅ Pinecone initialized: {index_name} (dimension: {self.dimension})")
         except ImportError:
             logger.info("ℹ️ Pinecone SDK not installed, using local storage")
@@ -252,6 +247,53 @@ class MinimalVectorSearch:
             return self._add_document_pinecone(text, metadata)
         else:
             return self._add_document_local(text, metadata)
+
+    def upsert_document(self, vector_id: str, text: str, metadata: Dict[str, Any] = None) -> bool:
+        """Insert or replace a vector by id. Use for revectorize so the same doc id overwrites (e.g. after dimension change)."""
+        if self.use_pinecone:
+            return self._upsert_document_pinecone(vector_id, text, metadata)
+        return self._upsert_document_local(vector_id, text, metadata)
+
+    def _upsert_document_pinecone(self, vector_id: str, text: str, metadata: Dict[str, Any] = None) -> bool:
+        """Upsert one vector with the given id (replaces existing with same id)."""
+        try:
+            embedding = self._normalize_vector(self._generate_embedding(text))
+            enhanced_metadata = {
+                'text': text,
+                'created_at': datetime.now(timezone.utc).isoformat(),
+                'embedding_model': self.embedding_model,
+                **(metadata or {})
+            }
+            self.pinecone_index.upsert(vectors=[(vector_id, embedding, enhanced_metadata)])
+            return True
+        except Exception as e:
+            logger.error("Pinecone upsert failed: %s", e)
+            return False
+
+    def _upsert_document_local(self, vector_id: str, text: str, metadata: Dict[str, Any] = None) -> bool:
+        """Update existing vector with metadata.document_id == vector_id, or append new."""
+        try:
+            for i, meta in enumerate(self.metadata):
+                if isinstance(meta, dict) and meta.get('document_id') == vector_id:
+                    embedding = self._normalize_vector(self._generate_embedding(text))
+                    self.vectors[i] = embedding
+                    self.documents[i] = text
+                    self.metadata[i].update(metadata or {})
+                    self.metadata[i]['updated_at'] = datetime.now(timezone.utc).isoformat()
+                    return True
+            embedding = self._normalize_vector(self._generate_embedding(text))
+            self.vectors.append(embedding)
+            self.documents.append(text)
+            self.metadata.append({
+                'created_at': datetime.now(timezone.utc).isoformat(),
+                'embedding_model': self.embedding_model,
+                'document_id': vector_id,
+                **(metadata or {})
+            })
+            return True
+        except Exception as e:
+            logger.error("Local upsert failed: %s", e)
+            return False
     
     def _add_document_local(self, text: str, metadata: Dict[str, Any] = None) -> int:
         """Add a document to local vector database."""
@@ -344,16 +386,56 @@ class MinimalVectorSearch:
         except Exception as e:
             logger.error(f"❌ Error deleting document: {e}")
             return False
-    
-    def search_similar(self, query: str, top_k: int = 5, threshold: float = 0.7) -> List[Dict[str, Any]]:
-        """Search for similar documents (Pinecone or local)."""
+
+    def delete_document_by_id(self, vector_id: str) -> bool:
+        """Delete a vector by its id (Pinecone id or local metadata document_id)."""
         if self.use_pinecone:
-            return self._search_similar_pinecone(query, top_k, threshold)
-        else:
-            return self._search_similar_local(query, top_k, threshold)
+            try:
+                self.pinecone_index.delete(ids=[vector_id])
+                return True
+            except Exception as e:
+                logger.error("Pinecone delete by id failed: %s", e)
+                return False
+        try:
+            for i, meta in enumerate(self.metadata):
+                if isinstance(meta, dict) and meta.get("document_id") == vector_id:
+                    del self.vectors[i]
+                    del self.documents[i]
+                    del self.metadata[i]
+                    return True
+            return False
+        except Exception as e:
+            logger.error("Local delete by id failed: %s", e)
+            return False
     
-    def _search_similar_local(self, query: str, top_k: int = 5, threshold: float = 0.7) -> List[Dict[str, Any]]:
-        """Search for similar documents - optimized with heap for top-k."""
+    def search_similar(self, query: str, top_k: int = 5, threshold: float = 0.7, 
+                       tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Search for similar documents (Pinecone or local).
+        
+        Args:
+            query: Search query text
+            top_k: Number of results to return
+            threshold: Minimum similarity score (0.0-1.0)
+            tenant_id: Optional tenant ID to filter results (for multi-tenant isolation)
+        
+        Returns:
+            List of similar documents with metadata
+        """
+        if self.use_pinecone:
+            return self._search_similar_pinecone(query, top_k, threshold, tenant_id)
+        else:
+            return self._search_similar_local(query, top_k, threshold, tenant_id)
+    
+    def _search_similar_local(self, query: str, top_k: int = 5, threshold: float = 0.7,
+                              tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Search for similar documents - optimized with heap for top-k.
+        
+        Args:
+            query: Search query text
+            top_k: Number of results to return
+            threshold: Minimum similarity score (0.0-1.0)
+            tenant_id: Optional tenant ID to filter results (for multi-tenant isolation)
+        """
         try:
             if not self.vectors:
                 logger.warning("⚠️ No vectors in database")
@@ -369,6 +451,12 @@ class MinimalVectorSearch:
             
             # Calculate similarities - single pass O(n)
             for i, vector in enumerate(self.vectors):
+                # Tenant isolation: filter by tenant_id if provided
+                if tenant_id is not None:
+                    doc_tenant_id = self.metadata[i].get('tenant_id') if i < len(self.metadata) else None
+                    if doc_tenant_id != tenant_id:
+                        continue  # Skip documents from other tenants
+                
                 similarity = self._cosine_similarity(query_embedding, vector)
                 if similarity >= threshold:
                     # Use negative similarity for min-heap (we want max)
@@ -398,10 +486,29 @@ class MinimalVectorSearch:
             logger.error(f"❌ Error searching: {e}")
             return []
     
-    def _search_similar_pinecone(self, query: str, top_k: int = 5, threshold: float = 0.7) -> List[Dict[str, Any]]:
-        """Search for similar documents in Pinecone."""
+    def _search_similar_pinecone(self, query: str, top_k: int = 5, threshold: float = 0.7,
+                                  tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Search for similar documents in Pinecone.
+        
+        Args:
+            query: Search query text
+            top_k: Number of results to return
+            threshold: Minimum similarity score (0.0-1.0)
+            tenant_id: Optional tenant ID to filter results (for multi-tenant isolation)
+        """
         query_embedding = self._normalize_vector(self._generate_embedding(query))
-        results = self.pinecone_index.query(vector=query_embedding, top_k=top_k, include_metadata=True)
+        
+        # Build Pinecone filter for tenant isolation
+        filter_dict = None
+        if tenant_id is not None:
+            filter_dict = {'tenant_id': tenant_id}
+        
+        results = self.pinecone_index.query(
+            vector=query_embedding, 
+            top_k=top_k, 
+            include_metadata=True,
+            filter=filter_dict
+        )
         
         return [
             {
@@ -413,17 +520,25 @@ class MinimalVectorSearch:
             for match in results.matches if match.score >= threshold
         ]
     
-    async def search_similar_async(self, query: str, top_k: int = 5, threshold: float = 0.7) -> List[Dict[str, Any]]:
+    async def search_similar_async(self, query: str, top_k: int = 5, threshold: float = 0.7,
+                                    tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Async version of search_similar for FastAPI compatibility."""
         # Run the synchronous method in a thread pool
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self.search_similar, query, top_k, threshold)
+        return await loop.run_in_executor(None, self.search_similar, query, top_k, threshold, tenant_id)
     
-    def get_context_for_rag(self, query: str, max_context_length: int = 1000) -> str:
-        """Get context for RAG (Retrieval-Augmented Generation)."""
+    def get_context_for_rag(self, query: str, max_context_length: int = 1000, 
+                            tenant_id: Optional[str] = None) -> str:
+        """Get context for RAG (Retrieval-Augmented Generation).
+        
+        Args:
+            query: Search query text
+            max_context_length: Maximum length of context string
+            tenant_id: Optional tenant ID to filter results (for multi-tenant isolation)
+        """
         try:
             # Search for relevant documents
-            results = self.search_similar(query, top_k=3, threshold=0.6)
+            results = self.search_similar(query, top_k=3, threshold=0.6, tenant_id=tenant_id)
             
             if not results:
                 return "No relevant context found."
@@ -640,6 +755,19 @@ class MinimalVectorSearch:
 def create_vector_search(vector_db_path: str = "data/vector_db.pkl", services: Dict[str, Any] = None) -> MinimalVectorSearch:
     """Create and return a vector search instance."""
     return MinimalVectorSearch(vector_db_path, services)
+
+
+_vector_search_singleton: Optional[MinimalVectorSearch] = None
+
+
+def get_vector_search() -> MinimalVectorSearch:
+    """Lazy singleton for use by KB and other modules (avoids circular import from chatbot_smart_faq_api)."""
+    global _vector_search_singleton
+    if _vector_search_singleton is None:
+        _vector_search_singleton = MinimalVectorSearch()
+        logger.info("Vector search singleton initialized (first use)")
+    return _vector_search_singleton
+
 
 if __name__ == "__main__":
     # Test the vector search service

@@ -1,8 +1,10 @@
 import React from 'react';
 import { VerticalLanding } from '../components/VerticalLanding';
+import { PublicChatbotWidget } from '../components/PublicChatbotWidget';
 
 export const RestaurantLanding: React.FC = () => {
   return (
+    <>
     <VerticalLanding
       industry="restaurant"
       title="Restaurant Automation Platform"
@@ -64,5 +66,7 @@ export const RestaurantLanding: React.FC = () => {
       ctaText="Boost Your Restaurant Revenue"
       ctaLink="/signup?industry=restaurant"
     />
+    <PublicChatbotWidget />
+    </>
   );
 };
