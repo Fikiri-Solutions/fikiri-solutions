@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   Container,
   Button,
@@ -38,22 +39,56 @@ function Hero() {
   )
 }
 
+const previewTabs = [
+  { key: 'dashboard', label: 'Dashboard', src: '/img/previews/dashboard-preview.webp', fallback: '/img/previews/dashboard-preview.png' },
+  { key: 'crm',       label: 'CRM',       src: '/img/previews/crm-preview.webp',       fallback: '/img/previews/crm-preview.png' },
+  { key: 'automations', label: 'Automations', src: '/img/previews/automations-preview.webp', fallback: '/img/previews/automations-preview.png' },
+] as const
+
 function FeatureSection() {
+  const [active, setActive] = useState(0)
+  const current = previewTabs[active]
+
   return (
     <div className="overflow-hidden">
       <Container className="pb-24">
         <Heading as="h2" className="max-w-3xl">
           One place for email, CRM, and scheduling.
         </Heading>
-        <div className="mt-10 sm:mt-16 flex justify-center">
-          <div className="relative h-48 sm:h-64 md:h-80 w-full max-w-4xl overflow-hidden rounded-2xl shadow-lg ring-1 ring-border">
-            <Gradient className="absolute inset-0" />
-            <div className="absolute inset-2 rounded-xl bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-lg font-medium text-muted-foreground">
-                Dashboard preview
-              </span>
-            </div>
+
+        {/* Tab bar */}
+        <div className="mt-8 sm:mt-12 flex justify-center gap-2">
+          {previewTabs.map((tab, i) => (
+            <button
+              key={tab.key}
+              onClick={() => setActive(i)}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                i === active
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Screenshot */}
+        <div className="mt-6 sm:mt-10 flex justify-center">
+          <div className="relative w-full max-w-5xl overflow-hidden rounded-2xl shadow-xl ring-1 ring-border">
+            <Gradient className="absolute inset-0 pointer-events-none" />
+            <picture>
+              <source srcSet={current.src} type="image/webp" />
+              <img
+                src={current.fallback}
+                alt={`${current.label} preview`}
+                width={1280}
+                height={800}
+                className="relative block w-full h-auto"
+                loading="lazy"
+                decoding="async"
+              />
+            </picture>
           </div>
         </div>
       </Container>
