@@ -1,0 +1,120 @@
+{% comment %}
+  Fikiri Lead Capture Form for Shopify
+  Add this to your contact page template (page.contact.liquid)
+  
+  Instructions:
+  1. Replace 'fik_your_api_key_here' with your actual Fikiri API key
+  2. Customize form fields and styling as needed
+  3. Save and preview
+{% endcomment %}
+
+<div class="fikiri-contact-form" style="max-width: 600px; margin: 40px auto; padding: 20px;">
+  <h2>{{ page.title }}</h2>
+  
+  <form id="fikiri-contact-form">
+    <div style="margin-bottom: 15px;">
+      <label for="contact-name" style="display: block; margin-bottom: 5px; font-weight: bold;">
+        Name <span style="color: red;">*</span>
+      </label>
+      <input 
+        type="text" 
+        id="contact-name" 
+        name="name" 
+        required 
+        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;"
+      >
+    </div>
+    
+    <div style="margin-bottom: 15px;">
+      <label for="contact-email" style="display: block; margin-bottom: 5px; font-weight: bold;">
+        Email <span style="color: red;">*</span>
+      </label>
+      <input 
+        type="email" 
+        id="contact-email" 
+        name="email" 
+        required 
+        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;"
+      >
+    </div>
+    
+    <div style="margin-bottom: 15px;">
+      <label for="contact-phone" style="display: block; margin-bottom: 5px; font-weight: bold;">
+        Phone
+      </label>
+      <input 
+        type="tel" 
+        id="contact-phone" 
+        name="phone" 
+        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;"
+      >
+    </div>
+    
+    <div style="margin-bottom: 15px;">
+      <label for="contact-message" style="display: block; margin-bottom: 5px; font-weight: bold;">
+        Message <span style="color: red;">*</span>
+      </label>
+      <textarea 
+        id="contact-message" 
+        name="message" 
+        rows="5" 
+        required 
+        style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;"
+      ></textarea>
+    </div>
+    
+    <button 
+      type="submit" 
+      style="width: 100%; padding: 12px; background: #0f766e; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer;"
+    >
+      Send Message
+    </button>
+    
+    <div id="fikiri-form-message" style="margin-top: 15px;"></div>
+  </form>
+</div>
+
+<script src="https://cdn.fikirisolutions.com/sdk/v1/fikiri-sdk.js"></script>
+<script>
+  (function() {
+    // Initialize Fikiri SDK
+    Fikiri.init({
+      apiKey: 'fik_your_api_key_here'
+    });
+    
+    // Handle form submission
+    document.getElementById('fikiri-contact-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      var formData = new FormData(this);
+      var messageDiv = document.getElementById('fikiri-form-message');
+      messageDiv.innerHTML = '<p style="color: #666;">Sending...</p>';
+      
+      // Submit form data to Fikiri
+      Fikiri.Forms.submit({
+        form_id: 'shopify_contact_form',
+        fields: {
+          email: formData.get('email'),
+          name: formData.get('name'),
+          phone: formData.get('phone'),
+          message: formData.get('message')
+        },
+        source: 'shopify_contact_page',
+        metadata: {
+          page_url: window.location.href,
+          shop_domain: '{{ shop.domain }}',
+          shop_name: '{{ shop.name }}'
+        }
+      }).then(function(result) {
+        if (result.success) {
+          messageDiv.innerHTML = '<p style="color: green; font-weight: bold;">Thank you! We\'ll be in touch soon.</p>';
+          this.reset();
+        } else {
+          messageDiv.innerHTML = '<p style="color: red;">Error: ' + (result.error || 'Unknown error') + '</p>';
+        }
+      }.bind(this)).catch(function(error) {
+        messageDiv.innerHTML = '<p style="color: red;">Error submitting form. Please try again.</p>';
+      });
+    });
+  })();
+</script>

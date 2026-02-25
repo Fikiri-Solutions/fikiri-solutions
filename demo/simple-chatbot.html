@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fikiri Simple Chatbot</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .chat-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        .messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #fafafa;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 10px 15px;
+            border-radius: 8px;
+            max-width: 70%;
+        }
+        .message.user {
+            background: #0f766e;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+        .message.bot {
+            background: #e0e0e0;
+            color: #333;
+        }
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+        .input-area input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .input-area button {
+            padding: 12px 24px;
+            background: #0f766e;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .input-area button:hover {
+            background: #14b8a6;
+        }
+        .setup {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .setup input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .setup button {
+            background: #ffc107;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <h1>🤖 Fikiri Chatbot</h1>
+        
+        <div class="setup" id="setup">
+            <h3>Setup</h3>
+            <p>Enter your API key to start:</p>
+            <input type="text" id="api-key" placeholder="fik_your_api_key_here">
+            <button onclick="init()">Start Chat</button>
+        </div>
+
+        <div class="messages" id="messages">
+            <div class="message bot">👋 Hello! Enter your API key above to start chatting.</div>
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="input" placeholder="Type your message..." disabled>
+            <button onclick="send()" id="send-btn" disabled>Send</button>
+        </div>
+    </div>
+
+    <script src="../integrations/universal/fikiri-sdk.js"></script>
+    <script>
+        let conversationId = null;
+
+        function init() {
+            const apiKey = document.getElementById('api-key').value.trim();
+            if (!apiKey) {
+                alert('Please enter an API key');
+                return;
+            }
+
+            Fikiri.init({
+                apiKey: apiKey,
+                apiUrl: window.location.origin,
+                features: ['chatbot']
+            });
+
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('input').disabled = false;
+            document.getElementById('send-btn').disabled = false;
+            addMessage('bot', '✅ Ready! How can I help you?');
+            conversationId = 'chat_' + Date.now();
+        }
+
+        async function send() {
+            const input = document.getElementById('input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            addMessage('user', message);
+            input.value = '';
+            input.disabled = true;
+
+            const loadingId = addMessage('bot', '...');
+
+            try {
+                const response = await Fikiri.Chatbot.query(message, {
+                    conversationId: conversationId
+                });
+
+                removeMessage(loadingId);
+
+                if (response.success) {
+                    addMessage('bot', response.response || response.answer || 'Got it!');
+                    if (response.conversation_id) {
+                        conversationId = response.conversation_id;
+                    }
+                } else {
+                    addMessage('bot', 'Error: ' + (response.error || 'Unknown error'));
+                }
+            } catch (error) {
+                removeMessage(loadingId);
+                addMessage('bot', 'Error: ' + error.message);
+            }
+
+            input.disabled = false;
+            input.focus();
+        }
+
+        function addMessage(type, text) {
+            const messages = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = `message ${type}`;
+            div.textContent = text;
+            div.id = 'msg_' + Date.now();
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+            return div.id;
+        }
+
+        function removeMessage(id) {
+            document.getElementById(id)?.remove();
+        }
+
+        document.getElementById('input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') send();
+        });
+    </script>
+</body>
+</html>

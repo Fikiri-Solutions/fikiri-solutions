@@ -1,0 +1,34 @@
+# Codex Initialization Prompt
+# Copy-paste this at the start of each Codex session
+
+I'm working on the Fikiri Solutions codebase. 
+
+CRITICAL: Please read these files first (I need you to explicitly read them):
+1. .cursorrules - Main rulepack (architecture, security, performance rules)
+2. COORDINATION.md - Multi-tool coordination (Cursor + Codex)
+3. SIMPLICITY_RULE.md - Code simplicity guidelines
+4. docs/SYSTEM_ARCHITECTURE.md - System architecture overview
+
+After reading, please verify access:
+1. Run: git status (to see recent changes)
+2. Read: core/minimal_config.py (to verify file access)
+
+Key rules from .cursorrules:
+- Check git status before editing
+- Follow .cursorrules guidelines
+- Coordinate with Cursor on API changes
+- Minimal scope changes (1-3 files per task)
+- Preserve existing patterns
+
+Domain boundaries:
+- core/ → shared utilities
+- services/ → business logic
+- integrations/ → external connectors
+- crm/ → CRM (crm/service.py canonical)
+- email_automation/ → email pipeline
+- frontend/ → React app
+
+Before making any changes, always:
+1. Run: git status
+2. Read the file(s) you'll edit
+3. Follow existing patterns

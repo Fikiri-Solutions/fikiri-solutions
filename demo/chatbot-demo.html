@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fikiri Chatbot Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .demo-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 1200px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .demo-header {
+            background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .demo-header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .demo-header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .demo-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+        }
+
+        .demo-info {
+            padding: 40px;
+            background: #f8fafc;
+        }
+
+        .demo-info h2 {
+            color: #0f766e;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+
+        .demo-info ul {
+            list-style: none;
+            margin: 20px 0;
+        }
+
+        .demo-info li {
+            padding: 10px 0;
+            padding-left: 30px;
+            position: relative;
+        }
+
+        .demo-info li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #14b8a6;
+            font-weight: bold;
+        }
+
+        .suggestion-btn {
+            background: transparent;
+            border: none;
+            color: #0369a1;
+            cursor: pointer;
+            font-size: 1em;
+            padding: 6px 0;
+            text-align: left;
+            text-decoration: underline;
+        }
+        .suggestion-btn:hover {
+            color: #0c4a6e;
+        }
+
+        .chatbot-container {
+            padding: 40px;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+        }
+
+        .chatbot-header {
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        .chatbot-header h3 {
+            color: #0f766e;
+            font-size: 1.5em;
+        }
+
+        .chatbot-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 12px 18px;
+            border-radius: 18px;
+            word-wrap: break-word;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            background: #0f766e;
+            color: white;
+        }
+
+        .message.bot {
+            align-self: flex-start;
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+
+        .message.loading {
+            align-self: flex-start;
+            background: #f1f5f9;
+            color: #64748b;
+            font-style: italic;
+        }
+
+        .chatbot-input {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            border-top: 2px solid #e2e8f0;
+            padding-top: 20px;
+        }
+
+        .chatbot-input input {
+            flex: 1;
+            padding: 12px 18px;
+            border: 2px solid #e2e8f0;
+            border-radius: 25px;
+            font-size: 1em;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .chatbot-input input:focus {
+            border-color: #0f766e;
+        }
+
+        .chatbot-input button {
+            padding: 12px 30px;
+            background: #0f766e;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .chatbot-input button:hover {
+            background: #14b8a6;
+        }
+
+        .chatbot-input button:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .message-feedback {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #e2e8f0;
+        }
+        .message-feedback button {
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 0.75em;
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #475569;
+            cursor: pointer;
+        }
+        .message-feedback button:hover {
+            background: #f1f5f9;
+            border-color: #0f766e;
+            color: #0f766e;
+        }
+        .message-feedback button.sent {
+            opacity: 0.6;
+            cursor: default;
+        }
+        .demo-toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            background: #0f766e;
+            color: white;
+            border-radius: 20px;
+            font-size: 0.9em;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+        .demo-toast.show {
+            opacity: 1;
+        }
+
+        .setup-section {
+            background: #fef3c7;
+            border: 2px solid #fbbf24;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+
+        .setup-section h4 {
+            color: #92400e;
+            margin-bottom: 10px;
+        }
+
+        .setup-section input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #fbbf24;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
+        .setup-section button {
+            background: #f59e0b;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            .demo-content {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <div class="demo-header">
+            <h1>🤖 Fikiri Chatbot Demo</h1>
+            <p>AI-Powered Customer Support Chatbot</p>
+            <p style="margin-top: 8px; font-size: 0.95em; opacity: 0.9;"><a href="/demo/widget" style="color: white; text-decoration: underline;">Try the widget version</a> (floating popup)</p>
+        </div>
+
+        <div class="demo-content">
+            <div class="demo-info">
+                <h2>Features</h2>
+                <ul>
+                    <li>AI-powered responses using FAQ and Knowledge Base</li>
+                    <li>Multi-turn conversation context</li>
+                    <li>Lead capture integration</li>
+                    <li>Expert escalation when needed</li>
+                    <li>Feedback collection</li>
+                    <li>Real-time responses</li>
+                </ul>
+
+                <div class="setup-section">
+                    <h4>🔑 Setup</h4>
+                    <p>Enter your API key to connect to the real chatbot, or try demo mode to see the UI:</p>
+                    <input type="text" id="api-key-input" placeholder="Paste API key (starts with fik_)" autocomplete="off">
+                    <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
+                        <button onclick="initializeChatbot()">Connect with API Key</button>
+                        <button onclick="startDemoMode()" style="background: #64748b;">Try Demo Mode</button>
+                    </div>
+                    <p id="setup-status" style="margin-top: 10px; font-size: 0.9em;"></p>
+                </div>
+
+                <div class="setup-section" style="background:#ecfeff; border-color:#67e8f9;">
+                    <h4 style="color:#155e75;">📘 Add FAQ to Your Bot</h4>
+                    <p>Add a quick Q&A so the bot can answer real questions.</p>
+                    <input type="text" id="faq-question" placeholder="Question (e.g., What are your hours?)" autocomplete="off">
+                    <input type="text" id="faq-answer" placeholder="Answer" autocomplete="off">
+                    <input type="text" id="faq-category" placeholder="Category (optional, e.g., general)" autocomplete="off">
+                    <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+                        <button onclick="submitFaq()" style="background:#0891b2;">Add FAQ</button>
+                    </div>
+                    <p id="faq-status" style="margin-top: 10px; font-size: 0.9em;"></p>
+                </div>
+
+                <div style="margin-top: 30px; padding: 20px; background: #e0f2fe; border-radius: 10px;">
+                    <h4 style="color: #0369a1; margin-bottom: 10px;">💡 Try These Questions:</h4>
+                    <ul style="list-style: none; margin-left: 0; padding: 0; color: #0369a1;">
+                        <li><button type="button" class="suggestion-btn" onclick="sendSuggestion('What are your business hours?')">What are your business hours?</button></li>
+                        <li><button type="button" class="suggestion-btn" onclick="sendSuggestion('How do I get started?')">How do I get started?</button></li>
+                        <li><button type="button" class="suggestion-btn" onclick="sendSuggestion('Tell me about your pricing')">Tell me about your pricing</button></li>
+                        <li><button type="button" class="suggestion-btn" onclick="sendSuggestion('What services do you offer?')">What services do you offer?</button></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="chatbot-container">
+                <div class="chatbot-header">
+                    <h3>💬 Chat with Fikiri</h3>
+                </div>
+
+                <div class="chatbot-messages" id="chat-messages">
+                    <div class="message bot">
+                        👋 Hello! I'm Fikiri, your AI assistant. How can I help you today?
+                    </div>
+                </div>
+
+                <div class="chatbot-input">
+                    <input 
+                        type="text" 
+                        id="chat-input" 
+                        placeholder="Type your message..." 
+                        disabled
+                        onkeypress="if(event.key === 'Enter') sendMessage()"
+                    >
+                    <button id="send-button" onclick="sendMessage()" disabled>Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="demo-toast" id="demo-toast" aria-live="polite"></div>
+
+    <!-- Load Fikiri SDK -->
+    <script src="../integrations/universal/fikiri-sdk.js"></script>
+    
+    <script>
+        let conversationId = null;
+        let apiKeySet = false;
+        let demoMode = false;
+        let currentApiKey = null;
+        let apiBaseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+
+        function showToast(text) {
+            const el = document.getElementById('demo-toast');
+            if (!el) return;
+            el.textContent = text;
+            el.classList.add('show');
+            setTimeout(function() { el.classList.remove('show'); }, 2500);
+        }
+
+        function submitFeedback(question, answer, retrieved_doc_ids, rating, onSuccess) {
+            const payload = {
+                question: question,
+                answer: answer,
+                retrieved_doc_ids: Array.isArray(retrieved_doc_ids) ? retrieved_doc_ids : [],
+                rating: rating,
+                session_id: conversationId || undefined
+            };
+            fetch(apiBaseUrl + '/api/chatbot/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(function(res) {
+                if (res.ok && typeof onSuccess === 'function') onSuccess();
+            }).catch(function() {
+                /* non-blocking: no toast on failure */
+            });
+        }
+
+        function startDemoMode() {
+            apiKeySet = true;
+            demoMode = true;
+            apiBaseUrl = window.location.origin;
+            document.getElementById('chat-input').disabled = false;
+            document.getElementById('send-button').disabled = false;
+            document.getElementById('setup-status').textContent = '✅ Demo mode — try the chat! (Responses are simulated. Add an API key for real AI.)';
+            document.getElementById('setup-status').style.color = 'green';
+            conversationId = 'demo_' + Date.now();
+            addMessage('bot', '✅ Demo mode! I\'ll give sample answers. Add your API key above for real AI responses.');
+        }
+
+        function sendSuggestion(text) {
+            const input = document.getElementById('chat-input');
+            if (!apiKeySet) return;
+            input.value = text;
+            sendMessage();
+        }
+
+        function initializeChatbot() {
+            const apiKey = document.getElementById('api-key-input').value.trim();
+            const statusEl = document.getElementById('setup-status');
+
+            if (!apiKey) {
+                statusEl.textContent = '❌ Please enter an API key';
+                statusEl.style.color = 'red';
+                return;
+            }
+
+            if (!apiKey.startsWith('fik_')) {
+                statusEl.textContent = '⚠️ API key should start with "fik_"';
+                statusEl.style.color = 'orange';
+                return;
+            }
+
+            try {
+                // Initialize Fikiri SDK
+                Fikiri.init({
+                    apiKey: apiKey,
+                    apiUrl: window.location.origin, // Use current origin for demo
+                    features: ['chatbot', 'leadCapture'],
+                    debug: true
+                });
+
+                // Store SDK instance for query method
+                window.fikiriSDK = window.Fikiri;
+
+                apiKeySet = true;
+                demoMode = false;
+                currentApiKey = apiKey;
+                document.getElementById('chat-input').disabled = false;
+                document.getElementById('send-button').disabled = false;
+                statusEl.textContent = '✅ Chatbot initialized! You can start chatting.';
+                statusEl.style.color = 'green';
+                apiBaseUrl = window.location.origin;
+
+                // Generate conversation ID
+                conversationId = 'demo_' + Date.now();
+
+                addMessage('bot', '✅ Chatbot ready! How can I help you?');
+            } catch (error) {
+                statusEl.textContent = '❌ Error: ' + error.message;
+                statusEl.style.color = 'red';
+            }
+        }
+
+        async function submitFaq() {
+            const statusEl = document.getElementById('faq-status');
+            const question = document.getElementById('faq-question').value.trim();
+            const answer = document.getElementById('faq-answer').value.trim();
+            const category = document.getElementById('faq-category').value.trim() || 'general';
+
+            if (!apiKeySet || demoMode || !currentApiKey) {
+                statusEl.textContent = 'Connect with an API key to add FAQs.';
+                statusEl.style.color = 'red';
+                return;
+            }
+            if (!question || !answer) {
+                statusEl.textContent = 'Question and answer are required.';
+                statusEl.style.color = 'red';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/chatbot/knowledge/import', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': currentApiKey
+                    },
+                    body: JSON.stringify({
+                        question,
+                        answer,
+                        category
+                    })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    statusEl.textContent = '✅ FAQ added. The bot can now answer this.';
+                    statusEl.style.color = 'green';
+                    document.getElementById('faq-question').value = '';
+                    document.getElementById('faq-answer').value = '';
+                    document.getElementById('faq-category').value = '';
+                } else {
+                    statusEl.textContent = '❌ ' + (data.error || 'Failed to add FAQ');
+                    statusEl.style.color = 'red';
+                }
+            } catch (error) {
+                statusEl.textContent = '❌ ' + error.message;
+                statusEl.style.color = 'red';
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            const button = document.getElementById('send-button');
+
+            if (!message || !apiKeySet) return;
+
+            // Add user message
+            addMessage('user', message);
+            input.value = '';
+            button.disabled = true;
+
+            // Show loading
+            const loadingId = addMessage('loading', 'Thinking...');
+
+            try {
+                if (demoMode) {
+                    // Demo mode: simulated responses
+                    setTimeout(function() {
+                        removeMessage(loadingId);
+                        const reply = getDemoReply(message);
+                        addMessage('bot', reply, { question: message, answer: reply, retrieved_doc_ids: [] });
+                        button.disabled = false;
+                        input.focus();
+                    }, 800);
+                    return;
+                }
+
+                // Use Fikiri SDK to query chatbot
+                const response = await window.Fikiri.Chatbot.query(message, {
+                    conversationId: conversationId
+                });
+
+                removeMessage(loadingId);
+
+                if (response.success) {
+                    const answerText = response.response || response.answer || 'I received your message.';
+                    const docIds = Array.isArray(response.retrieved_doc_ids)
+                        ? response.retrieved_doc_ids.filter(Boolean)
+                        : (response.sources || []).map(function(s) { return s.id || s.document_id; }).filter(Boolean);
+                    addMessage('bot', answerText, {
+                        question: message,
+                        answer: answerText,
+                        retrieved_doc_ids: docIds
+                    });
+                    if (response.conversation_id) {
+                        conversationId = response.conversation_id;
+                    }
+                    if (response.sources && response.sources.length > 0) {
+                        const sourcesText = '📚 Sources: ' + response.sources.slice(0, 3).map(function(s) { return s.title || s.question || s.id; }).join(', ');
+                        addMessage('bot', sourcesText);
+                    }
+                } else {
+                    addMessage('bot', 'Sorry, I encountered an error: ' + (response.error || 'Unknown error'));
+                }
+            } catch (error) {
+                removeMessage(loadingId);
+                addMessage('bot', 'Error: ' + error.message);
+                console.error('Chatbot error:', error);
+            } finally {
+                if (!demoMode) {
+                    button.disabled = false;
+                    input.focus();
+                }
+            }
+        }
+
+        function getDemoReply(query) {
+            const q = (query || '').toLowerCase();
+            if (q.includes('hour') || q.includes('open') || q.includes('time')) {
+                return 'In demo mode: We\'re open Monday–Friday 9am–5pm EST. Add your API key for real answers from your FAQ.';
+            }
+            if (q.includes('pricing') || q.includes('price') || q.includes('cost') || q.includes('plan')) {
+                return 'In demo mode: Pricing depends on your plan. Check our pricing page or add your API key to get answers from your knowledge base.';
+            }
+            if (q.includes('start') || q.includes('get started')) {
+                return 'In demo mode: Sign up at our website and add your API key here to connect your own chatbot.';
+            }
+            if (q.includes('service') || q.includes('offer')) {
+                return 'In demo mode: We offer AI chatbot, lead capture, and CRM integration. Connect with an API key to use your own content.';
+            }
+            if (q.includes('hello') || q.includes('hi') || q.includes('hey')) {
+                return 'Hi! This is demo mode. Try asking about hours, pricing, or services — or add your API key for real AI responses.';
+            }
+            return 'Demo mode: I received "' + query + '". Add your API key above to get real AI answers from your FAQ and knowledge base.';
+        }
+
+        function addMessage(type, text, options) {
+            const messagesContainer = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = text;
+            messageDiv.id = 'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+            if (type === 'bot' && options && (options.question != null || options.answer != null)) {
+                const feedbackRow = document.createElement('div');
+                feedbackRow.className = 'message-feedback';
+                [
+                    { label: 'Correct', value: 'correct' },
+                    { label: 'Somewhat correct', value: 'somewhat_correct' },
+                    { label: 'Somewhat incorrect', value: 'somewhat_incorrect' },
+                    { label: 'Incorrect', value: 'incorrect' }
+                ].forEach(function(r) {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.textContent = r.label;
+                    btn.addEventListener('click', function() {
+                        if (btn.classList.contains('sent')) return;
+                        submitFeedback(options.question || '', options.answer || '', options.retrieved_doc_ids || [], r.value, function() {
+                            btn.classList.add('sent');
+                            showToast('Thanks for your feedback!');
+                        });
+                    });
+                    feedbackRow.appendChild(btn);
+                });
+                messageDiv.appendChild(feedbackRow);
+            }
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            return messageDiv.id;
+        }
+
+        function removeMessage(id) {
+            const msg = document.getElementById(id);
+            if (msg) {
+                msg.remove();
+            }
+        }
+
+        // Auto-focus input when ready
+        document.getElementById('api-key-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                initializeChatbot();
+            }
+        });
+    </script>
+</body>
+</html>

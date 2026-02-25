@@ -1,0 +1,28 @@
+{% comment %}
+  Fikiri Integration for Shopify Themes
+  Quick Start Example
+  
+  Instructions:
+  1. Copy this code
+  2. Go to Online Store → Themes → Edit code
+  3. Open theme.liquid
+  4. Paste before </head>
+  5. Replace 'fik_your_api_key_here' with your API key
+  6. Save and preview
+{% endcomment %}
+
+<script src="https://cdn.fikirisolutions.com/sdk/v1/fikiri-sdk.js"></script>
+<script>
+  Fikiri.init({
+    apiKey: 'fik_your_api_key_here',
+    features: ['chatbot', 'leadCapture']
+  });
+  
+  window.addEventListener('load', function() {
+    Fikiri.Chatbot.show({
+      theme: 'light',
+      position: 'bottom-right',
+      title: 'Need Help?'
+    });
+  });
+</script>
