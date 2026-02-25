@@ -92,6 +92,8 @@ data/learning_data/models/
 data/vector_db/
 *.csv
 *.json
+!frontend/package.json
+!frontend/package-lock.json
 
 # Docker
 .dockerignore

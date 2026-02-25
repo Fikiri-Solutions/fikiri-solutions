@@ -210,7 +210,7 @@ class APIHandler(ChannelHandler):
     
     def send_response(self, formatted_response: Dict[str, Any]) -> bool:
         # API responses are returned directly, not sent
-        logger.info(f"🔌 API response prepared: {response.response_type}")
+        logger.info(f"🔌 API response prepared: {formatted_response.get('response_type', '')}")
         return True
 
 class SlackHandler(ChannelHandler):

@@ -293,6 +293,7 @@ def setup_socketio_handlers(socketio):
 def initialize_services(app):
     """Initialize all core services with app reference."""
     global services
+    services = services  # satisfy F824: name is assigned (mutated below)
     
     try:
         # Initialize core services

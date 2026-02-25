@@ -99,11 +99,6 @@ def update_user_profile():
         # Validate allowed fields
         allowed_fields = ['name', 'business_name', 'business_email', 'industry', 'team_size', 'phone', 'sms_consent']
         update_data = {k: v for k, v in data.items() if k in allowed_fields}
-        
-        if not update_data and not metadata_updates:
-            return create_error_response("No valid fields to update", 400, 'NO_VALID_FIELDS')
-
-        # phone and sms_consent go into metadata; rest into columns
         metadata_updates = {}
         if 'phone' in update_data:
             metadata_updates['phone'] = (update_data.pop('phone') or '').strip() or None
@@ -111,6 +106,9 @@ def update_user_profile():
             metadata_updates['sms_consent'] = bool(update_data.get('sms_consent'))
             metadata_updates['sms_consent_at'] = datetime.utcnow().isoformat() + 'Z' if metadata_updates['sms_consent'] else None
             update_data.pop('sms_consent')
+
+        if not update_data and not metadata_updates:
+            return create_error_response("No valid fields to update", 400, 'NO_VALID_FIELDS')
 
         # Update user profile (columns + metadata)
         result = user_auth_manager.update_user_profile(

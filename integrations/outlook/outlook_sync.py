@@ -7,6 +7,7 @@ Production-ready Outlook email synchronization following Gmail patterns
 import os
 import json
 import logging
+import time
 import requests
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional

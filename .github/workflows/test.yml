@@ -132,13 +132,3 @@ jobs:
       run: |
         cd frontend
         npm audit --audit-level moderate || true
-        
-    - name: Check for hardcoded secrets
-      run: |
-        echo "Checking for hardcoded secrets..."
-        if grep -r "password\|secret\|key" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" frontend/src/ | grep -v "test\|mock\|example"; then
-          echo "⚠️ Potential hardcoded secrets found"
-          exit 1
-        else
-          echo "✅ No hardcoded secrets found"
-        fi

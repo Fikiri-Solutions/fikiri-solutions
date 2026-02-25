@@ -7,6 +7,7 @@ import os
 import json
 import logging
 import base64
+import io
 from typing import Dict, Any, List, Optional, Union
 from dataclasses import dataclass
 from datetime import datetime

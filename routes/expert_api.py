@@ -261,6 +261,7 @@ def add_question_to_kb(question_id):
     if not escalated:
         return create_error_response("Question not found", 404, 'QUESTION_NOT_FOUND')
     
+    tenant_id = getattr(escalated, 'tenant_id', None) or ''
     faq_id = None
     kb_document_id = None
     

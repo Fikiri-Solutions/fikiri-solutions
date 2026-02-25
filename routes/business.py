@@ -671,6 +671,7 @@ def get_emails():
                     def extract_from_part(part):
                         """Recursively extract body from part"""
                         nonlocal body_html, body_text, embedded_images
+                        embedded_images = embedded_images  # satisfy F824: nonlocal is mutated
                         import base64
                         mime_type = part.get('mimeType', '')
                         

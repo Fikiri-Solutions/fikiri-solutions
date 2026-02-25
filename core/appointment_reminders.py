@@ -8,7 +8,7 @@ import logging
 import hashlib
 import base64
 from datetime import datetime, timedelta, timezone
-from typing import List, Dict
+from typing import List, Dict, Any
 from core.database_optimization import db_optimizer
 from core.idempotency_manager import idempotency_manager
 from core.automation_safety import automation_safety_manager

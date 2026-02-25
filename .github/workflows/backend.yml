@@ -49,7 +49,7 @@ jobs:
         name: backend-coverage
 
   deploy-staging:
-    if: ${{ github.ref == 'refs/heads/develop' && secrets.RENDER_API_KEY != '' && secrets.RENDER_STAGING_SERVICE_ID != '' }}
+    if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     needs: test
     env:
@@ -77,7 +77,7 @@ jobs:
         fi
 
   deploy-production:
-    if: ${{ github.ref == 'refs/heads/main' && secrets.RENDER_API_KEY != '' && secrets.RENDER_PRODUCTION_SERVICE_ID != '' }}
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     needs: test
     env:
@@ -127,9 +127,11 @@ jobs:
         fi
 
   performance-test:
-    if: ${{ github.ref == 'refs/heads/main' && secrets.PERF_API_BASE_URL != '' }}
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     needs: deploy-production
+    env:
+      API_BASE_URL: ${{ secrets.PERF_API_BASE_URL }}
     
     steps:
     - uses: actions/checkout@v4
@@ -140,14 +142,12 @@ jobs:
         node-version: '20.18.2'  # Latest LTS with security patches
     
     - name: Install k6
-      run: |
-        sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
-        echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
-        sudo apt-get update
-        sudo apt-get install k6
+      uses: grafana/setup-k6-action@v1
     
     - name: Run performance tests
       run: |
-        k6 run scripts/k6-performance-test.js
-      env:
-        API_BASE_URL: ${{ secrets.PERF_API_BASE_URL }}
+        if [ -n "$API_BASE_URL" ]; then
+          k6 run scripts/k6-performance-test.js
+        else
+          echo "Skipping k6 (PERF_API_BASE_URL not set)"
+        fi

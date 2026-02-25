@@ -8,8 +8,11 @@ import unittest
 import os
 import time
 import threading
+import logging
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch, MagicMock
+
+logger = logging.getLogger(__name__)
 
 # Set test environment: valid Fernet key (32 bytes base64url)
 os.environ['FERNET_KEY'] = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='

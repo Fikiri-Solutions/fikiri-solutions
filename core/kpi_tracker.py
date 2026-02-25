@@ -781,7 +781,8 @@ class KPITracker:
         self,
         period_days: int,
         include_marketing: bool,
-        include_sales: bool
+        include_sales: bool,
+        require_actual_costs: bool = True,
     ) -> float:
         """
         Estimate customer acquisition costs

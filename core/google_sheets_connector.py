@@ -3,6 +3,8 @@ Google Sheets Connector for Fikiri Solutions
 Handles Google Sheets integration for lead logging and CRM data sync
 """
 
+import os
+import pickle
 import json
 import logging
 from typing import Dict, Any, List, Optional
@@ -72,7 +74,7 @@ class GoogleSheetsConnector:
                 
                 # Save credentials
                 with open(self.config.token_path, 'wb') as token:
-                    pickle.pickle(creds, token)
+                    pickle.dump(creds, token)
             
             # Build service
             self.service = build('sheets', 'v4', credentials=creds)
