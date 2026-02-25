@@ -37,7 +37,7 @@ jobs:
     - name: Run type checking
       run: |
         pip install mypy
-        mypy core/ app.py --ignore-missing-imports
+        mypy core/ app.py --ignore-missing-imports --explicit-package-bases --namespace-packages
     
     - name: Run tests
       run: |
