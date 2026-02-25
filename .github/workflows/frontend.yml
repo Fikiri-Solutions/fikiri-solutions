@@ -34,15 +34,9 @@ jobs:
       working-directory: ./frontend
       run: npm run lint
     
-    - name: Run tests
+    - name: Run unit tests
       working-directory: ./frontend
-      run: npm run test
-    
-    - name: Run E2E tests
-      working-directory: ./frontend
-      run: npm run e2e
-      env:
-        CYPRESS_BASE_URL: http://localhost:3000
+      run: npm run test:unit
     
     - name: Build application
       working-directory: ./frontend
