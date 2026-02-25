@@ -126,24 +126,44 @@ def update_user_profile():
                 request=request
             )
             u = result['user']
-            meta = getattr(u, 'metadata', None) or {}
-            user_payload = {
-                'id': u.id,
-                'email': u.email,
-                'name': u.name,
-                'role': getattr(u, 'role', 'user'),
-                'business_name': getattr(u, 'business_name', None),
-                'business_email': getattr(u, 'business_email', None),
-                'industry': getattr(u, 'industry', None),
-                'team_size': getattr(u, 'team_size', None),
-                'onboarding_completed': getattr(u, 'onboarding_completed', False),
-                'onboarding_step': getattr(u, 'onboarding_step', 0),
-                'created_at': u.created_at.isoformat() if hasattr(u.created_at, 'isoformat') else str(u.created_at),
-                'last_login': getattr(u, 'last_login', None),
-                'phone': meta.get('phone'),
-                'sms_consent': bool(meta.get('sms_consent')),
-                'sms_consent_at': meta.get('sms_consent_at'),
-            }
+            if isinstance(u, dict):
+                meta = u.get('metadata') or {}
+                user_payload = {
+                    'id': u.get('id'),
+                    'email': u.get('email'),
+                    'name': u.get('name'),
+                    'role': u.get('role', 'user'),
+                    'business_name': u.get('business_name'),
+                    'business_email': u.get('business_email'),
+                    'industry': u.get('industry'),
+                    'team_size': u.get('team_size'),
+                    'onboarding_completed': u.get('onboarding_completed', False),
+                    'onboarding_step': u.get('onboarding_step', 0),
+                    'created_at': u.get('created_at'),
+                    'last_login': u.get('last_login'),
+                    'phone': meta.get('phone'),
+                    'sms_consent': bool(meta.get('sms_consent')),
+                    'sms_consent_at': meta.get('sms_consent_at'),
+                }
+            else:
+                meta = getattr(u, 'metadata', None) or {}
+                user_payload = {
+                    'id': u.id,
+                    'email': u.email,
+                    'name': u.name,
+                    'role': getattr(u, 'role', 'user'),
+                    'business_name': getattr(u, 'business_name', None),
+                    'business_email': getattr(u, 'business_email', None),
+                    'industry': getattr(u, 'industry', None),
+                    'team_size': getattr(u, 'team_size', None),
+                    'onboarding_completed': getattr(u, 'onboarding_completed', False),
+                    'onboarding_step': getattr(u, 'onboarding_step', 0),
+                    'created_at': u.created_at.isoformat() if hasattr(u.created_at, 'isoformat') else str(u.created_at),
+                    'last_login': getattr(u, 'last_login', None),
+                    'phone': meta.get('phone'),
+                    'sms_consent': bool(meta.get('sms_consent')),
+                    'sms_consent_at': meta.get('sms_consent_at'),
+                }
             return create_success_response(
                 {'user': user_payload},
                 'Profile updated successfully'

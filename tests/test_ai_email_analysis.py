@@ -62,6 +62,8 @@ class TestAIEmailAnalysis(unittest.TestCase):
             'suggested_action': 'Review',
             'confidence': 0.9
         }
+        mock_ai.return_value.summarize_email.return_value = "Summary"
+        mock_ai.return_value.extract_contact_info.return_value = {"email": "a@example.com"}
 
         response = self.client.post('/api/ai/analyze-email', json={
             'content': 'hello world',

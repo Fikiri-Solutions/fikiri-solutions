@@ -644,6 +644,8 @@ class TestBusinessRoutes(unittest.TestCase):
             instance = mock_ai.return_value
             instance.is_enabled.return_value = True
             instance.classify_email_intent.return_value = {"intent": "inquiry", "urgency": "low", "suggested_action": "reply"}
+            instance.summarize_email.return_value = "Summary"
+            instance.extract_contact_info.return_value = {"email": "a@example.com"}
             response = self.client.post(
                 "/api/ai/analyze-email",
                 json={"content": "Hello", "subject": "Hi"},

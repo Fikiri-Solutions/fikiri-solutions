@@ -1245,7 +1245,7 @@ Need help setting up? Contact our landscaping specialists at landscaping@fikiris
             if vector_id is not None:
                 try:
                     vs = _get_vector_search()
-                    if getattr(vs, "use_pinecone", False):
+                    if getattr(vs, "use_pinecone", False) is True:
                         vs.upsert_document(str(vector_id), new_text, vector_meta)
                     else:
                         vs.update_document(int(vector_id), new_text, vector_meta)
@@ -1261,7 +1261,7 @@ Need help setting up? Contact our landscaping specialists at landscaping@fikiris
                         vector_meta["tenant_id"] = meta["tenant_id"]
                     if isinstance(meta, dict) and "user_id" in meta:
                         vector_meta["user_id"] = meta["user_id"]
-                    if getattr(vs, "use_pinecone", False):
+                    if getattr(vs, "use_pinecone", False) is True:
                         vs.upsert_document(doc_id, new_text, vector_meta)
                         new_vid = doc_id
                     else:
@@ -1296,7 +1296,7 @@ Need help setting up? Contact our landscaping specialists at landscaping@fikiris
             if vector_id is not None:
                 try:
                     vs = _get_vector_search()
-                    if getattr(vs, "use_pinecone", False):
+                    if getattr(vs, "use_pinecone", False) is True:
                         vs.delete_document_by_id(str(vector_id))
                     else:
                         vs.delete_document(int(vector_id))

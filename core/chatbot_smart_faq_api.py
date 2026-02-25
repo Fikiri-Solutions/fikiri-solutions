@@ -194,7 +194,7 @@ def create_faq_entry():
                 faq_content += f"\nKeywords: {', '.join(keywords)}"
             
             vector_id = get_vector_search().add_document(
-                text=faq_content,
+                content=faq_content,
                 metadata={
                     "type": "faq",
                     "faq_id": faq_id,
@@ -411,11 +411,11 @@ def create_knowledge_document():
                 vector_metadata['user_id'] = user_id
             
             vs = get_vector_search()
-            if getattr(vs, "use_pinecone", False):
+            if getattr(vs, "use_pinecone", False) is True:
                 ok = vs.upsert_document(doc_id, doc_content, vector_metadata)
                 vector_id = doc_id if ok else None
             else:
-                vector_id = vs.add_document(text=doc_content, metadata=vector_metadata)
+                vector_id = vs.add_document(content=doc_content, metadata=vector_metadata)
                 vector_id = vector_id if (vector_id is not None and vector_id >= 0) else None
             logger.info(f"✅ Knowledge document {doc_id} persisted to vector index: {vector_id}")
             # Store vector_id in KB document metadata so update/delete can sync to vector index (see docs/CRUD_RAG_ARCHITECTURE.md)
@@ -500,7 +500,7 @@ def import_knowledge_document():
         vector_id = None
         try:
             vs = get_vector_search()
-            if getattr(vs, "use_pinecone", False):
+            if getattr(vs, "use_pinecone", False) is True:
                 ok = vs.upsert_document(doc_id, content, {
                     "type": "knowledge_base",
                     "document_id": doc_id,
@@ -512,7 +512,7 @@ def import_knowledge_document():
                 vector_id = doc_id if ok else None
             else:
                 vector_id = vs.add_document(
-                    text=content,
+                    content=content,
                     metadata={
                         "type": "knowledge_base",
                         "document_id": doc_id,
@@ -613,7 +613,7 @@ def import_knowledge_bulk():
                 vector_id = None
                 try:
                     vs = get_vector_search()
-                    if getattr(vs, "use_pinecone", False):
+                    if getattr(vs, "use_pinecone", False) is True:
                         ok = vs.upsert_document(doc_id, content, {
                             "type": "knowledge_base",
                             "document_id": doc_id,
@@ -822,7 +822,7 @@ def vectorize_document_content():
         if not isinstance(metadata, dict):
             metadata = {}
 
-        doc_id = get_vector_search().add_document(text=content, metadata=metadata)
+        doc_id = get_vector_search().add_document(content=content, metadata=metadata)
 
         return jsonify({
             "success": True,

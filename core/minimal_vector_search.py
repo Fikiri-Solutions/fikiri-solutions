@@ -12,11 +12,24 @@ import asyncio
 import logging
 import os
 from typing import Dict, Any, List, Optional, Tuple
+from dataclasses import dataclass
 from pathlib import Path
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 pinecone = None
+
+
+@dataclass
+class QueryResponse:
+    matches: List[Any]
+
+
+@dataclass
+class ScoredVector:
+    id: str
+    score: float
+    metadata: Dict[str, Any]
 
 class MinimalVectorSearch:
     """Minimal vector search service with production enhancements."""
@@ -242,12 +255,14 @@ class MinimalVectorSearch:
             logger.error(f"❌ Error saving vector database: {e}")
             return False
     
-    def add_document(self, text: str, metadata: Dict[str, Any] = None) -> int:
+    def add_document(self, text: Optional[str] = None, metadata: Dict[str, Any] = None, content: Optional[str] = None) -> int:
         """Add a document to the vector database (Pinecone or local)."""
+        doc_text = text if text is not None else content
+        if doc_text is None:
+            raise ValueError("text/content is required")
         if self.use_pinecone:
-            return self._add_document_pinecone(text, metadata)
-        else:
-            return self._add_document_local(text, metadata)
+            return self._add_document_pinecone(doc_text, metadata)
+        return self._add_document_local(doc_text, metadata)
 
     def upsert_document(self, vector_id: str, text: str, metadata: Dict[str, Any] = None) -> bool:
         """Insert or replace a vector by id. Use for revectorize so the same doc id overwrites (e.g. after dimension change)."""
