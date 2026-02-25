@@ -11,6 +11,17 @@ jobs:
   smoke-test:
     runs-on: ubuntu-latest
     
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -27,15 +38,38 @@ jobs:
         
     - name: Set up environment variables
       run: |
-        cp env.template .env
+        cp env.template .env 2>/dev/null || true
         echo "JWT_SECRET_KEY=xbppiUtMLEy-edconosX09sfeaeGwMhmhCxFabteQtw" >> .env
         echo "FERNET_KEY=2HJ-fbPvowR0BFd7MR2nXO4REdtRtBoz4Bb-HFTl4aU=" >> .env
-        echo "REDIS_URL=redis://default:fz0wvU6lk68C67y2bMwSrjGC38g3Dh6H@redis-19575.c17.us-east-1-4.ec2.redns.redis-cloud.com:19575" >> .env
+        echo "REDIS_URL=redis://localhost:6379/0" >> .env
+        echo "FLASK_ENV=development" >> .env
+        echo "PORT=5000" >> .env
+        # Prefer SQLite in CI (unset PostgreSQL from template)
+        sed -i '/^DATABASE_URL=/d' .env 2>/dev/null || true
+        echo "# DATABASE_URL left unset to use SQLite" >> .env
+        
+    - name: Create test user for smoke login
+      run: |
+        python3 -c "
+        from core.user_auth import user_auth_manager
+        r = user_auth_manager.create_user(
+            email='test@example.com', password='test123', name='Test User',
+            business_name='Test', business_email='test@example.com',
+            industry='Technology', team_size='1-10'
+        )
+        if r.get('success'):
+            print('Test user created')
+        elif r.get('error_code') == 'USER_EXISTS':
+            print('Test user already exists')
+        else:
+            raise SystemExit(r.get('error', 'create_user failed'))
+        "
         
     - name: Start Flask application
       run: |
-        python app.py &
-        sleep 10
+        script -qefc "python app.py" /dev/null &
+        sleep 15
+        curl -fsS http://localhost:5000/ || { echo "Flask failed to respond"; ps aux | grep python; exit 1; }
         echo "Flask app started"
         
     - name: Run smoke tests
