@@ -15,7 +15,7 @@ jobs:
     
     strategy:
       matrix:
-        node-version: ['18.20.6', '20.18.2']  # Latest patched versions for both LTS lines
+        node-version: ['20.18.2']  # Latest patched LTS version
     
     steps:
     - name: Checkout code

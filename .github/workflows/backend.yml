@@ -13,6 +13,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      FERNET_KEY: "dKxuXPyNhHB-eRv-rPD_EYz0S088dRI6NOrlXO5eV_I="
     
     steps:
     - uses: actions/checkout@v4

@@ -16,6 +16,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
+pinecone = None
 
 class MinimalVectorSearch:
     """Minimal vector search service with production enhancements."""

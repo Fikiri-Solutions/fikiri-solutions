@@ -4,9 +4,18 @@ import { BrowserRouter } from 'react-router-dom'
 import { AuthProvider, useAuth } from '../contexts/AuthContext'
 import { QueryProvider } from '../providers/QueryProvider'
 import { ActivityProvider } from '../contexts/ActivityContext'
+import { apiClient } from '../services/apiClient'
 
 // Mock fetch
 global.fetch = vi.fn()
+
+vi.mock('../services/apiClient', () => ({
+  apiClient: {
+    login: vi.fn(),
+    signup: vi.fn(),
+    logout: vi.fn(),
+  },
+}))
 
 // Mock navigate
 const mockNavigate = vi.fn()
@@ -88,11 +97,7 @@ describe('AuthContext', () => {
       },
     }
 
-    ;(global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => mockResponse,
-    })
+    vi.mocked(apiClient.login).mockResolvedValueOnce(mockResponse as any)
 
     const { result } = renderHook(() => useAuth(), { wrapper })
     
@@ -111,11 +116,7 @@ describe('AuthContext', () => {
       error: 'Invalid credentials',
     }
 
-    ;(global.fetch as any).mockResolvedValueOnce({
-      ok: false,
-      status: 401,
-      json: async () => mockResponse,
-    })
+    vi.mocked(apiClient.login).mockResolvedValueOnce(mockResponse as any)
 
     const { result } = renderHook(() => useAuth(), { wrapper })
     
@@ -126,10 +127,11 @@ describe('AuthContext', () => {
   })
 
   it('should handle rate limiting', async () => {
-    ;(global.fetch as any).mockResolvedValueOnce({
-      ok: false,
-      status: 429,
-      json: async () => ({ error: 'Rate limit exceeded' }),
+    vi.mocked(apiClient.login).mockRejectedValueOnce({
+      response: {
+        status: 429,
+        data: { retry_after: 900 },
+      },
     })
 
     const { result } = renderHook(() => useAuth(), { wrapper })
@@ -141,7 +143,7 @@ describe('AuthContext', () => {
   })
 
   it('should handle network errors', async () => {
-    ;(global.fetch as any).mockRejectedValueOnce(new Error('Network error'))
+    vi.mocked(apiClient.login).mockRejectedValueOnce(new Error('Network error. Please try again.'))
 
     const { result } = renderHook(() => useAuth(), { wrapper })
     

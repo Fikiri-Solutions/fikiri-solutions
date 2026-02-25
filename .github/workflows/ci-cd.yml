@@ -65,6 +65,8 @@ jobs:
   # Backend Tests and Build
   backend:
     runs-on: ubuntu-latest
+    env:
+      FERNET_KEY: "dKxuXPyNhHB-eRv-rPD_EYz0S088dRI6NOrlXO5eV_I="
     defaults:
       run:
         working-directory: ./
