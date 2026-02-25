@@ -84,6 +84,6 @@ export const pwaConfig = VitePWA({
       }
     ]
   },
-  // PWA is only enabled in production builds (see vite.config.ts)
+  // PWA is only enabled in production builds (see vite.config.mts)
   // No devOptions needed since plugin is conditionally included
 })

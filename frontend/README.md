@@ -83,7 +83,7 @@ frontend/
 │   └── index.css          # Global styles
 ├── public/                 # Static assets
 ├── package.json           # Dependencies
-├── vite.config.ts         # Build configuration
+├── vite.config.mts        # Build configuration
 ├── tailwind.config.js     # Tailwind configuration
 └── index.html             # HTML template
 ```
@@ -209,4 +209,3 @@ Creates optimized production build in `dist/` folder
 ---
 
 **This frontend transforms Fikiri Solutions into a delightful, customer-friendly platform that businesses will love to use!** 🚀
-

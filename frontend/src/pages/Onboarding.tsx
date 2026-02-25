@@ -30,7 +30,7 @@ export const Onboarding: React.FC = () => {
           const gmailStatus = await apiClient.getGmailConnectionStatus();
           const outlookStatus = await apiClient.getOutlookStatus(user.id);
           const gmailConnected = !!gmailStatus?.connected;
-          const outlookConnected = !!outlookStatus?.connected;
+          const outlookConnected = !!outlookStatus?.data?.connected;
           if (gmailConnected || outlookConnected) {
             setEmailConnected(true);
             toast.success('Email connected successfully!');

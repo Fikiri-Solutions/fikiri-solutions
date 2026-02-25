@@ -189,7 +189,7 @@ export const Integrations: React.FC = () => {
           </div>
         ) : (
           apiKey && (
-            <InstallFlow apiKey={apiKey} onComplete={() => addToast({ type: 'success', message: 'Install steps completed' })} />
+            <InstallFlow apiKey={apiKey} onComplete={() => addToast({ type: 'success', title: 'Install Complete', message: 'Install steps completed' })} />
           )
         )}
       </div>

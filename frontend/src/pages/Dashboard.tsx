@@ -56,7 +56,7 @@ export const Dashboard: React.FC = () => {
     enabled: true,
   })
 
-  const { data: metricsData = mockMetrics, isLoading: metricsLoading, error: metricsError } = useQuery({
+  const { data: metricsData = mockMetrics, isLoading: metricsLoading } = useQuery({
     queryKey: ['metrics'],
     queryFn: () => {
       console.log('[Dashboard] Fetching metrics...')
@@ -66,12 +66,6 @@ export const Dashboard: React.FC = () => {
     gcTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 60 * 1000, // Auto-refresh every minute
     enabled: true,
-    onError: (error) => {
-      console.error('[Dashboard] Error fetching metrics:', error)
-    },
-    onSuccess: (data) => {
-      console.log('[Dashboard] Metrics loaded:', data)
-    }
   })
 
   const emptyActivity: any[] = []

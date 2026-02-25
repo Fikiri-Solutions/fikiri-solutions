@@ -10,6 +10,7 @@ export const OutlookConnect: React.FC = () => {
   const { user } = useAuth()
   const { addToast } = useToast()
   const queryClient = useQueryClient()
+  type SyncResponse = { message?: string; data?: { message?: string } }
 
   const {
     data: outlookStatus,
@@ -25,8 +26,8 @@ export const OutlookConnect: React.FC = () => {
 
   const syncMutation = useMutation({
     mutationFn: () => apiClient.triggerOutlookSync(),
-    onSuccess: (data) => {
-      const message = (data as { message?: string; data?: { message?: string } })?.message || (data as { data?: { message?: string } })?.data?.message || 'Outlook sync triggered successfully'
+    onSuccess: (data: SyncResponse) => {
+      const message = data?.message || data?.data?.message || 'Outlook sync triggered successfully'
       addToast({ 
         type: 'success', 
         title: 'Outlook Sync Started', 
@@ -118,4 +119,3 @@ export const OutlookConnect: React.FC = () => {
     </div>
   )
 }
-
