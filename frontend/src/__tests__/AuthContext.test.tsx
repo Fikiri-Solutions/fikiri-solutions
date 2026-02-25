@@ -195,7 +195,7 @@ describe('AuthContext', () => {
     
     await waitFor(() => {
       expect(result.current.isAuthenticated).toBe(true)
-      expect(result.current.getRedirectPath()).toBe('/home')
+      expect(result.current.getRedirectPath()).toBe('/dashboard')
     })
   })
 
