@@ -105,7 +105,7 @@ jobs:
         isort --check-only . || true
     
     - name: Run type checking
-      run: mypy . --ignore-missing-imports
+      run: mypy core/ app.py --ignore-missing-imports --explicit-package-bases --namespace-packages
       continue-on-error: true
     
     - name: Run unit tests
