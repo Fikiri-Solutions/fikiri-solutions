@@ -348,7 +348,7 @@ def public_chatbot_query():
         kb_filters = {}
         if tenant_id:
             kb_filters['tenant_id'] = tenant_id
-        kb_results = knowledge_base.search(query, kb_filters, limit=3)
+        kb_results = knowledge_base.search(query, filters=kb_filters, limit=3)
 
         # Optional vector retrieval (feature flagged)
         vector_results = []

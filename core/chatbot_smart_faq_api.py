@@ -250,7 +250,7 @@ def search_knowledge_base():
             filters['tenant_id'] = tenant_id
         
         # Search knowledge base
-        response = knowledge_base.search(query, filters, limit)
+        response = knowledge_base.search(query, filters=filters, limit=limit)
         
         if response.success:
             return jsonify({

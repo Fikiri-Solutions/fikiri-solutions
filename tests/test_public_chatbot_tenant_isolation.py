@@ -177,7 +177,7 @@ class TestPublicChatbotTenantIsolation(unittest.TestCase):
         mock_get_vs.return_value = mock_vector_search
         
         # Setup KB to return tenant-specific results
-        from core.knowledge_base_system import KnowledgeDocument, DocumentType, ContentFormat
+        from core.knowledge_base_system import KnowledgeDocument, DocumentType, ContentFormat, SearchResult
         from datetime import datetime
         
         kb_doc = KnowledgeDocument(
@@ -201,7 +201,7 @@ class TestPublicChatbotTenantIsolation(unittest.TestCase):
         mock_kb_result = SearchResponse(
             success=True,
             query='test',
-            results=[kb_doc],
+            results=[SearchResult(document=kb_doc, relevance_score=0.9, matched_sections=[], highlighted_content=kb_doc.content, match_explanation='')],
             total_results=1,
             search_time=0.1,
             suggestions=[],

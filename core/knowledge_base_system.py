@@ -1265,7 +1265,7 @@ Need help setting up? Contact our landscaping specialists at landscaping@fikiris
                         vs.upsert_document(doc_id, new_text, vector_meta)
                         new_vid = doc_id
                     else:
-                        new_vid = vs.add_document(new_text, vector_meta)
+                        new_vid = vs.add_document(new_text, metadata=vector_meta)
                     if new_vid is not None and (new_vid >= 0 if isinstance(new_vid, int) else True):
                         new_meta = dict(meta) if isinstance(meta, dict) else {}
                         new_meta["vector_id"] = new_vid
