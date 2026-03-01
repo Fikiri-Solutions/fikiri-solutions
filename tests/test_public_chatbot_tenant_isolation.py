@@ -330,6 +330,7 @@ class TestKBDocumentCreationTenantIsolation(unittest.TestCase):
     @patch('core.chatbot_smart_faq_api.knowledge_base')
     def test_kb_search_endpoint_adds_tenant_id_filter(self, mock_kb):
         """Test KB search endpoint adds tenant_id to filters"""
+        from flask import g
         from core.knowledge_base_system import SearchResponse
         
         mock_kb_result = SearchResponse(
@@ -343,22 +344,20 @@ class TestKBDocumentCreationTenantIsolation(unittest.TestCase):
         )
         mock_kb.search.return_value = mock_kb_result
         
-        # Create request context with API key
-        with self.app.test_request_context():
-            g.api_key_info = {
-                'tenant_id': 'tenant_search',
-                'user_id': 'user_search'
+        # Set g.api_key_info during the request (client.post() uses a new request context)
+        api_key_info = {'tenant_id': 'tenant_search', 'user_id': 'user_search'}
+        @self.app.before_request
+        def inject_api_key_info():
+            g.api_key_info = api_key_info
+        
+        response = self.client.post(
+            '/api/chatbot/knowledge/search',
+            json={
+                'query': 'test query',
+                'filters': {},
+                'limit': 10
             }
-            
-            # Make request
-            response = self.client.post(
-                '/api/chatbot/knowledge/search',
-                json={
-                    'query': 'test query',
-                    'filters': {},
-                    'limit': 10
-                }
-            )
+        )
         
         # Verify KB search was called with tenant_id in filters
         mock_kb.search.assert_called_once()
