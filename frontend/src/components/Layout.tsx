@@ -51,6 +51,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Mail },
     { name: 'Inbox', href: '/inbox', icon: Mail },
+    { name: 'Integrations', href: '/integrations/gmail', icon: PlugZap },
     { name: 'Services', href: '/services', icon: Settings },
     { name: 'Automations', href: '/automations', icon: Zap },
     { name: 'CRM', href: '/crm', icon: Users },

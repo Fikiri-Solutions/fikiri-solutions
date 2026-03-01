@@ -56,7 +56,7 @@ export const Dashboard: React.FC = () => {
     enabled: true,
   })
 
-  const { data: metricsData = mockMetrics, isLoading: metricsLoading } = useQuery({
+  const { data: metricsData = mockMetrics, isLoading: metricsLoading, error: metricsError } = useQuery({
     queryKey: ['metrics'],
     queryFn: () => {
       console.log('[Dashboard] Fetching metrics...')

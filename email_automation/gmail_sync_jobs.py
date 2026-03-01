@@ -151,6 +151,7 @@ class GmailSyncJobManager:
                     labels TEXT DEFAULT '[]',
                     attachments TEXT DEFAULT '[]',
                     processed BOOLEAN DEFAULT FALSE,
+                    is_read BOOLEAN DEFAULT FALSE,
                     lead_score INTEGER DEFAULT 0,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     metadata TEXT DEFAULT '{}',
@@ -159,7 +160,14 @@ class GmailSyncJobManager:
                 )
             """, fetch=False)
             
-            # Migration: Copy gmail_id to external_id for existing records
+            # Migration: add is_read column if missing (existing DBs created before this column)
+            try:
+                db_optimizer.execute_query(
+                    "ALTER TABLE synced_emails ADD COLUMN is_read BOOLEAN DEFAULT 0",
+                    fetch=False,
+                )
+            except Exception:
+                pass  # column already exists
             try:
                 db_optimizer.execute_query("""
                     UPDATE synced_emails 

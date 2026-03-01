@@ -531,26 +531,28 @@ def get_email_metrics():
         
         start_date = datetime.now() - timedelta(days=days)
         
-        # Get email counts from synced_emails table
+        # Get email counts from synced_emails table (column is 'date', not 'received_date')
         try:
             total_result = db_optimizer.execute_query("""
                 SELECT COUNT(*) as count 
                 FROM synced_emails 
-                WHERE user_id = ? AND received_date >= ?
-            """, (user_id, start_date.isoformat()))
-            
-            unread_result = db_optimizer.execute_query("""
-                SELECT COUNT(*) as count 
-                FROM synced_emails 
-                WHERE user_id = ? AND received_date >= ? AND is_read = FALSE
+                WHERE user_id = ? AND date >= ?
             """, (user_id, start_date.isoformat()))
             
             total_emails = total_result[0]['count'] if total_result and len(total_result) > 0 else 0
-            unread_emails = unread_result[0]['count'] if unread_result and len(unread_result) > 0 else 0
-            
         except Exception as e:
-            logger.warning(f"Could not get email metrics from database: {e}")
+            logger.warning(f"Could not get total email metrics from database: {e}")
             total_emails = 0
+
+        try:
+            unread_result = db_optimizer.execute_query("""
+                SELECT COUNT(*) as count 
+                FROM synced_emails 
+                WHERE user_id = ? AND date >= ? AND is_read = FALSE
+            """, (user_id, start_date.isoformat()))
+            unread_emails = unread_result[0]['count'] if unread_result and len(unread_result) > 0 else 0
+        except Exception as e:
+            logger.debug("Unread email count not available (is_read column may be missing): %s", e)
             unread_emails = 0
         
         # Get email trends (daily breakdown)
@@ -564,7 +566,7 @@ def get_email_metrics():
                 day_result = db_optimizer.execute_query("""
                     SELECT COUNT(*) as count 
                     FROM synced_emails 
-                    WHERE user_id = ? AND received_date >= ? AND received_date < ?
+                    WHERE user_id = ? AND date >= ? AND date < ?
                 """, (user_id, day_start.isoformat(), day_end.isoformat()))
                 
                 count = day_result[0]['count'] if day_result and len(day_result) > 0 else 0

@@ -166,7 +166,8 @@ class MinimalAIEmailAssistant:
                     logger.warning("Failed to parse classification as JSON, using fallback")
                     return self._fallback_classification(email_content, subject)
             else:
-                logger.error(f"❌ AI classification failed: {result.get('error')}")
+                err_msg = result.get('error') or 'Schema validation failed or empty error'
+                logger.error(f"❌ AI classification failed: {err_msg}")
                 self._track_ai_usage("classify_intent", False)
                 return self._fallback_classification(email_content, subject)
             
@@ -320,7 +321,8 @@ class MinimalAIEmailAssistant:
                     logger.warning("Failed to parse contact info as JSON, using fallback")
                     return self._fallback_contact_extraction(email_content)
             else:
-                logger.error(f"❌ Contact extraction failed: {result.get('error')}")
+                err_msg = result.get('error') or 'Schema validation failed or empty error'
+                logger.error(f"❌ Contact extraction failed: {err_msg}")
                 self._track_ai_usage("extract_contact", False)
                 return self._fallback_contact_extraction(email_content)
             

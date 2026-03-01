@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Mail, Users, Brain, Settings, Home, BarChart3 } from 'lucide-react'
+import { Users, Brain, Settings, Home, BarChart3, PlugZap } from 'lucide-react'
 
 interface MobileBottomNavProps {
   className?: string
@@ -13,6 +13,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ className = ''
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'Services', href: '/services', icon: Settings },
+    { name: 'Integrations', href: '/integrations/gmail', icon: PlugZap },
     { name: 'CRM', href: '/crm', icon: Users },
     { name: 'AI Assistant', href: '/ai', icon: Brain },
     { name: 'Analytics', href: '/industry', icon: BarChart3 },
