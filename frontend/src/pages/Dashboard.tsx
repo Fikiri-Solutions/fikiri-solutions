@@ -56,7 +56,7 @@ export const Dashboard: React.FC = () => {
     enabled: true,
   })
 
-  const { data: metricsData = mockMetrics, isLoading: metricsLoading, error: metricsError } = useQuery({
+  const { data: metricsData = mockMetrics, isLoading: metricsLoading, error: metricsQueryError } = useQuery({
     queryKey: ['metrics'],
     queryFn: () => {
       console.log('[Dashboard] Fetching metrics...')
@@ -192,14 +192,14 @@ export const Dashboard: React.FC = () => {
               <MetricCardSkeleton />
               <MetricCardSkeleton />
             </>
-          ) : metricsError ? (
+          ) : metricsQueryError ? (
             <div className="col-span-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
                 <div>
                   <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Unable to load dashboard metrics</p>
                   <p className="text-xs text-yellow-600 dark:text-yellow-300 mt-1">
-                    {metricsError instanceof Error ? metricsError.message : 'Please check your connection and try again.'}
+                    {metricsQueryError instanceof Error ? metricsQueryError.message : 'Please check your connection and try again.'}
                   </p>
                   <p className="text-xs text-yellow-600 dark:text-yellow-300 mt-1">
                     Check browser console for details. Using mock data for now.
