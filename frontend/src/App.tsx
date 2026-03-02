@@ -210,7 +210,11 @@ function App() {
                               <Layout><ChatbotBuilder /></Layout>
                             </ProtectedRoute>
                           } />
-                          <Route path="/integrations" element={<Navigate to="/automations" replace />} />
+                          <Route path="/integrations" element={
+                            <ProtectedRoute>
+                              <Layout><Integrations /></Layout>
+                            </ProtectedRoute>
+                          } />
                           <Route path="/integrations/gmail" element={
                             <ProtectedRoute>
                               <Layout><GmailConnect /></Layout>
