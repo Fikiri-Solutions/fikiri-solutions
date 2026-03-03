@@ -8,6 +8,7 @@ import { ForgotPassword } from './pages/ForgotPassword'
 import { ResetPassword } from './pages/ResetPassword'
 import { TermsOfService } from './pages/TermsOfService'
 import { PrivacyPolicy } from './pages/PrivacyPolicy'
+import SmsOptIn from './pages/SmsOptIn'
 import { Onboarding } from './pages/Onboarding'
 import { Services } from './pages/Services'
 import { CRM } from './pages/CRM'
@@ -103,6 +104,7 @@ function App() {
                           <Route path="/about" element={<About />} />
                           <Route path="/contact" element={<Contact />} />
                           <Route path="/install" element={<InstallPage />} />
+                          <Route path="/sms-opt-in" element={<SmsOptIn />} />
                           <Route path="/terms" element={<TermsOfService />} />
                           <Route path="/privacy" element={<PrivacyPolicy />} />
                           <Route path="/error" element={<ErrorPage />} />

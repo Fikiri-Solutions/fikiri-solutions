@@ -354,6 +354,9 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Phone Number
             </label>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              Fikiri Solutions LLC may send account and security-related SMS only (e.g. verification codes, login alerts). Typically under 10/month. Reply STOP to opt out, HELP for help. Msg &amp; data rates may apply. Consent is not required for purchase.
+            </p>
             <input
               type="tel"
               value={accountData.phone}
@@ -373,7 +376,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
                 />
               </div>
               <label htmlFor="smsConsent" className="ml-3 text-sm text-gray-600 dark:text-gray-400">
-                I agree to receive account and security-related SMS messages from Fikiri Solutions. Reply STOP to opt out. Reply HELP for help. Msg &amp; data rates may apply. Consent is not a condition of purchase.
+                I agree to receive account and security-related SMS messages from Fikiri Solutions LLC as described above. Reply STOP to opt out. Reply HELP for help. Msg &amp; data rates may apply. Consent is not a condition of purchase.
               </label>
             </div>
           </div>
