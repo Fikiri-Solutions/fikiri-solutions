@@ -19,6 +19,7 @@ import { FikiriLogo } from '../components/FikiriLogo';
 import { RadiantLayout } from '../components/radiant';
 import { useAuth } from '../contexts/AuthContext';
 import { useUserActivityTracking } from '../contexts/ActivityContext';
+import { SMS_CONSENT } from '../constants/smsConsent';
 
 const Signup: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -467,11 +468,11 @@ const Signup: React.FC = () => {
                 )}
               </div>
 
-              {/* Optional Phone + SMS Consent (CTIA/TCPA express consent) */}
+              {/* Optional Phone + SMS Consent (CTIA/TCPA express consent — checkbox unchecked by default) */}
               <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 p-4">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">SMS notifications (optional)</p>
+                <p className="text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">{SMS_CONSENT.sectionTitle}</p>
                 <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
-                  Fikiri Solutions LLC may send you account and security-related text messages only—for example, verification codes, login and security alerts, and account status notifications. Message frequency varies as needed, typically under 10 per month. No marketing or promotional messages will be sent. Reply <strong>STOP</strong> to opt out at any time; reply <strong>HELP</strong> for help. Message and data rates may apply. Consent is not required to use our services or make a purchase.
+                  {SMS_CONSENT.upfrontDisclosure}
                 </p>
                 <label htmlFor="phone" className="block text-sm font-medium text-gray-200 mb-2">
                   Mobile number <span className="text-gray-500 font-normal">(optional)</span>
@@ -500,7 +501,7 @@ const Signup: React.FC = () => {
                     />
                   </div>
                   <label htmlFor="smsConsent" className="ml-3 text-sm text-gray-300">
-                    I agree to receive account and security-related SMS messages from Fikiri Solutions LLC as described above. Reply STOP to opt out. Reply HELP for help. Msg &amp; data rates may apply. Consent is not a condition of purchase.
+                    {SMS_CONSENT.checkboxLabel}
                   </label>
                 </div>
               </div>
