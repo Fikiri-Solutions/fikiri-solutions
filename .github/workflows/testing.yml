@@ -45,6 +45,9 @@ jobs:
 
   backend-tests:
     runs-on: ubuntu-latest
+    env:
+      FERNET_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
+      FLASK_ENV: test
     
     steps:
     - uses: actions/checkout@v4
@@ -179,6 +182,10 @@ jobs:
 
   security-scan:
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
     
     steps:
     - uses: actions/checkout@v4
@@ -193,7 +200,8 @@ jobs:
         exit-code: '0'
     
     - name: Upload Trivy scan results
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
+      continue-on-error: true
       with:
         sarif_file: 'trivy-results.sarif'
     
