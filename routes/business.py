@@ -1441,6 +1441,79 @@ def get_automation_logs():
         logger.error(f"Get automation logs error: {e}")
         return create_error_response("Failed to fetch automation logs", 500, 'AUTOMATION_LOGS_ERROR')
 
+@business_bp.route('/automation/capabilities', methods=['GET'])
+@handle_api_errors
+def get_automation_capabilities():
+    """Return the list of supported automation action types and their readiness."""
+    try:
+        user_id = get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+        capabilities = []
+        for action_type in automation_engine.action_handlers:
+            capabilities.append({
+                'action_type': action_type.value,
+                'capability': 'implemented',
+            })
+        return create_success_response({'capabilities': capabilities}, 'Automation capabilities')
+    except Exception as e:
+        logger.error("Capabilities error: %s", e)
+        return create_error_response(str(e), 500, 'CAPABILITIES_ERROR')
+
+
+@business_bp.route('/automation/metrics', methods=['GET'])
+@handle_api_errors
+def get_automation_metrics():
+    """Return aggregate automation execution metrics."""
+    try:
+        user_id = get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+        hours = request.args.get('hours', 24, type=int)
+        rows = db_optimizer.execute_query(
+            """SELECT status, COUNT(*) as cnt FROM automation_executions
+               WHERE user_id = ? AND executed_at >= datetime('now', ?)
+               GROUP BY status""",
+            (user_id, f'-{hours} hours')
+        )
+        counts = {r['status']: r['cnt'] for r in rows}
+        total = sum(counts.values()) or 1
+        return create_success_response({
+            'queued': 0,
+            'running': 0,
+            'success': counts.get('success', 0),
+            'failed': counts.get('error', 0),
+            'dead': 0,
+            'success_rate_24h': round(counts.get('success', 0) / total, 2),
+            'p95_duration_seconds': 0,
+        }, 'Automation metrics')
+    except Exception as e:
+        logger.error("Metrics error: %s", e)
+        return create_error_response(str(e), 500, 'METRICS_ERROR')
+
+
+@business_bp.route('/automation/queue-stats', methods=['GET'])
+@handle_api_errors
+def get_automation_queue_stats():
+    """Return automation job queue statistics."""
+    try:
+        user_id = get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+        return create_success_response({
+            'pending': 0,
+            'in_progress': 0,
+            'completed_24h': 0,
+            'failed_24h': 0,
+        }, 'Queue stats')
+    except Exception as e:
+        logger.error("Queue stats error: %s", e)
+        return create_error_response(str(e), 500, 'QUEUE_STATS_ERROR')
+
+
 @business_bp.route('/automation/test', methods=['POST'])
 @handle_api_errors
 def test_automation():

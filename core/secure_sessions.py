@@ -425,12 +425,23 @@ def init_secure_sessions(app):
         if request.cookies.get(secure_session_manager.cookie_name):
             session_id = request.cookies.get(secure_session_manager.cookie_name)
         
-        # Get session ID from Authorization header (for API calls)
+        # Fall back to JWT token in Authorization header (for API calls)
         elif request.headers.get('Authorization'):
             auth_header = request.headers.get('Authorization')
             if auth_header.startswith('Bearer '):
-                # This is for JWT tokens, not session tokens
-                logger.debug("Authorization header contains JWT, skipping session token parsing")
+                token = auth_header[7:]
+                try:
+                    from core.jwt_auth import get_jwt_manager
+                    jwt_mgr = get_jwt_manager()
+                    payload = jwt_mgr.verify_access_token(token)
+                    if payload and payload.get('user_id'):
+                        g.session_id = None
+                        g.user_id = payload['user_id']
+                        g.user_data = {k: payload.get(k) for k in ('email', 'role') if payload.get(k)}
+                        g.session_data = {}
+                        return
+                except Exception:
+                    logger.debug("JWT verification failed, continuing without session")
         
         if session_id:
             session_data = secure_session_manager.get_session(session_id)
@@ -440,7 +451,6 @@ def init_secure_sessions(app):
                 g.user_data = session_data.get('user_data', {})
                 g.session_data = session_data
             else:
-                # Session expired or invalid
                 g.session_id = None
                 g.user_id = None
                 g.user_data = {}
