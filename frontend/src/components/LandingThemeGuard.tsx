@@ -12,6 +12,7 @@ const LANDING_PATHS = [
   '/about',
   '/terms',
   '/privacy',
+  '/sms-opt-in',
   '/error',
   '/login',
   '/signup',

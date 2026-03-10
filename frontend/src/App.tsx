@@ -8,6 +8,7 @@ import { ForgotPassword } from './pages/ForgotPassword'
 import { ResetPassword } from './pages/ResetPassword'
 import { TermsOfService } from './pages/TermsOfService'
 import { PrivacyPolicy } from './pages/PrivacyPolicy'
+import SmsOptIn from './pages/SmsOptIn'
 import { Onboarding } from './pages/Onboarding'
 import { Services } from './pages/Services'
 import { CRM } from './pages/CRM'
@@ -28,8 +29,10 @@ import { MedicalLanding } from './pages/MedicalLanding'
 import { Layout } from './components/Layout'
 import { UsageAnalytics } from './pages/UsageAnalytics'
 import { About } from './pages/About'
+import { Contact } from './pages/Contact'
 import { PrivacySettings } from './components/PrivacySettings'
 import LandingPage from './pages/LandingPage'
+import InstallPage from './pages/Install'
 import RadiantLandingPage from './pages/RadiantLandingPage'
 import PricingPage from './pages/PricingPage'
 import { BillingPage } from './pages/BillingPage'
@@ -99,27 +102,17 @@ function App() {
                           <Route path="/industries/restaurant" element={<RestaurantLanding />} />
                           <Route path="/industries/medical" element={<MedicalLanding />} />
                           <Route path="/about" element={<About />} />
+                          <Route path="/contact" element={<Contact />} />
+                          <Route path="/install" element={<InstallPage />} />
+                          <Route path="/sms-opt-in" element={<SmsOptIn />} />
                           <Route path="/terms" element={<TermsOfService />} />
                           <Route path="/privacy" element={<PrivacyPolicy />} />
                           <Route path="/error" element={<ErrorPage />} />
                           
-                          {/* Pre-authentication onboarding flow */}
-                          <Route path="/onboarding-flow" element={
-                            <AuthRoute>
-                              <Onboarding />
-                            </AuthRoute>
-                          } />
-                          <Route path="/onboarding-flow/:step" element={
-                            <AuthRoute>
-                              <Onboarding />
-                            </AuthRoute>
-                          } />
-                          {/* Redirect old sync route to step 2 */}
-                          <Route path="/onboarding-flow/sync" element={
-                            <AuthRoute>
-                              <Onboarding />
-                            </AuthRoute>
-                          } />
+                          {/* Legacy onboarding-flow redirects */}
+                          <Route path="/onboarding-flow" element={<Navigate to="/onboarding" replace />} />
+                          <Route path="/onboarding-flow/:step" element={<Navigate to="/onboarding" replace />} />
+                          <Route path="/onboarding-flow/sync" element={<Navigate to="/onboarding/2" replace />} />
                           
                           {/* Authentication routes */}
                           <Route path="/login" element={

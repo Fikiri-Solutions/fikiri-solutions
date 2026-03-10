@@ -39,6 +39,16 @@ Quick reference for project documentation. Root-level docs: [`COMPLETE_CODEBASE_
 | [FRONTEND_UX_PATTERNS.md](FRONTEND_UX_PATTERNS.md) | Tooltips, modals, scroll—consistent UX patterns |
 | [FRONTEND_AUTH_CHECKLIST.md](FRONTEND_AUTH_CHECKLIST.md) | Frontend auth checklist |
 
+## Testing
+
+| Doc | Description |
+|-----|-------------|
+| [TESTING.md](TESTING.md) | Pytest commands, sellability gate, stability run |
+| [BACKEND_TEST_COVERAGE_GAP.md](BACKEND_TEST_COVERAGE_GAP.md) | Test counts, gaps, priorities |
+| [AUTOMATION_READINESS.md](AUTOMATION_READINESS.md) | Readiness script, SELLABLE requirements |
+| [PROVIDER_CONTRACT_TESTS.md](PROVIDER_CONTRACT_TESTS.md) | Gmail/Stripe contract checks (sandbox) |
+| [PUBLIC_API_TESTING.md](PUBLIC_API_TESTING.md) | Public API unit tests and smoke test |
+
 ## Implementation Reference
 
 | Doc | Description |
@@ -48,6 +58,12 @@ Quick reference for project documentation. Root-level docs: [`COMPLETE_CODEBASE_
 | [INTEGRATION_STATUS.md](INTEGRATION_STATUS.md) | Current integration status |
 | [WEBHOOK_BUILDER_IMPLEMENTATION.md](WEBHOOK_BUILDER_IMPLEMENTATION.md) | Webhook payload builder |
 | [BILLING_IMPROVEMENTS.md](BILLING_IMPROVEMENTS.md) | Billing system improvements |
+| [PUBLIC_API_DOCUMENTATION.md](PUBLIC_API_DOCUMENTATION.md) | Public API reference (auth, endpoints) |
+| [PUBLIC_API_IMPLEMENTATION.md](PUBLIC_API_IMPLEMENTATION.md) | Public API implementation summary |
+| [CHATBOT_EMBED.md](CHATBOT_EMBED.md) | Website chatbot embed (public endpoint) |
+| [CHATBOT_EVAL.md](CHATBOT_EVAL.md) | Chatbot eval: build sets, run eval, report location |
+| [CHATBOT_FAQ_AUDIT.md](CHATBOT_FAQ_AUDIT.md) | Audit of all FAQ/chatbot code (APIs, scripts, feedback, eval) |
+| [SMS_CONSENT_TWILIO.md](SMS_CONSENT_TWILIO.md) | SMS express consent (CTIA/TCPA) and Twilio proof for use case 30446 |
 
 ## Operations & Reliability
 
@@ -65,13 +81,20 @@ Quick reference for project documentation. Root-level docs: [`COMPLETE_CODEBASE_
 |-----|-------------|
 | [SECURITY_ASSESSMENT.md](SECURITY_ASSESSMENT.md) | Security assessment report |
 | [AUTHENTICATION_DEBUG_GUIDE.md](AUTHENTICATION_DEBUG_GUIDE.md) | Auth debugging guide |
-| [FRONTEND_AUTH_CHECKLIST.md](FRONTEND_AUTH_CHECKLIST.md) | Frontend auth checklist |
 | [TROUBLESHOOTING_GUIDE.md](TROUBLESHOOTING_GUIDE.md) | General troubleshooting |
 
 ## Technical Deep Dives
 
 | Doc | Description |
 |-----|-------------|
+| [CRUD_RAG_ARCHITECTURE.md](CRUD_RAG_ARCHITECTURE.md) | CRUD, RAG flow, identity/merge policy |
 | [MUTEX_CONTENTION_MITIGATION.md](MUTEX_CONTENTION_MITIGATION.md) | Mutex contention fixes |
 | [RULEPACK_AUDIT.md](RULEPACK_AUDIT.md) | Rulepack audit |
 | [CLIENT_ONBOARDING_GUIDE.md](CLIENT_ONBOARDING_GUIDE.md) | Client onboarding flow |
+
+## Reference
+
+| Doc | Description |
+|-----|-------------|
+| [SELLABLE_LIST.md](SELLABLE_LIST.md) | What we know works — sellable features and test evidence |
+| [COMING_SOON.md](COMING_SOON.md) | Features not guaranteed / coming soon (UI and backend) |

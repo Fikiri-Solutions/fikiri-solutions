@@ -299,6 +299,9 @@ class FikiriBillingManager:
 
     def create_checkout_session(self, price_id: str, customer_id: str = None, success_url: str = None, cancel_url: str = None) -> Dict[str, Any]:
         """Create Stripe Checkout session"""
+        if not STRIPE_AVAILABLE:
+            logger.warning("Stripe not available, skipping checkout session creation")
+            return {}
         try:
             session_params = {
                 'payment_method_types': ['card'],

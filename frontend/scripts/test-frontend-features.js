@@ -150,7 +150,7 @@ routes.forEach(({ route, desc }) => {
 log('\n⚙️  Configuration', 'bold')
 const configs = [
   { file: 'src/config.ts', desc: 'Frontend config' },
-  { file: 'vite.config.ts', desc: 'Vite config' },
+  { file: 'vite.config.mts', desc: 'Vite config' },
   { file: 'tailwind.config.js', desc: 'Tailwind config' },
   { file: 'eslint.config.mjs', desc: 'ESLint config' }
 ]
@@ -220,4 +220,3 @@ if (failed === 0) {
   log('\n⚠️  Some checks failed. Review the output above.', 'yellow')
   process.exit(1)
 }
-

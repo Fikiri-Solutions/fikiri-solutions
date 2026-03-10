@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckCircle, Star, Users, Zap, Shield, Clock } from 'lucide-react';
 import { FeatureStatus, getFeatureStatus } from '../components/FeatureStatus';
+import { PublicChatbotWidget } from '../components/PublicChatbotWidget';
 
 export const ServicesLanding: React.FC = () => {
   const features = [
@@ -245,7 +246,7 @@ export const ServicesLanding: React.FC = () => {
           </div>
         </div>
       </div>
+      <PublicChatbotWidget />
     </div>
   );
 };
-

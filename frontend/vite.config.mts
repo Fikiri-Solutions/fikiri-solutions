@@ -5,9 +5,13 @@
 
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { resolve } from 'path'
+import { resolve, dirname } from 'path'
+import { fileURLToPath } from 'url'
 import { pwaConfig } from './src/config/pwa'
 import { removeInvalidPrefetch } from './vite-plugin-remove-invalid-prefetch'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 export default defineConfig(({ mode }) => ({
   test: {

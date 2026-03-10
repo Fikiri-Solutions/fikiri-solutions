@@ -3,6 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Home } from 'lucide-react';
 import { RadiantLayout } from '../components/radiant';
+import { PublicChatbotWidget } from '../components/PublicChatbotWidget';
 
 const PrivacyPolicy: React.FC = () => {
   const navigate = useNavigate();
@@ -146,6 +147,7 @@ const PrivacyPolicy: React.FC = () => {
           </div>
             </div>
       </div>
+      <PublicChatbotWidget />
     </>
     </RadiantLayout>
   );

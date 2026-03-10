@@ -46,7 +46,7 @@ export default [
   // Node.js TypeScript config files (.ts files)
   {
     files: [
-      'vite.config.ts',
+      'vite.config.mts',
       'vitest.config.ts', 
       'playwright.config.ts',
       '**/*.config.ts',

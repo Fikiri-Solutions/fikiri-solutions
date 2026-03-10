@@ -14,6 +14,7 @@ import {
 import { EmailIcon } from '@/components/icons/EmailIcon'
 import { CRMIcon } from '@/components/icons/CRMIcon'
 import { IntegrationsIcon } from '@/components/icons/IntegrationsIcon'
+import { PublicChatbotWidget } from '../components/PublicChatbotWidget'
 
 function Hero() {
   return (
@@ -160,6 +161,7 @@ export default function RadiantLandingPage() {
         <Testimonials />
         <Footer />
       </div>
+      <PublicChatbotWidget />
     </div>
   )
 }

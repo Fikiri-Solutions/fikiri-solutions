@@ -1,5 +1,6 @@
 import React from 'react'
 import { RadiantLayout, Container, Gradient, AnimatedBackground } from '../components/radiant'
+import { PublicChatbotWidget } from '../components/PublicChatbotWidget'
 
 export const About: React.FC = () => {
   return (
@@ -139,6 +140,7 @@ export const About: React.FC = () => {
           </Container>
         </section>
       </div>
+      <PublicChatbotWidget />
     </RadiantLayout>
   )
 }

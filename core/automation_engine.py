@@ -5,6 +5,7 @@ Handles automated email responses, lead management, and workflow automation
 
 import json
 import logging
+import os
 from typing import Dict, Any, List, Optional, Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -1007,29 +1008,50 @@ class AutomationEngine:
             return {'success': False, 'error': str(e)}
     
     def _execute_send_sms(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Send SMS message"""
+        """Send SMS via Twilio when configured; otherwise log only."""
         try:
-            phone_number = action_data.get('phone_number')
+            phone_number = action_data.get('phone_number') or (trigger_data.get('lead', {}) or {}).get('phone')
             message = action_data.get('message', '')
             lead_id = action_data.get('lead_id')
-            
-            # In a real implementation, you would integrate with SMS service like Twilio
-            # For now, we'll log the SMS
-            logger.info(f"Sending SMS to {phone_number}: {message}")
-            
-            # Store SMS record
-            sms_id = db_optimizer.execute_query(
-                """INSERT INTO sms_messages 
-                   (user_id, lead_id, phone_number, message, status, sent_at) 
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (user_id, lead_id, phone_number, message, 'sent', datetime.now().isoformat()),
-                fetch=False
-            )
-            
-            return {'success': True, 'sms_id': sms_id}
-            
+            if not phone_number or not message:
+                return {'success': False, 'error': 'phone_number and message required'}
+            to = str(phone_number).strip()
+            if not to.startswith('+'):
+                digits = ''.join(c for c in to if c.isdigit())
+                to = ('+' + digits) if len(digits) == 11 and digits.startswith('1') else ('+1' + digits) if len(digits) == 10 else ('+' + digits)
+            status = 'sent'
+            error_msg = None
+            account_sid = os.getenv('TWILIO_ACCOUNT_SID')
+            auth_token = os.getenv('TWILIO_AUTH_TOKEN')
+            messaging_sid = os.getenv('TWILIO_MESSAGING_SERVICE_SID')
+            if account_sid and auth_token and messaging_sid:
+                try:
+                    from twilio.rest import Client
+                    client = Client(account_sid, auth_token)
+                    msg = client.messages.create(
+                        messaging_service_sid=messaging_sid,
+                        body=message,
+                        to=to,
+                    )
+                    logger.info("Twilio SMS sent to %s sid=%s", to, msg.sid)
+                except Exception as e:
+                    status = 'failed'
+                    error_msg = str(e)
+                    logger.exception("Twilio SMS error to %s", to)
+            else:
+                logger.info("SMS (no Twilio): to=%s body=%s", to, message[:50])
+            try:
+                db_optimizer.execute_query(
+                    """INSERT INTO sms_messages (user_id, lead_id, phone_number, message, status, sent_at)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (user_id, lead_id, to, message, status, datetime.now().isoformat()),
+                    fetch=False,
+                )
+            except Exception:
+                pass
+            return {'success': status == 'sent', 'error': error_msg} if error_msg else {'success': True}
         except Exception as e:
-            logger.error(f"Error sending SMS: {e}")
+            logger.error("Error sending SMS: %s", e)
             return {'success': False, 'error': str(e)}
     
     def _execute_create_invoice(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:

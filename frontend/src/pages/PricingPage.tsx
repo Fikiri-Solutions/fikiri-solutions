@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 import { RadiantLayout, Gradient, Container, AnimatedBackground } from '../components/radiant';
+import { PublicChatbotWidget } from '../components/PublicChatbotWidget';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../services/apiClient';
 import { useToast } from '../components/Toast';
@@ -468,7 +469,7 @@ const PricingPage: React.FC = () => {
                   onClick={async () => {
                     if (tier.name === 'Enterprise') {
                       // Navigate to contact or demo page
-                      navigate('/onboarding-flow');
+                      navigate('/signup');
                       return;
                     }
 
@@ -700,7 +701,7 @@ const PricingPage: React.FC = () => {
                 <ArrowRight className="w-5 h-5" />
               </button>
               <button
-                onClick={() => navigate('/onboarding-flow')}
+                onClick={() => navigate('/signup')}
                 className="px-8 py-4 border border-border text-foreground font-semibold rounded-full hover:bg-muted transition-all duration-300"
               >
                 Schedule Demo
@@ -711,6 +712,7 @@ const PricingPage: React.FC = () => {
       </section>
         </div>
       </div>
+      <PublicChatbotWidget />
     </RadiantLayout>
   );
 };

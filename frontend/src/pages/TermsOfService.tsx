@@ -1,6 +1,7 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { RadiantLayout } from '../components/radiant';
+import { PublicChatbotWidget } from '../components/PublicChatbotWidget';
 
 const TermsOfService: React.FC = () => {
   return (
@@ -125,6 +126,7 @@ const TermsOfService: React.FC = () => {
                 </div>
               </div>
       </div>
+      <PublicChatbotWidget />
     </>
     </RadiantLayout>
   );

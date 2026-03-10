@@ -56,7 +56,7 @@ export const Dashboard: React.FC = () => {
     enabled: true,
   })
 
-  const { data: metricsData = mockMetrics, isLoading: metricsLoading, error: metricsError } = useQuery({
+  const { data: metricsData = mockMetrics, isLoading: metricsLoading, error: metricsQueryError } = useQuery({
     queryKey: ['metrics'],
     queryFn: () => {
       console.log('[Dashboard] Fetching metrics...')
@@ -66,15 +66,10 @@ export const Dashboard: React.FC = () => {
     gcTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 60 * 1000, // Auto-refresh every minute
     enabled: true,
-    onError: (error) => {
-      console.error('[Dashboard] Error fetching metrics:', error)
-    },
-    onSuccess: (data) => {
-      console.log('[Dashboard] Metrics loaded:', data)
-    }
   })
 
-  const { data: activityData = mockActivity, isLoading: activityLoading } = useQuery({
+  const emptyActivity: any[] = []
+  const { data: activityData = (features.useMockData ? mockActivity : emptyActivity), isLoading: activityLoading } = useQuery({
     queryKey: ['activity'],
     queryFn: () => features.useMockData ? Promise.resolve(mockActivity) : apiClient.getActivity(),
     staleTime: 30 * 1000, // 30 seconds - activity updates frequently
@@ -197,14 +192,14 @@ export const Dashboard: React.FC = () => {
               <MetricCardSkeleton />
               <MetricCardSkeleton />
             </>
-          ) : metricsError ? (
+          ) : metricsQueryError ? (
             <div className="col-span-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
                 <div>
                   <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Unable to load dashboard metrics</p>
                   <p className="text-xs text-yellow-600 dark:text-yellow-300 mt-1">
-                    {metricsError instanceof Error ? metricsError.message : 'Please check your connection and try again.'}
+                    {metricsQueryError instanceof Error ? metricsQueryError.message : 'Please check your connection and try again.'}
                   </p>
                   <p className="text-xs text-yellow-600 dark:text-yellow-300 mt-1">
                     Check browser console for details. Using mock data for now.
@@ -347,6 +342,10 @@ export const Dashboard: React.FC = () => {
             </h3>
             {activityLoading ? (
               <ActivitySkeleton />
+            ) : activity.length === 0 ? (
+              <div className="text-sm text-brand-text/60 dark:text-gray-400">
+                No activity yet.
+              </div>
             ) : (
               <div className="space-y-3">
                 {activity.slice(0, 5).map((item) => (

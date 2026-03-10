@@ -46,11 +46,11 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
       return redirectParam
     }
     
-    // If user is in onboarding (on onboarding-flow pages), redirect back to onboarding
-    if (location.pathname.startsWith('/onboarding-flow') || location.pathname.startsWith('/onboarding')) {
+    // If user is in onboarding, redirect back to onboarding
+    if (location.pathname.startsWith('/onboarding')) {
       const redirectPath = getRedirectParam()
       const redirectQuery = redirectPath ? `?redirect=${encodeURIComponent(redirectPath)}` : ''
-      return `/onboarding-flow/2${redirectQuery}`
+      return `/onboarding/2${redirectQuery}`
     }
     
     // If user is already onboarded, redirect back to where they came from
@@ -64,8 +64,8 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
       return '/integrations/gmail'
     }
     
-    // Default: onboarding flow step 2 (for new users)
-    return '/onboarding-flow/2'
+    // Default: onboarding step 2 (for new users)
+    return '/onboarding/2'
   }
 
   const abortControllerRef = useRef<AbortController | null>(null)

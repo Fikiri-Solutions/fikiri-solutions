@@ -264,10 +264,19 @@ class IntegrationTestSuite:
         
         return results
 
+pytestmark = pytest.mark.integration
+
+
+def _integration_enabled() -> bool:
+    return os.getenv("RUN_INTEGRATION_TESTS") == "1"
+
+
 # Pytest integration tests
 @pytest.fixture
 def integration_suite():
     """Pytest fixture for integration test suite"""
+    if not _integration_enabled():
+        pytest.skip("Integration tests disabled. Set RUN_INTEGRATION_TESTS=1")
     suite = IntegrationTestSuite()
     suite.setup_test_environment()
     return suite
@@ -335,4 +344,3 @@ if __name__ == "__main__":
                 print(f"  {result['test']}: {result['error']}")
     
     exit(0 if results['failed_tests'] == 0 else 1)
-

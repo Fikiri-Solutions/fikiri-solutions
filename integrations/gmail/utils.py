@@ -12,6 +12,15 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+# Import timeout utilities
+try:
+    from core.api_timeouts import gmail_execute_with_timeout, DEFAULT_GMAIL_TIMEOUT
+    from core.circuit_breaker import get_circuit_breaker
+    TIMEOUT_AVAILABLE = True
+except ImportError:
+    TIMEOUT_AVAILABLE = False
+    logger.warning("Gmail timeout utilities not available")
+
 
 class MinimalGmailService:
     """Minimal Gmail service - lightweight version."""
@@ -76,12 +85,19 @@ class MinimalGmailService:
             return []
         
         try:
-            # Get message list
-            results = self.service.users().messages().list(
-                userId='me',
-                q=query,
-                maxResults=max_results
-            ).execute()
+            # Get message list with timeout protection
+            def _execute():
+                return self.service.users().messages().list(
+                    userId='me',
+                    q=query,
+                    maxResults=max_results
+                ).execute()
+            
+            if TIMEOUT_AVAILABLE:
+                breaker = get_circuit_breaker("gmail", failure_threshold=3, timeout_seconds=60, fail_open=True)
+                results = breaker.call(lambda: gmail_execute_with_timeout(_execute, DEFAULT_GMAIL_TIMEOUT))
+            else:
+                results = _execute()
             
             messages = results.get('messages', [])
             logger.info("Found %s messages", len(messages))
@@ -98,11 +114,19 @@ class MinimalGmailService:
             return None
         
         try:
-            message = self.service.users().messages().get(
-                userId='me',
-                id=message_id,
-                format='full'
-            ).execute()
+            def _execute():
+                return self.service.users().messages().get(
+                    userId='me',
+                    id=message_id,
+                    format='full'
+                ).execute()
+            
+            if TIMEOUT_AVAILABLE:
+                breaker = get_circuit_breaker("gmail", failure_threshold=3, timeout_seconds=60, fail_open=True)
+                message = breaker.call(lambda: gmail_execute_with_timeout(_execute, DEFAULT_GMAIL_TIMEOUT))
+            else:
+                message = _execute()
+            
             logger.info("Retrieved message: %s", message_id)
             return message
         except Exception as e:
@@ -116,10 +140,18 @@ class MinimalGmailService:
             return None
         
         try:
-            thread = self.service.users().threads().get(
-                userId='me',
-                id=thread_id
-            ).execute()
+            def _execute():
+                return self.service.users().threads().get(
+                    userId='me',
+                    id=thread_id
+                ).execute()
+            
+            if TIMEOUT_AVAILABLE:
+                breaker = get_circuit_breaker("gmail", failure_threshold=3, timeout_seconds=60, fail_open=True)
+                thread = breaker.call(lambda: gmail_execute_with_timeout(_execute, DEFAULT_GMAIL_TIMEOUT))
+            else:
+                thread = _execute()
+            
             logger.info("Retrieved thread: %s", thread_id)
             return thread
         except Exception as e:
@@ -133,11 +165,19 @@ class MinimalGmailService:
             return False
         
         try:
-            self.service.users().messages().modify(
-                userId='me',
-                id=message_id,
-                body={'removeLabelIds': ['UNREAD']}
-            ).execute()
+            def _execute():
+                return self.service.users().messages().modify(
+                    userId='me',
+                    id=message_id,
+                    body={'removeLabelIds': ['UNREAD']}
+                ).execute()
+            
+            if TIMEOUT_AVAILABLE:
+                breaker = get_circuit_breaker("gmail", failure_threshold=3, timeout_seconds=60, fail_open=True)
+                breaker.call(lambda: gmail_execute_with_timeout(_execute, DEFAULT_GMAIL_TIMEOUT))
+            else:
+                _execute()
+            
             logger.info("Marked message %s as read", message_id)
             return True
         except Exception as e:
@@ -151,11 +191,19 @@ class MinimalGmailService:
             return False
         
         try:
-            self.service.users().messages().modify(
-                userId='me',
-                id=message_id,
-                body={'addLabelIds': label_ids}
-            ).execute()
+            def _execute():
+                return self.service.users().messages().modify(
+                    userId='me',
+                    id=message_id,
+                    body={'addLabelIds': label_ids}
+                ).execute()
+            
+            if TIMEOUT_AVAILABLE:
+                breaker = get_circuit_breaker("gmail", failure_threshold=3, timeout_seconds=60, fail_open=True)
+                breaker.call(lambda: gmail_execute_with_timeout(_execute, DEFAULT_GMAIL_TIMEOUT))
+            else:
+                _execute()
+            
             logger.info("Added labels to message %s", message_id)
             return True
         except Exception as e:
@@ -169,7 +217,14 @@ class MinimalGmailService:
             return []
         
         try:
-            results = self.service.users().labels().list(userId='me').execute()
+            def _execute():
+                return self.service.users().labels().list(userId='me').execute()
+            
+            if TIMEOUT_AVAILABLE:
+                breaker = get_circuit_breaker("gmail", failure_threshold=3, timeout_seconds=60, fail_open=True)
+                results = breaker.call(lambda: gmail_execute_with_timeout(_execute, DEFAULT_GMAIL_TIMEOUT))
+            else:
+                results = _execute()
             labels = results.get('labels', [])
             logger.info("Retrieved %s labels", len(labels))
             return labels
@@ -189,11 +244,18 @@ class MinimalGmailService:
         
         # Get total count
         try:
-            results = self.service.users().messages().list(
-                userId='me',
-                q="is:unread",
-                maxResults=1
-            ).execute()
+            def _execute():
+                return self.service.users().messages().list(
+                    userId='me',
+                    q="is:unread",
+                    maxResults=1
+                ).execute()
+            
+            if TIMEOUT_AVAILABLE:
+                breaker = get_circuit_breaker("gmail", failure_threshold=3, timeout_seconds=60, fail_open=True)
+                results = breaker.call(lambda: gmail_execute_with_timeout(_execute, DEFAULT_GMAIL_TIMEOUT))
+            else:
+                results = _execute()
             
             total_count = results.get('resultSizeEstimate', 0)
             logger.info("Unread messages: %s", total_count)

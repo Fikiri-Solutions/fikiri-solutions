@@ -12,6 +12,13 @@ from typing import Dict, Any, Optional, Callable, List
 from enum import Enum
 from dataclasses import dataclass
 
+# Import trace context for background jobs
+try:
+    from core.trace_context import set_trace_id, get_trace_id
+    TRACE_CONTEXT_AVAILABLE = True
+except ImportError:
+    TRACE_CONTEXT_AVAILABLE = False
+
 # Optional Redis integration
 try:
     import redis
@@ -450,11 +457,30 @@ def start_worker(queue: RedisQueue, worker_name: str = "worker"):
     """Start a worker to process jobs"""
     logger.info(f"🚀 Starting {worker_name} for queue {queue.queue_name}")
     
+    # Import trace context for background jobs
+    try:
+        from core.trace_context import set_trace_id, get_trace_id
+        TRACE_CONTEXT_AVAILABLE = True
+    except ImportError:
+        TRACE_CONTEXT_AVAILABLE = False
+    
     while True:
         try:
             job = queue.dequeue_job(timeout=5)
             if job:
-                logger.info(f"📋 Processing job {job.id}: {job.task}")
+                # Set trace ID from job args or generate new one
+                job_trace_id = job.args.get('trace_id') or str(uuid.uuid4())
+                if TRACE_CONTEXT_AVAILABLE:
+                    set_trace_id(job_trace_id)
+                
+                logger.info(f"📋 Processing job {job.id}: {job.task}", extra={
+                    'event': 'job_started',
+                    'service': 'background_job',
+                    'severity': 'INFO',
+                    'trace_id': job_trace_id,
+                    'job_id': job.id,
+                    'task': job.task
+                })
                 
                 # Get task function
                 task_func = queue._registered_tasks.get(job.task)
@@ -462,13 +488,36 @@ def start_worker(queue: RedisQueue, worker_name: str = "worker"):
                     try:
                         result = task_func(**job.args)
                         queue.complete_job(job.id, result)
-                        logger.info(f"✅ Completed job {job.id}")
+                        logger.info(f"✅ Completed job {job.id}", extra={
+                            'event': 'job_completed',
+                            'service': 'background_job',
+                            'severity': 'INFO',
+                            'trace_id': job_trace_id,
+                            'job_id': job.id,
+                            'task': job.task
+                        })
                     except Exception as e:
                         queue.fail_job(job.id, str(e))
-                        logger.error(f"❌ Failed job {job.id}: {e}")
+                        logger.error(f"❌ Failed job {job.id}: {e}", extra={
+                            'event': 'job_failed',
+                            'service': 'background_job',
+                            'severity': 'ERROR',
+                            'trace_id': job_trace_id,
+                            'job_id': job.id,
+                            'task': job.task,
+                            'error': str(e)
+                        })
                 else:
                     queue.fail_job(job.id, f"Unknown task: {job.task}")
-                    logger.error(f"❌ Unknown task: {job.task}")
+                    logger.error(f"❌ Unknown task: {job.task}", extra={
+                        'event': 'job_failed',
+                        'service': 'background_job',
+                        'severity': 'ERROR',
+                        'trace_id': job_trace_id,
+                        'job_id': job.id,
+                        'task': job.task,
+                        'error': 'Unknown task'
+                    })
             else:
                 # No jobs available, sleep briefly
                 time.sleep(1)

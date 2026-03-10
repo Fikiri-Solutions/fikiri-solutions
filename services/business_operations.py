@@ -354,7 +354,8 @@ class LegalCompliance:
         """Get a legal document"""
         if document_type in self.documents:
             doc = self.documents[document_type].copy()
-            doc['rendered'] = doc['template'].format(last_updated=doc['last_updated'])
+            # Avoid str.format on HTML/CSS templates containing braces
+            doc['rendered'] = doc['template'].replace("{{ last_updated }}", doc['last_updated'])
             return doc
         return {'error': 'Document not found'}
     
@@ -409,7 +410,7 @@ legal_compliance = LegalCompliance()
 
 def create_business_blueprint() -> Blueprint:
     """Create business operations blueprint"""
-    blueprint = Blueprint('business', '/business')
+    blueprint = Blueprint('business', __name__, url_prefix='/business')
     
     @blueprint.route('/privacy-policy')
     def privacy_policy():
@@ -508,4 +509,3 @@ __all__ = [
     'LegalCompliance', 'legal_compliance',
     'create_business_blueprint'
 ]
-

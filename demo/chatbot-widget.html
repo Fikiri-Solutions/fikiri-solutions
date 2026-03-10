@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fikiri Chatbot Widget Demo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            background: #f8fafc;
+        }
+
+        /* Sample page content (simulates a customer site) */
+        .page-content {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 48px 24px 120px;
+        }
+        .page-content h1 { color: #0f172a; font-size: 2em; margin-bottom: 16px; }
+        .page-content p { color: #475569; line-height: 1.6; margin-bottom: 12px; }
+        .page-banner {
+            background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+            color: white;
+            padding: 24px;
+            border-radius: 12px;
+            margin-bottom: 32px;
+            text-align: center;
+        }
+        .page-banner a { color: rgba(255,255,255,0.95); text-decoration: underline; }
+
+        /* Widget: floating button — higher so it doesn't overlap taskbar or TanStack Query DevTools */
+        #fikiri-widget-button {
+            position: fixed;
+            bottom: 84px;
+            right: 28px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(15, 118, 110, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            z-index: 9998;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        #fikiri-widget-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 24px rgba(15, 118, 110, 0.5);
+        }
+        #fikiri-widget-button img.widget-logo {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+        }
+
+        /* Widget: popup panel */
+        #fikiri-widget-panel {
+            display: none;
+            position: fixed;
+            bottom: 172px;
+            right: 28px;
+            width: 380px;
+            max-width: calc(100vw - 48px);
+            height: 520px;
+            max-height: calc(100vh - 120px);
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+            flex-direction: column;
+            z-index: 9999;
+            overflow: hidden;
+        }
+        #fikiri-widget-panel.open {
+            display: flex;
+        }
+
+        .widget-header {
+            background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+            color: white;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        .widget-header img.widget-logo {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+            background: rgba(255,255,255,0.2);
+            border-radius: 8px;
+        }
+        .widget-header .widget-title {
+            font-weight: 600;
+            font-size: 1.1em;
+            flex: 1;
+        }
+        .widget-header button.widget-close {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+        }
+        .widget-header button.widget-close:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .widget-setup {
+            padding: 12px 16px;
+            background: #f1f5f9;
+            font-size: 0.85em;
+            flex-shrink: 0;
+        }
+        .widget-setup input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            margin-top: 6px;
+            font-size: 0.95em;
+        }
+        .widget-setup .widget-setup-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .widget-setup .widget-setup-actions button {
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            cursor: pointer;
+            border: none;
+        }
+        .widget-setup .widget-setup-actions button.primary {
+            background: #0f766e;
+            color: white;
+        }
+        .widget-setup .widget-setup-actions button.secondary {
+            background: #e2e8f0;
+            color: #475569;
+        }
+        .widget-setup .status { margin-top: 6px; font-size: 0.9em; }
+
+        .widget-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .widget-message {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 14px;
+            font-size: 0.95em;
+            word-wrap: break-word;
+        }
+        .widget-message.user {
+            align-self: flex-end;
+            background: #0f766e;
+            color: white;
+        }
+        .widget-message.bot {
+            align-self: flex-start;
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+        .widget-message.loading {
+            align-self: flex-start;
+            background: #f1f5f9;
+            color: #64748b;
+            font-style: italic;
+        }
+
+        .widget-input-row {
+            padding: 12px 16px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .widget-input-row input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            font-size: 0.95em;
+            outline: none;
+        }
+        .widget-input-row input:focus {
+            border-color: #0f766e;
+        }
+        .widget-input-row button {
+            padding: 10px 18px;
+            background: #0f766e;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .widget-input-row button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .widget-input-row button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .widget-feedback {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #e2e8f0;
+        }
+        .widget-feedback button {
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 0.75em;
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #475569;
+            cursor: pointer;
+        }
+        .widget-feedback button:hover {
+            background: #f1f5f9;
+            border-color: #0f766e;
+            color: #0f766e;
+        }
+        .widget-feedback button.sent {
+            opacity: 0.6;
+            cursor: default;
+        }
+        .widget-toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            background: #0f766e;
+            color: white;
+            border-radius: 20px;
+            font-size: 0.9em;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+        .widget-toast.show {
+            opacity: 1;
+        }
+
+        .widget-hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="page-content">
+        <div class="page-banner">
+            <strong>Fikiri Chatbot Widget Demo</strong> — This is how the widget looks on a page. Click the button in the bottom-right to open the chat.
+        </div>
+        <h1>Welcome to Example Corp</h1>
+        <p>We help businesses grow with AI-powered support. Explore our services and get in touch anytime using the chat in the corner.</p>
+        <p>Our team is here to answer questions about pricing, onboarding, and integrations. Click the Fikiri chat button to start.</p>
+    </div>
+
+    <!-- Floating button (logo placeholder: use text or replace with img src="your-logo.png") -->
+    <button type="button" id="fikiri-widget-button" aria-label="Open chat">
+        <!-- Optional: <img class="widget-logo" src="/path/to/logo.png" alt="Fikiri"> -->
+        <span aria-hidden="true">💬</span>
+    </button>
+
+    <!-- Chat panel -->
+    <div id="fikiri-widget-panel">
+        <div class="widget-header">
+            <!-- Optional logo: <img class="widget-logo" src="/path/to/logo.png" alt=""> -->
+            <span class="widget-title">Fikiri</span>
+            <button type="button" class="widget-close" id="widget-close" aria-label="Close">×</button>
+        </div>
+
+        <div class="widget-setup" id="widget-setup">
+            <div>API key (optional for demo)</div>
+            <input type="text" id="widget-api-key" placeholder="fik_..." autocomplete="off">
+            <div class="widget-setup-actions">
+                <button type="button" class="primary" id="widget-connect">Connect</button>
+                <button type="button" class="secondary" id="widget-demo">Try demo mode</button>
+            </div>
+            <div class="status" id="widget-setup-status"></div>
+        </div>
+
+        <div class="widget-messages" id="widget-messages">
+            <div class="widget-message bot">👋 Hi! I'm Fikiri. Ask me anything — or add your API key for real answers.</div>
+        </div>
+
+        <div class="widget-input-row widget-hidden" id="widget-input-row">
+            <input type="text" id="widget-input" placeholder="Type a message..." disabled>
+            <button type="button" id="widget-send" disabled>Send</button>
+        </div>
+    </div>
+
+    <div class="widget-toast" id="widget-toast" aria-live="polite"></div>
+
+    <script src="../integrations/universal/fikiri-sdk.js"></script>
+    <script>
+        (function() {
+            const panel = document.getElementById('fikiri-widget-panel');
+            const button = document.getElementById('fikiri-widget-button');
+            const closeBtn = document.getElementById('widget-close');
+            const setupDiv = document.getElementById('widget-setup');
+            const inputRow = document.getElementById('widget-input-row');
+            const messagesEl = document.getElementById('widget-messages');
+            const inputEl = document.getElementById('widget-input');
+            const sendBtn = document.getElementById('widget-send');
+            const apiKeyInput = document.getElementById('widget-api-key');
+            const statusEl = document.getElementById('widget-setup-status');
+
+            let conversationId = null;
+            let apiKeySet = false;
+            let demoMode = false;
+            let apiBaseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+
+            function showToast(text) {
+                const el = document.getElementById('widget-toast');
+                if (!el) return;
+                el.textContent = text;
+                el.classList.add('show');
+                setTimeout(function() { el.classList.remove('show'); }, 2500);
+            }
+
+            function addWidgetMessage(type, text, options) {
+                const div = document.createElement('div');
+                div.className = 'widget-message ' + type;
+                div.textContent = text;
+                div.id = 'wmsg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+                messagesEl.appendChild(div);
+                if (type === 'bot' && options && (options.question != null || options.answer != null)) {
+                    const feedbackRow = document.createElement('div');
+                    feedbackRow.className = 'widget-feedback';
+                    const ratings = [
+                        { label: 'Correct', value: 'correct' },
+                        { label: 'Somewhat correct', value: 'somewhat_correct' },
+                        { label: 'Somewhat incorrect', value: 'somewhat_incorrect' },
+                        { label: 'Incorrect', value: 'incorrect' }
+                    ];
+                    ratings.forEach(function(r) {
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.textContent = r.label;
+                        btn.addEventListener('click', function() {
+                            if (btn.classList.contains('sent')) return;
+                            submitFeedback(options.question || '', options.answer || '', options.retrieved_doc_ids || [], r.value, function() {
+                                btn.classList.add('sent');
+                                showToast('Thanks for your feedback!');
+                            });
+                        });
+                        feedbackRow.appendChild(btn);
+                    });
+                    div.appendChild(feedbackRow);
+                }
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+                return div.id;
+            }
+
+            function submitFeedback(question, answer, retrieved_doc_ids, rating, onSuccess) {
+                const payload = {
+                    question: question,
+                    answer: answer,
+                    retrieved_doc_ids: Array.isArray(retrieved_doc_ids) ? retrieved_doc_ids : [],
+                    rating: rating,
+                    session_id: conversationId || undefined
+                };
+                fetch(apiBaseUrl + '/api/chatbot/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }).then(function(res) {
+                    if (res.ok && typeof onSuccess === 'function') onSuccess();
+                }).catch(function() {
+                    /* non-blocking: no toast on failure */
+                });
+            }
+
+            function openPanel() {
+                panel.classList.add('open');
+            }
+            function closePanel() {
+                panel.classList.remove('open');
+            }
+            function togglePanel() {
+                panel.classList.toggle('open');
+            }
+
+            button.addEventListener('click', togglePanel);
+            closeBtn.addEventListener('click', closePanel);
+
+            document.getElementById('widget-demo').addEventListener('click', function() {
+                apiKeySet = true;
+                demoMode = true;
+                setupDiv.classList.add('widget-hidden');
+                inputRow.classList.remove('widget-hidden');
+                inputEl.disabled = false;
+                sendBtn.disabled = false;
+                conversationId = 'widget_demo_' + Date.now();
+                apiBaseUrl = window.location.origin;
+                addWidgetMessage('bot', "Demo mode — I'll give sample answers. Add your API key in the Fikiri dashboard for real AI.");
+            });
+
+            document.getElementById('widget-connect').addEventListener('click', function() {
+                const apiKey = apiKeyInput.value.trim();
+                if (!apiKey) {
+                    statusEl.textContent = 'Enter an API key';
+                    statusEl.style.color = 'red';
+                    return;
+                }
+                if (!apiKey.startsWith('fik_')) {
+                    statusEl.textContent = 'Key should start with fik_';
+                    statusEl.style.color = 'orange';
+                    return;
+                }
+                try {
+                    if (typeof Fikiri !== 'undefined') {
+                        Fikiri.init({
+                            apiKey: apiKey,
+                            apiUrl: window.location.origin,
+                            features: ['chatbot', 'leadCapture'],
+                            debug: false
+                        });
+                    }
+                    apiKeySet = true;
+                    demoMode = false;
+                    setupDiv.classList.add('widget-hidden');
+                    inputRow.classList.remove('widget-hidden');
+                    inputEl.disabled = false;
+                    sendBtn.disabled = false;
+                    conversationId = 'widget_' + Date.now();
+                    apiBaseUrl = window.location.origin;
+                    statusEl.textContent = '';
+                    addWidgetMessage('bot', 'Connected! How can I help?');
+                } catch (e) {
+                    statusEl.textContent = 'Error: ' + e.message;
+                    statusEl.style.color = 'red';
+                }
+            });
+
+            function removeWidgetMessage(id) {
+                const el = document.getElementById(id);
+                if (el) el.remove();
+            }
+
+            function getDemoReply(query) {
+                const q = (query || '').toLowerCase();
+                if (q.includes('hour') || q.includes('open') || q.includes('time')) return "We're open Mon–Fri 9am–5pm EST.";
+                if (q.includes('pricing') || q.includes('price') || q.includes('cost') || q.includes('plan')) return 'Pricing depends on your plan. Check our pricing page or add your API key for real answers.';
+                if (q.includes('start') || q.includes('get started')) return 'Sign up and add your API key in the widget to connect your chatbot.';
+                if (q.includes('service') || q.includes('offer')) return 'We offer AI chatbot, lead capture, and CRM. Add your API key for your own content.';
+                if (q.includes('hello') || q.includes('hi') || q.includes('hey')) return "Hi! This is demo mode. Ask about hours, pricing, or services — or add your API key for real AI.";
+                return 'Got it. Add your API key above for real answers from your FAQ and knowledge base.';
+            }
+
+            async function sendWidgetMessage() {
+                const message = inputEl.value.trim();
+                if (!message || !apiKeySet) return;
+
+                addWidgetMessage('user', message);
+                inputEl.value = '';
+                sendBtn.disabled = true;
+                const loadingId = addWidgetMessage('loading', 'Thinking...');
+
+                if (demoMode) {
+                    setTimeout(function() {
+                        removeWidgetMessage(loadingId);
+                        const reply = getDemoReply(message);
+                        addWidgetMessage('bot', reply, { question: message, answer: reply, retrieved_doc_ids: [] });
+                        sendBtn.disabled = false;
+                        inputEl.focus();
+                    }, 700);
+                    return;
+                }
+
+                try {
+                    const response = await window.Fikiri.Chatbot.query(message, { conversationId: conversationId });
+                    removeWidgetMessage(loadingId);
+                    if (response.success) {
+                        const answerText = response.response || response.answer || 'Got it.';
+                        const docIds = Array.isArray(response.retrieved_doc_ids)
+                            ? response.retrieved_doc_ids.filter(Boolean)
+                            : (response.sources || []).map(function(s) { return s.id || s.document_id; }).filter(Boolean);
+                        addWidgetMessage('bot', answerText, { question: message, answer: answerText, retrieved_doc_ids: docIds });
+                        if (response.conversation_id) conversationId = response.conversation_id;
+                    } else {
+                        addWidgetMessage('bot', 'Error: ' + (response.error || 'Unknown'));
+                    }
+                } catch (err) {
+                    removeWidgetMessage(loadingId);
+                    addWidgetMessage('bot', 'Error: ' + err.message);
+                } finally {
+                    sendBtn.disabled = false;
+                    inputEl.focus();
+                }
+            }
+
+            sendBtn.addEventListener('click', sendWidgetMessage);
+            inputEl.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') sendWidgetMessage();
+            });
+        })();
+    </script>
+</body>
+</html>

@@ -252,34 +252,35 @@ export const Login: React.FC = () => {
   const handleMicrosoftLogin = async () => {
     setIsMicrosoftLoading(true)
     setError('')
-    
     try {
-      // Get user ID from localStorage or create a temporary one
-      let userId = localStorage.getItem('fikiri-user-id')
-      if (!userId) {
-        userId = 'temp_' + Date.now()
-        localStorage.setItem('fikiri-user-id', userId)
+      trackLogin('microsoft', 'oauth')
+      const redirectUri = `${window.location.origin}/integrations/outlook`
+      const result = await apiClient.startOutlookOAuth(redirectUri)
+      if (result?.url) {
+        window.location.href = result.url
+        return
       }
-      
-      const data = await apiClient.request<{ success: boolean; auth_url?: string; error?: string }>(
-        'POST',
-        '/auth/microsoft/connect',
-        { data: { user_id: userId } }
-      )
-
-      if (data.success && data.auth_url) {
-        // Track Microsoft login attempt
-        trackLogin('microsoft', 'oauth')
-        
-        // Redirect to Microsoft OAuth
-        window.location.href = data.auth_url
-      } else {
-        throw new Error(data.error || 'Failed to initiate Microsoft login')
-      }
+      throw new Error(result?.error || 'Outlook OAuth not configured')
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Microsoft login failed. Please try again.')
     } finally {
       setIsMicrosoftLoading(false)
+    }
+  }
+
+  const handleGmailLogin = async () => {
+    setError('')
+    try {
+      trackLogin('gmail', 'oauth')
+      const redirectUri = `${window.location.origin}/integrations/gmail`
+      const result = await apiClient.startGmailOAuth(redirectUri)
+      if (result?.url) {
+        window.location.href = result.url
+        return
+      }
+      throw new Error(result?.error || 'Gmail OAuth not configured')
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Gmail login failed. Please try again.')
     }
   }
 
@@ -586,6 +587,7 @@ export const Login: React.FC = () => {
               <div className="mt-6 grid grid-cols-3 gap-3">
                 <button
                   type="button"
+                  onClick={handleGmailLogin}
                   className="w-full inline-flex justify-center py-3 px-4 border border-gray-300 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary transition-all duration-200"
                 >
                   <Chrome className="h-5 w-5 mr-2" />
@@ -604,10 +606,12 @@ export const Login: React.FC = () => {
 
                 <button
                   type="button"
-                  className="w-full inline-flex justify-center py-3 px-4 border border-gray-300 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary transition-all duration-200"
+                  disabled
+                  title="Coming soon"
+                  className="w-full inline-flex justify-center py-3 px-4 border border-gray-200 rounded-xl shadow-sm bg-gray-50 text-sm font-medium text-gray-400 cursor-not-allowed"
                 >
                   <Github className="h-5 w-5 mr-2" />
-                  GitHub
+                  GitHub (soon)
                 </button>
               </div>
             </div>

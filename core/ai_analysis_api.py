@@ -58,7 +58,6 @@ class ContactAnalysisSchema(Schema):
     company = fields.Str(validate=validate.Length(max=255), allow_none=True)
     phone = fields.Str(validate=validate.Length(max=50), allow_none=True)
     job_title = fields.Str(validate=validate.Length(max=255), allow_none=True)
-    linkedin_url = fields.Url(allow_none=True)
     notes = fields.Str(allow_none=True)
     metadata = fields.Dict(allow_none=True)
 

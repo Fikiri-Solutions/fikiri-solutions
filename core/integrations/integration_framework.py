@@ -214,10 +214,12 @@ class IntegrationManager:
         try:
             # expires_at is stored as epoch seconds (INTEGER), return as int
             expires_at = token_data.get('expires_at')
-            if expires_at and isinstance(expires_at, str):
-                # Handle legacy timestamp strings (migration support)
+            if expires_at is not None and isinstance(expires_at, str):
                 try:
-                    expires_at = int(datetime.fromisoformat(expires_at).timestamp())
+                    if expires_at.isdigit():
+                        expires_at = int(expires_at)
+                    else:
+                        expires_at = int(datetime.fromisoformat(expires_at).timestamp())
                 except (ValueError, TypeError):
                     expires_at = None
             
