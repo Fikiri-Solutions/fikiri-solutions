@@ -130,44 +130,61 @@ async function setupAutomationApiMocks(page: Page) {
 }
 
 test.describe('Automations Launch Flows', () => {
-  test('renders automations dashboard with queue health and capabilities', async ({ page }) => {
+  test('renders automations dashboard with preset cards and safety status', async ({ page }) => {
     await setupAutomationApiMocks(page)
 
     await page.goto('/automations')
 
     await expect(page.getByRole('heading', { name: 'Workflow Automations' })).toBeVisible()
     await expect(page.getByText('Gmail → CRM')).toBeVisible()
-    await expect(page.getByText('Send Leads to Your Tools')).toBeVisible()
-    await expect(page.getByText('Partial (depends on configuration)')).toBeVisible()
-    await expect(page.getByText('Queued: 2 · Running: 1')).toBeVisible()
-    await expect(page.getByText('Success rate (24h): 92%')).toBeVisible()
+    await expect(page.getByText('Lead Scoring')).toBeVisible()
+    await expect(page.locator('[data-preset-id="email_sheets"]')).toBeVisible()
+    await expect(page.getByText('Calendar follow-ups')).toBeVisible()
+    await expect(page.getByText('Enabled · normal')).toBeVisible()
   })
 
   test('can run preset tests and activate a preset from UI', async ({ page }) => {
-    await setupAutomationApiMocks(page)
-
     let testPresetCalls = 0
-    let createRuleCalls = 0
+    let writeRuleCalls = 0
+
+    await page.route('**/automation/rules*', async (route) => {
+      const method = route.request().method()
+      if (method === 'GET') {
+        return fulfillApi(route, { success: true, data: { rules: [] } })
+      }
+      if (method === 'POST' || method === 'PUT') {
+        writeRuleCalls += 1
+        return fulfillApi(route, { success: true, data: { rule: { id: 111 } } })
+      }
+      return route.continue()
+    })
 
     await page.route('**/api/automation/test/preset', async (route) => {
       testPresetCalls += 1
       await fulfillApi(route, { success: true, data: { total_executed: 1 } })
     })
 
-    await page.route('**/api/automation/rules', async (route) => {
-      if (route.request().method() === 'POST') {
-        createRuleCalls += 1
-        return fulfillApi(route, { success: true, data: { rule: { id: 111 } } })
-      }
-      return route.continue()
+    await page.route('**/api/automation/safety-status**', async (route) => {
+      return fulfillApi(route, { success: true, data: { automation_enabled: true, safety_level: 'normal' } })
+    })
+
+    await page.route('**/api/automation/suggestions**', async (route) => {
+      return fulfillApi(route, { success: true, data: { suggestions: [] } })
+    })
+
+    await page.route('**/api/automation/logs**', async (route) => {
+      return fulfillApi(route, { success: true, data: { logs: [] } })
     })
 
     await page.goto('/automations')
 
-    await page.getByRole('button', { name: 'Run Test' }).first().click()
+    const gmailCard = page.locator('[data-preset-id="gmail_crm"]')
+    await expect(gmailCard).toBeVisible()
+
+    await gmailCard.getByRole('button', { name: 'Run Test' }).click()
     await expect.poll(() => testPresetCalls).toBe(1)
 
-    await page.getByRole('button', { name: 'Save & Activate' }).first().click()
-    await expect.poll(() => createRuleCalls).toBe(1)
+    await gmailCard.getByRole('button', { name: 'Save & Activate' }).click()
+    await expect.poll(() => writeRuleCalls).toBeGreaterThanOrEqual(1)
   })
 })

@@ -276,7 +276,7 @@ export const Automations: React.FC = () => {
   }
 
   const createMutation = useMutation({
-    mutationFn: apiClient.createAutomationRule,
+    mutationFn: (rule: Parameters<typeof apiClient.createAutomationRule>[0]) => apiClient.createAutomationRule(rule),
     onSuccess: () => {
       addToast({ type: 'success', title: 'Automation enabled' })
       refetchRules()
@@ -464,7 +464,7 @@ export const Automations: React.FC = () => {
             const lastMessage = lastLog?.action_result?.message || lastLog?.error_message
             const isTesting = testPresetMutation.isPending && testPresetMutation.variables === preset.id
             return (
-              <div key={preset.id} className="rounded-2xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm flex flex-col gap-4">
+              <div key={preset.id} data-preset-id={preset.id} className="rounded-2xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-xl bg-brand-accent/20">
