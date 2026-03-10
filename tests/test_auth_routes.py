@@ -95,10 +95,11 @@ class TestAuthRoutes(unittest.TestCase):
     @patch('routes.auth.business_analytics')
     @patch('routes.auth.log_security_event')
     @patch('routes.auth.secure_session_manager')
-    @patch('routes.auth.jwt_auth_manager')
+    @patch('routes.auth.get_jwt_manager')
     @patch('routes.auth.user_auth_manager')
-    def test_signup_success(self, mock_user_auth, mock_jwt_mgr, mock_session_mgr,
+    def test_signup_success(self, mock_user_auth, mock_get_jwt, mock_session_mgr,
                             mock_log, mock_analytics, mock_email_jobs):
+        mock_jwt_mgr = mock_get_jwt.return_value
         mock_user_auth.create_user.return_value = {
             'success': True,
             'user': {
@@ -136,8 +137,9 @@ class TestAuthRoutes(unittest.TestCase):
         self.assertIn('tokens', data['data'])
 
     @patch('routes.auth.db_optimizer')
-    @patch('routes.auth.jwt_auth_manager')
-    def test_refresh_token_uses_db_user(self, mock_jwt_mgr, mock_db):
+    @patch('routes.auth.get_jwt_manager')
+    def test_refresh_token_uses_db_user(self, mock_get_jwt, mock_db):
+        mock_jwt_mgr = mock_get_jwt.return_value
         mock_jwt_mgr.verify_access_token.return_value = {'user_id': 1}
         mock_db.execute_query.return_value = [{'id': 1, 'email': 'test@example.com', 'name': 'Test', 'role': 'user'}]
         mock_jwt_mgr.generate_tokens.return_value = {

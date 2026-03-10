@@ -13,7 +13,7 @@ from datetime import datetime
 
 # Import our authentication modules
 from core.user_auth import user_auth_manager
-from core.jwt_auth import jwt_auth_manager, jwt_required
+from core.jwt_auth import get_jwt_manager, jwt_required
 from core.secure_sessions import secure_session_manager
 from core.api_validation import validate_api_request, handle_api_errors, create_success_response, create_error_response
 from core.rate_limiter import rate_limit
@@ -144,7 +144,7 @@ def api_signup():
             'role': user_dict.get('role', 'user')
         }
 
-        tokens = jwt_auth_manager.generate_tokens(
+        tokens = get_jwt_manager().generate_tokens(
             user_data['id'],
             user_data,
             device_info=request.headers.get('User-Agent'),
@@ -311,7 +311,7 @@ def refresh_token():
         token = auth_header.split(' ')[1]
         
         # Verify current token
-        payload = jwt_auth_manager.verify_access_token(token)
+        payload = get_jwt_manager().verify_access_token(token)
         
         if not payload or payload.get('error'):
             return create_error_response("Invalid or expired token", 401, 'INVALID_TOKEN')
@@ -333,7 +333,7 @@ def refresh_token():
         if not user_data:
             return create_error_response("User not found", 404, 'USER_NOT_FOUND')
         
-        new_tokens = jwt_auth_manager.generate_tokens(
+        new_tokens = get_jwt_manager().generate_tokens(
             user_id=user_id,
             user_data=user_data,
             device_info=request.headers.get('User-Agent'),
