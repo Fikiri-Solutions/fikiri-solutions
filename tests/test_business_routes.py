@@ -464,6 +464,23 @@ class TestBusinessRoutes(unittest.TestCase):
         response = self.client.get("/api/automation/rules")
         self.assertEqual(response.status_code, 401)
 
+    @patch("routes.business.get_current_user_id")
+    def test_get_automation_capabilities_requires_auth(self, mock_get_user):
+        mock_get_user.return_value = None
+        response = self.client.get("/api/automation/capabilities")
+        self.assertEqual(response.status_code, 401)
+
+    @patch("routes.business.automation_engine")
+    @patch("routes.business.get_current_user_id")
+    def test_get_automation_capabilities_success(self, mock_get_user, mock_engine):
+        mock_get_user.return_value = 1
+        mock_engine.get_action_capabilities.return_value = {"success": True, "data": {"capabilities": [{"action_type": "trigger_webhook", "capability": "implemented"}]}}
+        response = self.client.get("/api/automation/capabilities")
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data.get("success"))
+        self.assertIn("capabilities", data.get("data", {}))
+
     @patch("routes.business.automation_engine")
     @patch("routes.business.get_current_user_id")
     def test_get_automation_rules_success(self, mock_get_user, mock_engine):
@@ -540,14 +557,26 @@ class TestBusinessRoutes(unittest.TestCase):
     @patch("routes.business.get_current_user_id")
     def test_execute_automation_success(self, mock_get_user, mock_plan, mock_engine):
         mock_get_user.return_value = 1
-        mock_engine.execute_rules.return_value = []
-        response = self.client.post(
-            "/api/automation/execute",
-            json={"rule_ids": [1]},
-            content_type="application/json",
-        )
+        with patch("services.automation_queue.automation_job_manager") as mock_mgr:
+            mock_mgr.queue_automation_job.return_value = "automation_test123"
+            mock_mgr.process_automation_job.return_value = {
+                "success": True,
+                "status": "success",
+                "execution_results": [],
+            }
+            with patch("core.redis_queues.get_automation_queue") as mock_get_q:
+                mock_q = mock_get_q.return_value
+                mock_q.is_connected.return_value = False
+                response = self.client.post(
+                    "/api/automation/execute",
+                    json={"rule_ids": [1]},
+                    content_type="application/json",
+                )
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.get_json().get("success"))
+        data = response.get_json().get("data", {})
+        self.assertIn("job_id", data)
+        self.assertEqual(data.get("status"), "completed")
 
     @patch("routes.business.automation_safety_manager")
     @patch("routes.business.get_current_user_id")

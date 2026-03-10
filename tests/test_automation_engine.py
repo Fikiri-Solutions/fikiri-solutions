@@ -57,6 +57,28 @@ class TestAutomationEngine(unittest.TestCase):
         self.assertIn("rules", result["data"])
         self.assertIsInstance(result["data"]["rules"], list)
 
+    def test_send_notification_without_webhook_returns_not_implemented(self):
+        result = self.engine._execute_send_notification(
+            {"message": "Hi", "type": "info"}, {}, 1
+        )
+        self.assertFalse(result.get("success"))
+        self.assertEqual(result.get("error_code"), "NOT_IMPLEMENTED")
+
+    @patch("requests.post")
+    def test_send_notification_with_webhook_posts_to_slack(self, mock_post):
+        mock_post.return_value = MagicMock(status_code=200)
+        mock_post.return_value.raise_for_status = MagicMock()
+        result = self.engine._execute_send_notification(
+            {"message": "Hi", "type": "info", "slack_webhook_url": "https://hooks.slack.com/x"},
+            {},
+            1,
+        )
+        self.assertTrue(result.get("success"))
+        mock_post.assert_called_once()
+        call_kw = mock_post.call_args[1]
+        self.assertIn("text", call_kw["json"])
+        self.assertIn("info", call_kw["json"]["text"])
+
 
 if __name__ == "__main__":
     unittest.main()

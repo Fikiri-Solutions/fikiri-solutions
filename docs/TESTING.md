@@ -127,6 +127,8 @@ INTEGRATION_LOGIN_EMAIL=test@example.com INTEGRATION_LOGIN_PASSWORD=TestPassword
 ./scripts/run_launch_readiness.sh
 ```
 
+**E2E (Playwright) note:** In specs that mock API routes (e.g. `frontend/tests/e2e.automations.spec.ts`), prefer asserting on **real outbound requests** (e.g. `page.waitForRequest(...)`) rather than counting mock-handler invocations. When multiple handlers can fulfill the same URL, handler counters may stay 0 and cause flaky failures; waiting for the actual request the browser sends is more reliable.
+
 ---
 
 ## 4. What’s left (high-value test gaps)

@@ -34,6 +34,22 @@ export interface MetricData {
   avgResponseTime: number
 }
 
+export interface IndustryPromptConfig {
+  industry: string
+  tone: string
+  focus_areas: string[]
+  tools: string[]
+  pricing_tier: string
+}
+
+export interface IndustryUsageMetrics {
+  tier: string
+  responses: number
+  tool_calls: number
+  tokens: number
+  monthly_cost: number
+}
+
 export interface ServiceData {
   id: string
   name: string
@@ -504,11 +520,39 @@ class ApiClient {
   }
 
   // Dashboard endpoints
-  async getDashboardTimeseries(userId: number = 1, period: 'week' | 'month' | 'quarter' = 'week'): Promise<any> {
+  async getDashboardTimeseries(userId?: number, period: 'week' | 'month' | 'quarter' = 'week'): Promise<any> {
+    const uid = userId ?? this.getUserId() ?? 1
     const response = await this.client.get('/dashboard/timeseries', {
-      params: { user_id: userId, period }
+      params: { user_id: uid, period }
     })
     return response.data
+  }
+
+  async getIndustryPrompts(): Promise<Record<string, IndustryPromptConfig>> {
+    const response = await this.client.get('/dashboard/industry/prompts')
+    const data = response.data?.data || response.data || {}
+    return data.prompts || {}
+  }
+
+  async getIndustryPricingTiers(): Promise<Record<string, any>> {
+    const response = await this.client.get('/dashboard/industry/pricing')
+    const data = response.data?.data || response.data || {}
+    return data.pricing_tiers || {}
+  }
+
+  async getIndustryUsage(userId?: number): Promise<IndustryUsageMetrics> {
+    const uid = userId ?? this.getUserId() ?? 1
+    const response = await this.client.get('/dashboard/industry/usage', {
+      params: { user_id: uid }
+    })
+    const data = response.data?.data || response.data || {}
+    return data.usage || {
+      tier: 'starter',
+      responses: 0,
+      tool_calls: 0,
+      tokens: 0,
+      monthly_cost: 49
+    }
   }
 
   async getDashboardMetrics(userId: number = 1): Promise<any> {
@@ -701,6 +745,60 @@ class ApiClient {
       params: { user_id: userId }
     })
     return response.data?.data?.suggestions || response.data?.suggestions || []
+  }
+
+  async getAutomationCapabilities(): Promise<{ action_type: string; capability: 'implemented' | 'partial' | 'stub'; description?: string }[]> {
+    const response = await this.client.get('/automation/capabilities')
+    return response.data?.data?.capabilities || response.data?.capabilities || []
+  }
+
+  async getAutomationQueueStats(): Promise<{
+    queued: number
+    running: number
+    success: number
+    failed: number
+    retrying: number
+    dead: number
+  }> {
+    const response = await this.client.get('/automation/queue-stats')
+    return response.data?.data || response.data || {}
+  }
+
+  async getAutomationMetrics(params?: { hours?: number }): Promise<{
+    queued: number
+    running: number
+    success: number
+    failed: number
+    retrying: number
+    dead: number
+    success_rate_24h?: number | null
+    total_success_24h?: number
+    total_failed_24h?: number
+    total_dead_24h?: number
+    p95_duration_seconds?: number | null
+    period_hours?: number
+  }> {
+    const response = await this.client.get('/automation/metrics', {
+      params: params?.hours ? { hours: params.hours } : undefined
+    })
+    return response.data?.data || response.data || {}
+  }
+
+  async getAutomationJobStatus(jobId: string): Promise<{
+    job_id: string
+    user_id: number
+    payload_type: string
+    status: string
+    attempt: number
+    max_attempts: number
+    created_at: string
+    started_at?: string
+    completed_at?: string
+    error_message?: string
+    result?: any
+  } | null> {
+    const response = await this.client.get(`/automation/jobs/${encodeURIComponent(jobId)}`)
+    return response.data?.data || response.data || null
   }
 
   async getAutomationLogs(params?: { ruleId?: number; slug?: string; limit?: number }): Promise<AutomationLog[]> {

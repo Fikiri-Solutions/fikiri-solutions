@@ -27,14 +27,21 @@ logger = logging.getLogger(__name__)
 def register_tasks():
     """Register all task functions with queues"""
     from core.redis_queues import (
-        email_queue, ai_queue, crm_queue,
+        email_queue, ai_queue, crm_queue, automation_queue,
         get_email_queue, get_ai_queue, get_crm_queue
     )
     from email_automation.gmail_sync_jobs import GmailSyncJobManager
-    
+
     # Register Gmail sync task
     sync_job_manager = GmailSyncJobManager()
     email_queue.register_task('process_gmail_sync', sync_job_manager.process_sync_job)
+
+    # Register automation run task
+    try:
+        from services.automation_queue import process_automation_run
+        automation_queue.register_task('process_automation_run', process_automation_run)
+    except Exception as e:
+        logger.warning("Could not register process_automation_run task: %s", e)
     
     # Register email sending task (if exists)
     try:
@@ -67,7 +74,7 @@ def register_tasks():
 def start_worker(queue_name: Optional[str] = None):
     """Start RQ worker for specified queue"""
     from core.redis_queues import (
-        email_queue, ai_queue, crm_queue,
+        email_queue, ai_queue, crm_queue, automation_queue,
         start_worker as rq_start_worker
     )
     
@@ -79,7 +86,8 @@ def start_worker(queue_name: Optional[str] = None):
         queue_map = {
             'email': email_queue,
             'ai': ai_queue,
-            'crm': crm_queue
+            'crm': crm_queue,
+            'automation': automation_queue,
         }
         if queue_name not in queue_map:
             logger.error(f"Unknown queue: {queue_name}. Available: {list(queue_map.keys())}")
@@ -88,7 +96,8 @@ def start_worker(queue_name: Optional[str] = None):
         worker_name = f"rq-worker-{queue_name}"
     else:
         # Process all queues
-        queues = [email_queue, ai_queue, crm_queue]
+        from core.redis_queues import automation_queue
+        queues = [email_queue, ai_queue, crm_queue, automation_queue]
         worker_name = "rq-worker-all"
     
     logger.info(f"🚀 Starting {worker_name}")

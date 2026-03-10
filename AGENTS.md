@@ -28,3 +28,23 @@ See `README.md` for canonical commands. Quick reference:
 - **Frontend type-check**: `cd frontend && npx tsc --noEmit` (3 pre-existing errors in `Dashboard.tsx`)
 - **Frontend tests**: `cd frontend && npx vitest run` (some pre-existing Toast test failures)
 - **Frontend build**: `cd frontend && npm run build`
+
+### Admin routes (when building)
+
+- **No separate admin portal.** Keep one app; add an `/admin` section with role-based access.
+- **RBAC + server-side enforcement:** Use capability-based permissions (e.g. `budget.approve`, `users.manage_roles`); backend decorators/middleware must enforce every admin action. Never rely on frontend hiding alone.
+- **Audit log** all admin actions (actor, action, target, before/after, timestamp, IP).
+- **First lean slice:** One admin endpoint for approve/revoke budget soft-stop override + one `/admin/budgets` UI for pending approvals.
+- Full strategy: [docs/ADMIN_ROUTES_STRATEGY.md](docs/ADMIN_ROUTES_STRATEGY.md).
+
+### Quality gate (automation, queues, workflows)
+
+Before marking queue/workflow/automation features "done", follow the protocol in [docs/CURSOR_QUALITY_GATE.md](docs/CURSOR_QUALITY_GATE.md):
+
+- Build a **contract table** (claim → expected behavior → code location → pass/fail).
+- Model **state transitions** explicitly (event → from_state → to_state → side effects); reject labels like `retrying` with no re-enqueue or scheduler.
+- Run a **failure-first review**: partial failures, retries exhausted, idempotency, auth scoping, HTTP contract.
+- Require **branch-complete tests** (success + at least one failure/retry/idempotency branch per critical path).
+- Report findings by **severity** (critical / high / medium / low).
+
+Prompt to use: *"Before writing code, create a contract-vs-implementation checklist for this feature. Then implement with explicit state-transition guarantees. After coding, run a failure-first review: partial failure handling, retries, idempotency, auth scoping, and HTTP contract consistency. Do not report success until each claim has code evidence and test coverage for success + failure branches."*

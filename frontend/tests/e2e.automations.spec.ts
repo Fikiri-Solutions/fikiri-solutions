@@ -130,14 +130,35 @@ async function setupAutomationApiMocks(page: Page) {
 }
 
 test.describe('Automations Launch Flows', () => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    // Keep this suite focused on desktop authenticated journeys.
+    if (!['e2e', 'admin-e2e'].includes(testInfo.project.name)) {
+      test.skip()
+    }
+
+    // RouteGuard/AuthContext initialize from localStorage; seed a stable signed-in user.
+    await page.addInitScript(() => {
+      const user = {
+        id: 1,
+        email: 'launch-test@example.com',
+        name: 'Launch Test',
+        role: 'user',
+        onboarding_completed: true,
+        onboarding_step: 4,
+      }
+      localStorage.setItem('fikiri-user', JSON.stringify(user))
+      localStorage.setItem('fikiri-user-id', String(user.id))
+    })
+  })
+
   test('renders automations dashboard with queue health and capabilities', async ({ page }) => {
     await setupAutomationApiMocks(page)
 
     await page.goto('/automations')
 
     await expect(page.getByRole('heading', { name: 'Workflow Automations' })).toBeVisible()
-    await expect(page.getByText('Gmail → CRM')).toBeVisible()
-    await expect(page.getByText('Send Leads to Your Tools')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Gmail → CRM' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Send Leads to Your Tools' })).toBeVisible()
     await expect(page.getByText('Partial (depends on configuration)')).toBeVisible()
     await expect(page.getByText('Queued: 2 · Running: 1')).toBeVisible()
     await expect(page.getByText('Success rate (24h): 92%')).toBeVisible()
@@ -147,19 +168,10 @@ test.describe('Automations Launch Flows', () => {
     await setupAutomationApiMocks(page)
 
     let testPresetCalls = 0
-    let createRuleCalls = 0
 
     await page.route('**/api/automation/test/preset', async (route) => {
       testPresetCalls += 1
       await fulfillApi(route, { success: true, data: { total_executed: 1 } })
-    })
-
-    await page.route('**/api/automation/rules', async (route) => {
-      if (route.request().method() === 'POST') {
-        createRuleCalls += 1
-        return fulfillApi(route, { success: true, data: { rule: { id: 111 } } })
-      }
-      return route.continue()
     })
 
     await page.goto('/automations')
@@ -167,7 +179,12 @@ test.describe('Automations Launch Flows', () => {
     await page.getByRole('button', { name: 'Run Test' }).first().click()
     await expect.poll(() => testPresetCalls).toBe(1)
 
-    await page.getByRole('button', { name: 'Save & Activate' }).first().click()
-    await expect.poll(() => createRuleCalls).toBe(1)
+    const activationRequest = page.waitForRequest(
+      req => req.url().includes('/api/automation/rules') && ['POST', 'PUT'].includes(req.method()),
+      { timeout: 5000 }
+    )
+    const gmailCard = page.locator('div.rounded-2xl', { has: page.getByRole('heading', { name: 'Gmail → CRM' }) }).first()
+    await gmailCard.getByRole('button', { name: 'Save & Activate' }).click()
+    await activationRequest
   })
 })

@@ -383,6 +383,7 @@ email_queue = RedisQueue("fikiri:email")
 ai_queue = RedisQueue("fikiri:ai")
 crm_queue = RedisQueue("fikiri:crm")
 webhook_queue = RedisQueue("fikiri:webhook")
+automation_queue = RedisQueue("fikiri:automation")
 
 def get_email_queue() -> RedisQueue:
     """Get email processing queue"""
@@ -395,6 +396,10 @@ def get_ai_queue() -> RedisQueue:
 def get_crm_queue() -> RedisQueue:
     """Get CRM processing queue"""
     return crm_queue
+
+def get_automation_queue() -> RedisQueue:
+    """Get automation execution queue"""
+    return automation_queue
 
 def get_redis_queue() -> RedisQueue:
     """Get default Redis queue instance"""

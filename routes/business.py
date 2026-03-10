@@ -16,6 +16,7 @@ from datetime import datetime
 # Import business logic modules
 from crm.service import enhanced_crm_service
 from core.database_optimization import db_optimizer
+from core.ai_budget_guardrails import ai_budget_guardrails
 from core.api_validation import handle_api_errors, create_success_response, create_error_response
 from services.automation_engine import AutomationEngine, TriggerType
 # Create automation_engine instance for backward compatibility
@@ -816,6 +817,16 @@ def analyze_email():
         
         if not content:
             return create_error_response("Email content is required", 400, 'MISSING_CONTENT')
+
+        budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
+        if not budget_decision.allowed:
+            return create_error_response(
+                "AI monthly budget cap reached. Upgrade or wait until next billing period."
+                if budget_decision.reason == "monthly_budget_cap_reached"
+                else "AI monthly budget approval required.",
+                402,
+                "AI_BUDGET_SOFT_STOP"
+            )
         
         try:
             from email_automation.ai_assistant import MinimalAIEmailAssistant
@@ -839,6 +850,7 @@ def analyze_email():
                 'confidence': classification.get('confidence', 0.8) if classification else 0.8,
                 'contact_info': contact_info
             }
+            ai_budget_guardrails.record_ai_usage(user_id, 1)
             
             return create_success_response(analysis, 'Email analyzed successfully')
             
@@ -884,6 +896,16 @@ def generate_reply():
         
         if not content:
             return create_error_response("Email content is required", 400, 'MISSING_CONTENT')
+
+        budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
+        if not budget_decision.allowed:
+            return create_error_response(
+                "AI monthly budget cap reached. Upgrade or wait until next billing period."
+                if budget_decision.reason == "monthly_budget_cap_reached"
+                else "AI monthly budget approval required.",
+                402,
+                "AI_BUDGET_SOFT_STOP"
+            )
         
         try:
             from email_automation.ai_assistant import MinimalAIEmailAssistant
@@ -901,6 +923,7 @@ def generate_reply():
             
             # Generate reply
             reply = ai_assistant.generate_response(content, sender_name, subject, intent)
+            ai_budget_guardrails.record_ai_usage(user_id, 1)
             
             return create_success_response({'reply': reply}, 'Reply generated successfully')
             
@@ -1316,10 +1339,26 @@ def get_automation_suggestions():
         logger.error(f"Get automation suggestions error: {e}")
         return create_error_response("Failed to retrieve automation suggestions", 500, 'AUTOMATION_SUGGESTIONS_ERROR')
 
+@business_bp.route('/automation/capabilities', methods=['GET'])
+@handle_api_errors
+def get_automation_capabilities():
+    """Get per-action capability flags (implemented | partial | stub) for UI. Requires auth."""
+    try:
+        user_id = get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+        result = automation_engine.get_action_capabilities()
+        if result['success']:
+            return create_success_response(result['data'], 'Capabilities retrieved')
+        return create_error_response(result.get('error', 'Failed to get capabilities'), 500, 'AUTOMATION_CAPABILITIES_ERROR')
+    except Exception as e:
+        logger.error(f"Get automation capabilities error: {e}")
+        return create_error_response("Failed to retrieve capabilities", 500, 'AUTOMATION_CAPABILITIES_ERROR')
+
 @business_bp.route('/automation/execute', methods=['POST'])
 @handle_api_errors
 def execute_automation():
-    """Execute automation rules"""
+    """Execute automation rules. Queues to Redis when available; otherwise runs synchronously."""
     try:
         user_id = get_current_user_id()
         if not user_id:
@@ -1334,16 +1373,106 @@ def execute_automation():
         if 'rule_ids' not in data:
             return create_error_response("Rule IDs are required", 400, 'MISSING_RULE_IDS')
 
-        execution_result = automation_engine.execute_rules(user_id, data['rule_ids'])
-        
+        rule_ids = data['rule_ids']
+        idempotency_key = data.get('idempotency_key')
+
+        from services.automation_queue import automation_job_manager
+        job_id = automation_job_manager.queue_automation_job(
+            user_id,
+            rule_ids=rule_ids,
+            idempotency_key=idempotency_key,
+        )
+        if not job_id:
+            return create_error_response("Duplicate run (idempotency) or queue failed", 409, 'DUPLICATE_OR_QUEUE_FAILED')
+
+        try:
+            from core.redis_queues import get_automation_queue
+            aq = get_automation_queue()
+            if aq.is_connected():
+                if 'process_automation_run' not in aq._registered_tasks:
+                    from services.automation_queue import process_automation_run
+                    aq.register_task('process_automation_run', process_automation_run)
+                aq.enqueue_job('process_automation_run', {'job_id': job_id}, max_retries=2)
+                return create_success_response(
+                    {'job_id': job_id, 'status': 'queued'},
+                    'Automation job queued'
+                )
+        except Exception as queue_err:
+            logger.warning("Automation queue enqueue failed, running sync: %s", queue_err)
+
+        result = automation_job_manager.process_automation_job(job_id)
+        if result.get('error_code') == 'NOT_IMPLEMENTED':
+            return create_error_response(
+                result.get('error', 'Action not implemented'),
+                501,
+                'NOT_IMPLEMENTED'
+            )
+        if not result.get('success'):
+            return create_error_response(
+                result.get('error', 'Execution failed'),
+                500,
+                'AUTOMATION_EXECUTION_ERROR'
+            )
         return create_success_response(
-            {'execution_results': execution_result}, 
+            {'job_id': job_id, 'status': 'completed', 'execution_results': result.get('execution_results', [])},
             'Automation rules executed successfully'
         )
-        
     except Exception as e:
         logger.error(f"Execute automation error: {e}")
         return create_error_response("Failed to execute automation rules", 500, 'AUTOMATION_EXECUTION_ERROR')
+
+@business_bp.route('/automation/jobs/<job_id>', methods=['GET'])
+@handle_api_errors
+def get_automation_job_status(job_id):
+    """Get automation job status and result."""
+    try:
+        user_id = get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+        from services.automation_queue import automation_job_manager
+        status = automation_job_manager.get_job_status(job_id, user_id=user_id)
+        if not status:
+            return create_error_response("Job not found", 404, 'JOB_NOT_FOUND')
+        return create_success_response(status, 'Job status retrieved')
+    except Exception as e:
+        logger.error(f"Get automation job status error: {e}")
+        return create_error_response("Failed to get job status", 500, 'AUTOMATION_JOB_ERROR')
+
+@business_bp.route('/automation/queue-stats', methods=['GET'])
+@handle_api_errors
+def get_automation_queue_stats():
+    """Get automation queue depth (queued, running, success, failed, dead) for observability."""
+    try:
+        user_id = get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+        from services.automation_queue import automation_job_manager
+        depth = automation_job_manager.get_queue_depth()
+        return create_success_response(depth, 'Queue stats retrieved')
+    except Exception as e:
+        logger.error(f"Get automation queue stats error: {e}")
+        return create_error_response("Failed to get queue stats", 500, 'AUTOMATION_QUEUE_ERROR')
+
+@business_bp.route('/automation/metrics', methods=['GET'])
+@handle_api_errors
+def get_automation_metrics():
+    """Get automation metrics: queue depth, success rate, p95 duration (for activity/health panel)."""
+    try:
+        user_id = get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+        hours = request.args.get('hours', 24, type=int)
+        hours = max(1, min(168, hours))
+
+        from services.automation_queue import automation_job_manager
+        metrics = automation_job_manager.get_automation_metrics(user_id=user_id, hours=hours)
+        return create_success_response(metrics, 'Metrics retrieved')
+    except Exception as e:
+        logger.error(f"Get automation metrics error: {e}")
+        return create_error_response("Failed to get metrics", 500, 'AUTOMATION_METRICS_ERROR')
 
 @business_bp.route('/automation/kill-switch', methods=['POST'])
 @handle_api_errors
@@ -1458,7 +1587,14 @@ def test_automation():
             return create_error_response("rule_id is required", 400, 'MISSING_RULE_ID')
         
         result = automation_engine.test_rule(rule_id, test_data, user_id)
-        
+        if result.get('error_code') == 'NOT_IMPLEMENTED':
+            return create_error_response(
+                result.get('error', 'Action not implemented'),
+                501,
+                'NOT_IMPLEMENTED'
+            )
+        if not result.get('success'):
+            return create_error_response(result.get('error', 'Test failed'), 500, 'AUTOMATION_TEST_FAILED')
         return create_success_response(result, "Automation test completed")
     except Exception as e:
         logger.error(f"❌ Automation test failed: {e}")
@@ -2157,8 +2293,16 @@ def test_automation_preset():
             return create_error_response("Unknown preset", 400, 'UNKNOWN_PRESET')
         
         result = automation_engine.execute_automation_rules(mapping['trigger'], mapping['data'], user_id)
-        if result['success']:
-            return create_success_response(result['data'], 'Preset executed')
+        failed = result.get('data', {}).get('failed_rules', [])
+        not_impl = next((f for f in failed if f.get('error_code') == 'NOT_IMPLEMENTED'), None)
+        if not_impl:
+            return create_error_response(
+                not_impl.get('error') or 'Action not implemented',
+                501,
+                'NOT_IMPLEMENTED'
+            )
+        if result.get('success'):
+            return create_success_response(result.get('data', {}), 'Preset executed')
         return create_error_response(result.get('error', 'Execution failed'), 500, 'AUTOMATION_EXECUTION_ERROR')
         
     except Exception as e:

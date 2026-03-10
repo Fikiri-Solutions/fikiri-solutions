@@ -13,7 +13,8 @@ import {
   History,
   AlertTriangle,
   PlayCircle,
-  CheckCircle2
+  CheckCircle2,
+  BarChart3
 } from 'lucide-react'
 import { apiClient, AutomationLog, AutomationRule, AutomationSafetyStatus } from '../services/apiClient'
 import { useToast } from '../components/Toast'
@@ -90,6 +91,7 @@ const automationPresets: AutomationPreset[] = [
     actionType: 'send_notification',
     defaultConfig: { channel: '#sales', frequency: 'daily' },
     configFields: [
+      { key: 'slack_webhook_url', label: 'Slack webhook URL', type: 'text', helper: 'Incoming Webhook URL from Slack (required for delivery)' },
       { key: 'channel', label: 'Slack channel', type: 'text', helper: 'Example: #leads' },
       {
         key: 'frequency',
@@ -239,6 +241,29 @@ export const Automations: React.FC = () => {
     gcTime: 30 * 60 * 1000, // 30 minutes
   })
 
+  const { data: capabilities = [] } = useQuery({
+    queryKey: ['automation-capabilities'],
+    queryFn: () => apiClient.getAutomationCapabilities(),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  })
+
+  const capabilityByAction = useMemo(() => {
+    const map: Record<string, 'implemented' | 'partial' | 'stub'> = {}
+    capabilities.forEach((c: { action_type: string; capability: string }) => {
+      map[c.action_type] = c.capability as 'implemented' | 'partial' | 'stub'
+    })
+    return map
+  }, [capabilities])
+
+  const { data: automationMetrics, isFetching: metricsLoading } = useQuery({
+    queryKey: ['automation-metrics'],
+    queryFn: () => apiClient.getAutomationMetrics({ hours: 24 }),
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchInterval: 2 * 60 * 1000,
+  })
+
   const { data: automationLogs = [], refetch: refetchLogs, isFetching: logsLoading } = useQuery<AutomationLog[]>({
     queryKey: ['automation-logs'],
     queryFn: () => apiClient.getAutomationLogs({ limit: 50 }),
@@ -266,8 +291,14 @@ export const Automations: React.FC = () => {
       refetchLogs()
     },
     onError: (error: any) => {
-      const message = error?.response?.data?.error || 'Preset failed to execute'
-      addToast({ type: 'error', title: message })
+      const data = error?.response?.data
+      const message = data?.error || data?.message || 'Preset failed to execute'
+      const is501 = error?.response?.status === 501
+      addToast({
+        type: 'error',
+        title: is501 ? 'Action not implemented' : 'Preset failed',
+        message: message
+      })
     }
   })
 
@@ -276,7 +307,14 @@ export const Automations: React.FC = () => {
   }
 
   const createMutation = useMutation({
-    mutationFn: apiClient.createAutomationRule,
+    mutationFn: (rule: {
+      name: string
+      description: string
+      trigger_type: string
+      trigger_conditions: Record<string, any>
+      action_type: string
+      action_parameters: Record<string, any>
+    }) => apiClient.createAutomationRule(rule),
     onSuccess: () => {
       addToast({ type: 'success', title: 'Automation enabled' })
       refetchRules()
@@ -422,6 +460,7 @@ export const Automations: React.FC = () => {
             Toggle always-on workflows without writing code. Each automation runs using your connected Gmail and CRM.
           </p>
         </div>
+        <div className="flex items-center gap-4 flex-wrap">
         <div className="rounded-2xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 px-5 py-3 shadow-sm">
           <div className="flex items-center gap-3">
             <Shield className="h-5 w-5 text-brand-primary" />
@@ -432,6 +471,32 @@ export const Automations: React.FC = () => {
               </p>
             </div>
           </div>
+        </div>
+        <div className="rounded-2xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 px-5 py-3 shadow-sm min-w-[200px]">
+          <div className="flex items-center gap-3">
+            <BarChart3 className="h-5 w-5 text-brand-primary" />
+            <div className="flex-1">
+              <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400">Queue health</p>
+              {metricsLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-brand-text/50 mt-0.5" />
+              ) : automationMetrics ? (
+                <div className="text-sm font-semibold text-brand-text dark:text-white space-y-0.5">
+                  <span className="block">Queued: {automationMetrics.queued ?? 0} · Running: {automationMetrics.running ?? 0}</span>
+                  <span className="block text-emerald-500 dark:text-emerald-400">Success: {automationMetrics.success ?? 0}</span>
+                  <span className="block text-rose-500 dark:text-rose-400">Failed: {automationMetrics.failed ?? 0} · Dead: {automationMetrics.dead ?? 0}</span>
+                  {automationMetrics.success_rate_24h != null && (
+                    <span className="block text-brand-text/70 dark:text-gray-300">
+                      Success rate (24h): {Math.round(automationMetrics.success_rate_24h * 100)}%
+                      {automationMetrics.p95_duration_seconds != null && ` · p95: ${automationMetrics.p95_duration_seconds}s`}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-brand-text/60 dark:text-gray-400">No metrics yet</p>
+              )}
+            </div>
+          </div>
+        </div>
         </div>
       </div>
 
@@ -457,6 +522,9 @@ export const Automations: React.FC = () => {
             const Icon = preset.icon
             const rule = findRuleForPreset(rules, preset.id)
             const isActive = rule?.status === 'active'
+            const capability = capabilityByAction[preset.actionType] ?? 'implemented'
+            const isStub = capability === 'stub'
+            const isPartial = capability === 'partial'
             const presetLogs = logsByPreset[preset.id] || []
             const lastLog = presetLogs[0]
             const statusKey = lastLog?.status || 'idle'
@@ -473,6 +541,16 @@ export const Automations: React.FC = () => {
                     <div>
                       <h3 className="text-lg font-semibold text-brand-text dark:text-white">{preset.name}</h3>
                       <p className="text-sm text-brand-text/70 dark:text-gray-400">{preset.description}</p>
+                      {isStub && (
+                        <span className="inline-block mt-1.5 px-2 py-0.5 rounded text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                          Not implemented yet
+                        </span>
+                      )}
+                      {isPartial && !isStub && (
+                        <span className="inline-block mt-1.5 px-2 py-0.5 rounded text-xs font-medium bg-blue-500/15 text-blue-600 dark:text-blue-400">
+                          Partial (depends on configuration)
+                        </span>
+                      )}
                     </div>
                   </div>
                   <button
@@ -539,7 +617,8 @@ export const Automations: React.FC = () => {
                       disabled={isTesting}
                       className={`text-sm font-medium inline-flex items-center gap-2 ${
                         isTesting ? 'text-brand-text/50 dark:text-gray-500 cursor-not-allowed' : 'text-brand-primary hover:text-brand-secondary'
-                      }`}
+                      } ${isStub ? 'opacity-75' : ''}`}
+                      title={isStub ? 'Run Test will return "Not implemented" until this action is built' : undefined}
                     >
                       <PlayCircle className="h-4 w-4" />
                       {isTesting ? 'Testing…' : 'Run Test'}

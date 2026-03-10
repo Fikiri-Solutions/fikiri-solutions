@@ -51,6 +51,44 @@ class AutomationStatus(Enum):
     PAUSED = "paused"
     ERROR = "error"
 
+
+class ActionCapability(Enum):
+    """Whether an action type is fully implemented, partial, or stub (not implemented)."""
+    IMPLEMENTED = "implemented"
+    PARTIAL = "partial"
+    STUB = "stub"
+
+
+# Per-action capability: do not fake success for STUB; return 501 from API.
+ACTION_CAPABILITIES: Dict[ActionType, ActionCapability] = {
+    ActionType.SEND_EMAIL: ActionCapability.STUB,
+    ActionType.UPDATE_LEAD_STAGE: ActionCapability.IMPLEMENTED,
+    ActionType.ADD_LEAD_ACTIVITY: ActionCapability.IMPLEMENTED,
+    ActionType.APPLY_LABEL: ActionCapability.STUB,
+    ActionType.ARCHIVE_EMAIL: ActionCapability.STUB,
+    ActionType.CREATE_TASK: ActionCapability.STUB,
+    ActionType.SEND_NOTIFICATION: ActionCapability.PARTIAL,
+    ActionType.SCHEDULE_FOLLOW_UP: ActionCapability.IMPLEMENTED,
+    ActionType.CREATE_CALENDAR_EVENT: ActionCapability.IMPLEMENTED,
+    ActionType.UPDATE_CRM_FIELD: ActionCapability.IMPLEMENTED,
+    ActionType.TRIGGER_WEBHOOK: ActionCapability.IMPLEMENTED,
+    ActionType.GENERATE_DOCUMENT: ActionCapability.PARTIAL,
+    ActionType.SEND_SMS: ActionCapability.PARTIAL,
+    ActionType.CREATE_INVOICE: ActionCapability.IMPLEMENTED,
+    ActionType.ASSIGN_TEAM_MEMBER: ActionCapability.IMPLEMENTED,
+}
+
+_ACTION_CAPABILITY_DESCRIPTIONS: Dict[ActionType, str] = {
+    ActionType.SEND_EMAIL: "Gmail send not integrated; use stub.",
+    ActionType.APPLY_LABEL: "Gmail label API not integrated.",
+    ActionType.ARCHIVE_EMAIL: "Gmail archive API not integrated.",
+    ActionType.CREATE_TASK: "Task system not integrated.",
+    ActionType.SEND_NOTIFICATION: "Works when Slack webhook URL is configured (action param or SLACK_WEBHOOK_URL).",
+    ActionType.TRIGGER_WEBHOOK: "Real HTTP POST with timeout and retries; optional HMAC signature.",
+    ActionType.GENERATE_DOCUMENT: "Depends on document templates.",
+    ActionType.SEND_SMS: "Works when Twilio is configured.",
+}
+
 @dataclass
 class AutomationRule:
     """Automation rule data structure"""
@@ -114,6 +152,17 @@ class AutomationEngine:
             ActionType.ASSIGN_TEAM_MEMBER: self._execute_assign_team_member
         }
     
+    def get_action_capabilities(self) -> Dict[str, Any]:
+        """Return per-action capability flags for UI/API. implemented | partial | stub."""
+        capabilities = []
+        for action_type, cap in ACTION_CAPABILITIES.items():
+            capabilities.append({
+                "action_type": action_type.value,
+                "capability": cap.value,
+                "description": _ACTION_CAPABILITY_DESCRIPTIONS.get(action_type, ""),
+            })
+        return {"success": True, "data": {"capabilities": capabilities}}
+
     def create_automation_rule(self, user_id: int, rule_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new automation rule"""
         try:
@@ -310,7 +359,8 @@ class AutomationEngine:
                         failed_rules.append({
                             'rule_id': rule.id,
                             'rule_name': rule.name,
-                            'error': execution_result['error']
+                            'error': execution_result.get('error'),
+                            'error_code': execution_result.get('error_code'),
                         })
             
             return {
@@ -420,7 +470,66 @@ class AutomationEngine:
                 'error': str(e),
                 'data': None
             }
-    
+
+    def execute_rules(self, user_id: int, rule_ids: List[int]) -> List[Dict[str, Any]]:
+        """Execute specific rules by ID (used by /automation/execute). Runs synchronously."""
+        results = []
+        for rule_id in rule_ids:
+            rule_data = db_optimizer.execute_query(
+                """SELECT id, user_id, name, description, trigger_type, trigger_conditions,
+                   action_type, action_parameters, status, created_at, updated_at,
+                   last_executed, execution_count, success_count, error_count
+                   FROM automation_rules WHERE id = ? AND user_id = ? AND status = ?""",
+                (rule_id, user_id, AutomationStatus.ACTIVE.value)
+            )
+            if not rule_data:
+                results.append({"rule_id": rule_id, "success": False, "error": "Rule not found or inactive"})
+                continue
+            rule = self._format_rule(rule_data[0])
+            # Build synthetic trigger data from trigger type for one-shot run
+            trigger_data = self._synthetic_trigger_data_for_rule(rule)
+            execution_result = self._execute_rule(rule, trigger_data)
+            results.append({
+                "rule_id": rule_id,
+                "rule_name": rule.name,
+                "success": execution_result.get("success", False),
+                "error": execution_result.get("error"),
+                "error_code": execution_result.get("error_code"),
+                "data": execution_result.get("data"),
+            })
+        return results
+
+    def _synthetic_trigger_data_for_rule(self, rule: AutomationRule) -> Dict[str, Any]:
+        """Build minimal trigger data for a rule when running by ID (e.g. test)."""
+        if rule.trigger_type == TriggerType.EMAIL_RECEIVED:
+            return {"sender_email": "test@example.com", "subject": "Test", "text": "Test run"}
+        if rule.trigger_type == TriggerType.LEAD_CREATED:
+            return {"lead_id": 0, "source": "manual"}
+        if rule.trigger_type == TriggerType.LEAD_STAGE_CHANGED:
+            return {"lead_id": 0, "old_stage": "new", "new_stage": "contacted"}
+        if rule.trigger_type == TriggerType.TIME_BASED:
+            return {"timestamp": datetime.now().isoformat()}
+        if rule.trigger_type == TriggerType.KEYWORD_DETECTED:
+            return {"text": "test keyword", "sender_email": "test@example.com"}
+        return {"trigger": rule.trigger_type.value}
+
+    def test_rule(self, rule_id: int, test_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+        """Test a single rule with provided trigger data (used by /automation/test)."""
+        rule_data = db_optimizer.execute_query(
+            """SELECT id, user_id, name, description, trigger_type, trigger_conditions,
+               action_type, action_parameters, status, created_at, updated_at,
+               last_executed, execution_count, success_count, error_count
+               FROM automation_rules WHERE id = ? AND user_id = ?""",
+            (rule_id, user_id)
+        )
+        if not rule_data:
+            return {"success": False, "error": "Rule not found", "error_code": "RULE_NOT_FOUND"}
+        rule = self._format_rule(rule_data[0])
+        trigger_data = test_data if test_data else self._synthetic_trigger_data_for_rule(rule)
+        result = self._execute_rule(rule, trigger_data)
+        result["rule_id"] = rule_id
+        return result
+
     def _validate_rule_data(self, rule_data: Dict[str, Any]) -> Dict[str, Any]:
         """Validate automation rule data"""
         required_fields = ['name', 'trigger_type', 'action_type']
@@ -525,17 +634,17 @@ class AutomationEngine:
             }
     
     def _execute_send_email(self, parameters: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Execute send email action"""
+        """Execute send email action. Stub: Gmail send not integrated."""
+        if ACTION_CAPABILITIES.get(ActionType.SEND_EMAIL) == ActionCapability.STUB:
+            return {
+                "success": False,
+                "error": "Send email is not yet implemented; Gmail send API not integrated.",
+                "error_code": "NOT_IMPLEMENTED",
+            }
         try:
-            # This would integrate with Gmail API to send emails
-            # For now, we'll simulate the action
-            
             template = parameters.get('template', 'default')
             delay_minutes = parameters.get('delay_minutes', 0)
-            
-            # Simulate email sending
             logger.info(f"Sending email using template: {template}")
-            
             return {
                 'success': True,
                 'data': {
@@ -545,12 +654,8 @@ class AutomationEngine:
                     'recipient': trigger_data.get('sender_email', 'unknown')
                 }
             }
-            
         except Exception as e:
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            return {'success': False, 'error': str(e)}
     
     def _execute_update_lead_stage(self, parameters: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Execute update lead stage action"""
@@ -600,73 +705,56 @@ class AutomationEngine:
             }
     
     def _execute_apply_label(self, parameters: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Execute apply label action"""
+        """Execute apply label action. Stub: Gmail label API not integrated."""
+        if ACTION_CAPABILITIES.get(ActionType.APPLY_LABEL) == ActionCapability.STUB:
+            return {
+                "success": False,
+                "error": "Apply label is not yet implemented; Gmail label API not integrated.",
+                "error_code": "NOT_IMPLEMENTED",
+            }
         try:
             label = parameters.get('label')
             email_id = trigger_data.get('email_id')
-            
             if not label or not email_id:
-                return {
-                    'success': False,
-                    'error': 'Missing label or email_id parameter'
-                }
-            
-            # This would integrate with Gmail API to apply labels
+                return {'success': False, 'error': 'Missing label or email_id parameter'}
             logger.info(f"Applying label {label} to email {email_id}")
-            
             return {
                 'success': True,
-                'data': {
-                    'action': 'label_applied',
-                    'label': label,
-                    'email_id': email_id
-                }
+                'data': {'action': 'label_applied', 'label': label, 'email_id': email_id}
             }
-            
         except Exception as e:
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            return {'success': False, 'error': str(e)}
     
     def _execute_archive_email(self, parameters: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Execute archive email action"""
+        """Execute archive email action. Stub: Gmail archive API not integrated."""
+        if ACTION_CAPABILITIES.get(ActionType.ARCHIVE_EMAIL) == ActionCapability.STUB:
+            return {
+                "success": False,
+                "error": "Archive email is not yet implemented; Gmail archive API not integrated.",
+                "error_code": "NOT_IMPLEMENTED",
+            }
         try:
             email_id = trigger_data.get('email_id')
-            
             if not email_id:
-                return {
-                    'success': False,
-                    'error': 'Missing email_id parameter'
-                }
-            
-            # This would integrate with Gmail API to archive emails
+                return {'success': False, 'error': 'Missing email_id parameter'}
             logger.info(f"Archiving email {email_id}")
-            
-            return {
-                'success': True,
-                'data': {
-                    'action': 'email_archived',
-                    'email_id': email_id
-                }
-            }
-            
+            return {'success': True, 'data': {'action': 'email_archived', 'email_id': email_id}}
         except Exception as e:
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            return {'success': False, 'error': str(e)}
     
     def _execute_create_task(self, parameters: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Execute create task action"""
+        """Execute create task action. Stub: task management not integrated."""
+        if ACTION_CAPABILITIES.get(ActionType.CREATE_TASK) == ActionCapability.STUB:
+            return {
+                "success": False,
+                "error": "Create task is not yet implemented; task management system not integrated.",
+                "error_code": "NOT_IMPLEMENTED",
+            }
         try:
             task_type = parameters.get('task_type', 'general')
             priority = parameters.get('priority', 'medium')
             description = parameters.get('description', 'Automated task')
-            
-            # This would integrate with a task management system
             logger.info(f"Creating {priority} priority {task_type} task: {description}")
-            
             return {
                 'success': True,
                 'data': {
@@ -676,36 +764,41 @@ class AutomationEngine:
                     'description': description
                 }
             }
-            
         except Exception as e:
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            return {'success': False, 'error': str(e)}
     
     def _execute_send_notification(self, parameters: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Execute send notification action"""
+        """Execute send notification. When slack_webhook_url (or SLACK_WEBHOOK_URL) is set, POST to Slack; else NOT_IMPLEMENTED."""
+        webhook_url = (parameters.get('slack_webhook_url') or parameters.get('webhook_url') or os.getenv('SLACK_WEBHOOK_URL') or '').strip()
+        if not webhook_url:
+            return {
+                "success": False,
+                "error": "Send notification requires slack_webhook_url in action parameters or SLACK_WEBHOOK_URL env.",
+                "error_code": "NOT_IMPLEMENTED",
+            }
+        message = parameters.get('message', 'Automation executed')
+        notification_type = parameters.get('type', 'info')
+        channel = parameters.get('channel')
+        # Build Slack payload (Incoming Webhooks)
+        payload = {"text": f"[{notification_type}] {message}"}
+        if channel:
+            payload["channel"] = channel
         try:
-            message = parameters.get('message', 'Automation executed')
-            notification_type = parameters.get('type', 'info')
-            
-            # This would integrate with notification system
-            logger.info(f"Sending {notification_type} notification: {message}")
-            
+            import requests
+            response = requests.post(webhook_url, json=payload, timeout=10)
+            response.raise_for_status()
+            logger.info("Slack notification sent to webhook")
             return {
                 'success': True,
                 'data': {
                     'action': 'notification_sent',
                     'message': message,
-                    'type': notification_type
+                    'type': notification_type,
                 }
             }
-            
         except Exception as e:
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            logger.warning("Slack webhook failed: %s", e)
+            return {'success': False, 'error': str(e), 'error_code': 'NOTIFICATION_DELIVERY_FAILED'}
     
     def _update_rule_stats(self, rule_id: int, success: bool):
         """Update rule execution statistics"""
@@ -919,25 +1012,62 @@ class AutomationEngine:
             logger.error(f"Error updating CRM field: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _execute_trigger_webhook(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Trigger a webhook"""
+    def _execute_trigger_webhook(self, parameters: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+        """Trigger a webhook via HTTP POST with timeout, retries, and optional signature."""
         try:
-            webhook_url = action_data.get('webhook_url')
-            payload = action_data.get('payload', {})
-            
-            # Add user context to payload
+            webhook_url = (parameters.get('webhook_url') or parameters.get('sheet_url') or '').strip()
+            if not webhook_url:
+                return {'success': False, 'error': 'Missing webhook_url', 'error_code': 'MISSING_URL'}
+            payload = dict(parameters.get('payload', {}))
             payload['user_id'] = user_id
             payload['timestamp'] = datetime.now().isoformat()
-            
-            # In a real implementation, you would make an HTTP request here
-            # For now, we'll log the webhook trigger
-            logger.info(f"Triggered webhook to {webhook_url} with payload: {payload}")
-            
-            return {'success': True, 'webhook_url': webhook_url}
-            
+            payload.setdefault('event', trigger_data.get('event_type', 'automation_triggered'))
+            for k, v in trigger_data.items():
+                if k not in payload:
+                    payload[k] = v
+
+            secret = parameters.get('webhook_secret')
+            body_bytes = json.dumps(payload, sort_keys=True).encode()
+            headers = {'Content-Type': 'application/json'}
+            if secret:
+                import hmac
+                import hashlib
+                sig = hmac.new(secret.encode() if isinstance(secret, str) else secret, body_bytes, hashlib.sha256).hexdigest()
+                headers['X-Fikiri-Signature'] = f'sha256={sig}'
+
+            timeout_sec = min(30, max(5, int(parameters.get('timeout_seconds', 10))))
+            max_attempts = max(1, min(3, int(parameters.get('max_retries', 2)) + 1))
+
+            last_error = None
+            for attempt in range(max_attempts):
+                try:
+                    import requests
+                    response = requests.post(
+                        webhook_url,
+                        data=body_bytes,
+                        headers=headers,
+                        timeout=timeout_sec,
+                    )
+                    response.raise_for_status()
+                    logger.info("Webhook delivered to %s status=%s", webhook_url[:80], response.status_code)
+                    return {
+                        'success': True,
+                        'data': {'webhook_url': webhook_url, 'status_code': response.status_code},
+                    }
+                except Exception as e:
+                    last_error = e
+                    if attempt < max_attempts - 1:
+                        import time
+                        time.sleep(0.5 * (2 ** attempt))
+            logger.warning("Webhook failed after %s attempts to %s: %s", max_attempts, webhook_url[:80], last_error)
+            return {
+                'success': False,
+                'error': str(last_error),
+                'error_code': 'WEBHOOK_DELIVERY_FAILED',
+            }
         except Exception as e:
-            logger.error(f"Error triggering webhook: {e}")
-            return {'success': False, 'error': str(e)}
+            logger.error("Error triggering webhook: %s", e)
+            return {'success': False, 'error': str(e), 'error_code': 'WEBHOOK_ERROR'}
     
     def _execute_generate_document(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Generate a document"""
