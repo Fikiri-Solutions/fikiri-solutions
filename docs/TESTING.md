@@ -87,6 +87,48 @@ Exit codes: `0` = all SELLABLE; `1` = at least one BETA; `2` = at least one NOT 
 
 ---
 
+## 3.1 Launch readiness run (integration + E2E)
+
+For launch prep, run the dedicated script from repo root:
+
+```bash
+./scripts/run_launch_readiness.sh
+```
+
+What it executes:
+
+- Backend critical-path tests (auth/routes/billing guardrails/automation queue+safety)
+- Integration suite (when `RUN_INTEGRATION_TESTS=1`)
+- Playwright E2E suite (when `RUN_E2E_TESTS=1`)
+
+Environment flags:
+
+- `RUN_INTEGRATION_TESTS=1` requires:
+  - `INTEGRATION_BACKEND_URL`
+  - `INTEGRATION_LOGIN_EMAIL`
+  - `INTEGRATION_LOGIN_PASSWORD`
+- `RUN_E2E_TESTS=1` requires frontend + backend running and Playwright auth setup credentials (`TEST_USER_EMAIL`, `TEST_USER_PASSWORD`, etc.)
+
+Examples:
+
+```bash
+# Backend only (fast sanity)
+./scripts/run_launch_readiness.sh
+
+# Backend + integration
+RUN_INTEGRATION_TESTS=1 INTEGRATION_BACKEND_URL=http://localhost:5000 \
+INTEGRATION_LOGIN_EMAIL=test@example.com INTEGRATION_LOGIN_PASSWORD=TestPassword123! \
+./scripts/run_launch_readiness.sh
+
+# Full launch suite
+RUN_INTEGRATION_TESTS=1 RUN_E2E_TESTS=1 \
+INTEGRATION_BACKEND_URL=http://localhost:5000 \
+INTEGRATION_LOGIN_EMAIL=test@example.com INTEGRATION_LOGIN_PASSWORD=TestPassword123! \
+./scripts/run_launch_readiness.sh
+```
+
+---
+
 ## 4. What’s left (high-value test gaps)
 
 From the coverage report, the highest-value remaining tests if you want to tighten:
