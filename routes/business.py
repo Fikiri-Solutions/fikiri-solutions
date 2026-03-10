@@ -1920,9 +1920,17 @@ def test_automation_preset():
             return create_error_response("Unknown preset", 400, 'UNKNOWN_PRESET')
         
         result = automation_engine.execute_automation_rules(mapping['trigger'], mapping['data'], user_id)
-        if result['success']:
-            return create_success_response(result['data'], 'Preset executed')
-        return create_error_response(result.get('error', 'Execution failed'), 500, 'AUTOMATION_EXECUTION_ERROR')
+        if not result['success']:
+            return create_error_response(result.get('error', 'Execution failed'), 500, 'AUTOMATION_EXECUTION_ERROR')
+
+        executed = result['data'].get('total_executed', 0)
+        failed = result['data'].get('total_failed', 0)
+        if executed == 0 and failed == 0:
+            return create_error_response(
+                f"No active rules matched preset '{preset}'. Enable the automation first.",
+                404, 'NO_MATCHING_RULES'
+            )
+        return create_success_response(result['data'], 'Preset executed')
         
     except Exception as e:
         logger.error(f"Automation preset test error: {e}")

@@ -848,10 +848,10 @@ class AutomationEngine:
         return self.execute_automation_rules(TriggerType.KEYWORD_DETECTED, trigger_data, user_id)
     
     # Advanced workflow action implementations
-    def _execute_schedule_follow_up(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+    def _execute_schedule_follow_up(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Schedule a follow-up action"""
         try:
-            lead_id = action_data.get('lead_id')
+            lead_id = action_data.get('lead_id') or trigger_data.get('lead_id')
             follow_up_date = action_data.get('follow_up_date')
             follow_up_type = action_data.get('follow_up_type', 'email')
             message = action_data.get('message', '')
@@ -872,14 +872,14 @@ class AutomationEngine:
             logger.error(f"Error scheduling follow-up: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _execute_create_calendar_event(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+    def _execute_create_calendar_event(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Create a calendar event"""
         try:
             event_title = action_data.get('title', 'Meeting')
             event_date = action_data.get('date')
             event_duration = action_data.get('duration', 60)
             event_description = action_data.get('description', '')
-            lead_id = action_data.get('lead_id')
+            lead_id = action_data.get('lead_id') or trigger_data.get('lead_id')
             
             # Store calendar event in database
             event_id = db_optimizer.execute_query(
@@ -897,28 +897,70 @@ class AutomationEngine:
             logger.error(f"Error creating calendar event: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _execute_update_crm_field(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Update a CRM field"""
+    def _execute_update_crm_field(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+        """Update a CRM field.
+
+        Supports two parameter shapes:
+        1. Direct: lead_id + field_name + field_value
+        2. Preset-style: target_stage (gmail_crm) or min_score (lead_scoring)
+           with lead context coming from trigger_data.
+        """
         try:
-            lead_id = action_data.get('lead_id')
+            slug = action_data.get('slug', '')
+
+            # --- gmail_crm preset: create a lead from the inbound email ---
+            if slug == 'gmail_crm' or action_data.get('target_stage'):
+                target_stage = action_data.get('target_stage', 'new')
+                sender_email = trigger_data.get('sender_email', '')
+                subject = trigger_data.get('subject', '')
+                name = sender_email.split('@')[0] if sender_email else 'Unknown'
+                result = enhanced_crm_service.create_lead(user_id, {
+                    'email': sender_email,
+                    'name': name,
+                    'source': 'gmail',
+                    'stage': target_stage,
+                    'notes': subject,
+                    'tags': action_data.get('tags', []),
+                })
+                logger.info("gmail_crm preset: created lead from %s → stage %s", sender_email, target_stage)
+                return result
+
+            # --- lead_scoring preset: update score on the lead ---
+            if slug == 'lead_scoring' or action_data.get('min_score') is not None:
+                lead_id = trigger_data.get('lead_id')
+                score = trigger_data.get('score', 0)
+                if not lead_id:
+                    return {'success': False, 'error': 'Missing lead_id in trigger data'}
+                result = enhanced_crm_service.update_lead(lead_id, user_id, {'score': score})
+                logger.info("lead_scoring preset: set score %s on lead %s", score, lead_id)
+                return result
+
+            # --- Direct field update (original behaviour) ---
+            lead_id = action_data.get('lead_id') or trigger_data.get('lead_id')
             field_name = action_data.get('field_name')
             field_value = action_data.get('field_value')
-            
-            # Update lead field
+
+            if not lead_id or not field_name:
+                return {'success': False, 'error': 'Missing lead_id or field_name'}
+
+            allowed_fields = {'stage', 'score', 'name', 'email', 'phone', 'company', 'notes', 'tags'}
+            if field_name not in allowed_fields:
+                return {'success': False, 'error': f'Field {field_name} is not an allowed CRM field'}
+
             db_optimizer.execute_query(
-                """UPDATE leads SET {} = ? WHERE id = ? AND user_id = ?""".format(field_name),
+                f"UPDATE leads SET {field_name} = ? WHERE id = ? AND user_id = ?",
                 (field_value, lead_id, user_id),
                 fetch=False
             )
-            
-            logger.info(f"Updated CRM field {field_name} for lead {lead_id}")
+
+            logger.info("Updated CRM field %s for lead %s", field_name, lead_id)
             return {'success': True}
-            
+
         except Exception as e:
             logger.error(f"Error updating CRM field: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _execute_trigger_webhook(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+    def _execute_trigger_webhook(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Trigger a webhook"""
         try:
             webhook_url = action_data.get('webhook_url')
@@ -938,11 +980,11 @@ class AutomationEngine:
             logger.error(f"Error triggering webhook: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _execute_generate_document(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+    def _execute_generate_document(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Generate a document"""
         try:
             template_id = action_data.get('template_id')
-            lead_id = action_data.get('lead_id')
+            lead_id = action_data.get('lead_id') or trigger_data.get('lead_id')
             variables = action_data.get('variables', {})
             
             # Import document templates system
@@ -958,12 +1000,12 @@ class AutomationEngine:
             logger.error(f"Error generating document: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _execute_send_sms(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+    def _execute_send_sms(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Send SMS message"""
         try:
             phone_number = action_data.get('phone_number')
             message = action_data.get('message', '')
-            lead_id = action_data.get('lead_id')
+            lead_id = action_data.get('lead_id') or trigger_data.get('lead_id')
             
             # In a real implementation, you would integrate with SMS service like Twilio
             # For now, we'll log the SMS
@@ -984,10 +1026,10 @@ class AutomationEngine:
             logger.error(f"Error sending SMS: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _execute_create_invoice(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+    def _execute_create_invoice(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Create an invoice"""
         try:
-            lead_id = action_data.get('lead_id')
+            lead_id = action_data.get('lead_id') or trigger_data.get('lead_id')
             amount = action_data.get('amount', 0)
             description = action_data.get('description', '')
             due_date = action_data.get('due_date')
@@ -1008,10 +1050,10 @@ class AutomationEngine:
             logger.error(f"Error creating invoice: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _execute_assign_team_member(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+    def _execute_assign_team_member(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Assign team member to lead"""
         try:
-            lead_id = action_data.get('lead_id')
+            lead_id = action_data.get('lead_id') or trigger_data.get('lead_id')
             team_member_id = action_data.get('team_member_id')
             assignment_type = action_data.get('assignment_type', 'owner')
             
