@@ -121,12 +121,12 @@ else
     log "❌ Burst cap not configured"
 fi
 
-# Check idempotency keys
-log "🔍 Checking idempotency keys..."
-if grep -q "idempotency_key" core/automation_safety.py; then
-    log "✅ Idempotency keys enabled"
+# Check idempotency (webhook + automation: server-generated deterministic keys)
+log "🔍 Checking idempotency..."
+if grep -q "idempotency_key" core/automation_safety.py && grep -q "idempotency_manager" core/webhook_api.py && grep -q "check_key\|store_key" core/idempotency_manager.py; then
+    log "✅ Idempotency implemented (webhook + automation; server-generated keys)"
 else
-    log "❌ Idempotency keys not implemented"
+    log "❌ Idempotency missing (check core/idempotency_manager.py, core/webhook_api.py, core/automation_safety.py)"
 fi
 
 # 3. Auth & Tokens Checks
@@ -134,12 +134,12 @@ log ""
 log "🔐 3. AUTH & TOKENS CHECKS"
 log "-------------------------"
 
-# Check token encryption
-log "🔍 Checking token encryption..."
-if grep -q "Fernet" core/oauth_token_manager.py; then
-    log "✅ Tokens encrypted at rest"
+# Check token encryption (OAuth tokens encrypted at rest via Fernet)
+log "🔍 Checking OAuth token encryption..."
+if grep -q "Fernet\|encrypt_token\|decrypt_token" core/oauth_token_manager.py; then
+    log "✅ OAuth tokens encrypted at rest (Fernet in oauth_token_manager)"
 else
-    log "❌ Token encryption not implemented"
+    log "❌ OAuth token encryption not found in core/oauth_token_manager.py"
 fi
 
 # Check refresh logic

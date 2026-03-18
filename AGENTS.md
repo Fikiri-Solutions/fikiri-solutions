@@ -17,7 +17,13 @@
 - **`python-dotenv`**: Not in `requirements.txt` but needed for `.env` loading. The update script installs it alongside `requirements.txt`.
 - **Redis is optional**: The backend gracefully degrades to in-memory/SQLite fallbacks if Redis is unavailable. No need to install Redis for local dev.
 - **DATABASE_URL**: Must be commented out in `.env` for local dev; otherwise the backend attempts a PostgreSQL connection. SQLite (`data/fikiri.db`) is used automatically.
-- **Signup endpoint bug (pre-existing)**: The `/api/auth/signup` route uses a stale `jwt_auth_manager` import (always `None`). Login (`/api/auth/login`) works correctly because `user_auth_manager.authenticate_user()` calls `get_jwt_manager()` internally. To create test users, use the login endpoint after the user is created (signup creates the user but fails on token generation).
+- **Signup**: `/api/auth/signup` uses `get_jwt_manager().generate_tokens()` and returns access/refresh tokens. Confirm with `pytest tests/test_auth_routes.py -v -k signup` (or full auth test run). If token generation ever fails, create the user via signup then use `/api/auth/login` to get tokens.
+
+### E2E tests (Playwright)
+
+- **Run the backend with `FLASK_ENV=development`** (or `FIKIRI_TEST_MODE=1`) when running E2E locally so signup isn’t rate limited (signup is 3/hour per IP otherwise; setup creates users every run).
+- If you can’t change the backend env, the 429 fallback in auth setup (log in as default test user and save that state) still avoids failing the run when the limit is hit.
+- Auth env: set `TEST_USER_EMAIL` and `TEST_USER_PASSWORD` to a valid user, or unset them to use defaults (`test@example.com` / `TestPassword123!`). See [docs/E2E_TEST_PLAN.md](docs/E2E_TEST_PLAN.md).
 
 ### Lint / Test / Build commands
 

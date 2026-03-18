@@ -2,6 +2,10 @@
  * Fikiri Universal JavaScript SDK
  * Works with WordPress, SquareSpace, Replit, and custom websites
  * Version: 1.0.0
+ *
+ * Load with async to avoid blocking page render:
+ *   <script async src="https://.../fikiri-sdk.js" data-fikiri-api-key="..."></script>
+ * Initialization is wrapped in try/catch so widget errors do not break the host page.
  */
 
 (function(window) {
@@ -527,24 +531,28 @@
     }
   }
 
-  // Auto-initialize from data attributes
+  // Auto-initialize from data attributes (wrapped so widget errors don't break the host page)
+  function initFromAttributes() {
+    try {
+      const script = document.querySelector('script[data-fikiri-api-key]');
+      if (script) {
+        const config = {
+          apiKey: script.getAttribute('data-fikiri-api-key'),
+          apiUrl: script.getAttribute('data-fikiri-api-url') || DEFAULT_API_URL,
+          tenantId: script.getAttribute('data-fikiri-tenant-id'),
+          debug: script.getAttribute('data-fikiri-debug') === 'true'
+        };
+        FikiriSDK.init(config);
+      }
+    } catch (err) {
+      console.error('Fikiri widget error:', err);
+    }
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initFromAttributes);
   } else {
     initFromAttributes();
-  }
-
-  function initFromAttributes() {
-    const script = document.querySelector('script[data-fikiri-api-key]');
-    if (script) {
-      const config = {
-        apiKey: script.getAttribute('data-fikiri-api-key'),
-        apiUrl: script.getAttribute('data-fikiri-api-url') || DEFAULT_API_URL,
-        tenantId: script.getAttribute('data-fikiri-tenant-id'),
-        debug: script.getAttribute('data-fikiri-debug') === 'true'
-      };
-      FikiriSDK.init(config);
-    }
   }
 
   // Export for module systems

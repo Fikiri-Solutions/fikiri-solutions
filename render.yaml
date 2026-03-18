@@ -3,7 +3,7 @@ services:
     name: fikiri-backend
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --workers 2 --bind 0.0.0.0:$PORT app:app
+    startCommand: gunicorn --worker-class gthread --workers ${WEB_CONCURRENCY:-4} --threads ${GUNICORN_THREADS:-4} --timeout ${GUNICORN_TIMEOUT:-120} --bind 0.0.0.0:$PORT app:app
     plan: starter
     disk:
       name: fikiri-data
@@ -17,7 +17,17 @@ services:
       - key: DATABASE_URL
         value: sqlite:///data/fikiri.db
       - key: REDIS_URL
-        value: redis://localhost:6379
+        sync: false
+      - key: WEB_CONCURRENCY
+        value: "4"
+      - key: GUNICORN_THREADS
+        value: "4"
+      - key: GUNICORN_TIMEOUT
+        value: "120"
+      - key: APP_RATE_LIMIT_PER_HOUR
+        value: 1000 per hour
+      - key: APP_RATE_LIMIT_PER_MINUTE
+        value: 100 per minute
       - key: SENTRY_DSN
         sync: false
       - key: SENTRY_DSN_WEBHOOKS
@@ -46,7 +56,7 @@ services:
     name: fikiri-backend-staging
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --workers 2 --bind 0.0.0.0:$PORT app:app
+    startCommand: gunicorn --worker-class gthread --workers ${WEB_CONCURRENCY:-2} --threads ${GUNICORN_THREADS:-2} --timeout ${GUNICORN_TIMEOUT:-120} --bind 0.0.0.0:$PORT app:app
     plan: starter
     envVars:
       - key: FLASK_ENV
@@ -55,6 +65,14 @@ services:
         generateValue: true
       - key: DATABASE_URL
         value: sqlite:///data/fikiri_staging.db
+      - key: REDIS_URL
+        sync: false
+      - key: WEB_CONCURRENCY
+        value: "2"
+      - key: GUNICORN_THREADS
+        value: "2"
+      - key: GUNICORN_TIMEOUT
+        value: "120"
     healthCheckPath: /api/health
     autoDeploy: true
     branch: develop

@@ -104,3 +104,4 @@ frontend/test-results/
 
 # Node dependencies
 frontend/node_modules/
+.vercel

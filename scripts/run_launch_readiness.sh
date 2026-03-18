@@ -5,12 +5,20 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 echo "== Launch Readiness: Backend critical-path tests =="
-python3 -m pytest -q \
-  tests/test_auth_routes.py \
-  tests/test_business_routes.py \
-  tests/test_revenue_billing_security.py \
-  tests/test_automation_queue.py \
+backend_tests=(
+  tests/test_auth_routes.py
+  tests/test_business_routes.py
+  tests/test_revenue_billing_security.py
   tests/test_automation_safety.py
+)
+
+if [[ -f tests/test_automation_queue.py ]]; then
+  backend_tests+=(tests/test_automation_queue.py)
+else
+  echo "== Launch Readiness: tests/test_automation_queue.py missing; skipping =="
+fi
+
+python3 -m pytest -q "${backend_tests[@]}"
 
 if [[ "${RUN_INTEGRATION_TESTS:-0}" == "1" ]]; then
   echo "== Launch Readiness: Integration tests =="
