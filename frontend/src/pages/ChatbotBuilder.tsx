@@ -139,13 +139,13 @@ export const ChatbotBuilder: React.FC = () => {
               </div>
               <div>
                 <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400">Document ingestion</p>
-                <h2 className="text-xl font-semibold text-brand-text dark:text-white">Upload PDF or DOCX</h2>
+                <h2 className="text-xl font-semibold text-brand-text dark:text-white">Upload PDF, DOCX, CSV, or Excel</h2>
               </div>
             </div>
             <div className="space-y-3">
               <input
                 type="file"
-                accept=".pdf,.doc,.docx,.txt"
+                accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.xls"
                 onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                 className="block w-full text-sm text-brand-text dark:text-gray-100 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-accent/20 file:text-brand-primary hover:file:bg-brand-accent/30"
               />
