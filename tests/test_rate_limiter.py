@@ -8,6 +8,7 @@ import unittest
 import os
 import sys
 from unittest.mock import patch, MagicMock
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("FLASK_ENV", "test")
@@ -62,6 +63,35 @@ class TestEnhancedRateLimiter(unittest.TestCase):
             rl, "id", ip_address="127.0.0.1", user_id=42
         )
         self.assertIn("user:42", key)
+
+    @patch("core.rate_limiter.db_optimizer")
+    def test_database_fallback_tracks_requests_and_blocks(self, mock_db):
+        from core.rate_limiter import RateLimit, RateLimitType
+
+        state = {"count": 0}
+
+        def _execute(query, params=None, fetch=True):
+            q = " ".join(query.split())
+            if "SELECT COUNT(*) as count FROM rate_limit_requests" in q:
+                return [{"count": state["count"]}]
+            if "INSERT INTO rate_limit_requests" in q:
+                state["count"] += 1
+                return None
+            if "SELECT request_time FROM rate_limit_requests" in q:
+                return [{"request_time": datetime.utcnow().isoformat()}]
+            return []
+
+        mock_db.execute_query.side_effect = _execute
+        rate_limit = RateLimit("test_limit", RateLimitType.CUSTOM, 2, 60)
+
+        first = self.limiter._check_database_rate_limit("rl:key:test", rate_limit)
+        second = self.limiter._check_database_rate_limit("rl:key:test", rate_limit)
+        third = self.limiter._check_database_rate_limit("rl:key:test", rate_limit)
+
+        self.assertTrue(first.allowed)
+        self.assertTrue(second.allowed)
+        self.assertFalse(third.allowed)
+        self.assertEqual(third.remaining, 0)
 
 
 if __name__ == "__main__":

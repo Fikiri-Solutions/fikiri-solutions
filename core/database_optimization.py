@@ -251,6 +251,17 @@ class DatabaseOptimizer:
             if cf_columns and 'metadata' not in cf_columns:
                 cursor.execute("ALTER TABLE conversation_feedback ADD COLUMN metadata TEXT")
                 logger.info("✅ Added metadata column to conversation_feedback")
+
+            # Email sync: ensure synced_emails has required columns for inbox and metrics
+            cursor.execute("PRAGMA table_info(synced_emails)")
+            synced_email_columns = [row[1] for row in cursor.fetchall()]
+            if synced_email_columns:
+                if 'external_id' not in synced_email_columns:
+                    cursor.execute("ALTER TABLE synced_emails ADD COLUMN external_id TEXT")
+                    logger.info("✅ Added external_id column to synced_emails table")
+                if 'is_read' not in synced_email_columns:
+                    cursor.execute("ALTER TABLE synced_emails ADD COLUMN is_read BOOLEAN DEFAULT 0")
+                    logger.info("✅ Added is_read column to synced_emails table")
         except Exception as e:
             logger.warning(f"Migration warning: {e}")
     
@@ -1233,6 +1244,10 @@ class DatabaseOptimizer:
             ("idx_appointments_status", "appointments", ["status"]),
             ("idx_appointments_contact_id", "appointments", ["contact_id"]),
             ("idx_appointments_time_range", "appointments", ["start_time", "end_time"]),
+            # Leads table indexes (CRM / webhook queries; prevents slow dashboards)
+            ("idx_leads_user_id", "leads", ["user_id"]),
+            ("idx_leads_email", "leads", ["email"]),
+            ("idx_leads_created_at", "leads", ["created_at"]),
         ]
         
         for index_name, table_name, columns in indexes:

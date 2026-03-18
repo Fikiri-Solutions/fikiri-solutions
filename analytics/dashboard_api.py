@@ -13,11 +13,107 @@ from core.api_validation import handle_api_errors, create_success_response, crea
 from core.secure_sessions import get_current_user_id
 from core.database_optimization import db_optimizer
 from core.jwt_auth import jwt_required, get_current_user
+from core.billing_manager import FikiriBillingManager
 
 logger = logging.getLogger(__name__)
+billing_manager = FikiriBillingManager()
 
 # Create Blueprint
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api/dashboard')
+
+INDUSTRY_PROMPTS: Dict[str, Dict[str, Any]] = {
+    "real_estate": {
+        "industry": "real_estate",
+        "tone": "professional",
+        "focus_areas": ["property listings", "client consultations", "market analysis", "showings scheduling"],
+        "tools": ["calendar", "crm", "property_api", "market_data"],
+        "pricing_tier": "business"
+    },
+    "property_management": {
+        "industry": "property_management",
+        "tone": "professional",
+        "focus_areas": ["tenant communication", "maintenance requests", "lease renewals", "rent collection"],
+        "tools": ["calendar", "crm", "payment_processor", "maintenance_tracker"],
+        "pricing_tier": "growth"
+    },
+    "construction": {
+        "industry": "construction",
+        "tone": "professional",
+        "focus_areas": ["project quotes", "client communication", "scheduling", "material orders"],
+        "tools": ["calendar", "quote_generator", "project_manager", "inventory"],
+        "pricing_tier": "growth"
+    },
+    "legal_services": {
+        "industry": "legal_services",
+        "tone": "professional",
+        "focus_areas": ["client intake", "appointment scheduling", "document management", "case updates"],
+        "tools": ["calendar", "crm", "document_storage", "compliance_checker"],
+        "pricing_tier": "business"
+    },
+    "cleaning_services": {
+        "industry": "cleaning_services",
+        "tone": "friendly",
+        "focus_areas": ["service scheduling", "quote requests", "recurring appointments", "customer follow-up"],
+        "tools": ["calendar", "quote_generator", "recurring_scheduler", "crm"],
+        "pricing_tier": "starter"
+    },
+    "auto_services": {
+        "industry": "auto_services",
+        "tone": "friendly",
+        "focus_areas": ["appointment booking", "service reminders", "estimate requests", "customer follow-up"],
+        "tools": ["calendar", "quote_generator", "reminder_system", "crm"],
+        "pricing_tier": "starter"
+    },
+    "event_planning": {
+        "industry": "event_planning",
+        "tone": "friendly",
+        "focus_areas": ["client consultations", "vendor coordination", "timeline management", "follow-up"],
+        "tools": ["calendar", "crm", "project_manager", "vendor_portal"],
+        "pricing_tier": "growth"
+    },
+    "fitness_wellness": {
+        "industry": "fitness_wellness",
+        "tone": "motivational",
+        "focus_areas": ["class scheduling", "membership inquiries", "appointment booking", "wellness tips"],
+        "tools": ["calendar", "crm", "class_scheduler", "payment_processor"],
+        "pricing_tier": "starter"
+    },
+    "beauty_spa": {
+        "industry": "beauty_spa",
+        "tone": "friendly",
+        "focus_areas": ["appointment booking", "service inquiries", "reminders", "promotions"],
+        "tools": ["calendar", "crm", "reminder_system", "promotion_manager"],
+        "pricing_tier": "starter"
+    },
+    "accounting_consulting": {
+        "industry": "accounting_consulting",
+        "tone": "professional",
+        "focus_areas": ["client onboarding", "appointment scheduling", "document requests", "tax reminders"],
+        "tools": ["calendar", "crm", "document_storage", "reminder_system"],
+        "pricing_tier": "business"
+    },
+    "restaurant": {
+        "industry": "restaurant",
+        "tone": "friendly",
+        "focus_areas": ["reservation management", "menu recommendations", "special promotions", "catering inquiries"],
+        "tools": ["reservation_system", "menu_api", "promotion_tracker", "crm"],
+        "pricing_tier": "growth"
+    },
+    "medical_practice": {
+        "industry": "medical_practice",
+        "tone": "professional",
+        "focus_areas": ["appointment scheduling", "patient reminders", "HIPAA compliance", "follow-up care"],
+        "tools": ["calendar", "patient_portal", "compliance_checker", "reminder_system"],
+        "pricing_tier": "business"
+    },
+    "enterprise_solutions": {
+        "industry": "enterprise_solutions",
+        "tone": "professional",
+        "focus_areas": ["custom workflows", "multi-industry support", "advanced analytics", "white-label options"],
+        "tools": ["custom_api", "white_label", "dedicated_support", "advanced_analytics"],
+        "pricing_tier": "enterprise"
+    },
+}
 
 @dashboard_bp.route('/debug', methods=['GET'])
 @handle_api_errors
@@ -88,9 +184,14 @@ def debug_dashboard():
 def get_dashboard_metrics():
     """Get dashboard metrics for authenticated user"""
     try:
-        # For now, use default user data until auth is fixed
-        user_data = {'user_id': 1, 'name': 'Demo User', 'email': 'demo@example.com'}
-        user_id = user_data['user_id']
+        # Prefer authenticated user; fall back to query param or demo user
+        user_id = get_current_user_id()
+        if not user_id:
+            # Allow overriding via query param for debugging, else default to demo user
+            user_id = request.args.get('user_id', type=int) or 1
+        
+        # Default user metadata (used if we can't load from DB)
+        user_data = {'user_id': user_id, 'name': 'User', 'email': ''}
         
         # Initialize default metrics
         metrics_data = {
@@ -189,21 +290,40 @@ def get_dashboard_metrics():
         except Exception as e:
             logger.warning(f"Could not get recent leads: {e}")
         
-        # Try to check Gmail connection
+        # Try to check Gmail connection using canonical gmail_tokens table
         try:
-            oauth_data = db_optimizer.execute_query(
-                "SELECT COUNT(*) as count FROM oauth_tokens WHERE user_id = ? AND service = 'gmail' AND expires_at > datetime('now')",
-                (user_id,)
+            gmail_token_rows = db_optimizer.execute_query(
+                """
+                SELECT access_token_enc, access_token, is_active, expiry_timestamp
+                FROM gmail_tokens
+                WHERE user_id = ? AND is_active = 1
+                ORDER BY updated_at DESC
+                LIMIT 1
+                """,
+                (user_id,),
             )
-            if oauth_data and len(oauth_data) > 0:
-                oauth_row = oauth_data[0]
-                if hasattr(oauth_row, 'keys'):
-                    oauth_dict = dict(oauth_row)
-                    metrics_data['integrations']['gmail_connected'] = oauth_dict.get('count', 0) > 0
+            if gmail_token_rows and len(gmail_token_rows) > 0:
+                row = gmail_token_rows[0]
+                if isinstance(row, dict):
+                    has_token = bool(row.get('access_token_enc') or row.get('access_token'))
+                    expiry_ts = row.get('expiry_timestamp')
                 else:
-                    metrics_data['integrations']['gmail_connected'] = oauth_row.get('count', 0) > 0 if isinstance(oauth_row, dict) else False
+                    # Fallback if row is a tuple
+                    has_token = bool(row[0] or (len(row) > 1 and row[1]))
+                    expiry_ts = row[3] if len(row) > 3 else None
+
+                is_expired = False
+                if expiry_ts:
+                    try:
+                        now_ts = int(datetime.utcnow().timestamp())
+                        expiry_int = int(expiry_ts)
+                        is_expired = expiry_int <= now_ts
+                    except Exception:
+                        is_expired = False
+
+                metrics_data['integrations']['gmail_connected'] = bool(has_token and not is_expired)
         except Exception as e:
-            logger.warning(f"Could not check Gmail connection: {e}")
+            logger.warning(f"Could not check Gmail connection from gmail_tokens: {e}")
         
         # Try to get AI response count from analytics_events
         try:
@@ -461,45 +581,152 @@ def get_dashboard_kpi():
 @dashboard_bp.route('/timeseries', methods=['GET'])
 @handle_api_errors
 def get_dashboard_timeseries():
-    """Get dashboard timeseries data for the last 14 days with change calculations"""
+    """Get dashboard timeseries data backed by DB aggregates."""
     try:
-        user_id = request.args.get('user_id', 1, type=int)
+        user_id = get_current_user_id() or request.args.get('user_id', type=int) or 1
         period = request.args.get('period', 'week', type=str)
-        
-        # Mock data for now - replace with actual database queries
-        import random
-        
-        # Generate mock timeseries data for the last 14 days
+
+        period_days = {
+            'week': 7,
+            'month': 30,
+            'quarter': 90,
+        }.get(period, 7)
+
+        today = datetime.utcnow().date()
+        start_date = today - timedelta(days=period_days - 1)
+        previous_start = start_date - timedelta(days=period_days)
+        previous_end = start_date - timedelta(days=1)
+
+        def _rows_to_daily_map(rows: Optional[List[Dict[str, Any]]]) -> Dict[str, float]:
+            mapped: Dict[str, float] = {}
+            for row in rows or []:
+                day = row.get('day') if isinstance(row, dict) else None
+                value = row.get('value') if isinstance(row, dict) else 0
+                if day:
+                    mapped[str(day)] = float(value or 0)
+            return mapped
+
+        leads_daily = _rows_to_daily_map(db_optimizer.execute_query(
+            """
+            SELECT DATE(created_at) AS day, COUNT(*) AS value
+            FROM leads
+            WHERE user_id = ? AND DATE(created_at) >= ?
+            GROUP BY DATE(created_at)
+            """,
+            (user_id, start_date.isoformat())
+        ))
+
+        emails_daily = _rows_to_daily_map(db_optimizer.execute_query(
+            """
+            SELECT DATE(date) AS day, COUNT(*) AS value
+            FROM synced_emails
+            WHERE user_id = ? AND DATE(date) >= ?
+            GROUP BY DATE(date)
+            """,
+            (user_id, start_date.isoformat())
+        ))
+
+        responses_daily = _rows_to_daily_map(db_optimizer.execute_query(
+            """
+            SELECT DATE(created_at) AS day, COUNT(*) AS value
+            FROM analytics_events
+            WHERE user_id = ? AND DATE(created_at) >= ?
+              AND (event_type LIKE '%ai%' OR event_type LIKE '%llm%' OR event_type LIKE '%response%')
+            GROUP BY DATE(created_at)
+            """,
+            (user_id, start_date.isoformat())
+        ))
+
+        revenue_daily = _rows_to_daily_map(db_optimizer.execute_query(
+            """
+            SELECT DATE(revenue_date) AS day, COALESCE(SUM(amount), 0) AS value
+            FROM revenue_tracking
+            WHERE user_id = ? AND DATE(revenue_date) >= ?
+            GROUP BY DATE(revenue_date)
+            """,
+            (user_id, start_date.isoformat())
+        ))
+
         timeseries = []
-        base_date = datetime.now() - timedelta(days=13)
-        
-        for i in range(14):
-            day = base_date + timedelta(days=i)
+        for i in range(period_days):
+            day = start_date + timedelta(days=i)
+            day_key = day.isoformat()
             timeseries.append({
-                "day": day.strftime("%Y-%m-%d"),
-                "leads": random.randint(3, 15),
-                "emails": random.randint(8, 25),
-                "revenue": random.randint(500, 2000)
+                "day": day_key,
+                "leads": int(leads_daily.get(day_key, 0)),
+                "emails": int(emails_daily.get(day_key, 0)),
+                "responses": int(responses_daily.get(day_key, 0)),
+                "revenue": round(float(revenue_daily.get(day_key, 0.0)), 2),
             })
-        
-        # Split into current vs previous 7 days
-        current = timeseries[-7:]
-        previous = timeseries[:7]
-        
-        def calc_change(key):
-            cur = sum(d[key] for d in current)
-            prev = sum(d[key] for d in previous) if previous else 0
-            if prev == 0: 
-                return {"change_pct": None, "positive": True}
-            change = ((cur - prev) / prev) * 100
-            return {"change_pct": round(change, 1), "positive": change >= 0}
-        
+
+        def _range_total(query: str, params: tuple) -> float:
+            result = db_optimizer.execute_query(query, params)
+            if not result:
+                return 0.0
+            row = result[0]
+            if isinstance(row, dict):
+                return float(row.get('value', 0) or 0)
+            return 0.0
+
+        def _change(cur: float, prev: float) -> Dict[str, Any]:
+            if prev <= 0:
+                return {"change_pct": None, "positive": cur >= prev}
+            pct = ((cur - prev) / prev) * 100
+            return {"change_pct": round(pct, 1), "positive": pct >= 0}
+
+        range_params_current = (user_id, start_date.isoformat(), today.isoformat())
+        range_params_previous = (user_id, previous_start.isoformat(), previous_end.isoformat())
+
+        current_leads = _range_total(
+            "SELECT COUNT(*) AS value FROM leads WHERE user_id = ? AND DATE(created_at) BETWEEN ? AND ?",
+            range_params_current
+        )
+        previous_leads = _range_total(
+            "SELECT COUNT(*) AS value FROM leads WHERE user_id = ? AND DATE(created_at) BETWEEN ? AND ?",
+            range_params_previous
+        )
+        current_emails = _range_total(
+            "SELECT COUNT(*) AS value FROM synced_emails WHERE user_id = ? AND DATE(date) BETWEEN ? AND ?",
+            range_params_current
+        )
+        previous_emails = _range_total(
+            "SELECT COUNT(*) AS value FROM synced_emails WHERE user_id = ? AND DATE(date) BETWEEN ? AND ?",
+            range_params_previous
+        )
+        current_responses = _range_total(
+            """
+            SELECT COUNT(*) AS value
+            FROM analytics_events
+            WHERE user_id = ? AND DATE(created_at) BETWEEN ? AND ?
+              AND (event_type LIKE '%ai%' OR event_type LIKE '%llm%' OR event_type LIKE '%response%')
+            """,
+            range_params_current
+        )
+        previous_responses = _range_total(
+            """
+            SELECT COUNT(*) AS value
+            FROM analytics_events
+            WHERE user_id = ? AND DATE(created_at) BETWEEN ? AND ?
+              AND (event_type LIKE '%ai%' OR event_type LIKE '%llm%' OR event_type LIKE '%response%')
+            """,
+            range_params_previous
+        )
+        current_revenue = _range_total(
+            "SELECT COALESCE(SUM(amount), 0) AS value FROM revenue_tracking WHERE user_id = ? AND DATE(revenue_date) BETWEEN ? AND ?",
+            range_params_current
+        )
+        previous_revenue = _range_total(
+            "SELECT COALESCE(SUM(amount), 0) AS value FROM revenue_tracking WHERE user_id = ? AND DATE(revenue_date) BETWEEN ? AND ?",
+            range_params_previous
+        )
+
         return create_success_response({
             "timeseries": timeseries,
             "summary": {
-                "leads": calc_change("leads"),
-                "emails": calc_change("emails"),
-                "revenue": calc_change("revenue")
+                "leads": _change(current_leads, previous_leads),
+                "emails": _change(current_emails, previous_emails),
+                "responses": _change(current_responses, previous_responses),
+                "revenue": _change(current_revenue, previous_revenue),
             }
         })
     except Exception as e:
@@ -507,6 +734,106 @@ def get_dashboard_timeseries():
         import traceback
         logger.error(f"Dashboard timeseries traceback: {traceback.format_exc()}")
         return create_error_response(f"Failed to fetch dashboard data: {str(e)}", 500, 'DASHBOARD_TIMESERIES_ERROR')
+
+@dashboard_bp.route('/industry/prompts', methods=['GET'])
+@handle_api_errors
+def get_industry_prompts():
+    """Get industry prompt configuration used by IndustryAutomation page."""
+    return create_success_response({"prompts": INDUSTRY_PROMPTS}, "Industry prompts retrieved")
+
+@dashboard_bp.route('/industry/pricing', methods=['GET'])
+@handle_api_errors
+def get_industry_pricing():
+    """Get pricing tiers for industry automation UI."""
+    try:
+        tiers = billing_manager.get_pricing_tiers()
+        pricing = {}
+        for tier_key, tier_data in tiers.items():
+            limits = tier_data.get('limits', {})
+            pricing[tier_key] = {
+                "name": tier_data.get('name', tier_key.title()),
+                "price": tier_data.get('monthly_price', 0),
+                "responses_limit": limits.get('ai_responses', 0),
+                "features": tier_data.get('features', []),
+            }
+        return create_success_response({"pricing_tiers": pricing}, "Industry pricing retrieved")
+    except Exception as e:
+        logger.error("Industry pricing error: %s", e)
+        return create_error_response("Failed to load pricing tiers", 500, "INDUSTRY_PRICING_ERROR")
+
+@dashboard_bp.route('/industry/usage', methods=['GET'])
+@handle_api_errors
+def get_industry_usage():
+    """Get usage analytics for industry automation UI."""
+    try:
+        user_id = get_current_user_id() or request.args.get('user_id', type=int) or 1
+        month_start = datetime.utcnow().strftime('%Y-%m-01')
+        month_key = datetime.utcnow().strftime('%Y-%m')
+
+        tier = "starter"
+        monthly_cost = 49.0
+        try:
+            sub_rows = db_optimizer.execute_query(
+                "SELECT tier FROM subscriptions WHERE user_id = ? ORDER BY current_period_end DESC, updated_at DESC LIMIT 1",
+                (user_id,)
+            )
+            if sub_rows:
+                tier = (sub_rows[0].get('tier') or tier).lower()
+        except Exception:
+            pass
+
+        pricing_tiers = billing_manager.get_pricing_tiers()
+        if tier in pricing_tiers:
+            monthly_cost = float(pricing_tiers[tier].get('monthly_price', monthly_cost) or monthly_cost)
+
+        usage_rows = db_optimizer.execute_query(
+            """
+            SELECT usage_type, SUM(quantity) AS total
+            FROM billing_usage
+            WHERE user_id = ? AND month = ?
+            GROUP BY usage_type
+            """,
+            (user_id, month_key)
+        )
+        usage_map: Dict[str, int] = {}
+        for row in usage_rows or []:
+            usage_type = row.get('usage_type') if isinstance(row, dict) else None
+            total = row.get('total') if isinstance(row, dict) else 0
+            if usage_type:
+                usage_map[usage_type] = int(total or 0)
+
+        responses = usage_map.get('ai_responses', 0)
+        if responses == 0:
+            ai_rows = db_optimizer.execute_query(
+                """
+                SELECT COUNT(*) AS value
+                FROM analytics_events
+                WHERE user_id = ? AND DATE(created_at) >= DATE(?)
+                  AND (event_type LIKE '%ai%' OR event_type LIKE '%llm%' OR event_type LIKE '%response%')
+                """,
+                (user_id, month_start)
+            )
+            responses = int((ai_rows[0].get('value') if ai_rows else 0) or 0)
+
+        tool_calls_rows = db_optimizer.execute_query(
+            "SELECT COUNT(*) AS value FROM automation_executions WHERE user_id = ? AND DATE(executed_at) >= DATE(?)",
+            (user_id, month_start)
+        )
+        tokens = responses * 120
+        tool_calls = int((tool_calls_rows[0].get('value') if tool_calls_rows else 0) or 0)
+
+        return create_success_response({
+            "usage": {
+                "tier": tier,
+                "responses": responses,
+                "tool_calls": tool_calls,
+                "tokens": tokens,
+                "monthly_cost": monthly_cost,
+            }
+        }, "Industry usage retrieved")
+    except Exception as e:
+        logger.error("Industry usage error: %s", e)
+        return create_error_response("Failed to load usage analytics", 500, "INDUSTRY_USAGE_ERROR")
 
 @dashboard_bp.route('/emails', methods=['GET'])
 @handle_api_errors

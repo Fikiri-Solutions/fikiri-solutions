@@ -65,7 +65,13 @@ try:
     from flask_limiter import Limiter
     from flask_limiter.util import get_remote_address
     LIMITER_AVAILABLE = True
-    _app_limiter = Limiter(key_func=get_remote_address, default_limits=["200 per hour"])
+    _app_limiter = Limiter(
+        key_func=get_remote_address,
+        default_limits=[
+            os.getenv("APP_RATE_LIMIT_PER_HOUR", "1000 per hour"),
+            os.getenv("APP_RATE_LIMIT_PER_MINUTE", "100 per minute"),
+        ],
+    )
 except ImportError:
     LIMITER_AVAILABLE = False
     Limiter = None
@@ -438,9 +444,29 @@ def setup_routes(app):
 
     @app.route('/api/health')
     def api_health_check():
-        """API health check endpoint for Render"""
+        """API health check for Render / uptime checks. Includes database and Redis status."""
+        db_status = 'unknown'
+        redis_status = 'unknown'
+        try:
+            from core.database_optimization import db_optimizer
+            db_optimizer.execute_query('SELECT 1', fetch=False)
+            db_status = 'connected'
+        except Exception:
+            db_status = 'disconnected'
+        try:
+            from core.redis_connection_helper import get_redis_client
+            client = get_redis_client(decode_responses=True, db=0)
+            if client and client.ping():
+                redis_status = 'connected'
+            else:
+                redis_status = 'disconnected'
+        except Exception:
+            redis_status = 'disconnected'
+        overall = 'ok' if db_status == 'connected' else 'degraded'
         return jsonify({
-            'status': 'healthy',
+            'status': overall,
+            'database': db_status,
+            'redis': redis_status,
             'timestamp': datetime.now().isoformat(),
             'version': '1.0.0',
             'message': 'Fikiri Solutions API is running',
@@ -639,14 +665,25 @@ if os.getenv('FLASK_ENV') == 'development':
 
     @app.route('/api/ai-response', methods=['POST'])
     def ai_response_direct():
-        """Direct AI response endpoint for frontend"""
+        """Direct AI response endpoint for frontend (requires auth and respects AI budget)."""
         try:
+            from core.secure_sessions import get_current_user_id
+            from core.ai_budget_guardrails import ai_budget_guardrails
             data = request.get_json()
             if not data:
                 return jsonify({'success': False, 'error': 'Request body cannot be empty'}), 400
             message = data.get('message', '')
             if not message:
                 return jsonify({'success': False, 'error': 'Message is required'}), 400
+            user_id = get_current_user_id()
+            if not user_id:
+                return jsonify({'success': False, 'error': 'Authentication required'}), 401
+            budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
+            if not budget_decision.allowed:
+                msg = ("AI monthly budget cap reached. Upgrade or wait until next billing period."
+                       if budget_decision.reason == "monthly_budget_cap_reached"
+                       else "AI monthly budget approval required.")
+                return jsonify({'success': False, 'error': msg, 'error_code': 'AI_BUDGET_SOFT_STOP'}), 402
             try:
                 from core.ai.llm_router import LLMRouter
                 router = LLMRouter()
@@ -657,6 +694,7 @@ if os.getenv('FLASK_ENV') == 'development':
                         context={'channel': 'ai_response_direct'}
                     )
                     if llm_result.get('success'):
+                        ai_budget_guardrails.record_ai_usage(user_id, 1)
                         return jsonify({
                             'success': True,
                             'data': {

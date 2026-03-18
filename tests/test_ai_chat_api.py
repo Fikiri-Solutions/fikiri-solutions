@@ -75,11 +75,13 @@ class TestAIChatAPI:
         assert "suggested_actions" in data["data"]
 
     @patch("core.ai_chat_api._get_llm_router")
+    @patch("core.ai_chat_api.ai_budget_guardrails.evaluate")
     @patch("core.ai_chat_api.get_current_user_id")
     @patch("core.ai_chat_api.get_current_user")
-    def test_chat_uses_llm_when_available(self, mock_get_user, mock_get_user_id, mock_get_router):
+    def test_chat_uses_llm_when_available(self, mock_get_user, mock_get_user_id, mock_budget_eval, mock_get_router):
         mock_get_user.side_effect = Exception("no jwt")
         mock_get_user_id.return_value = None
+        mock_budget_eval.return_value = MagicMock(allowed=True)
         router = MagicMock()
         router.client.is_enabled.return_value = True
         router.process.return_value = {"success": True, "content": "LLM reply"}
@@ -95,6 +97,28 @@ class TestAIChatAPI:
         assert data.get("success") is True
         assert data["data"]["response"] == "LLM reply"
         router.process.assert_called_once()
+
+    @patch("core.ai_chat_api._get_llm_router")
+    @patch("core.ai_chat_api.ai_budget_guardrails.evaluate")
+    @patch("core.ai_chat_api.get_current_user_id")
+    @patch("core.ai_chat_api.get_current_user")
+    def test_chat_budget_soft_stop_returns_402(self, mock_get_user, mock_get_user_id, mock_budget_eval, mock_get_router):
+        mock_get_user.side_effect = Exception("no jwt")
+        mock_get_user_id.return_value = None
+        mock_budget_eval.return_value = MagicMock(allowed=False)
+        router = MagicMock()
+        router.client.is_enabled.return_value = True
+        mock_get_router.return_value = router
+
+        response = self.client.post(
+            "/api/ai/chat",
+            json={"message": "analyze my leads", "user_id": 1},
+            content_type="application/json",
+        )
+        assert response.status_code == 402
+        data = json.loads(response.data)
+        assert data.get("success") is False
+        assert data.get("code") == "AI_BUDGET_SOFT_STOP"
 
     @patch("core.ai_chat_api.get_current_user_id")
     def test_chat_contextual_fallback_for_lead_query(self, mock_get_user_id):

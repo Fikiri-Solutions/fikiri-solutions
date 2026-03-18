@@ -15,12 +15,15 @@ from core.database_optimization import db_optimizer
 logger = logging.getLogger(__name__)
 
 class CleanupScheduler:
-    """Scheduled cleanup jobs for system maintenance"""
+    """Scheduled cleanup jobs for system maintenance and delivery layer (follow-ups, calendar reminders)."""
     
     def __init__(self):
         self.running = False
         self.thread = None
         self.cleanup_interval = 3600  # Run cleanup checks every hour
+        self.follow_up_interval = int(os.getenv('FOLLOW_UP_INTERVAL_SECONDS', '600'))  # 10 min
+        self._last_follow_ups = 0.0
+        self._last_cleanup = 0.0
         self.job_retention_days = int(os.getenv('CLEANUP_JOB_RETENTION_DAYS', '30'))
         self.email_retention_days = int(os.getenv('CLEANUP_EMAIL_RETENTION_DAYS', '90'))
         self.log_retention_days = int(os.getenv('CLEANUP_LOG_RETENTION_DAYS', '30'))
@@ -44,22 +47,39 @@ class CleanupScheduler:
         logger.info("🛑 Cleanup scheduler stopped")
     
     def _run_scheduler(self):
-        """Main scheduler loop"""
+        """Main scheduler loop: follow-ups/calendar every N sec, cleanup every hour."""
         while self.running:
             try:
-                # Run cleanup tasks
-                self.cleanup_old_email_jobs()
-                self.cleanup_old_sync_records()
-                self.cleanup_old_analytics_events()
-                self.cleanup_old_performance_logs()
-                self.cleanup_expired_sessions()
-                
-                # Sleep until next cleanup cycle
-                time.sleep(self.cleanup_interval)
-                
+                now = time.time()
+                # Delivery layer: due follow-ups and calendar reminders (e.g. every 10 min)
+                if now - self._last_follow_ups >= self.follow_up_interval:
+                    try:
+                        from core.workflow_followups import run_due_follow_ups_for_all_users, process_due_calendar_reminders
+                        r = run_due_follow_ups_for_all_users()
+                        if r.get("processed") or r.get("failed"):
+                            logger.info("Follow-ups run: users=%s processed=%s failed=%s", r.get("users_run"), r.get("processed"), r.get("failed"))
+                        c = process_due_calendar_reminders()
+                        if c.get("reminded"):
+                            logger.info("Calendar reminders: reminded=%s", c.get("reminded"))
+                        from core.automation_engine import run_due_time_based_automations
+                        tb = run_due_time_based_automations()
+                        if tb.get("due_count", 0) > 0:
+                            logger.info("Time-based automations: due=%s executed=%s failed=%s", tb.get("due_count"), tb.get("executed"), tb.get("failed"))
+                    except Exception as e:
+                        logger.error("Delivery layer (follow-ups/calendar/time-based) error: %s", e)
+                    self._last_follow_ups = now
+                # Cleanup tasks (hourly)
+                if now - self._last_cleanup >= self.cleanup_interval:
+                    self.cleanup_old_email_jobs()
+                    self.cleanup_old_sync_records()
+                    self.cleanup_old_analytics_events()
+                    self.cleanup_old_performance_logs()
+                    self.cleanup_expired_sessions()
+                    self._last_cleanup = now
+                time.sleep(60)
             except Exception as e:
                 logger.error(f"❌ Cleanup scheduler error: {e}")
-                time.sleep(60)  # Wait 1 minute before retrying
+                time.sleep(60)
     
     def cleanup_old_email_jobs(self) -> Dict[str, Any]:
         """Clean up old email jobs"""

@@ -342,8 +342,8 @@ class FikiriBillingManager:
         return {
             'starter': {
                 'name': 'Fikiri Starter',
-                'monthly_price': 39.00,
-                'annual_price': 390.00,
+                'monthly_price': 49.00,
+                'annual_price': 529.00,
                 'description': 'Perfect for solo entrepreneurs and growing small businesses',
                 'features': self.tier_limits[SubscriptionTier.STARTER].features,
                 'limits': {
@@ -355,8 +355,8 @@ class FikiriBillingManager:
             },
             'growth': {
                 'name': 'Fikiri Growth',
-                'monthly_price': 79.00,
-                'annual_price': 790.00,
+                'monthly_price': 99.00,
+                'annual_price': 1069.00,
                 'description': 'Scale your operations with advanced AI and integrations',
                 'features': self.tier_limits[SubscriptionTier.GROWTH].features,
                 'limits': {
@@ -381,8 +381,8 @@ class FikiriBillingManager:
             },
             'enterprise': {
                 'name': 'Fikiri Enterprise',
-                'monthly_price': 399.00,
-                'annual_price': 3990.00,
+                'monthly_price': 499.00,
+                'annual_price': 5389.00,
                 'description': 'Enterprise-grade automation with dedicated support and custom AI',
                 'features': self.tier_limits[SubscriptionTier.ENTERPRISE].features,
                 'limits': {

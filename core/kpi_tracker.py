@@ -698,10 +698,10 @@ class KPITracker:
             
             # Tier pricing (hardcoded - TODO: integrate with Stripe API or revenue_tracking table)
             tier_pricing = {
-                'starter': {'monthly': 29, 'annual': 290},
-                'growth': {'monthly': 99, 'annual': 990},
-                'business': {'monthly': 299, 'annual': 2990},
-                'enterprise': {'monthly': 999, 'annual': 9990}
+                'starter': {'monthly': 49, 'annual': 529},
+                'growth': {'monthly': 99, 'annual': 1069},
+                'business': {'monthly': 199, 'annual': 2149},
+                'enterprise': {'monthly': 499, 'annual': 5389}
             }
             
             total_revenue = 0.0
@@ -754,10 +754,10 @@ class KPITracker:
                 return 0.0
             
             tier_pricing = {
-                'starter': {'monthly': 29, 'annual': 290},
-                'growth': {'monthly': 99, 'annual': 990},
-                'business': {'monthly': 299, 'annual': 2990},
-                'enterprise': {'monthly': 999, 'annual': 9990}
+                'starter': {'monthly': 49, 'annual': 529},
+                'growth': {'monthly': 99, 'annual': 1069},
+                'business': {'monthly': 199, 'annual': 2149},
+                'enterprise': {'monthly': 499, 'annual': 5389}
             }
             
             total_revenue = 0.0
@@ -875,10 +875,10 @@ class KPITracker:
             )
             
             tier_pricing = {
-                'starter': {'monthly': 29, 'annual': 290},
-                'growth': {'monthly': 99, 'annual': 990},
-                'business': {'monthly': 299, 'annual': 2990},
-                'enterprise': {'monthly': 999, 'annual': 9990}
+                'starter': {'monthly': 49, 'annual': 529},
+                'growth': {'monthly': 99, 'annual': 1069},
+                'business': {'monthly': 199, 'annual': 2149},
+                'enterprise': {'monthly': 499, 'annual': 5389}
             }
             
             total_revenue = 0.0
@@ -937,10 +937,10 @@ class KPITracker:
             )
             
             tier_pricing = {
-                'starter': {'monthly': 29, 'annual': 290},
-                'growth': {'monthly': 99, 'annual': 990},
-                'business': {'monthly': 299, 'annual': 2990},
-                'enterprise': {'monthly': 999, 'annual': 9990}
+                'starter': {'monthly': 49, 'annual': 529},
+                'growth': {'monthly': 99, 'annual': 1069},
+                'business': {'monthly': 199, 'annual': 2149},
+                'enterprise': {'monthly': 499, 'annual': 5389}
             }
             
             total_churned = 0.0

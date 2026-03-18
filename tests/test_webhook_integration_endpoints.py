@@ -117,7 +117,7 @@ class TestWebhookIntegrationEndpoints(unittest.TestCase):
         mock_api_key_mgr.validate_api_key.return_value = self.mock_key_info_full
         mock_idem.check_key.return_value = None
         mock_gen_key.return_value = 'test_key_123'
-        mock_crm.create_lead.return_value = {'lead_id': 12345}
+        mock_crm.create_lead.return_value = {'success': True, 'data': {'lead_id': 12345, 'message': 'Lead created successfully'}}
         
         response = self.client.post(
             '/api/webhooks/forms/submit',
@@ -164,7 +164,7 @@ class TestWebhookIntegrationEndpoints(unittest.TestCase):
         mock_api_key_mgr.validate_api_key.return_value = self.mock_key_info_full
         mock_idem.check_key.return_value = None
         mock_gen_key.return_value = 'test_key_123'
-        mock_crm.create_lead.return_value = {'lead_id': 12345}
+        mock_crm.create_lead.return_value = {'success': True, 'data': {'lead_id': 12345, 'message': 'Lead created successfully'}}
         
         response = self.client.post(
             '/api/webhooks/leads/capture',

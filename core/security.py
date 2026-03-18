@@ -49,12 +49,9 @@ def init_security(app: Flask):
     else:
         logger.warning("⚠️ ProxyFix not available - install werkzeug for production deployments")
     
-    # Initialize Redis for rate limiting with proper SSL handling
-    # Note: Flask-Limiter's limits library creates its own Redis connection from URLs
-    # and doesn't support passing SSL configuration directly, so we use in-memory for now
-    # to avoid SSL certificate verification issues with Upstash Redis
-    
-    storage_uri = 'memory://'  # Use in-memory to avoid SSL certificate issues
+    # Initialize shared storage for rate limiting (prefer Redis, fallback to in-memory).
+    storage_uri = 'memory://'
+    redis_client = None
     
     # Try to use Redis if we can configure it properly
     # For now, we'll use in-memory storage since RedisStorage doesn't accept
@@ -65,20 +62,18 @@ def init_security(app: Flask):
             redis_url = _resolve_redis_url() or os.getenv('REDIS_URL', '') or ''
         except Exception:
             redis_url = os.getenv('REDIS_URL', '')
-        if redis_url and redis_url.startswith('rediss://'):
-            # Upstash Redis with TLS - Flask-Limiter can't handle SSL cert verification
-            # Use in-memory storage to avoid SSL certificate errors
-            logger.info("ℹ️ Using in-memory rate limiting (Upstash SSL certificate verification not supported by Flask-Limiter)")
-            storage_uri = 'memory://'
-        elif redis_url and redis_url.startswith('redis://'):
-            # Standard Redis without TLS - can try to use it
+        if redis_url and (redis_url.startswith('redis://') or redis_url.startswith('rediss://')):
+            # Flask-Limiter uses limits + redis-py. For rediss endpoints, add TLS override
+            # in URL query to match redis_connection_helper behavior.
+            if redis_url.startswith('rediss://') and 'ssl_cert_reqs=' not in redis_url:
+                sep = '&' if '?' in redis_url else '?'
+                redis_url = f"{redis_url}{sep}ssl_cert_reqs=none"
             try:
                 from core.redis_connection_helper import get_redis_client
                 redis_client = get_redis_client(decode_responses=True, db=0)
                 if redis_client:
-                    # Test if we can use Redis URL (non-TLS only)
                     storage_uri = redis_url
-                    logger.info("✅ Rate limiter will use Redis (non-TLS)")
+                    logger.info("✅ Rate limiter will use Redis shared storage")
                 else:
                     storage_uri = 'memory://'
                     logger.warning("⚠️ Redis not available, using in-memory rate limiting")
@@ -100,7 +95,10 @@ def init_security(app: Flask):
             limiter = Limiter(
                 key_func=get_remote_address,
                 storage_uri=storage_uri,
-                default_limits=["1000 per hour", "100 per minute"]
+                default_limits=[
+                    os.getenv("APP_RATE_LIMIT_PER_HOUR", "1000 per hour"),
+                    os.getenv("APP_RATE_LIMIT_PER_MINUTE", "100 per minute"),
+                ]
             )
             limiter.init_app(app)
             if storage_uri == 'memory://':
@@ -115,7 +113,10 @@ def init_security(app: Flask):
                 limiter = Limiter(
                     key_func=get_remote_address,
                     storage_uri='memory://',
-                    default_limits=["1000 per hour", "100 per minute"]
+                    default_limits=[
+                        os.getenv("APP_RATE_LIMIT_PER_HOUR", "1000 per hour"),
+                        os.getenv("APP_RATE_LIMIT_PER_MINUTE", "100 per minute"),
+                    ]
                 )
                 limiter.init_app(app)
                 logger.info("✅ Rate limiter initialized (in-memory fallback)")
@@ -191,6 +192,8 @@ def init_security(app: Flask):
                     key = get_remote_address()
                 
                 # Check rate limit
+                if not redis_client:
+                    return f(*args, **kwargs)
                 current = redis_client.get(key)
                 if current is None:
                     redis_client.setex(key, 3600, 1)  # 1 hour window
@@ -218,6 +221,8 @@ def init_security(app: Flask):
                 ip = get_remote_address()
                 key = f"ip:{ip}"
                 
+                if not redis_client:
+                    return f(*args, **kwargs)
                 current = redis_client.get(key)
                 if current is None:
                     redis_client.setex(key, 3600, 1)

@@ -331,7 +331,27 @@ class UserAuthManager:
         except Exception as e:
             logger.error(f"Error revoking user sessions: {e}")
             return False
-    
+
+    def deactivate_user(self, user_id: int) -> Dict[str, Any]:
+        """Soft-delete user: set is_active=0 and revoke all sessions."""
+        try:
+            db_optimizer.execute_query(
+                "UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (user_id,),
+                fetch=False
+            )
+            self.revoke_all_user_sessions(user_id)
+            try:
+                from core.jwt_auth import get_jwt_manager
+                get_jwt_manager().revoke_all_refresh_tokens(user_id)
+            except Exception as revoke_error:
+                logger.warning("Failed to revoke refresh tokens on deactivate: %s", revoke_error)
+            logger.info("User %s deactivated", user_id)
+            return {'success': True, 'message': 'Account deactivated successfully'}
+        except Exception as e:
+            logger.error("Error deactivating user: %s", e)
+            return {'success': False, 'error': 'Failed to deactivate account', 'error_code': 'DEACTIVATE_ERROR'}
+
     def update_user_profile(self, user_id: int, **updates) -> Dict[str, Any]:
         """Update user profile information. updates may include metadata_updates dict for phone/sms_consent."""
         try:

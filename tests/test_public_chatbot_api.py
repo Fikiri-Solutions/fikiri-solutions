@@ -173,6 +173,26 @@ class TestPublicChatbotAPI(unittest.TestCase):
         data = json.loads(response.data)
         self.assertFalse(data['success'])
         self.assertEqual(data['error_code'], 'RATE_LIMIT_EXCEEDED')
+
+    @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
+    @patch('core.public_chatbot_api.api_key_manager.check_rate_limit')
+    def test_4b_query_endpoint_hour_rate_limit_exceeded(self, mock_rate_limit, mock_validate):
+        """Test that sustained hourly rate limit is enforced."""
+        mock_validate.return_value = self.mock_api_key_info
+        mock_rate_limit.side_effect = [
+            {'allowed': True, 'remaining': 10, 'limit': 10, 'used': 0},  # minute
+            {'allowed': False, 'remaining': 0, 'limit': 100, 'used': 100},  # hour
+        ]
+
+        response = self.client.post('/api/public/chatbot/query',
+                                   json={'query': 'test'},
+                                   headers={'X-API-Key': 'fik_test_key'})
+
+        self.assertEqual(response.status_code, 429)
+        data = json.loads(response.data)
+        self.assertFalse(data['success'])
+        self.assertEqual(data['error_code'], 'RATE_LIMIT_EXCEEDED')
+        self.assertEqual(data['retry_after'], 3600)
     
     @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
     @patch('core.public_chatbot_api.api_key_manager.check_rate_limit')
@@ -189,6 +209,61 @@ class TestPublicChatbotAPI(unittest.TestCase):
         data = json.loads(response.data)
         self.assertFalse(data['success'])
         self.assertEqual(data['error_code'], 'MISSING_QUERY')
+
+    @patch('core.public_chatbot_api.ai_budget_guardrails.evaluate')
+    @patch('core.public_chatbot_api.get_feature_flags')
+    @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
+    @patch('core.public_chatbot_api.api_key_manager.check_rate_limit')
+    @patch('core.public_chatbot_api.faq_system.search_faqs')
+    @patch('core.public_chatbot_api.knowledge_base.search')
+    @patch('core.public_chatbot_api.context_system.start_conversation')
+    def test_5b_query_endpoint_ai_budget_soft_stop(
+        self, mock_start_conv, mock_kb_search, mock_faq_search, mock_rate_limit,
+        mock_validate, mock_flags, mock_budget_eval
+    ):
+        mock_validate.return_value = self.mock_api_key_info
+        mock_rate_limit.return_value = {'allowed': True, 'remaining': 60, 'limit': 60}
+        mock_flags.return_value.is_enabled.return_value = False
+
+        mock_faq_result = Mock()
+        mock_faq_result.success = True
+        mock_faq_result.matches = []
+        mock_faq_search.return_value = mock_faq_result
+
+        mock_doc = Mock()
+        mock_doc.id = "doc_1"
+        mock_doc.title = "Hours"
+        mock_doc.content = "We are open 9am-5pm."
+        mock_kb_entry = Mock()
+        mock_kb_entry.document = mock_doc
+        mock_kb_entry.relevance_score = 0.9
+        mock_kb_result = Mock()
+        mock_kb_result.success = True
+        mock_kb_result.results = [mock_kb_entry]
+        mock_kb_search.return_value = mock_kb_result
+
+        mock_conversation = Mock()
+        mock_conversation.conversation_id = "conv_123"
+        mock_start_conv.return_value = mock_conversation
+
+        mock_budget_eval.return_value = Mock(
+            allowed=False,
+            tier="enterprise",
+            month="2099-01",
+            budget_cap_usd=100.0,
+            estimated_cost_usd=95.0,
+            projected_cost_usd=95.5,
+            requires_approval=True,
+        )
+
+        response = self.client.post('/api/public/chatbot/query',
+                                   json={'query': 'What are your hours?'},
+                                   headers={'X-API-Key': 'fik_test_key'})
+
+        self.assertEqual(response.status_code, 402)
+        data = json.loads(response.data)
+        self.assertFalse(data['success'])
+        self.assertEqual(data['error_code'], 'AI_BUDGET_SOFT_STOP')
     
     def test_6_health_endpoint_no_auth(self):
         """Test that health endpoint doesn't require authentication"""

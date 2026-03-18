@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """
 Lead Scoring Service
-Computes lead_score (0-100) and lead_quality label with configurable weights.
+Computes lead_score (0-100) and lead_quality (A/B/C/D) with configurable weights.
+
+Technique: weighted sum of five 0-100 components (source, recency, stage, engagement,
+attributes). Weights configurable via LEAD_SCORING_WEIGHTS env JSON. Breakdown returned
+for transparency. Used by crm/service on create_lead, update_lead, and recalculate_lead_score.
+See docs/CRM_LEAD_SCORING.md for full process and code map.
 """
 
 import json

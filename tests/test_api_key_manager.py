@@ -43,6 +43,11 @@ class TestAPIKeyManager(unittest.TestCase):
         """Clean up test data"""
         from core.database_optimization import db_optimizer
         db_optimizer.execute_query(
+            "DELETE FROM subscriptions WHERE user_id = ?",
+            (self.test_user_id,),
+            fetch=False
+        )
+        db_optimizer.execute_query(
             "DELETE FROM api_key_usage WHERE api_key_id IN (SELECT id FROM api_keys WHERE user_id = ?)",
             (self.test_user_id,),
             fetch=False
@@ -283,6 +288,40 @@ class TestAPIKeyManager(unittest.TestCase):
         
         rate_limit = self.manager.check_rate_limit(api_key_id, 'hour')
         self.assertEqual(rate_limit['limit'], 500)
+
+    def test_11_paid_tier_caps_api_key_limit(self):
+        """Paid subscription tier should cap API key limits."""
+        from core.database_optimization import db_optimizer
+
+        db_optimizer.execute_query("""
+            INSERT INTO subscriptions (
+                user_id, stripe_customer_id, stripe_subscription_id, status, tier,
+                billing_period, current_period_start, current_period_end
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            self.test_user_id,
+            "cus_test_999",
+            "sub_test_999",
+            "active",
+            "starter",
+            "monthly",
+            0,
+            9999999999
+        ), fetch=False)
+
+        result = self.manager.generate_api_key(
+            user_id=self.test_user_id,
+            name="Tier Capped Key",
+            rate_limit_per_minute=500,
+            rate_limit_per_hour=20000
+        )
+        key_info = self.manager.validate_api_key(result['api_key'])
+
+        minute = self.manager.check_rate_limit(key_info['api_key_id'], 'minute')
+        hour = self.manager.check_rate_limit(key_info['api_key_id'], 'hour')
+
+        self.assertEqual(minute['limit'], 10)
+        self.assertEqual(hour['limit'], 100)
 
 
 if __name__ == '__main__':

@@ -600,9 +600,9 @@ class ContextAwareResponseSystem:
         
         elif intent == "pricing_inquiry":
             if technical_level == "technical":
-                return "Our pricing is based on usage tiers with API rate limits and feature access. We offer Starter ($29), Growth ($79), Business ($199), and Enterprise (custom) plans. Each includes different limits for emails, AI responses, and integrations."
+                return "Our pricing is based on usage tiers with API rate limits and feature access. We offer Starter ($49), Growth ($99), Business ($199), and Enterprise ($499) plans. Each includes different limits for emails, AI responses, and integrations."
             else:
-                return "We have flexible pricing plans starting at $29/month for our Starter plan. Each plan includes different features and limits. Would you like me to help you find the right plan for your needs?"
+                return "We have flexible pricing plans starting at $49/month for our Starter plan. Each plan includes different features and limits. Would you like me to help you find the right plan for your needs?"
         
         elif intent == "problem_report":
             return "I'm sorry to hear you're experiencing an issue. Let me help you troubleshoot this. Can you provide more details about what specific problem you're encountering?"

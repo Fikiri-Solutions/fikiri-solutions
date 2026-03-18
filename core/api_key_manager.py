@@ -17,6 +17,14 @@ logger = logging.getLogger(__name__)
 
 class APIKeyManager:
     """Manages API keys for external client authentication"""
+
+    TIER_RATE_LIMITS = {
+        "free": {"minute": 60, "hour": 1000},
+        "starter": {"minute": 10, "hour": 100},
+        "growth": {"minute": 30, "hour": 300},
+        "business": {"minute": 100, "hour": 1000},
+        "enterprise": {"minute": 300, "hour": 5000},
+    }
     
     def __init__(self):
         self._initialize_tables()
@@ -101,6 +109,34 @@ class APIKeyManager:
             
         except Exception as e:
             logger.error(f"❌ API key table initialization failed: {e}")
+
+    def get_subscription_tier(self, user_id: int) -> str:
+        """Return user's currently active/trialing subscription tier, else free."""
+        try:
+            if not db_optimizer.table_exists("subscriptions"):
+                return "free"
+            rows = db_optimizer.execute_query("""
+                SELECT status, tier
+                FROM subscriptions
+                WHERE user_id = ?
+                ORDER BY current_period_end DESC, updated_at DESC
+                LIMIT 1
+            """, (user_id,))
+            if not rows:
+                return "free"
+            status = (rows[0].get("status") or "").lower()
+            tier = (rows[0].get("tier") or "starter").lower()
+            if status in {"active", "trialing"}:
+                return tier if tier in self.TIER_RATE_LIMITS else "starter"
+            return "free"
+        except Exception as e:
+            logger.warning("Failed to resolve subscription tier for user %s: %s", user_id, e)
+            return "free"
+
+    def get_tier_rate_limits(self, tier: str) -> Dict[str, int]:
+        """Return (minute, hour) rate limits for the subscription tier."""
+        normalized = (tier or "free").lower()
+        return self.TIER_RATE_LIMITS.get(normalized, self.TIER_RATE_LIMITS["starter"])
     
     def generate_api_key(self, user_id: int, name: str, description: str = None,
                         tenant_id: str = None, scopes: List[str] = None,
@@ -131,6 +167,14 @@ class APIKeyManager:
             expires_at = datetime.utcnow() + timedelta(days=expires_days)
         
         try:
+            # Apply subscription-tier defaults when caller doesn't pass custom limits.
+            if rate_limit_per_minute == 60 and rate_limit_per_hour == 1000:
+                subscription_tier = self.get_subscription_tier(user_id)
+                if subscription_tier != "free":
+                    tier_limits = self.get_tier_rate_limits(subscription_tier)
+                    rate_limit_per_minute = tier_limits["minute"]
+                    rate_limit_per_hour = tier_limits["hour"]
+
             # Insert API key
             db_optimizer.execute_query("""
                 INSERT INTO api_keys (
@@ -256,7 +300,7 @@ class APIKeyManager:
         try:
             # Get rate limit config
             result = db_optimizer.execute_query("""
-                SELECT rate_limit_per_minute, rate_limit_per_hour
+                SELECT rate_limit_per_minute, rate_limit_per_hour, user_id
                 FROM api_keys
                 WHERE id = ?
             """, (api_key_id,))
@@ -264,7 +308,16 @@ class APIKeyManager:
             if not result:
                 return {"allowed": False, "remaining": 0, "reset_time": None}
             
-            limit = result[0][f'rate_limit_per_{limit_type}']
+            stored_limit = result[0][f'rate_limit_per_{limit_type}']
+            user_id = result[0]['user_id']
+            subscription_tier = self.get_subscription_tier(user_id)
+            if subscription_tier == "free":
+                limit = stored_limit
+            else:
+                tier_limits = self.get_tier_rate_limits(subscription_tier)
+                tier_limit = tier_limits.get(limit_type, stored_limit)
+                # Keep optional custom key caps if lower than tier cap.
+                limit = min(stored_limit, tier_limit) if stored_limit else tier_limit
             
             # Count recent requests
             if limit_type == 'minute':

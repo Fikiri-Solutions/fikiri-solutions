@@ -197,8 +197,8 @@ class FikiriStripeManager:
                 },
                 'integrations': ['gmail'],
                 'pricing': {
-                    'monthly': 3900,  # $39.00 in cents
-                    'annual': 39000   # $390.00 in cents (10% discount)
+                    'monthly': 4900,  # $49.00 in cents
+                    'annual': 52920   # $529.20 in cents (10% discount)
                 }
             },
             SubscriptionTier.GROWTH: {
@@ -213,8 +213,8 @@ class FikiriStripeManager:
                 },
                 'integrations': ['gmail', 'outlook', 'yahoo'],
                 'pricing': {
-                    'monthly': 7900,  # $79.00 in cents
-                    'annual': 79000   # $790.00 in cents (10% discount)
+                    'monthly': 9900,  # $99.00 in cents
+                    'annual': 106920   # $1,069.20 in cents (10% discount)
                 }
             },
             SubscriptionTier.BUSINESS: {
@@ -245,8 +245,8 @@ class FikiriStripeManager:
                 },
                 'integrations': ['all'],
                 'pricing': {
-                    'monthly': 39900,  # $399.00 in cents
-                    'annual': 399000   # $3990.00 in cents (10% discount)
+                    'monthly': 49900,  # $499.00 in cents
+                    'annual': 538920   # $5,389.20 in cents (10% discount)
                 }
             }
         }
@@ -666,16 +666,16 @@ class FikiriStripeManager:
         return {
             'starter': {
                 'name': 'Fikiri Starter',
-                'monthly_price': 39.00,
-                'annual_price': 390.00,
+                'monthly_price': 49.00,
+                'annual_price': 529.00,
                 'description': 'Perfect for solo entrepreneurs and growing small businesses',
                 'features': self.products[SubscriptionTier.STARTER]['features'],
                 'limits': self.products[SubscriptionTier.STARTER]['limits']
             },
             'growth': {
                 'name': 'Fikiri Growth',
-                'monthly_price': 79.00,
-                'annual_price': 790.00,
+                'monthly_price': 99.00,
+                'annual_price': 1069.00,
                 'description': 'Scale your operations with advanced AI and integrations',
                 'features': self.products[SubscriptionTier.GROWTH]['features'],
                 'limits': self.products[SubscriptionTier.GROWTH]['limits']
@@ -690,8 +690,8 @@ class FikiriStripeManager:
             },
             'enterprise': {
                 'name': 'Fikiri Enterprise',
-                'monthly_price': 399.00,
-                'annual_price': 3990.00,
+                'monthly_price': 499.00,
+                'annual_price': 5389.00,
                 'description': 'Enterprise-grade automation with dedicated support and custom AI',
                 'features': self.products[SubscriptionTier.ENTERPRISE]['features'],
                 'limits': self.products[SubscriptionTier.ENTERPRISE]['limits']

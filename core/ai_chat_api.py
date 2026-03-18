@@ -11,6 +11,7 @@ from flask import Blueprint, request, jsonify
 
 from core.api_validation import handle_api_errors, create_success_response, create_error_response
 from core.ai.llm_router import LLMRouter
+from core.ai_budget_guardrails import ai_budget_guardrails
 from core.secure_sessions import get_current_user_id
 from core.jwt_auth import jwt_required, get_current_user
 
@@ -162,6 +163,15 @@ def ai_chat():
         try:
             router = _get_llm_router()
             if router and router.client and router.client.is_enabled():
+                budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
+                if not budget_decision.allowed:
+                    return create_error_response(
+                        "AI monthly budget cap reached. Upgrade or wait until next billing period."
+                        if budget_decision.reason == "monthly_budget_cap_reached"
+                        else "AI monthly budget approval required.",
+                        402,
+                        "AI_BUDGET_SOFT_STOP"
+                    )
                 llm_result = router.process(
                     input_data=message,
                     intent='general',
@@ -172,6 +182,7 @@ def ai_chat():
                     }
                 )
                 if llm_result.get('success'):
+                    ai_budget_guardrails.record_ai_usage(user_id, 1)
                     response_data = {
                         'response': llm_result.get('content', ''),
                         'service_queries': [],

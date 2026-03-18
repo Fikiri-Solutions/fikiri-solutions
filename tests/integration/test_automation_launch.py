@@ -2,6 +2,7 @@
 
 import os
 from typing import Dict
+from uuid import uuid4
 
 import pytest
 import requests
@@ -114,3 +115,64 @@ def test_automation_execute_guardrails(backend_url: str, auth_headers: Dict[str,
         timeout=15,
     )
     assert response.status_code in {400, 402}
+
+
+def test_automation_email_sheets_webhook_execution(backend_url: str, auth_headers: Dict[str, str]):
+    webhook_url = os.getenv("INTEGRATION_WEBHOOK_URL")
+    if not webhook_url:
+        pytest.skip("INTEGRATION_WEBHOOK_URL not set")
+
+    slug = "email_sheets"
+    rule_name = f"int-email-sheets-{uuid4().hex[:10]}"
+    create_response = requests.post(
+        f"{backend_url}/api/automation/rules",
+        headers=auth_headers,
+        json={
+            "name": rule_name,
+            "description": "Integration webhook execution check",
+            "trigger_type": "email_received",
+            "trigger_conditions": {"slug": slug},
+            "action_type": "trigger_webhook",
+            "action_parameters": {
+                "slug": slug,
+                "webhook_url": webhook_url,
+                "payload": {"source": "integration_test"},
+            },
+            "status": "active",
+        },
+        timeout=20,
+    )
+    assert create_response.status_code == 200, create_response.text
+    created_payload = create_response.json()
+    assert created_payload.get("success") is True
+    created_rule = created_payload.get("data", {}).get("rule", {})
+    created_rule_id = created_rule.get("id")
+    assert created_rule_id, "Created rule id missing"
+
+    execute_response = requests.post(
+        f"{backend_url}/api/automation/test/preset",
+        headers=auth_headers,
+        json={"preset_id": slug},
+        timeout=30,
+    )
+    assert execute_response.status_code == 200, execute_response.text
+    execute_payload = execute_response.json()
+    assert execute_payload.get("success") is True
+    execute_data = execute_payload.get("data", {})
+    assert execute_data.get("total_executed", 0) >= 1
+    assert execute_data.get("total_failed", 0) == 0
+
+    logs_response = requests.get(
+        f"{backend_url}/api/automation/logs",
+        headers=auth_headers,
+        params={"slug": slug, "limit": 20},
+        timeout=20,
+    )
+    assert logs_response.status_code == 200, logs_response.text
+    logs_payload = logs_response.json()
+    assert logs_payload.get("success") is True
+    logs = logs_payload.get("data", {}).get("logs", [])
+    assert any(
+        log.get("rule_id") == created_rule_id and log.get("status") == "success"
+        for log in logs
+    ), f"No successful log found for rule {created_rule_id}"

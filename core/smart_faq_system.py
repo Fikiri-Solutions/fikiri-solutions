@@ -167,7 +167,7 @@ class SmartFAQSystem:
             FAQEntry(
                 id="pricing_plans",
                 question="What are your pricing plans?",
-                answer="We offer four pricing tiers: Starter ($29/month), Growth ($79/month), Business ($199/month), and Enterprise (custom pricing). Each plan includes different limits for emails, leads, AI responses, and features. Visit our pricing page for detailed comparisons.",
+                answer="We offer four pricing tiers: Starter ($49/month), Growth ($99/month), Business ($199/month), and Enterprise ($499/month). Each plan includes different limits for emails, leads, AI responses, and features. Visit our pricing page for detailed comparisons.",
                 category=FAQCategory.PRICING,
                 keywords=["pricing", "plans", "cost", "price", "subscription", "tiers"],
                 variations=[
@@ -182,7 +182,7 @@ class SmartFAQSystem:
             FAQEntry(
                 id="pricing_free_trial",
                 question="Do you offer a free trial?",
-                answer="Yes! We offer a 14-day free trial with full access to all features. No credit card required to start. You can explore the platform and see how it works for your business before committing to a paid plan.",
+                answer="Yes! We offer a 7-day free trial with full access to all features. No credit card required to start. You can explore the platform and see how it works for your business before committing to a paid plan.",
                 category=FAQCategory.PRICING,
                 keywords=["free", "trial", "demo", "test", "try"],
                 variations=[

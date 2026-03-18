@@ -311,6 +311,10 @@ class SecureSessionManager:
             logger.error(f"❌ Session revocation failed: {e}")
             return False
     
+    def delete_session(self, session_id: str) -> bool:
+        """Delete/revoke a session (alias for revoke_session used by logout)."""
+        return self.revoke_session(session_id)
+    
     def revoke_all_user_sessions(self, user_id: int) -> bool:
         """Revoke all sessions for a user"""
         try:

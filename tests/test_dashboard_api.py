@@ -49,11 +49,12 @@ class TestDashboardAPI(unittest.TestCase):
 
     @patch("analytics.dashboard_api.db_optimizer")
     def test_dashboard_metrics_success(self, mock_db):
-        # user, leads total, leads recent, oauth gmail
+        # user, leads total, leads recent, oauth gmail, ai total
         mock_db.execute_query.side_effect = [
             [{"id": 1, "email": "u@t.com", "name": "User", "onboarding_completed": 1, "onboarding_step": 2}],
             [{"count": 5}],
             [{"count": 2}],
+            [{"access_token_enc": "enc", "access_token": None, "expiry_timestamp": None}],
             [{"count": 1}],
         ]
         response = self.client.get("/api/dashboard/metrics")
@@ -93,12 +94,28 @@ class TestDashboardAPI(unittest.TestCase):
         self.assertTrue(data.get("success"))
         self.assertIn("data", data)
 
-    def test_dashboard_timeseries_success(self):
+    @patch("analytics.dashboard_api.db_optimizer")
+    def test_dashboard_timeseries_success(self, mock_db):
+        mock_db.execute_query.side_effect = [
+            [{"day": "2026-03-01", "value": 2}],     # leads daily
+            [{"day": "2026-03-01", "value": 5}],     # emails daily
+            [{"day": "2026-03-01", "value": 3}],     # responses daily
+            [{"day": "2026-03-01", "value": 100.0}], # revenue daily
+            [{"value": 10}],  # current leads
+            [{"value": 5}],   # previous leads
+            [{"value": 20}],  # current emails
+            [{"value": 10}],  # previous emails
+            [{"value": 8}],   # current responses
+            [{"value": 4}],   # previous responses
+            [{"value": 300}], # current revenue
+            [{"value": 200}], # previous revenue
+        ]
         response = self.client.get("/api/dashboard/timeseries")
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertTrue(data.get("success"))
         self.assertIn("timeseries", data.get("data", {}))
+        self.assertIn("responses", data.get("data", {}).get("summary", {}))
 
     @patch("analytics.dashboard_api.db_optimizer")
     @patch("analytics.dashboard_api.get_current_user_id", return_value=1)
@@ -161,7 +178,13 @@ class TestDashboardAPI(unittest.TestCase):
         self.assertIn("leads", metrics)
         self.assertIn("timestamp", metrics)
 
-    def test_dashboard_timeseries_accepts_user_id_and_period(self):
+    @patch("analytics.dashboard_api.db_optimizer")
+    def test_dashboard_timeseries_accepts_user_id_and_period(self, mock_db):
+        mock_db.execute_query.side_effect = [
+            [], [], [], [],  # daily rows
+            [{"value": 0}], [{"value": 0}], [{"value": 0}], [{"value": 0}],
+            [{"value": 0}], [{"value": 0}], [{"value": 0}], [{"value": 0}],
+        ]
         """Timeseries accepts user_id and period query params."""
         response = self.client.get("/api/dashboard/timeseries?user_id=2&period=month")
         self.assertEqual(response.status_code, 200)
@@ -169,6 +192,49 @@ class TestDashboardAPI(unittest.TestCase):
         self.assertTrue(data.get("success"))
         self.assertIn("timeseries", data.get("data", {}))
         self.assertIn("summary", data.get("data", {}))
+
+    def test_dashboard_industry_prompts_success(self):
+        response = self.client.get("/api/dashboard/industry/prompts")
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data.get("success"))
+        self.assertIn("prompts", data.get("data", {}))
+
+    @patch("analytics.dashboard_api.billing_manager")
+    def test_dashboard_industry_pricing_success(self, mock_billing):
+        mock_billing.get_pricing_tiers.return_value = {
+            "starter": {
+                "name": "Starter",
+                "monthly_price": 49,
+                "features": ["basic_ai"],
+                "limits": {"ai_responses": 200},
+            }
+        }
+        response = self.client.get("/api/dashboard/industry/pricing")
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data.get("success"))
+        self.assertIn("pricing_tiers", data.get("data", {}))
+
+    @patch("analytics.dashboard_api.db_optimizer")
+    @patch("analytics.dashboard_api.billing_manager")
+    @patch("analytics.dashboard_api.get_current_user_id", return_value=1)
+    def test_dashboard_industry_usage_success(self, mock_user_id, mock_billing, mock_db):
+        mock_billing.get_pricing_tiers.return_value = {
+            "growth": {"monthly_price": 99}
+        }
+        mock_db.execute_query.side_effect = [
+            [{"tier": "growth"}],                                # subscription tier
+            [{"usage_type": "ai_responses", "total": 12}],       # billing usage
+            [{"value": 7}],                                      # automation executions
+        ]
+        response = self.client.get("/api/dashboard/industry/usage")
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data.get("success"))
+        usage = data.get("data", {}).get("usage", {})
+        self.assertEqual(usage.get("tier"), "growth")
+        self.assertEqual(usage.get("responses"), 12)
 
 
 if __name__ == "__main__":

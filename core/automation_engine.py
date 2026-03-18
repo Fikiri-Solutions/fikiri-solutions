@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from core.database_optimization import db_optimizer
+from core.workflow_followups import schedule_follow_up as workflow_schedule_follow_up
 from crm.service import enhanced_crm_service
 from email_automation.parser import MinimalEmailParser
 
@@ -257,6 +258,64 @@ class AutomationEngine:
                 'data': None
             }
     
+    def run_single_rule(self, rule: AutomationRule, trigger_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Run a single automation rule (e.g. for time-based scheduler)."""
+        return self._execute_rule(rule, trigger_data)
+
+    def get_due_time_based_rules(self) -> List[tuple]:
+        """Return list of (rule, trigger_data) for time_based rules that are due now (UTC).
+        Uses action_parameters.frequency (daily|weekly) and run_at_hour (default 9)."""
+        try:
+            now_utc = datetime.utcnow()
+            run_at_hour = 9  # default
+            rows = db_optimizer.execute_query(
+                """SELECT * FROM automation_rules
+                   WHERE trigger_type = ? AND status = ?""",
+                (TriggerType.TIME_BASED.value, AutomationStatus.ACTIVE.value)
+            )
+            due = []
+            for rule_data in rows:
+                params = rule_data.get('action_parameters')
+                if isinstance(params, str):
+                    try:
+                        params = json.loads(params) if params else {}
+                    except json.JSONDecodeError:
+                        params = {}
+                frequency = (params.get('frequency') or 'daily').lower()
+                hour = params.get('run_at_hour', run_at_hour)
+                try:
+                    hour = int(hour)
+                except (TypeError, ValueError):
+                    hour = run_at_hour
+                if now_utc.hour != hour:
+                    continue
+                last_executed = rule_data.get('last_executed')
+                if last_executed and isinstance(last_executed, str):
+                    try:
+                        last_executed = datetime.fromisoformat(last_executed.replace('Z', '+00:00'))
+                    except Exception:
+                        last_executed = None
+                if last_executed and last_executed.tzinfo:
+                    last_executed = last_executed.replace(tzinfo=None)
+                last_date = last_executed.date() if last_executed else None
+                today = now_utc.date()
+                if frequency == 'daily':
+                    if last_date is not None and last_date >= today:
+                        continue
+                elif frequency == 'weekly':
+                    start_of_week = today - timedelta(days=now_utc.weekday())
+                    if last_date is not None and last_date >= start_of_week:
+                        continue
+                else:
+                    continue
+                rule = self._format_rule(rule_data)
+                trigger_data = {'scheduled_run': True, 'frequency': frequency}
+                due.append((rule, trigger_data))
+            return due
+        except Exception as e:
+            logger.error("get_due_time_based_rules error: %s", e)
+            return []
+
     def execute_automation_rules(self, trigger_type: TriggerType, trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Execute automation rules based on trigger"""
         try:
@@ -470,6 +529,13 @@ class AutomationEngine:
             if conditions.get('source'):
                 return source == conditions['source']
             return True
+
+        elif rule.trigger_type == TriggerType.TIME_BASED:
+            # Scheduler passes scheduled_run and frequency; rule is due when frequency matches
+            if not trigger_data.get('scheduled_run'):
+                return False
+            want = rule.action_parameters.get('frequency', 'daily')
+            return trigger_data.get('frequency') == want
         
         return True  # Default to true for other trigger types
     
@@ -674,14 +740,29 @@ class AutomationEngine:
             }
     
     def _execute_send_notification(self, parameters: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Execute send notification action"""
+        """Execute send notification action. If slack_webhook_url is set, POST to Slack (e.g. daily/weekly summaries)."""
         try:
             message = parameters.get('message', 'Automation executed')
             notification_type = parameters.get('type', 'info')
-            
-            # This would integrate with notification system
-            logger.info(f"Sending {notification_type} notification: {message}")
-            
+            webhook_url = (parameters.get('slack_webhook_url') or '').strip()
+            if webhook_url:
+                try:
+                    import requests
+                    channel = parameters.get('channel', '')
+                    text = f"[{channel}] {message}" if channel else message
+                    resp = requests.post(
+                        webhook_url,
+                        json={'text': text},
+                        headers={'Content-Type': 'application/json'},
+                        timeout=10
+                    )
+                    resp.raise_for_status()
+                    logger.info("Slack notification sent to webhook")
+                except Exception as slack_err:
+                    logger.warning("Slack webhook failed: %s", slack_err)
+                    return {'success': False, 'error': str(slack_err)}
+            else:
+                logger.info("Sending %s notification: %s", notification_type, message[:80])
             return {
                 'success': True,
                 'data': {
@@ -690,12 +771,8 @@ class AutomationEngine:
                     'type': notification_type
                 }
             }
-            
         except Exception as e:
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            return {'success': False, 'error': str(e)}
     
     def _update_rule_stats(self, rule_id: int, success: bool):
         """Update rule execution statistics"""
@@ -840,27 +917,33 @@ class AutomationEngine:
     
     # Advanced workflow action implementations
     def _execute_schedule_follow_up(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Schedule a follow-up action"""
+        """Schedule a follow-up action. For calendar_followups preset: lead_id and follow_up_date come from trigger + delay_hours."""
         try:
-            lead_id = action_data.get('lead_id')
+            lead_id = action_data.get('lead_id') or trigger_data.get('lead_id')
             follow_up_date = action_data.get('follow_up_date')
             follow_up_type = action_data.get('follow_up_type', 'email')
-            message = action_data.get('message', '')
-            
-            # Store follow-up in database
-            follow_up_id = db_optimizer.execute_query(
-                """INSERT INTO scheduled_follow_ups 
-                   (user_id, lead_id, follow_up_date, follow_up_type, message, status, created_at) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (user_id, lead_id, follow_up_date, follow_up_type, message, 'scheduled', datetime.now().isoformat()),
-                fetch=False
-            )
-            
-            logger.info(f"Scheduled follow-up {follow_up_id} for lead {lead_id}")
-            return {'success': True, 'follow_up_id': follow_up_id}
-            
+            message = action_data.get('message', 'Follow-up reminder')
+
+            # Calendar follow-ups preset: compute follow_up_date from now + delay_hours when not provided
+            delay_hours = action_data.get('delay_hours')
+            if follow_up_date is None and delay_hours is not None:
+                try:
+                    delta = timedelta(hours=int(delay_hours))
+                    follow_up_date = (datetime.utcnow() + delta).isoformat()
+                except (TypeError, ValueError):
+                    pass
+            if not follow_up_date:
+                return {'success': False, 'error': 'follow_up_date or delay_hours required'}
+            if lead_id is None:
+                return {'success': False, 'error': 'lead_id required'}
+
+            result = workflow_schedule_follow_up(user_id, lead_id, follow_up_date, follow_up_type, message)
+            if not result.get('success'):
+                return result
+            logger.info("Scheduled follow-up follow_up_id=%s lead_id=%s date=%s", result.get('follow_up_id'), lead_id, follow_up_date)
+            return {'success': True, 'follow_up_id': result.get('follow_up_id'), 'data': result}
         except Exception as e:
-            logger.error(f"Error scheduling follow-up: {e}")
+            logger.error("Error scheduling follow-up: %s", e)
             return {'success': False, 'error': str(e)}
     
     def _execute_create_calendar_event(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
@@ -889,8 +972,42 @@ class AutomationEngine:
             return {'success': False, 'error': str(e)}
     
     def _execute_update_crm_field(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Update a CRM field or create lead from email"""
+        """Update a CRM field or create lead from email. Handles lead_scoring preset: stage update when score >= threshold."""
         try:
+            # Lead scoring preset: when lead score >= min_score, set stage (e.g. qualified)
+            if action_data.get('slug') == 'lead_scoring':
+                lead_id = trigger_data.get('lead_id') or action_data.get('lead_id')
+                if not lead_id:
+                    return {'success': False, 'error': 'lead_id required for lead_scoring'}
+                row = db_optimizer.execute_query(
+                    "SELECT id, score FROM leads WHERE id = ? AND user_id = ?",
+                    (lead_id, user_id)
+                )
+                if not row:
+                    return {'success': False, 'error': 'Lead not found'}
+                score = row[0].get('score') or 0
+                min_score = action_data.get('min_score', 60)
+                try:
+                    min_score = int(min_score)
+                except (TypeError, ValueError):
+                    min_score = 60
+                if score >= min_score:
+                    target_stage = action_data.get('target_stage', 'qualified')
+                    db_optimizer.execute_query(
+                        "UPDATE leads SET stage = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?",
+                        (target_stage, lead_id, user_id),
+                        fetch=False
+                    )
+                    enhanced_crm_service.add_lead_activity(
+                        lead_id, user_id, 'note_added',
+                        f"Lead scored {score} (≥{min_score}); stage set to {target_stage}"
+                    )
+                    logger.info("Lead scoring: lead_id=%s score=%s stage=%s", lead_id, score, target_stage)
+                return {
+                    'success': True,
+                    'data': {'lead_id': lead_id, 'score': score, 'min_score': min_score, 'action': 'stage_updated' if score >= min_score else 'no_change'}
+                }
+
             # Check if this is "Gmail → CRM" preset (creates lead from email)
             if trigger_data.get('sender_email') and not action_data.get('lead_id'):
                 # Create lead from email
@@ -1102,5 +1219,24 @@ class AutomationEngine:
 # Global automation engine instance
 automation_engine = AutomationEngine()
 
+
+def run_due_time_based_automations() -> Dict[str, Any]:
+    """Run all due time-based automation rules (daily/weekly). Called from scheduler."""
+    try:
+        due = automation_engine.get_due_time_based_rules()
+        executed = 0
+        failed = 0
+        for rule, trigger_data in due:
+            result = automation_engine.run_single_rule(rule, trigger_data)
+            if result.get('success'):
+                executed += 1
+            else:
+                failed += 1
+        return {'executed': executed, 'failed': failed, 'due_count': len(due)}
+    except Exception as e:
+        logger.error("run_due_time_based_automations error: %s", e)
+        return {'executed': 0, 'failed': 0, 'due_count': 0, 'error': str(e)}
+
+
 # Export the automation engine
-__all__ = ['AutomationEngine', 'automation_engine', 'AutomationRule', 'AutomationExecution', 'TriggerType', 'ActionType', 'AutomationStatus']
+__all__ = ['AutomationEngine', 'automation_engine', 'AutomationRule', 'AutomationExecution', 'TriggerType', 'ActionType', 'AutomationStatus', 'run_due_time_based_automations']

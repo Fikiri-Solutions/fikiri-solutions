@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from core.database_optimization import db_optimizer
+from core.workflow_followups import schedule_follow_up as workflow_schedule_follow_up
 from crm.service import enhanced_crm_service
 from email_automation.parser import MinimalEmailParser
 
@@ -942,40 +943,39 @@ class AutomationEngine:
         return self.execute_automation_rules(TriggerType.KEYWORD_DETECTED, trigger_data, user_id)
     
     # Advanced workflow action implementations
-    def _execute_schedule_follow_up(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Schedule a follow-up action"""
+    def _execute_schedule_follow_up(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+        """Schedule a follow-up. For calendar_followups: lead_id and follow_up_date from trigger + delay_hours."""
         try:
-            lead_id = action_data.get('lead_id')
+            lead_id = action_data.get('lead_id') or trigger_data.get('lead_id')
             follow_up_date = action_data.get('follow_up_date')
             follow_up_type = action_data.get('follow_up_type', 'email')
-            message = action_data.get('message', '')
-            
-            # Store follow-up in database
-            follow_up_id = db_optimizer.execute_query(
-                """INSERT INTO scheduled_follow_ups 
-                   (user_id, lead_id, follow_up_date, follow_up_type, message, status, created_at) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (user_id, lead_id, follow_up_date, follow_up_type, message, 'scheduled', datetime.now().isoformat()),
-                fetch=False
-            )
-            
-            logger.info(f"Scheduled follow-up {follow_up_id} for lead {lead_id}")
-            return {'success': True, 'follow_up_id': follow_up_id}
-            
+            message = action_data.get('message', 'Follow-up reminder')
+            delay_hours = action_data.get('delay_hours')
+            if follow_up_date is None and delay_hours is not None:
+                try:
+                    follow_up_date = (datetime.utcnow() + timedelta(hours=int(delay_hours))).isoformat()
+                except (TypeError, ValueError):
+                    pass
+            if not follow_up_date or lead_id is None:
+                return {'success': False, 'error': 'lead_id and follow_up_date or delay_hours required'}
+            result = workflow_schedule_follow_up(user_id, lead_id, follow_up_date, follow_up_type, message)
+            if not result.get('success'):
+                return result
+            return {'success': True, 'follow_up_id': result.get('follow_up_id'), 'data': result}
         except Exception as e:
-            logger.error(f"Error scheduling follow-up: {e}")
+            logger.error("Error scheduling follow-up: %s", e)
             return {'success': False, 'error': str(e)}
     
-    def _execute_create_calendar_event(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Create a calendar event"""
+    def _execute_create_calendar_event(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+        """Create a calendar event. lead_id and date can come from trigger_data."""
         try:
             event_title = action_data.get('title', 'Meeting')
-            event_date = action_data.get('date')
+            event_date = action_data.get('date') or trigger_data.get('event_date')
             event_duration = action_data.get('duration', 60)
             event_description = action_data.get('description', '')
-            lead_id = action_data.get('lead_id')
-            
-            # Store calendar event in database
+            lead_id = action_data.get('lead_id') or trigger_data.get('lead_id')
+            if not event_date:
+                return {'success': False, 'error': 'event date required'}
             event_id = db_optimizer.execute_query(
                 """INSERT INTO calendar_events 
                    (user_id, lead_id, title, event_date, duration, description, status, created_at) 
@@ -983,33 +983,56 @@ class AutomationEngine:
                 (user_id, lead_id, event_title, event_date, event_duration, event_description, 'scheduled', datetime.now().isoformat()),
                 fetch=False
             )
-            
-            logger.info(f"Created calendar event {event_id}")
+            logger.info("Created calendar event %s", event_id)
             return {'success': True, 'event_id': event_id}
-            
         except Exception as e:
-            logger.error(f"Error creating calendar event: {e}")
+            logger.error("Error creating calendar event: %s", e)
             return {'success': False, 'error': str(e)}
     
-    def _execute_update_crm_field(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Update a CRM field"""
+    def _execute_update_crm_field(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+        """Update a CRM field. Handles lead_scoring preset: set stage when score >= min_score."""
         try:
-            lead_id = action_data.get('lead_id')
+            if action_data.get('slug') == 'lead_scoring':
+                lead_id = trigger_data.get('lead_id') or action_data.get('lead_id')
+                if not lead_id:
+                    return {'success': False, 'error': 'lead_id required for lead_scoring'}
+                row = db_optimizer.execute_query(
+                    "SELECT id, score FROM leads WHERE id = ? AND user_id = ?",
+                    (lead_id, user_id)
+                )
+                if not row:
+                    return {'success': False, 'error': 'Lead not found'}
+                score = row[0].get('score') or 0
+                min_score = int(action_data.get('min_score', 60)) if action_data.get('min_score') is not None else 60
+                if score >= min_score:
+                    target_stage = action_data.get('target_stage', 'qualified')
+                    db_optimizer.execute_query(
+                        "UPDATE leads SET stage = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?",
+                        (target_stage, lead_id, user_id),
+                        fetch=False
+                    )
+                    enhanced_crm_service.add_lead_activity(
+                        lead_id, user_id, 'note_added',
+                        f"Lead scored {score} (≥{min_score}); stage set to {target_stage}"
+                    )
+                return {
+                    'success': True,
+                    'data': {'lead_id': lead_id, 'score': score, 'min_score': min_score}
+                }
+            lead_id = action_data.get('lead_id') or trigger_data.get('lead_id')
             field_name = action_data.get('field_name')
             field_value = action_data.get('field_value')
-            
-            # Update lead field
+            if not lead_id or not field_name:
+                return {'success': False, 'error': 'Missing lead_id or field_name'}
             db_optimizer.execute_query(
                 """UPDATE leads SET {} = ? WHERE id = ? AND user_id = ?""".format(field_name),
                 (field_value, lead_id, user_id),
                 fetch=False
             )
-            
-            logger.info(f"Updated CRM field {field_name} for lead {lead_id}")
+            logger.info("Updated CRM field %s for lead %s", field_name, lead_id)
             return {'success': True}
-            
         except Exception as e:
-            logger.error(f"Error updating CRM field: {e}")
+            logger.error("Error updating CRM field: %s", e)
             return {'success': False, 'error': str(e)}
     
     def _execute_trigger_webhook(self, parameters: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:

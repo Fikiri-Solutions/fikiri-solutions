@@ -71,7 +71,7 @@ class TestRevenueChatbotFlow:
             "success": True,
             "validated": True,
             "content": json.dumps({
-                "answer": "Our pricing starts at $29.",
+                "answer": "Our pricing starts at $49.",
                 "confidence": 0.9,
                 "fallback_used": False,
                 "sources": ["doc_1"]
@@ -87,7 +87,7 @@ class TestRevenueChatbotFlow:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data['schema_version'] == 'v1'
-        assert data['response'] == 'Our pricing starts at $29.'
+        assert data['response'] == 'Our pricing starts at $49.'
         assert data['sources']
         mock_vector_search.return_value.search_similar.assert_called_once()
         mock_llm.process.assert_called_once()

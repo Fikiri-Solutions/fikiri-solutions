@@ -3,6 +3,7 @@ Webhook API Endpoints for Fikiri Solutions
 Handles incoming webhook requests from form services
 """
 
+import re
 import json
 import logging
 from flask import Blueprint, request, jsonify
@@ -10,6 +11,59 @@ from core.webhook_intake_service import get_webhook_service
 from core.minimal_config import get_config
 
 logger = logging.getLogger(__name__)
+
+# Payload limits (abuse prevention)
+EMAIL_MAX_LENGTH = 255
+NAME_MAX_LENGTH = 500
+# Simple email validation: local@domain.tld
+EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+# Honeypot field names: if present and non-empty, reject (bot trap)
+HONEYPOT_NAMES = ("honeypot", "honeypot_field", "_hp", "website", "url")
+
+
+def _check_webhook_rate_limit(key_info: dict, endpoint: str):
+    """Return (None, None) if allowed, else (response_dict, status_code) for 429."""
+    from core.api_key_manager import api_key_manager
+    api_key_id = key_info.get("api_key_id")
+    if not api_key_id:
+        return None, None
+    result = api_key_manager.check_rate_limit(api_key_id, "minute")
+    if result.get("allowed", True):
+        return None, None
+    retry_after = 60
+    return {
+        "success": False,
+        "error": "Rate limit exceeded. Retry after 1 minute.",
+        "error_code": "RATE_LIMIT_EXCEEDED",
+        "retry_after_seconds": retry_after,
+    }, 429
+
+
+def _validate_webhook_email_and_name(email: str, name: str = None) -> tuple:
+    """Validate email and name. Returns (None, None) if valid else (error_message, error_code)."""
+    if not email or not email.strip():
+        return "Email is required", "MISSING_EMAIL"
+    email = email.strip()
+    if len(email) > EMAIL_MAX_LENGTH:
+        return f"Email must be at most {EMAIL_MAX_LENGTH} characters", "INVALID_EMAIL"
+    if not EMAIL_RE.match(email):
+        return "Invalid email format", "INVALID_EMAIL"
+    if name is not None and len(name) > NAME_MAX_LENGTH:
+        return f"Name must be at most {NAME_MAX_LENGTH} characters", "INVALID_PAYLOAD"
+    return None, None
+
+
+def _check_honeypot(data: dict, fields: dict = None) -> bool:
+    """Return True if honeypot was filled (reject request)."""
+    for key in HONEYPOT_NAMES:
+        val = data.get(key) if isinstance(data, dict) else None
+        if val is not None and str(val).strip() != "":
+            return True
+        if fields and isinstance(fields, dict):
+            val = fields.get(key)
+            if val is not None and str(val).strip() != "":
+                return True
+    return False
 
 # Import trace context
 try:
@@ -460,6 +514,28 @@ def handle_form_submission():
                     "error_code": "ORIGIN_NOT_ALLOWED"
                 }), 403
         
+        # Request logging (for debugging and retry-storm detection)
+        key_prefix = (key_info.get('key_prefix') or '')[:12] or 'unknown'
+        logger.info(
+            "webhook request endpoint=%s api_key_prefix=%s origin=%s",
+            "/api/webhooks/forms/submit",
+            key_prefix,
+            request.headers.get('Origin') or request.headers.get('Referer') or '-',
+        )
+        # Rate limit per API key (e.g. 100/min)
+        err_resp, err_status = _check_webhook_rate_limit(key_info, '/api/webhooks/forms/submit')
+        if err_resp is not None:
+            resp = jsonify(err_resp)
+            resp.headers['Retry-After'] = str(err_resp.get('retry_after_seconds', 60))
+            return resp, err_status
+        try:
+            api_key_manager.record_usage(
+                key_info['api_key_id'], '/api/webhooks/forms/submit',
+                ip_address=request.remote_addr, user_agent=request.headers.get('User-Agent')
+            )
+        except Exception:
+            pass
+        
         user_id = key_info.get('user_id')
         tenant_id = key_info.get('tenant_id')
         
@@ -488,6 +564,20 @@ def handle_form_submission():
                 "error": "Email is required",
                 "error_code": "MISSING_EMAIL"
             }), 400
+        
+        # Honeypot: reject if bot filled hidden field
+        if _check_honeypot(data, fields):
+            logger.info("Form submission rejected: honeypot filled")
+            return jsonify({
+                "success": True,
+                "message": "Form submitted successfully",
+                "deduplicated": False
+            }), 200
+        
+        # Payload validation
+        err_msg, err_code = _validate_webhook_email_and_name(email, name)
+        if err_msg:
+            return jsonify({"success": False, "error": err_msg, "error_code": err_code}), 400
         
         # Generate idempotency key
         from core.idempotency_manager import idempotency_manager, generate_deterministic_key
@@ -543,7 +633,13 @@ def handle_form_submission():
                 lead_data['tenant_id'] = tenant_id
             
             result = enhanced_crm_service.create_lead(user_id, lead_data)
-            lead_id = result.get('lead_id')
+            if not result.get('success'):
+                return jsonify({
+                    "success": False,
+                    "error": result.get('error', 'Failed to create lead'),
+                    "error_code": result.get('error_code', 'LEAD_CREATE_FAILED')
+                }), 400
+            lead_id = (result.get('data') or {}).get('lead_id')
             
             # Update idempotency key with result
             idempotency_manager.update_key_result(
@@ -641,6 +737,28 @@ def handle_lead_capture():
                     "error_code": "ORIGIN_NOT_ALLOWED"
                 }), 403
         
+        # Request logging
+        key_prefix = (key_info.get('key_prefix') or '')[:12] or 'unknown'
+        logger.info(
+            "webhook request endpoint=%s api_key_prefix=%s origin=%s",
+            "/api/webhooks/leads/capture",
+            key_prefix,
+            request.headers.get('Origin') or request.headers.get('Referer') or '-',
+        )
+        # Rate limit per API key
+        err_resp, err_status = _check_webhook_rate_limit(key_info, '/api/webhooks/leads/capture')
+        if err_resp is not None:
+            resp = jsonify(err_resp)
+            resp.headers['Retry-After'] = str(err_resp.get('retry_after_seconds', 60))
+            return resp, err_status
+        try:
+            api_key_manager.record_usage(
+                key_info['api_key_id'], '/api/webhooks/leads/capture',
+                ip_address=request.remote_addr, user_agent=request.headers.get('User-Agent')
+            )
+        except Exception:
+            pass
+        
         user_id = key_info.get('user_id')
         tenant_id = key_info.get('tenant_id')
         
@@ -660,6 +778,21 @@ def handle_lead_capture():
                 "error": "Email is required",
                 "error_code": "MISSING_EMAIL"
             }), 400
+        
+        # Honeypot
+        if _check_honeypot(data, data.get('fields')):
+            logger.info("Lead capture rejected: honeypot filled")
+            return jsonify({
+                "success": True,
+                "message": "Lead captured successfully",
+                "deduplicated": False
+            }), 200
+        
+        # Payload validation
+        name = data.get('name') or email.split('@')[0]
+        err_msg, err_code = _validate_webhook_email_and_name(email, name)
+        if err_msg:
+            return jsonify({"success": False, "error": err_msg, "error_code": err_code}), 400
         
         # Generate idempotency key
         from core.idempotency_manager import idempotency_manager, generate_deterministic_key
@@ -711,7 +844,13 @@ def handle_lead_capture():
                 lead_data['tenant_id'] = tenant_id
             
             result = enhanced_crm_service.create_lead(user_id, lead_data)
-            lead_id = result.get('lead_id')
+            if not result.get('success'):
+                return jsonify({
+                    "success": False,
+                    "error": result.get('error', 'Failed to create lead'),
+                    "error_code": result.get('error_code', 'LEAD_CREATE_FAILED')
+                }), 400
+            lead_id = (result.get('data') or {}).get('lead_id')
             
             # Update idempotency key with result
             idempotency_manager.update_key_result(
