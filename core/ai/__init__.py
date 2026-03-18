@@ -1,12 +1,20 @@
 """
 Fikiri Solutions - AI Pipeline Module
-Centralized LLM routing, client management, and validation.
+Centralized LLM routing, client management, validation, and canonical schemas.
 """
 
-from core.ai.llm_router import LLMRouter
+from core.ai.llm_router import LLMRouter, INTENT_MODEL_CONFIG, KNOWN_INTENTS
 from core.ai.llm_client import LLMClient
 from core.ai.validators import SchemaValidator
 from core.ai.embedding_client import get_embedding, is_embedding_available, get_embedding_dimension
 
-__all__ = ['LLMRouter', 'LLMClient', 'SchemaValidator', 'get_embedding', 'is_embedding_available', 'get_embedding_dimension']
+# Canonical schemas for LLM and ingestion (see docs/SCHEMA_STRATEGY_LLM_DATA.md)
+from core.ai import schemas as ai_schemas
+
+__all__ = [
+    'LLMRouter', 'INTENT_MODEL_CONFIG', 'KNOWN_INTENTS',
+    'LLMClient', 'SchemaValidator',
+    'get_embedding', 'is_embedding_available', 'get_embedding_dimension',
+    'ai_schemas',
+]
 

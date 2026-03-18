@@ -13,20 +13,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from core.ai.llm_router import LLMRouter
+from core.ai.schemas import EmailClassificationSchema
+from core.domain.schemas import normalize_extracted_contact
 
 logger = logging.getLogger(__name__)
 
-CLASSIFICATION_SCHEMA = {
-    "type": "object",
-    "required": ["intent", "confidence", "urgency", "suggested_action"],
-    "properties": {
-        "intent": {"type": "string"},
-        "confidence": {"type": "number"},
-        "urgency": {"type": "string"},
-        "suggested_action": {"type": "string"},
-    },
-}
-
+# Contact extraction: keep local until Phase 2 (ExtractedContact in core/domain/schemas.py)
 CONTACT_SCHEMA = {
     "type": "object",
     "required": ["phone", "company", "website", "location", "budget", "timeline"],
@@ -146,7 +138,7 @@ class MinimalAIEmailAssistant:
             result = self.router.process(
                 input_data=prompt,
                 intent='classification',
-                output_schema=CLASSIFICATION_SCHEMA,
+                output_schema=EmailClassificationSchema,
                 context={'operation': 'email_classification', 'subject': subject}
             )
             
@@ -316,20 +308,20 @@ class MinimalAIEmailAssistant:
                     # Track usage
                     self._track_ai_usage("extract_contact", True, result.get('tokens_used', 0))
                     logger.info(f"✅ Contact info extracted via LLM router")
-                    return parsed_result
+                    return normalize_extracted_contact(parsed_result)
                 except json.JSONDecodeError:
                     logger.warning("Failed to parse contact info as JSON, using fallback")
-                    return self._fallback_contact_extraction(email_content)
+                    return normalize_extracted_contact(self._fallback_contact_extraction(email_content))
             else:
                 err_msg = result.get('error') or 'Schema validation failed or empty error'
                 logger.error(f"❌ Contact extraction failed: {err_msg}")
                 self._track_ai_usage("extract_contact", False)
-                return self._fallback_contact_extraction(email_content)
-            
+                return normalize_extracted_contact(self._fallback_contact_extraction(email_content))
+
         except Exception as e:
             logger.error(f"❌ Contact extraction failed: {e}")
             self._track_ai_usage("extract_contact", False)
-            return self._fallback_contact_extraction(email_content)
+            return normalize_extracted_contact(self._fallback_contact_extraction(email_content))
 
     def summarize_email(self, email_content: str, subject: str = "") -> str:
         """Summarize a single email with enhanced tracking."""
@@ -541,14 +533,14 @@ Fikiri Solutions Team"""
         website_pattern = r'https?://[^\s]+'
         website_match = re.search(website_pattern, email_content)
         
-        return {
+        return normalize_extracted_contact({
             "phone": phone_match.group(0) if phone_match else None,
             "company": None,
             "website": website_match.group(0) if website_match else None,
             "location": None,
             "budget": None,
             "timeline": None
-        }
+        })
 
     def _fallback_summary(self, email_content: str) -> str:
         """Fallback summary when AI is not available."""

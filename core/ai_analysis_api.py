@@ -14,6 +14,8 @@ from core.api_key_manager import api_key_manager
 from core.public_chatbot_api import require_api_key, record_api_usage
 from core.api_validation import handle_api_errors, create_error_response
 from core.ai.llm_router import LLMRouter
+from core.ai.schemas import LeadAnalysisSchema as LeadAnalysisOutputSchema
+from core.ai_budget_guardrails import ai_budget_guardrails
 
 logger = logging.getLogger(__name__)
 
@@ -28,15 +30,21 @@ except Exception as e:
     llm_router = None
 
 
-def _call_llm_json(prompt: str, max_tokens: int = 500) -> Optional[Dict[str, Any]]:
-    """Call LLM router and parse JSON response if possible."""
+def _call_llm_json(
+    prompt: str,
+    max_tokens: int = 500,
+    intent: Optional[str] = None,
+    output_schema: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Call LLM router and parse JSON response. Optional output_schema validates LLM output."""
     if not llm_router or not llm_router.client or not llm_router.client.is_enabled():
         return None
 
     result = llm_router.process(
         input_data=prompt,
-        intent='extraction',
-        context={'max_tokens': max_tokens}
+        intent=intent or 'extraction',
+        context={'max_tokens': max_tokens},
+        output_schema=output_schema,
     )
 
     if not result.get('success'):
@@ -233,7 +241,12 @@ def analyze_lead(lead_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     
     try:
-        analysis = _call_llm_json(prompt, max_tokens=500)
+        analysis = _call_llm_json(
+            prompt,
+            max_tokens=500,
+            intent='extraction',
+            output_schema=LeadAnalysisOutputSchema,
+        )
         if analysis is None:
             analysis = {
                 "score": 50,
@@ -333,8 +346,22 @@ def analyze_contact_endpoint():
         }
     """
     start_time = datetime.utcnow()
-    
+
     try:
+        user_id = None
+        if hasattr(g, 'api_key_info') and isinstance(getattr(g, 'api_key_info'), dict):
+            user_id = g.api_key_info.get('user_id')
+        if user_id is not None:
+            budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
+            if not budget_decision.allowed:
+                record_api_usage(response_status=402)
+                return create_error_response(
+                    "AI monthly budget cap reached. Upgrade or wait until next billing period."
+                    if budget_decision.reason == "monthly_budget_cap_reached"
+                    else "AI budget approval required.",
+                    402,
+                    "AI_BUDGET_SOFT_STOP"
+                )
         # Validate request schema
         schema = ContactAnalysisSchema()
         try:
@@ -357,6 +384,8 @@ def analyze_contact_endpoint():
         # Record usage
         response_time_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
         record_api_usage(response_status=200, response_time_ms=response_time_ms)
+        if user_id is not None:
+            ai_budget_guardrails.record_ai_usage(user_id, 1)
         
         return jsonify(response_data)
         
@@ -405,8 +434,22 @@ def analyze_lead_endpoint():
         }
     """
     start_time = datetime.utcnow()
-    
+
     try:
+        user_id = None
+        if hasattr(g, 'api_key_info') and isinstance(getattr(g, 'api_key_info'), dict):
+            user_id = g.api_key_info.get('user_id')
+        if user_id is not None:
+            budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
+            if not budget_decision.allowed:
+                record_api_usage(response_status=402)
+                return create_error_response(
+                    "AI monthly budget cap reached. Upgrade or wait until next billing period."
+                    if budget_decision.reason == "monthly_budget_cap_reached"
+                    else "AI budget approval required.",
+                    402,
+                    "AI_BUDGET_SOFT_STOP"
+                )
         schema = LeadAnalysisSchema()
         try:
             validated_data = schema.load(request.json)
@@ -424,6 +467,8 @@ def analyze_lead_endpoint():
         
         response_time_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
         record_api_usage(response_status=200, response_time_ms=response_time_ms)
+        if user_id is not None:
+            ai_budget_guardrails.record_ai_usage(user_id, 1)
         
         return jsonify(response_data)
         
@@ -472,8 +517,22 @@ def analyze_business_endpoint():
         }
     """
     start_time = datetime.utcnow()
-    
+
     try:
+        user_id = None
+        if hasattr(g, 'api_key_info') and isinstance(getattr(g, 'api_key_info'), dict):
+            user_id = g.api_key_info.get('user_id')
+        if user_id is not None:
+            budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
+            if not budget_decision.allowed:
+                record_api_usage(response_status=402)
+                return create_error_response(
+                    "AI monthly budget cap reached. Upgrade or wait until next billing period."
+                    if budget_decision.reason == "monthly_budget_cap_reached"
+                    else "AI budget approval required.",
+                    402,
+                    "AI_BUDGET_SOFT_STOP"
+                )
         schema = BusinessSummarySchema()
         try:
             validated_data = schema.load(request.json)
@@ -491,6 +550,8 @@ def analyze_business_endpoint():
         
         response_time_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
         record_api_usage(response_status=200, response_time_ms=response_time_ms)
+        if user_id is not None:
+            ai_budget_guardrails.record_ai_usage(user_id, 1)
         
         return jsonify(response_data)
         

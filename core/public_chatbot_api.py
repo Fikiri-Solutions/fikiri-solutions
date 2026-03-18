@@ -14,6 +14,7 @@ from flask import Blueprint, request, jsonify, g
 from functools import wraps
 
 from core.api_key_manager import api_key_manager
+from core.ai_budget_guardrails import ai_budget_guardrails
 from core.minimal_vector_search import get_vector_search
 from core.smart_faq_system import get_smart_faq
 from core.knowledge_base_system import get_knowledge_base
@@ -36,17 +37,12 @@ faq_system = get_smart_faq()
 knowledge_base = get_knowledge_base()
 context_system = get_context_system()
 
-CHATBOT_RESPONSE_SCHEMA_V1 = {
-    "type": "object",
-    "required": ["answer", "confidence", "fallback_used", "sources"],
-    "properties": {
-        "answer": {"type": "string"},
-        "confidence": {"type": "number"},
-        "fallback_used": {"type": "boolean"},
-        "sources": {"type": "array", "items": {"type": "string"}},
-        "follow_up": {"type": "string"},
-    },
-}
+# Phase 1: canonical LLM output schema from core.ai.schemas
+from core.ai.schemas import ChatbotResponseSchema
+CHATBOT_RESPONSE_SCHEMA_V1 = ChatbotResponseSchema  # backward compat
+
+# Phase 2b: canonical KnowledgeSnippet and context string from domain
+from core.domain.schemas import knowledge_snippet, snippets_to_context_string
 
 
 def _extract_lead_info(query: str, lead_payload: Dict[str, Any]) -> Dict[str, Optional[str]]:
@@ -192,16 +188,31 @@ def _confidence_threshold() -> float:
         return 0.4
 
 
-def _build_context_snippets(sources: List[Dict[str, Any]]) -> str:
+def _sources_to_snippets(sources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Convert _build_sources output to canonical KnowledgeSnippet shape."""
     snippets = []
-    for source in sources:
-        if source["type"] == "faq":
-            snippets.append(f"FAQ: Q={source.get('question')} A={source.get('answer')}")
-        elif source["type"] == "knowledge_base":
-            snippets.append(f"KB: {source.get('title')}: {source.get('content')}")
-        elif source["type"] == "vector":
-            snippets.append(f"KB: {source.get('content')}")
-    return "\n".join(snippets)
+    for s in sources:
+        t = s.get("type", "")
+        sid = s.get("id")
+        source_id = str(sid) if sid is not None else None
+        if t == "faq":
+            q, a = s.get("question") or "", s.get("answer") or ""
+            content = a or q
+            snippets.append(knowledge_snippet("faq", content, question=q, answer=a, source_id=source_id, confidence=s.get("confidence")))
+        elif t == "knowledge_base":
+            content = s.get("content") or ""
+            snippets.append(knowledge_snippet("knowledge_base", content, title=s.get("title"), source_id=source_id, relevance=s.get("relevance")))
+        elif t == "vector":
+            content = s.get("content") or ""
+            snippets.append(knowledge_snippet("vector", content, source_id=source_id, relevance=s.get("relevance")))
+        else:
+            snippets.append(knowledge_snippet(t, s.get("content", ""), source_id=source_id))
+    return snippets
+
+
+def _build_context_snippets(sources: List[Dict[str, Any]]) -> str:
+    """Build prompt context string from retrieval sources (canonical KnowledgeSnippet → string)."""
+    return snippets_to_context_string(_sources_to_snippets(sources))
 
 
 def _safe_fallback_response() -> str:
@@ -251,16 +262,18 @@ def require_api_key(f):
                 "error_code": "INSUFFICIENT_SCOPE"
             }), 403
         
-        # Check rate limit
-        rate_limit_result = api_key_manager.check_rate_limit(key_info['api_key_id'], 'minute')
-        if not rate_limit_result['allowed']:
+        # Check both short burst and sustained usage rate limits.
+        minute_limit_result = api_key_manager.check_rate_limit(key_info['api_key_id'], 'minute')
+        hour_limit_result = api_key_manager.check_rate_limit(key_info['api_key_id'], 'hour')
+        if not minute_limit_result['allowed'] or not hour_limit_result['allowed']:
+            active_limit = minute_limit_result if not minute_limit_result['allowed'] else hour_limit_result
             return jsonify({
                 "success": False,
                 "error": "Rate limit exceeded",
                 "error_code": "RATE_LIMIT_EXCEEDED",
-                "retry_after": 60,
-                "limit": rate_limit_result['limit'],
-                "remaining": rate_limit_result['remaining']
+                "retry_after": 60 if not minute_limit_result['allowed'] else 3600,
+                "limit": active_limit['limit'],
+                "remaining": active_limit['remaining']
             }), 429
         
         # Store key info in Flask g for use in route handlers
@@ -394,7 +407,25 @@ def public_chatbot_query():
         llm_confidence: Optional[float] = 0.2
         fallback_used = True
         llm_trace_id = None
+        llm_attempted = False
         if allow_llm and not fallback_needed:
+            budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
+            if not budget_decision.allowed:
+                record_api_usage(response_status=402)
+                return jsonify({
+                    "success": False,
+                    "error": "AI monthly budget cap reached. Upgrade or wait until next billing period."
+                    if budget_decision.reason == "monthly_budget_cap_reached"
+                    else "AI monthly budget approval required.",
+                    "error_code": "AI_BUDGET_SOFT_STOP",
+                    "tier": budget_decision.tier,
+                    "month": budget_decision.month,
+                    "budget_cap_usd": budget_decision.budget_cap_usd,
+                    "estimated_cost_usd": budget_decision.estimated_cost_usd,
+                    "projected_cost_usd": budget_decision.projected_cost_usd,
+                    "requires_approval": budget_decision.requires_approval
+                }), 402
+
             router = LLMRouter()
             prompt = (
                 "You are a customer support chatbot. Use ONLY the provided context.\n"
@@ -410,6 +441,7 @@ def public_chatbot_query():
                 output_schema=CHATBOT_RESPONSE_SCHEMA_V1,
                 context={"conversation_id": conversation_id, "tenant_id": tenant_id}
             )
+            llm_attempted = True
             if llm_result.get("success") and llm_result.get("validated"):
                 try:
                     parsed = json.loads(llm_result.get("content", "{}"))
@@ -545,6 +577,8 @@ def public_chatbot_query():
         # Record usage
         record_api_usage(response_status=200, response_time_ms=response_time_ms)
         _record_billing_usage(user_id, "chatbot_queries", 1)
+        if llm_attempted and llm_result.get("success"):
+            ai_budget_guardrails.record_ai_usage(user_id, 1)
         
         retrieved_doc_ids, retrieval_scores = _retrieval_metadata(sources)
         
@@ -567,7 +601,8 @@ def public_chatbot_query():
             "llm_trace_id": llm_trace_id,
             "lead_id": lead_id,
             "escalated": should_escalate,
-            "escalated_question_id": escalated_question_id
+            "escalated_question_id": escalated_question_id,
+            "ai_usage_recorded": bool(llm_attempted)
         })
         
     except Exception as e:

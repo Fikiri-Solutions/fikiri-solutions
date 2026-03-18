@@ -14,6 +14,20 @@ from core.ai.validators import SchemaValidator
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Centralized intent registry (Phase 3). Unknown intents fall back to 'general'.
+# Output schemas: see core.ai.schemas (ChatbotResponseSchema, EmailClassificationSchema, LeadAnalysisSchema).
+# ---------------------------------------------------------------------------
+INTENT_MODEL_CONFIG = {
+    "email_reply": {"model": "gpt-3.5-turbo", "max_tokens": 300, "temperature": 0.7},
+    "classification": {"model": "gpt-3.5-turbo", "max_tokens": 100, "temperature": 0.3},
+    "extraction": {"model": "gpt-3.5-turbo", "max_tokens": 200, "temperature": 0.1},
+    "summarization": {"model": "gpt-3.5-turbo", "max_tokens": 500, "temperature": 0.5},
+    "chatbot_response": {"model": "gpt-3.5-turbo", "max_tokens": 500, "temperature": 0.4},
+    "general": {"model": "gpt-3.5-turbo", "max_tokens": 500, "temperature": 0.7},
+}
+KNOWN_INTENTS = tuple(INTENT_MODEL_CONFIG.keys())
+
 class LLMRouter:
     """
     Central router for all LLM operations.
@@ -117,36 +131,46 @@ class LLMRouter:
             if output_schema:
                 validated = self.validator.validate_schema(postprocessed, output_schema)
                 if not validated:
-                    logger.warning(
-                        f"Schema validation failed for trace_id {self.trace_id}",
-                        extra={
-                            'event': 'schema_validation_failed',
-                            'service': 'ai',
-                            'severity': 'WARN',
-                            'trace_id': self.trace_id
-                        }
-                    )
+                    warn_extra = {
+                        "event": "schema_validation_failed",
+                        "service": "ai",
+                        "severity": "WARN",
+                        "trace_id": self.trace_id,
+                    }
+                    if context:
+                        if context.get("source") is not None:
+                            warn_extra["source"] = context["source"]
+                        if context.get("tenant_id") is not None:
+                            warn_extra["tenant_id"] = context["tenant_id"]
+                        if context.get("user_id") is not None:
+                            warn_extra["user_id"] = context["user_id"]
+                    logger.warning("Schema validation failed for trace_id %s", self.trace_id, extra=warn_extra)
             else:
                 validated = True  # No schema to validate against
             
-            # Step 7: Log cost + latency (already logged in client, but log summary)
+            # Step 7: Log cost + latency and context (source, tenant_id, user_id when present)
             total_latency = (datetime.now() - start_time).total_seconds() * 1000
-            logger.info(
-                f"✅ AI pipeline completed",
-                extra={
-                    'event': 'ai_pipeline_complete',
-                    'service': 'ai',
-                    'severity': 'INFO',
-                    'trace_id': self.trace_id,
-                    'intent': intent,
-                    'model': model,
-                    'tokens_used': llm_result['tokens_used'],
-                    'cost_usd': llm_result['cost_usd'],
-                    'latency_ms': total_latency,
-                    'validated': validated,
-                    'metadata': {'cost_budget': cost_budget, 'latency_requirement': latency_requirement}
-                }
-            )
+            log_extra = {
+                "event": "ai_pipeline_complete",
+                "service": "ai",
+                "severity": "INFO",
+                "trace_id": self.trace_id,
+                "intent": intent,
+                "model": model,
+                "tokens_used": llm_result["tokens_used"],
+                "cost_usd": llm_result["cost_usd"],
+                "latency_ms": total_latency,
+                "validated": validated,
+                "metadata": {"cost_budget": cost_budget, "latency_requirement": latency_requirement},
+            }
+            if context:
+                if context.get("source") is not None:
+                    log_extra["source"] = context["source"]
+                if context.get("tenant_id") is not None:
+                    log_extra["tenant_id"] = context["tenant_id"]
+                if context.get("user_id") is not None:
+                    log_extra["user_id"] = context["user_id"]
+            logger.info("✅ AI pipeline completed", extra=log_extra)
             
             # Step 8: Return structured result
             return {
@@ -164,16 +188,21 @@ class LLMRouter:
             
         except Exception as e:
             error_msg = str(e)
-            logger.error(
-                f"❌ AI pipeline failed: {error_msg}",
-                extra={
-                    'event': 'ai_pipeline_error',
-                    'service': 'ai',
-                    'severity': 'ERROR',
-                    'trace_id': self.trace_id,
-                    'error': error_msg
-                }
-            )
+            err_extra = {
+                "event": "ai_pipeline_error",
+                "service": "ai",
+                "severity": "ERROR",
+                "trace_id": self.trace_id,
+                "error": error_msg,
+            }
+            if context:
+                if context.get("source") is not None:
+                    err_extra["source"] = context["source"]
+                if context.get("tenant_id") is not None:
+                    err_extra["tenant_id"] = context["tenant_id"]
+                if context.get("user_id") is not None:
+                    err_extra["user_id"] = context["user_id"]
+            logger.error("❌ AI pipeline failed: %s", error_msg, extra=err_extra)
             return {
                 'success': False,
                 'content': '',
@@ -201,10 +230,11 @@ class LLMRouter:
         # Sanitize: remove excessive whitespace, basic cleanup
         preprocessed = ' '.join(input_data.split())
         
-        # Add context if provided
+        # Add context if provided (standard key: context_text or context)
         if context:
-            context_str = f"\n\nContext: {context.get('context', '')}"
-            preprocessed = preprocessed + context_str
+            context_str = context.get('context_text') or context.get('context') or ''
+            if context_str:
+                preprocessed = preprocessed + f"\n\nContext: {context_str}"
         
         # Truncate if too long (prevent token overflow)
         max_length = 8000  # Reasonable limit for most models
@@ -256,16 +286,7 @@ class LLMRouter:
         Returns:
             Dict with model, max_tokens, temperature
         """
-        # Default model selection based on intent
-        model_selection = {
-            'email_reply': {'model': 'gpt-3.5-turbo', 'max_tokens': 300, 'temperature': 0.7},
-            'classification': {'model': 'gpt-3.5-turbo', 'max_tokens': 100, 'temperature': 0.3},
-            'extraction': {'model': 'gpt-3.5-turbo', 'max_tokens': 200, 'temperature': 0.1},
-            'summarization': {'model': 'gpt-3.5-turbo', 'max_tokens': 500, 'temperature': 0.5},
-            'general': {'model': 'gpt-3.5-turbo', 'max_tokens': 500, 'temperature': 0.7}
-        }
-        
-        config = model_selection.get(intent, model_selection['general']).copy()
+        config = INTENT_MODEL_CONFIG.get(intent, INTENT_MODEL_CONFIG["general"]).copy()
         
         # Adjust based on cost budget
         if cost_budget is not None:
