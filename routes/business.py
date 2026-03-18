@@ -4,13 +4,14 @@ Business and CRM Routes
 Extracted from app.py for better maintainability
 """
 
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, Response
 from functools import wraps
 import logging
 import os
 import io
 import csv
 import json
+import re
 from datetime import datetime
 
 # Import business logic modules
@@ -37,6 +38,9 @@ from core.automation_safety import automation_safety_manager
 from core.oauth_token_manager import oauth_token_manager
 from core.secure_sessions import get_current_user_id
 from core.activity_logger import log_activity_event
+from core.rate_limiter import enhanced_rate_limiter
+from core.idempotency_manager import idempotency_manager
+from core.domain.schemas import normalize_lead_payload
 from email_automation.service_manager import IMAPProvider
 from core.user_auth import user_auth_manager
 from core.workflow_followups import schedule_follow_up, execute_due_follow_ups
@@ -101,6 +105,60 @@ def get_leads():
         'analytics': data.get('analytics', {})
     }, 'Leads retrieved successfully')
 
+
+@business_bp.route('/crm/leads/export', methods=['GET'])
+@handle_api_errors
+def export_leads_csv():
+    """Export all leads for the authenticated user as CSV."""
+    user_id = get_current_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+    result = enhanced_crm_service.get_leads_summary(user_id, limit=5000, offset=0)
+    if not result.get('success'):
+        return create_error_response(result.get('error', 'Failed to retrieve leads'), 500, 'CRM_ERROR')
+
+    leads = result.get('data', {}).get('leads', [])
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['id', 'name', 'email', 'phone', 'company', 'source', 'stage', 'score', 'created_at'])
+
+    for lead in leads:
+        if hasattr(lead, 'id'):
+            created = lead.created_at.isoformat() if hasattr(lead.created_at, 'isoformat') else str(getattr(lead, 'created_at', ''))
+            writer.writerow([
+                getattr(lead, 'id', ''),
+                getattr(lead, 'name', '') or '',
+                getattr(lead, 'email', '') or '',
+                getattr(lead, 'phone', None) or '',
+                getattr(lead, 'company', None) or '',
+                getattr(lead, 'source', '') or '',
+                getattr(lead, 'stage', '') or '',
+                getattr(lead, 'score', '') or '',
+                created,
+            ])
+        else:
+            lead_dict = dict(lead) if hasattr(lead, 'keys') else lead
+            created = lead_dict.get('created_at')
+            if hasattr(created, 'isoformat'):
+                created = created.isoformat()
+            writer.writerow([
+                lead_dict.get('id', ''),
+                lead_dict.get('name', '') or '',
+                lead_dict.get('email', '') or '',
+                lead_dict.get('phone', '') or '',
+                lead_dict.get('company', '') or '',
+                lead_dict.get('source', '') or '',
+                lead_dict.get('stage', '') or '',
+                lead_dict.get('score', '') or '',
+                created or '',
+            ])
+
+    response = Response(output.getvalue(), mimetype='text/csv')
+    response.headers['Content-Disposition'] = 'attachment; filename=leads.csv'
+    return response
+
+
 @business_bp.route('/crm/leads', methods=['POST'])
 @handle_api_errors
 def create_lead():
@@ -148,10 +206,261 @@ def import_leads():
     if not data or 'leads' not in data or not isinstance(data['leads'], list):
         return create_error_response("leads[] is required", 400, 'MISSING_FIELDS')
 
-    result = enhanced_crm_service.import_leads(user_id, data['leads'])
+    normalized_leads = [normalize_lead_payload(lead) for lead in data['leads']]
+    result = enhanced_crm_service.import_leads(user_id, normalized_leads)
     if not result.get('success'):
         return create_error_response(result.get('error', 'Import failed'), 500, 'CRM_IMPORT_ERROR')
     return create_success_response(result.get('data', {}), 'Leads imported successfully')
+
+
+def _is_valid_email(value):
+    if not value or not isinstance(value, str):
+        return False
+    value = value.strip()
+    if not value:
+        return False
+    return bool(re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', value))
+
+
+# CRM CSV import limits (documented in docs/EXPORT_IMPORT_DATA_FORMATS.md)
+CRM_CSV_MAX_FILE_BYTES = 5 * 1024 * 1024   # 5 MB
+CRM_CSV_MAX_ROWS = 10000
+
+
+@business_bp.route('/crm/leads/import/csv', methods=['POST'])
+@handle_api_errors
+def import_leads_csv():
+    """Import leads from an uploaded CSV file. Required columns: email, name. Optional: phone, source, company.
+    Query/form: on_duplicate=skip|update|merge. Header: Idempotency-Key for safe retries. Rate limited per user."""
+    user_id = get_current_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+    rate_result = enhanced_rate_limiter.check_rate_limit(
+        'crm_csv_import', f"user:{user_id}", user_id=user_id
+    )
+    if not rate_result.allowed:
+        return jsonify({
+            'success': False,
+            'error': 'Rate limit exceeded',
+            'error_code': 'RATE_LIMIT_EXCEEDED',
+            'retry_after': rate_result.retry_after,
+            'limit': rate_result.limit,
+            'remaining': rate_result.remaining,
+        }), 429
+
+    idem_key = request.headers.get('Idempotency-Key') or request.form.get('idempotency_key')
+    if idem_key:
+        cached = idempotency_manager.check_key(idem_key)
+        if cached and cached.get('status') == 'completed' and cached.get('response_data'):
+            return create_success_response(cached['response_data'], 'Leads imported successfully')
+        if cached and cached.get('status') == 'pending':
+            return create_error_response(
+                "Import with this idempotency key is already in progress",
+                409,
+                'IDEMPOTENCY_CONFLICT'
+            )
+
+    file = request.files.get('file')
+    if not file or not file.filename:
+        return create_error_response("No file uploaded", 400, 'NO_FILE')
+
+    if not file.filename.lower().endswith('.csv'):
+        return create_error_response("File must be a CSV", 400, 'INVALID_FILE_TYPE')
+
+    try:
+        content = file.read()
+        if len(content) > CRM_CSV_MAX_FILE_BYTES:
+            return create_error_response(
+                f"File too large (max {CRM_CSV_MAX_FILE_BYTES // (1024 * 1024)} MB)",
+                400,
+                'FILE_TOO_LARGE'
+            )
+        if isinstance(content, bytes):
+            content = content.decode('utf-8', errors='replace')
+    except Exception as e:
+        logger.warning("CSV import decode error: %s", e)
+        return create_error_response("Could not read file", 400, 'INVALID_CSV')
+
+    if not content or not content.strip():
+        return create_error_response("File is empty", 400, 'INVALID_CSV')
+
+    reader = csv.DictReader(io.StringIO(content))
+    fieldnames = reader.fieldnames or []
+    email_key = next((f for f in fieldnames if f.strip().lower() == 'email'), None)
+    name_key = next((f for f in fieldnames if f.strip().lower() == 'name'), None)
+    if not email_key or not name_key:
+        return create_error_response(
+            "CSV must have 'email' and 'name' columns",
+            400,
+            'INVALID_CSV'
+        )
+
+    leads = []
+    skipped = []
+    for i, row in enumerate(reader):
+        email = (row.get(email_key) or '').strip()
+        name = (row.get(name_key) or '').strip()
+        if not email:
+            skipped.append({'row': i + 2, 'reason': 'missing email'})
+            continue
+        if not _is_valid_email(email):
+            skipped.append({'row': i + 2, 'reason': 'invalid email', 'email': email})
+            continue
+        if not name:
+            name = email.split('@')[0]
+        phone = (row.get('phone') or row.get('Phone') or '').strip()
+        source = (row.get('source') or row.get('Source') or 'csv_import').strip() or 'csv_import'
+        company = (row.get('company') or row.get('Company') or '').strip()
+        leads.append(normalize_lead_payload({
+            'email': email,
+            'name': name,
+            'phone': phone or None,
+            'source': source,
+            'company': company or None,
+        }))
+
+    if not leads:
+        return create_error_response(
+            "No valid rows to import (need valid email and name)",
+            400,
+            'INVALID_CSV'
+        )
+
+    if len(leads) + len(skipped) > CRM_CSV_MAX_ROWS:
+        return create_error_response(
+            f"Too many rows (max {CRM_CSV_MAX_ROWS})",
+            400,
+            'TOO_MANY_ROWS'
+        )
+
+    on_duplicate = (request.form.get('on_duplicate') or request.args.get('on_duplicate') or 'update').strip().lower()
+    if on_duplicate not in ('skip', 'update', 'merge'):
+        on_duplicate = 'update'
+
+    if idem_key:
+        idempotency_manager.store_key(
+            idem_key, 'crm_csv_import', user_id=user_id,
+            request_data={'filename': file.filename, 'on_duplicate': on_duplicate},
+            ttl=86400,
+        )
+
+    result = enhanced_crm_service.import_leads(user_id, leads, on_duplicate=on_duplicate)
+    if not result.get('success'):
+        if idem_key:
+            idempotency_manager.update_key_result(
+                idem_key, 'failed',
+                response_data={'error': result.get('error', 'Import failed')},
+            )
+        return create_error_response(result.get('error', 'Import failed'), 500, 'CRM_IMPORT_ERROR')
+
+    data = result.get('data', {})
+    response_body = {
+        'imported': data.get('created', 0) + data.get('updated', 0),
+        'created': data.get('created', 0),
+        'updated': data.get('updated', 0),
+        'skipped': len(skipped),
+        'skipped_duplicate': data.get('skipped_duplicate', 0),
+        'skipped_details': skipped[:50],
+        'total_rows': len(leads) + len(skipped),
+    }
+    if idem_key:
+        idempotency_manager.update_key_result(idem_key, 'completed', response_data=response_body)
+    return create_success_response(response_body, 'Leads imported successfully')
+
+
+@business_bp.route('/crm/leads/import/csv/preview', methods=['POST'])
+@handle_api_errors
+def import_leads_csv_preview():
+    """Validate CSV and return per-row status (ok, duplicate, invalid) without importing.
+    Use before import to show preview. Same file constraints as import."""
+    user_id = get_current_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+    file = request.files.get('file')
+    if not file or not file.filename:
+        return create_error_response("No file uploaded", 400, 'NO_FILE')
+    if not file.filename.lower().endswith('.csv'):
+        return create_error_response("File must be a CSV", 400, 'INVALID_FILE_TYPE')
+
+    try:
+        content = file.read()
+        if len(content) > CRM_CSV_MAX_FILE_BYTES:
+            return create_error_response(
+                f"File too large (max {CRM_CSV_MAX_FILE_BYTES // (1024 * 1024)} MB)",
+                400,
+                'FILE_TOO_LARGE'
+            )
+        if isinstance(content, bytes):
+            content = content.decode('utf-8', errors='replace')
+    except Exception as e:
+        logger.warning("CSV preview decode error: %s", e)
+        return create_error_response("Could not read file", 400, 'INVALID_CSV')
+    if not content or not content.strip():
+        return create_error_response("File is empty", 400, 'INVALID_CSV')
+
+    reader = csv.DictReader(io.StringIO(content))
+    fieldnames = reader.fieldnames or []
+    email_key = next((f for f in fieldnames if f.strip().lower() == 'email'), None)
+    name_key = next((f for f in fieldnames if f.strip().lower() == 'name'), None)
+    if not email_key or not name_key:
+        return create_error_response(
+            "CSV must have 'email' and 'name' columns",
+            400,
+            'INVALID_CSV'
+        )
+
+    existing_emails = set()
+    try:
+        existing = db_optimizer.execute_query(
+            "SELECT email FROM leads WHERE user_id = ?",
+            (user_id,)
+        )
+        existing_emails = {row['email'].lower().strip() for row in (existing or [])}
+    except Exception:
+        pass
+
+    rows_out = []
+    ok_count = duplicate_count = invalid_count = 0
+    for i, row in enumerate(reader):
+        csv_row = i + 2
+        email = (row.get(email_key) or '').strip()
+        name = (row.get(name_key) or '').strip()
+        if not email:
+            rows_out.append({'row': csv_row, 'email': email, 'name': name, 'status': 'invalid', 'reason': 'missing email'})
+            invalid_count += 1
+            continue
+        if not _is_valid_email(email):
+            rows_out.append({'row': csv_row, 'email': email, 'name': name or email.split('@')[0], 'status': 'invalid', 'reason': 'invalid email'})
+            invalid_count += 1
+            continue
+        if not name:
+            name = email.split('@')[0]
+        if email.lower() in existing_emails:
+            rows_out.append({'row': csv_row, 'email': email, 'name': name, 'status': 'duplicate'})
+            duplicate_count += 1
+        else:
+            rows_out.append({'row': csv_row, 'email': email, 'name': name, 'status': 'ok'})
+            ok_count += 1
+
+    total = len(rows_out)
+    if total > CRM_CSV_MAX_ROWS:
+        return create_error_response(
+            f"Too many rows (max {CRM_CSV_MAX_ROWS})",
+            400,
+            'TOO_MANY_ROWS'
+        )
+
+    return create_success_response({
+        'preview': True,
+        'total_rows': total,
+        'valid_rows': ok_count + duplicate_count,
+        'invalid_rows': invalid_count,
+        'summary': {'ok': ok_count, 'duplicate': duplicate_count, 'invalid': invalid_count},
+        'rows': rows_out[:500],
+    }, 'Preview generated')
+
 
 @business_bp.route('/crm/leads/<int:lead_id>', methods=['PUT'])
 @handle_api_errors

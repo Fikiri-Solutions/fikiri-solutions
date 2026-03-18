@@ -33,6 +33,14 @@ def _is_test_mode() -> bool:
     )
 
 
+def _should_bypass_signup_limit() -> bool:
+    """True when signup rate limit should be skipped (E2E, tests, or local dev)."""
+    return (
+        _is_test_mode()
+        or os.getenv("FLASK_ENV") == "development"
+    )
+
+
 def _utcnow_naive() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -77,7 +85,8 @@ class EnhancedRateLimiter:
             'signup_attempts': RateLimit('signup_attempts', RateLimitType.IP, 3, 3600, 'Signup attempts per IP'),
             'email_send': RateLimit('email_send', RateLimitType.USER, 50, 3600, 'Email sending per user'),
             'gmail_sync': RateLimit('gmail_sync', RateLimitType.USER, 10, 3600, 'Gmail sync per user'),
-            'onboarding': RateLimit('onboarding', RateLimitType.USER, 20, 3600, 'Onboarding operations per user')
+            'onboarding': RateLimit('onboarding', RateLimitType.USER, 20, 3600, 'Onboarding operations per user'),
+            'crm_csv_import': RateLimit('crm_csv_import', RateLimitType.USER, 30, 3600, '', 'CRM CSV imports per user per hour'),
         }
         self._connect_redis()
         self._initialize_tables()
@@ -105,6 +114,27 @@ class EnhancedRateLimiter:
     def _initialize_tables(self):
         """Initialize database tables for rate limit tracking"""
         try:
+            # Track all requests when Redis is unavailable so DB fallback can enforce limits.
+            db_optimizer.execute_query("""
+                CREATE TABLE IF NOT EXISTS rate_limit_requests (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    rate_limit_key TEXT NOT NULL,
+                    limit_name TEXT NOT NULL,
+                    identifier TEXT NOT NULL,
+                    request_time DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """, fetch=False)
+
+            db_optimizer.execute_query("""
+                CREATE INDEX IF NOT EXISTS idx_rate_limit_requests_key_time
+                ON rate_limit_requests (rate_limit_key, request_time)
+            """, fetch=False)
+
+            db_optimizer.execute_query("""
+                CREATE INDEX IF NOT EXISTS idx_rate_limit_requests_identifier_time
+                ON rate_limit_requests (identifier, request_time)
+            """, fetch=False)
+
             # Create rate limit violations table
             db_optimizer.execute_query("""
                 CREATE TABLE IF NOT EXISTS rate_limit_violations (
@@ -151,6 +181,14 @@ class EnhancedRateLimiter:
                         endpoint: str = None) -> RateLimitResult:
         """Check if request is within rate limit"""
         try:
+            # In test/E2E or development, allow signup so Playwright/local dev don't hit 3/hour limit
+            if _should_bypass_signup_limit() and limit_name == 'signup_attempts':
+                return RateLimitResult(
+                    allowed=True,
+                    remaining=999,
+                    reset_time=int(time.time() + 3600),
+                    limit=999
+                )
             # Get rate limit configuration
             rate_limit = self.default_limits.get(limit_name)
             if not rate_limit:
@@ -262,24 +300,57 @@ class EnhancedRateLimiter:
             current_time = _utcnow_naive()
             window_start = current_time - timedelta(seconds=rate_limit.window_seconds)
             
-            # Count requests in window
+            # Count requests already made in the active window.
             count_result = db_optimizer.execute_query("""
-                SELECT COUNT(*) as count FROM rate_limit_violations 
-                WHERE identifier = ? AND last_violation > ?
+                SELECT COUNT(*) as count
+                FROM rate_limit_requests
+                WHERE rate_limit_key = ? AND request_time > ?
             """, (key, window_start.isoformat()))
             
             current_count = count_result[0]['count'] if count_result else 0
-            
-            allowed = current_count < rate_limit.max_requests
-            remaining = max(0, rate_limit.max_requests - current_count - 1)
+
+            if current_count >= rate_limit.max_requests:
+                oldest_result = db_optimizer.execute_query("""
+                    SELECT request_time
+                    FROM rate_limit_requests
+                    WHERE rate_limit_key = ? AND request_time > ?
+                    ORDER BY request_time ASC
+                    LIMIT 1
+                """, (key, window_start.isoformat()))
+                if oldest_result and oldest_result[0].get('request_time'):
+                    try:
+                        oldest = datetime.fromisoformat(str(oldest_result[0]['request_time']).replace("Z", "+00:00"))
+                        if oldest.tzinfo is not None:
+                            oldest = oldest.astimezone(timezone.utc).replace(tzinfo=None)
+                        retry_after = max(1, int((oldest + timedelta(seconds=rate_limit.window_seconds) - current_time).total_seconds()))
+                    except Exception:
+                        retry_after = rate_limit.window_seconds
+                else:
+                    retry_after = rate_limit.window_seconds
+
+                return RateLimitResult(
+                    allowed=False,
+                    remaining=0,
+                    reset_time=int(time.time() + retry_after),
+                    retry_after=retry_after,
+                    limit=rate_limit.max_requests
+                )
+
+            # Record this request because it is within the limit.
+            db_optimizer.execute_query("""
+                INSERT INTO rate_limit_requests (rate_limit_key, limit_name, identifier)
+                VALUES (?, ?, ?)
+            """, (key, rate_limit.name, key), fetch=False)
+
+            current_count += 1
+            remaining = max(0, rate_limit.max_requests - current_count)
             reset_time = int(time.time() + rate_limit.window_seconds)
-            retry_after = 0 if allowed else rate_limit.window_seconds
             
             return RateLimitResult(
-                allowed=allowed,
+                allowed=True,
                 remaining=remaining,
                 reset_time=reset_time,
-                retry_after=retry_after,
+                retry_after=0,
                 limit=rate_limit.max_requests
             )
             
@@ -366,8 +437,9 @@ class EnhancedRateLimiter:
                 window_start = current_time - timedelta(seconds=rate_limit.window_seconds)
                 
                 count_result = db_optimizer.execute_query("""
-                    SELECT COUNT(*) as count FROM rate_limit_violations 
-                    WHERE identifier = ? AND last_violation > ?
+                    SELECT COUNT(*) as count
+                    FROM rate_limit_requests
+                    WHERE rate_limit_key = ? AND request_time > ?
                 """, (key, window_start.isoformat()))
                 
                 current_count = count_result[0]['count'] if count_result else 0
@@ -405,6 +477,10 @@ class EnhancedRateLimiter:
                 DELETE FROM rate_limit_violations 
                 WHERE identifier = ? AND limit_name = ?
             """, (key, limit_name), fetch=False)
+            db_optimizer.execute_query("""
+                DELETE FROM rate_limit_requests
+                WHERE rate_limit_key = ? AND limit_name = ?
+            """, (key, limit_name), fetch=False)
             
             logger.info(f"✅ Rate limit reset: {limit_name} for {identifier}")
             return True
@@ -422,6 +498,10 @@ class EnhancedRateLimiter:
             db_optimizer.execute_query("""
                 DELETE FROM rate_limit_violations 
                 WHERE last_violation < ?
+            """, (cutoff_date.isoformat(),), fetch=False)
+            db_optimizer.execute_query("""
+                DELETE FROM rate_limit_requests
+                WHERE request_time < ?
             """, (cutoff_date.isoformat(),), fetch=False)
             
             logger.info("✅ Expired rate limit violations cleaned up")

@@ -135,7 +135,7 @@ class EnhancedCRMService:
             'lead_quality': score_result['quality'],
             'score_breakdown': score_result['breakdown']
         }
-        lead_id = db_optimizer.execute_query(
+        db_optimizer.execute_query(
             """INSERT INTO leads (user_id, email, name, phone, company, source, stage, score, notes, tags, metadata) 
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (user_id, lead_data['email'], lead_data['name'],
@@ -145,6 +145,14 @@ class EnhancedCRMService:
              json.dumps(lead_data.get('metadata', {}))),
             fetch=False
         )
+        row = db_optimizer.execute_query(
+            "SELECT id FROM leads WHERE user_id = ? AND email = ? ORDER BY id DESC LIMIT 1",
+            (user_id, lead_data['email'])
+        )
+        if not row:
+            logger.error("Lead INSERT succeeded but SELECT id failed for user_id=%s email=%s", user_id, lead_data['email'])
+            raise ValueError("Failed to retrieve created lead id")
+        lead_id = row[0]['id'] if isinstance(row[0], dict) else row[0][0]
         
         self._add_lead_activity(lead_id, 'note_added', "Lead created manually")
         
@@ -182,7 +190,7 @@ class EnhancedCRMService:
             update_fields = []
             update_values = []
             
-            allowed_fields = ['name', 'phone', 'company', 'stage', 'notes', 'tags', 'metadata']
+            allowed_fields = ['name', 'phone', 'company', 'source', 'stage', 'notes', 'tags', 'metadata']
             
             for field, value in updates.items():
                 if field in allowed_fields:
@@ -539,6 +547,7 @@ class EnhancedCRMService:
         )
     
     def _score_lead_data(self, lead_data: Dict[str, Any], activity_count: int, last_activity: Optional[datetime]) -> Dict[str, Any]:
+        """Score via LeadScoringService (weighted source/recency/stage/engagement/attributes). See docs/CRM_LEAD_SCORING.md."""
         service = get_lead_scoring_service()
         result = service.score_lead(lead_data, activity_count=activity_count, last_activity=last_activity)
         return {'score': result.score, 'quality': result.quality, 'breakdown': result.breakdown}
@@ -580,10 +589,21 @@ class EnhancedCRMService:
         lead['metadata'] = json.dumps(metadata)
         return {'success': True, 'data': {'lead': self._format_lead(lead)}}
 
-    def import_leads(self, user_id: int, leads: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def import_leads(
+        self,
+        user_id: int,
+        leads: List[Dict[str, Any]],
+        on_duplicate: str = 'update',
+    ) -> Dict[str, Any]:
+        """Import leads. on_duplicate: 'skip' | 'update' | 'merge'.
+        skip: do not update existing, count as skipped; update: overwrite; merge: update only non-empty fields."""
         created = 0
         updated = 0
+        skipped_duplicate = 0
         errors = []
+        allowed_dup = ('skip', 'update', 'merge')
+        if on_duplicate not in allowed_dup:
+            on_duplicate = 'update'
         for item in leads:
             email = item.get('email')
             name = item.get('name')
@@ -595,8 +615,18 @@ class EnhancedCRMService:
                 (user_id, email)
             )
             if existing:
+                if on_duplicate == 'skip':
+                    skipped_duplicate += 1
+                    continue
                 lead_id = existing[0]['id']
-                self.update_lead(lead_id, user_id, item)
+                if on_duplicate == 'merge':
+                    updates = {k: v for k, v in item.items() if k != 'email' and v is not None and v != ''}
+                    if not updates:
+                        skipped_duplicate += 1
+                        continue
+                    self.update_lead(lead_id, user_id, updates)
+                else:
+                    self.update_lead(lead_id, user_id, item)
                 updated += 1
             else:
                 self.create_lead(user_id, item)
@@ -606,6 +636,7 @@ class EnhancedCRMService:
             'data': {
                 'created': created,
                 'updated': updated,
+                'skipped_duplicate': skipped_duplicate,
                 'errors': errors,
                 'total': len(leads)
             }
