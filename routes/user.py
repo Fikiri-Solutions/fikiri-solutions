@@ -74,6 +74,8 @@ def get_user_profile():
             out['phone'] = metadata.get('phone') or None
             out['sms_consent'] = bool(metadata.get('sms_consent'))
             out['sms_consent_at'] = metadata.get('sms_consent_at')
+            out['timezone'] = metadata.get('timezone') or None
+            out['notification_preferences'] = metadata.get('notification_preferences')
         
         return create_success_response({
             'user': out
@@ -97,7 +99,7 @@ def update_user_profile():
             return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
 
         # Validate allowed fields
-        allowed_fields = ['name', 'business_name', 'business_email', 'industry', 'team_size', 'phone', 'sms_consent']
+        allowed_fields = ['name', 'business_name', 'business_email', 'industry', 'team_size', 'phone', 'sms_consent', 'timezone']
         update_data = {k: v for k, v in data.items() if k in allowed_fields}
         metadata_updates = {}
         if 'phone' in update_data:
@@ -106,6 +108,11 @@ def update_user_profile():
             metadata_updates['sms_consent'] = bool(update_data.get('sms_consent'))
             metadata_updates['sms_consent_at'] = datetime.utcnow().isoformat() + 'Z' if metadata_updates['sms_consent'] else None
             update_data.pop('sms_consent')
+        if 'timezone' in update_data:
+            tz = update_data.pop('timezone')
+            metadata_updates['timezone'] = (tz or '').strip() or None
+        if 'notification_preferences' in data and isinstance(data.get('notification_preferences'), dict):
+            metadata_updates['notification_preferences'] = data['notification_preferences']
 
         if not update_data and not metadata_updates:
             return create_error_response("No valid fields to update", 400, 'NO_VALID_FIELDS')
@@ -144,6 +151,8 @@ def update_user_profile():
                     'phone': meta.get('phone'),
                     'sms_consent': bool(meta.get('sms_consent')),
                     'sms_consent_at': meta.get('sms_consent_at'),
+                    'timezone': meta.get('timezone'),
+                    'notification_preferences': meta.get('notification_preferences'),
                 }
             else:
                 meta = getattr(u, 'metadata', None) or {}
@@ -163,6 +172,8 @@ def update_user_profile():
                     'phone': meta.get('phone'),
                     'sms_consent': bool(meta.get('sms_consent')),
                     'sms_consent_at': meta.get('sms_consent_at'),
+                    'timezone': meta.get('timezone'),
+                    'notification_preferences': meta.get('notification_preferences'),
                 }
             return create_success_response(
                 {'user': user_payload},
@@ -424,3 +435,31 @@ def export_user_data():
     except Exception as e:
         logger.error(f"Data export error: {e}")
         return create_error_response("Failed to export user data", 500, 'DATA_EXPORT_ERROR')
+
+@user_bp.route('/user/delete-account', methods=['POST'])
+@handle_api_errors
+@jwt_required
+def delete_account():
+    """Soft-deactivate the current user's account. Requires authentication."""
+    try:
+        user_id = get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+        result = user_auth_manager.deactivate_user(user_id)
+        if result['success']:
+            log_activity_event(
+                user_id,
+                'account_deleted',
+                message="User requested account deactivation",
+                metadata={},
+                request=request
+            )
+            return create_success_response(
+                {'message': result['message']},
+                'Account deactivated successfully'
+            )
+        return create_error_response(result['error'], 400, result.get('error_code', 'DEACTIVATE_ERROR'))
+    except Exception as e:
+        logger.error(f"Delete account error: {e}")
+        return create_error_response("Failed to deactivate account", 500, 'DELETE_ACCOUNT_ERROR')

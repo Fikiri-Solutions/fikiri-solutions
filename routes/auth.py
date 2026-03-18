@@ -13,8 +13,8 @@ from datetime import datetime
 
 # Import our authentication modules
 from core.user_auth import user_auth_manager
-from core.jwt_auth import jwt_auth_manager, jwt_required
-from core.secure_sessions import secure_session_manager
+from core.jwt_auth import get_jwt_manager, jwt_required
+from core.secure_sessions import secure_session_manager, get_current_user_id
 from core.api_validation import validate_api_request, handle_api_errors, create_success_response, create_error_response
 from core.rate_limiter import rate_limit
 from core.database_optimization import db_optimizer
@@ -112,6 +112,7 @@ def api_login():
 def api_signup():
     """Simplified signup endpoint without tenant complexity"""
     data = request.get_json()
+    logger.info("Signup attempt: %s", (data.get('email') if data else 'no body'))
     if not data:
         return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
 
@@ -144,7 +145,7 @@ def api_signup():
             'role': user_dict.get('role', 'user')
         }
 
-        tokens = jwt_auth_manager.generate_tokens(
+        tokens = get_jwt_manager().generate_tokens(
             user_data['id'],
             user_data,
             device_info=request.headers.get('User-Agent'),
@@ -262,12 +263,12 @@ def api_reset_password():
         return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
     
     token = data.get('token')
-    new_password = data.get('new_password')
+    new_passphrase = data.get('new_password')
     
-    if not token or not new_password:
+    if not token or not new_passphrase:
         return create_error_response("Token and password are required", 400, 'MISSING_FIELDS')
     
-    if len(new_password) < 6:
+    if len(new_passphrase) < 6:
         return create_error_response("Password must be at least 6 characters", 400, 'WEAK_PASSWORD')
     
     # Find user with this reset token
@@ -281,7 +282,7 @@ def api_reset_password():
     
     try:
         # Update user password
-        result = user_auth_manager.reset_user_password(user_data[0]['id'], new_password)
+        result = user_auth_manager.reset_user_password(user_data[0]['id'], new_passphrase)
         
         if result['success']:
             log_security_event(
@@ -297,6 +298,33 @@ def api_reset_password():
         logger.error(f"Password reset error: {e}")
         return create_error_response("Password reset failed", 500, "RESET_ERROR")
 
+@auth_bp.route('/change-password', methods=['POST'])
+@handle_api_errors
+@jwt_required
+def api_change_password():
+    """Change password for the authenticated user (requires current password)."""
+    user_id = get_current_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+    data = request.get_json()
+    if not data:
+        return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
+    current_passphrase = data.get('current_password')
+    new_passphrase = data.get('new_password')
+    if not current_passphrase or not new_passphrase:
+        return create_error_response("Current password and new password are required", 400, 'MISSING_FIELDS')
+    if len(new_passphrase) < 8:
+        return create_error_response("New password must be at least 8 characters", 400, 'WEAK_PASSWORD')
+    result = user_auth_manager.change_password(user_id, current_passphrase, new_passphrase)
+    if result['success']:
+        log_security_event(
+            event_type="password_changed",
+            severity="info",
+            details={"user_id": user_id}
+        )
+        return create_success_response({"message": result['message']}, "Password changed successfully")
+    return create_error_response(result['error'], 400, result.get('error_code', 'PASSWORD_CHANGE_ERROR'))
+
 @auth_bp.route('/refresh', methods=['POST'])
 @handle_api_errors
 def refresh_token():
@@ -311,7 +339,8 @@ def refresh_token():
         token = auth_header.split(' ')[1]
         
         # Verify current token
-        payload = jwt_auth_manager.verify_access_token(token)
+        jwt_manager = get_jwt_manager()
+        payload = jwt_manager.verify_access_token(token)
         
         if not payload or payload.get('error'):
             return create_error_response("Invalid or expired token", 401, 'INVALID_TOKEN')
@@ -333,7 +362,7 @@ def refresh_token():
         if not user_data:
             return create_error_response("User not found", 404, 'USER_NOT_FOUND')
         
-        new_tokens = jwt_auth_manager.generate_tokens(
+        new_tokens = jwt_manager.generate_tokens(
             user_id=user_id,
             user_data=user_data,
             device_info=request.headers.get('User-Agent'),

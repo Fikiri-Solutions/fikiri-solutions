@@ -133,6 +133,93 @@ class TestUserRoutes(unittest.TestCase):
         data = json.loads(response.data)
         self.assertEqual(data.get('data', {}).get('export_status'), 'completed')
 
+    @patch("core.jwt_auth.get_jwt_manager")
+    @patch("routes.user.db_optimizer")
+    def test_get_user_profile_includes_timezone_and_notifications(self, mock_db, mock_mgr):
+        """Profile response should surface timezone and notification_preferences from metadata."""
+        mock_mgr.return_value.verify_access_token.return_value = {"user_id": 1}
+        mock_db.execute_query.return_value = [{
+            "id": 1,
+            "email": "a@example.com",
+            "name": "A",
+            "role": "user",
+            "onboarding_completed": 1,
+            "onboarding_step": 2,
+            "metadata": json.dumps({
+                "phone": "+15555550123",
+                "sms_consent": True,
+                "timezone": "Europe/London",
+                "notification_preferences": {
+                    "email": {"marketing": False},
+                    "sms": {"security": True},
+                    "push": {"all": True},
+                },
+            }),
+            "created_at": "now",
+            "last_login": "now",
+        }]
+        response = self.client.get('/api/user/profile', headers=_auth_headers())
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        user = data.get('data', {}).get('user', {})
+        self.assertEqual(user.get('timezone'), "Europe/London")
+        self.assertIsInstance(user.get('notification_preferences'), dict)
+        self.assertTrue(user['notification_preferences']['sms']['security'])
+
+    @patch("routes.user.user_auth_manager")
+    @patch("routes.user.get_current_user_id", return_value=1)
+    def test_update_user_profile_saves_timezone_and_notifications(self, mock_user_id, mock_manager):
+        """PUT /user/profile should pass timezone and notification_preferences into metadata_updates."""
+        mock_manager.update_user_profile.return_value = {
+            "success": True,
+            "user": {"id": 1, "name": "A"},
+        }
+        payload = {
+            "timezone": "America/Chicago",
+            "notification_preferences": {
+                "email": {"marketing": False, "updates": True},
+                "sms": {"security": True},
+                "push": {"all": False},
+            },
+        }
+        response = self.client.put('/api/user/profile', json=payload)
+        self.assertEqual(response.status_code, 200)
+        # Ensure metadata_updates contained our new fields
+        self.assertTrue(mock_manager.update_user_profile.called)
+        _args, kwargs = mock_manager.update_user_profile.call_args
+        self.assertEqual(_args[0], 1)  # user_id
+        metadata_updates = kwargs.get("metadata_updates") or {}
+        self.assertEqual(metadata_updates.get("timezone"), "America/Chicago")
+        self.assertIn("notification_preferences", metadata_updates)
+        self.assertEqual(
+            metadata_updates["notification_preferences"]["email"]["updates"],
+            True,
+        )
+
+    @patch("core.jwt_auth.get_jwt_manager")
+    @patch("routes.user.user_auth_manager")
+    @patch("routes.user.get_current_user_id", return_value=1)
+    def test_delete_account_success(self, mock_user_id, mock_manager, mock_mgr):
+        """POST /user/delete-account should soft-deactivate account when authenticated."""
+        mock_mgr.return_value.verify_access_token.return_value = {"user_id": 1}
+        mock_manager.deactivate_user.return_value = {
+            "success": True,
+            "message": "Account deactivated successfully",
+        }
+        response = self.client.post(
+            '/api/user/delete-account',
+            headers=_auth_headers(),
+            json={},
+        )
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data.get('success'))
+        self.assertEqual(
+            data.get('data', {}).get('message'),
+            "Account deactivated successfully",
+        )
+        mock_manager.deactivate_user.assert_called_once_with(1)
+
 
 if __name__ == '__main__':
     unittest.main()

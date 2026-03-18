@@ -7,7 +7,7 @@ Focused unit tests with mocked dependencies.
 import unittest
 import json
 import time
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import sys
 import os
 from flask import Flask
@@ -95,9 +95,9 @@ class TestAuthRoutes(unittest.TestCase):
     @patch('routes.auth.business_analytics')
     @patch('routes.auth.log_security_event')
     @patch('routes.auth.secure_session_manager')
-    @patch('routes.auth.jwt_auth_manager')
+    @patch('routes.auth.get_jwt_manager')
     @patch('routes.auth.user_auth_manager')
-    def test_signup_success(self, mock_user_auth, mock_jwt_mgr, mock_session_mgr,
+    def test_signup_success(self, mock_user_auth, mock_get_jwt_mgr, mock_session_mgr,
                             mock_log, mock_analytics, mock_email_jobs):
         mock_user_auth.create_user.return_value = {
             'success': True,
@@ -108,12 +108,14 @@ class TestAuthRoutes(unittest.TestCase):
                 'role': 'user'
             }
         }
-        mock_jwt_mgr.generate_tokens.return_value = {
+        jwt_mgr = MagicMock()
+        jwt_mgr.generate_tokens.return_value = {
             'access_token': 'access',
             'refresh_token': 'refresh',
             'expires_in': 1800,
             'token_type': 'Bearer'
         }
+        mock_get_jwt_mgr.return_value = jwt_mgr
         mock_session_mgr.create_session.return_value = (
             'session-id',
             {
@@ -136,16 +138,18 @@ class TestAuthRoutes(unittest.TestCase):
         self.assertIn('tokens', data['data'])
 
     @patch('routes.auth.db_optimizer')
-    @patch('routes.auth.jwt_auth_manager')
-    def test_refresh_token_uses_db_user(self, mock_jwt_mgr, mock_db):
-        mock_jwt_mgr.verify_access_token.return_value = {'user_id': 1}
+    @patch('routes.auth.get_jwt_manager')
+    def test_refresh_token_uses_db_user(self, mock_get_jwt_mgr, mock_db):
+        jwt_mgr = MagicMock()
+        jwt_mgr.verify_access_token.return_value = {'user_id': 1}
         mock_db.execute_query.return_value = [{'id': 1, 'email': 'test@example.com', 'name': 'Test', 'role': 'user'}]
-        mock_jwt_mgr.generate_tokens.return_value = {
+        jwt_mgr.generate_tokens.return_value = {
             'access_token': 'access',
             'refresh_token': 'refresh',
             'expires_in': 1800,
             'token_type': 'Bearer'
         }
+        mock_get_jwt_mgr.return_value = jwt_mgr
 
         response = self.client.post('/api/auth/refresh', headers={
             'Authorization': 'Bearer validtoken'
@@ -303,6 +307,98 @@ class TestAuthRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
         self.assertTrue(data.get('success'))
+
+    @patch('core.jwt_auth.get_jwt_manager')
+    @patch('routes.auth.user_auth_manager')
+    @patch('routes.auth.get_current_user_id', return_value=1)
+    def test_change_password_success(self, mock_user_id, mock_user_auth, mock_get_jwt):
+        """POST /api/auth/change-password happy path."""
+        jwt_mgr = MagicMock()
+        jwt_mgr.verify_access_token.return_value = {'user_id': 1}
+        mock_get_jwt.return_value = jwt_mgr
+        mock_user_auth.change_password.return_value = {
+            'success': True,
+            'message': 'Password changed successfully'
+        }
+
+        response = self.client.post(
+            '/api/auth/change-password',
+            headers={'Authorization': 'Bearer validtoken'},
+            json={
+                'current_password': 'OldPassword123!',
+                'new_password': 'NewPassword123!',
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data.get('success'))
+        self.assertEqual(
+            data.get('data', {}).get('message'),
+            'Password changed successfully',
+        )
+        mock_user_auth.change_password.assert_called_once_with(
+            1, 'OldPassword123!', 'NewPassword123!'
+        )
+
+    @patch('core.jwt_auth.get_jwt_manager')
+    @patch('routes.auth.get_current_user_id', return_value=1)
+    def test_change_password_missing_fields(self, mock_user_id, mock_get_jwt):
+        """Missing fields should return 400 with MISSING_FIELDS code."""
+        jwt_mgr = MagicMock()
+        jwt_mgr.verify_access_token.return_value = {'user_id': 1}
+        mock_get_jwt.return_value = jwt_mgr
+
+        response = self.client.post(
+            '/api/auth/change-password',
+            headers={'Authorization': 'Bearer validtoken'},
+            json={'current_password': 'x'},  # no new_password
+        )
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.data)
+        self.assertEqual(data.get('code'), 'MISSING_FIELDS')
+
+    @patch('core.jwt_auth.get_jwt_manager')
+    @patch('routes.auth.get_current_user_id', return_value=1)
+    def test_change_password_weak_password(self, mock_user_id, mock_get_jwt):
+        """Too-short new password should be rejected."""
+        jwt_mgr = MagicMock()
+        jwt_mgr.verify_access_token.return_value = {'user_id': 1}
+        mock_get_jwt.return_value = jwt_mgr
+
+        response = self.client.post(
+            '/api/auth/change-password',
+            headers={'Authorization': 'Bearer validtoken'},
+            json={'current_password': 'OldPassword123!', 'new_password': '123'},
+        )
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.data)
+        self.assertEqual(data.get('code'), 'WEAK_PASSWORD')
+
+    @patch('core.jwt_auth.get_jwt_manager')
+    @patch('routes.auth.user_auth_manager')
+    @patch('routes.auth.get_current_user_id', return_value=1)
+    def test_change_password_invalid_current(self, mock_user_id, mock_user_auth, mock_get_jwt):
+        """Backend error from change_password should surface appropriate error_code."""
+        jwt_mgr = MagicMock()
+        jwt_mgr.verify_access_token.return_value = {'user_id': 1}
+        mock_get_jwt.return_value = jwt_mgr
+        mock_user_auth.change_password.return_value = {
+            'success': False,
+            'error': 'Current password is incorrect',
+            'error_code': 'INVALID_CURRENT_PASSWORD',
+        }
+
+        response = self.client.post(
+            '/api/auth/change-password',
+            headers={'Authorization': 'Bearer validtoken'},
+            json={
+                'current_password': 'WrongPassword!',
+                'new_password': 'NewPassword123!',
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.data)
+        self.assertEqual(data.get('code'), 'INVALID_CURRENT_PASSWORD')
 
 
 if __name__ == '__main__':
