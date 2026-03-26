@@ -26,6 +26,17 @@ class TestEmailJobHelpers:
         assert t.tzinfo is None
         assert isinstance(t, datetime)
 
+    def test_should_skip_smtp_delivery_reserved_domains(self):
+        from email_automation.jobs import _should_skip_smtp_delivery
+
+        assert _should_skip_smtp_delivery("u@example.com") is True
+        assert _should_skip_smtp_delivery("u@example.net") is True
+        assert _should_skip_smtp_delivery("u@example.org") is True
+        assert _should_skip_smtp_delivery("u@foo.test") is True
+        assert _should_skip_smtp_delivery("u@x.invalid") is True
+        assert _should_skip_smtp_delivery("real@gmail.com") is False
+        assert _should_skip_smtp_delivery("") is False
+
 
 class TestEmailJobDataclass:
     """Test EmailJob structure."""

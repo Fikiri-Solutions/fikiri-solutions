@@ -45,13 +45,15 @@ class TestAppointmentsRoutes(unittest.TestCase):
         data = json.loads(response.data)
         self.assertEqual(data.get('code'), 'INVALID_DATE')
 
+    @patch("routes.appointments.db_optimizer")
     @patch("routes.appointments.AppointmentsService")
     @patch("core.jwt_auth.get_jwt_manager")
-    def test_create_appointment_success(self, mock_mgr, mock_service):
+    def test_create_appointment_success(self, mock_mgr, mock_service, mock_db):
         mock_mgr.return_value.verify_access_token.return_value = {"id": 1, "user_id": 1}
         mock_service.return_value.create_appointment.return_value = {"id": 10, "title": "Call"}
         start = (datetime.now() + timedelta(hours=1)).isoformat()
         end = (datetime.now() + timedelta(hours=2)).isoformat()
+        mock_db.execute_query.return_value = None
         response = self.client.post(
             '/api/appointments',
             headers=_auth_headers(),
@@ -60,6 +62,16 @@ class TestAppointmentsRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
         self.assertTrue(data.get('success'))
+
+        # Best-effort persistence: verify we attempted an insert.
+        insert_calls = [
+            c for c in mock_db.execute_query.call_args_list
+            if "customer_appointment_intake_submissions" in (c[0][0] or "")
+        ]
+        self.assertTrue(len(insert_calls) >= 1)
+        _query, params = insert_calls[0][0][0], insert_calls[0][0][1]
+        # params tuple: (..., timezone, status, error_message, payload_json, payload_truncated)
+        self.assertEqual(params[10], "completed")
 
     @patch("routes.appointments.AppointmentsService")
     @patch("core.jwt_auth.get_jwt_manager")
@@ -84,15 +96,25 @@ class TestAppointmentsRoutes(unittest.TestCase):
         data = json.loads(response.data)
         self.assertEqual(data.get('code'), 'INVALID_DATE')
 
+    @patch("routes.appointments.db_optimizer")
     @patch("routes.appointments.AppointmentsService")
     @patch("core.jwt_auth.get_jwt_manager")
-    def test_cancel_appointment_success(self, mock_mgr, mock_service):
+    def test_cancel_appointment_success(self, mock_mgr, mock_service, mock_db):
         mock_mgr.return_value.verify_access_token.return_value = {"id": 1, "user_id": 1}
         mock_service.return_value.cancel_appointment.return_value = {"id": 1, "status": "canceled"}
+        mock_db.execute_query.return_value = None
         response = self.client.post('/api/appointments/1/cancel', headers=_auth_headers())
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
         self.assertEqual(data.get('data', {}).get('status'), 'canceled')
+
+        insert_calls = [
+            c for c in mock_db.execute_query.call_args_list
+            if "customer_appointment_intake_submissions" in (c[0][0] or "")
+        ]
+        self.assertTrue(len(insert_calls) >= 1)
+        _query, params = insert_calls[0][0][0], insert_calls[0][0][1]
+        self.assertEqual(params[10], "cancelled")
 
     @patch("routes.appointments.integration_manager")
     @patch("routes.appointments.AppointmentsService")

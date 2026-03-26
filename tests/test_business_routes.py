@@ -96,7 +96,27 @@ class TestBusinessRoutes(unittest.TestCase):
     @patch("routes.business.enhanced_crm_service")
     def test_create_lead_success(self, mock_crm, mock_get_user):
         mock_get_user.return_value = 1
-        mock_crm.create_lead.return_value = {"id": 99, "email": "n@m.com", "name": "New Lead"}
+        mock_crm.create_lead.return_value = {
+            "success": True,
+            "data": {"lead_id": 99, "message": "ok"},
+        }
+        mock_crm.get_lead.return_value = {
+            "id": 99,
+            "user_id": 1,
+            "email": "n@m.com",
+            "name": "New Lead",
+            "phone": None,
+            "company": None,
+            "source": "website",
+            "stage": "new",
+            "score": 0,
+            "created_at": "2024-01-01T00:00:00",
+            "updated_at": "2024-01-01T00:00:00",
+            "last_contact": None,
+            "notes": None,
+            "tags": "[]",
+            "metadata": "{}",
+        }
         response = self.client.post(
             "/api/crm/leads",
             json={"email": "n@m.com", "name": "New Lead"},
@@ -164,7 +184,7 @@ class TestBusinessRoutes(unittest.TestCase):
     @patch("routes.business.enhanced_crm_service")
     def test_update_lead_forbidden_wrong_user(self, mock_crm, mock_get_user):
         mock_get_user.return_value = 1
-        mock_crm.get_lead.return_value = {"id": 999, "user_id": 2}
+        mock_crm.get_lead.return_value = None
         response = self.client.put(
             "/api/crm/leads/999",
             json={"status": "contacted"},
@@ -205,7 +225,10 @@ class TestBusinessRoutes(unittest.TestCase):
     @patch("routes.business.enhanced_crm_service")
     def test_add_lead_activity_success(self, mock_crm, mock_get_user):
         mock_get_user.return_value = 1
-        mock_crm.add_lead_activity.return_value = {"id": 1, "type": "note"}
+        mock_crm.add_lead_activity.return_value = {
+            "success": True,
+            "data": {"activity_id": 1, "message": "Activity added successfully"},
+        }
         response = self.client.post(
             "/api/crm/leads/1/activities",
             json={"type": "note", "description": "Test"},
@@ -228,7 +251,10 @@ class TestBusinessRoutes(unittest.TestCase):
     def test_get_lead_activities_success(self, mock_crm, mock_get_user):
         mock_get_user.return_value = 1
         mock_crm.get_lead.return_value = {"id": 1, "user_id": 1}
-        mock_crm.get_lead_activities.return_value = []
+        mock_crm.get_lead_activities.return_value = {
+            "success": True,
+            "data": {"activities": [], "count": 0},
+        }
         response = self.client.get("/api/crm/leads/1/activities")
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
@@ -326,6 +352,25 @@ class TestBusinessRoutes(unittest.TestCase):
         data = response.get_json()
         self.assertTrue(data.get("success"))
         self.assertEqual(data.get("data", {}).get("message_id"), "m1")
+
+    @patch("routes.business.db_optimizer")
+    @patch("routes.business.get_current_user_id")
+    def test_send_email_plan_limit_exceeded(self, mock_get_user, mock_db):
+        mock_get_user.return_value = 1
+        mock_db.table_exists.return_value = True
+        mock_db.execute_query.side_effect = [
+            [{"status": "active", "tier": "starter"}],  # subscription lookup
+            [{"total": 500}],  # email_processing usage for current month
+        ]
+        response = self.client.post(
+            "/api/email/send",
+            json={"to": "a@b.com", "subject": "Hi", "body": "Test"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 402)
+        data = response.get_json()
+        self.assertFalse(data.get("success", True))
+        self.assertEqual(data.get("code"), "PLAN_LIMIT_EXCEEDED")
 
     @patch("routes.business.get_current_user_id")
     def test_archive_email_requires_auth(self, mock_get_user):
@@ -685,6 +730,25 @@ class TestBusinessRoutes(unittest.TestCase):
         self.assertTrue(data.get("success"))
         self.assertEqual(data.get("data", {}).get("intent"), "inquiry")
 
+    @patch("routes.business.db_optimizer")
+    @patch("routes.business.get_current_user_id")
+    def test_analyze_email_plan_limit_exceeded(self, mock_get_user, mock_db):
+        mock_get_user.return_value = 1
+        mock_db.table_exists.return_value = True
+        mock_db.execute_query.side_effect = [
+            [{"status": "active", "tier": "starter"}],  # subscription lookup
+            [{"total": 200}],  # ai_responses usage for current month
+        ]
+        response = self.client.post(
+            "/api/ai/analyze-email",
+            json={"content": "Hello", "subject": "Hi"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 402)
+        data = response.get_json()
+        self.assertFalse(data.get("success", True))
+        self.assertEqual(data.get("code"), "PLAN_LIMIT_EXCEEDED")
+
     @patch("routes.business.get_current_user_id")
     def test_generate_reply_requires_auth(self, mock_get_user):
         mock_get_user.return_value = None
@@ -714,6 +778,25 @@ class TestBusinessRoutes(unittest.TestCase):
         data = response.get_json()
         self.assertTrue(data.get("success"))
         self.assertIn("reply", data.get("data", {}))
+
+    @patch("routes.business.db_optimizer")
+    @patch("routes.business.get_current_user_id")
+    def test_generate_reply_plan_limit_exceeded(self, mock_get_user, mock_db):
+        mock_get_user.return_value = 1
+        mock_db.table_exists.return_value = True
+        mock_db.execute_query.side_effect = [
+            [{"status": "active", "tier": "starter"}],  # subscription lookup
+            [{"total": 200}],  # ai_responses usage for current month
+        ]
+        response = self.client.post(
+            "/api/ai/generate-reply",
+            json={"content": "Hello", "from": "User <u@example.com>", "subject": "Hi"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 402)
+        data = response.get_json()
+        self.assertFalse(data.get("success", True))
+        self.assertEqual(data.get("code"), "PLAN_LIMIT_EXCEEDED")
 
     @patch("routes.business.get_current_user_id")
     def test_schedule_followup_requires_auth(self, mock_get_user):
@@ -875,11 +958,17 @@ class TestBusinessRoutes(unittest.TestCase):
         mock_engine.execute_automation_rules.return_value = {"success": True, "data": {"ok": True}}
         response = self.client.post(
             "/api/automation/test/preset",
-            json={"preset_id": "gmail_crm"},
+            json={"preset_id": "gmail_crm", "correlation_id": "preset-trace-1"},
             content_type="application/json",
+            headers={"X-Correlation-ID": "preset-trace-1"},
         )
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.get_json().get("success"))
+        body = response.get_json()
+        self.assertTrue(body.get("success"))
+        self.assertEqual(body.get("correlation_id"), "preset-trace-1")
+        args = mock_engine.execute_automation_rules.call_args[0]
+        trigger_data = args[1]
+        self.assertEqual(trigger_data.get("correlation_id"), "preset-trace-1")
 
 
 if __name__ == "__main__":

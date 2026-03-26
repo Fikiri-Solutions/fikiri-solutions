@@ -8,9 +8,25 @@ from unittest.mock import patch, MagicMock
 
 os.environ.setdefault("FLASK_ENV", "test")
 os.environ.setdefault("FIKIRI_TEST_MODE", "1")
+os.environ.setdefault("FIKIRI_AI_EVENT_LOG", "0")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.ai.llm_router import LLMRouter
+from core.ai.llm_router import LLMRouter, _safe_float, _safe_int, _safe_latency_ms
+
+
+class TestSafeCoercions:
+    def test_safe_latency_ms(self):
+        assert _safe_latency_ms(None) == 0.0
+        assert _safe_latency_ms("nope") == 0.0
+        assert _safe_latency_ms(42) == 42.0
+        assert _safe_latency_ms(0.0) == 0.0
+
+    def test_safe_float_and_int(self):
+        assert _safe_float(None) == 0.0
+        assert _safe_float("1.5") == 1.5
+        assert _safe_int(None) == 0
+        assert _safe_int("3") == 3
+        assert _safe_int("x") == 0
 
 
 class TestLLMRouterPipelineMethods:
@@ -66,6 +82,54 @@ class TestLLMRouterProcess:
         router.client = mock_client
         result = router.process("Hello", intent="general")
         assert result["success"] is False and result["validated"] is False
+        assert "correlation_id" in result and result["correlation_id"]
+
+    @patch("core.ai.llm_router.LLMClient")
+    def test_process_llm_failure_with_null_latency_ms(self, mock_client_class):
+        mock_client = MagicMock()
+        mock_client.call_llm.return_value = {
+            "success": False,
+            "content": "",
+            "error": "API error",
+            "latency_ms": None,
+            "tokens_used": 0,
+            "cost_usd": 0.0,
+        }
+        mock_client_class.return_value = mock_client
+        router = LLMRouter(api_key=None)
+        router.client = mock_client
+        result = router.process("Hello", intent="general")
+        assert result["success"] is False
+        assert result["latency_ms"] == 0.0
+
+    @patch("core.ai.llm_router.LLMClient")
+    def test_process_call_llm_non_dict_treated_as_failure(self, mock_client_class):
+        mock_client = MagicMock()
+        mock_client.call_llm.return_value = None
+        mock_client_class.return_value = mock_client
+        router = LLMRouter(api_key=None)
+        router.client = mock_client
+        result = router.process("Hello", intent="general")
+        assert result["success"] is False
+        assert "Invalid LLM client response" in (result.get("error") or "")
+
+    @patch("core.ai.llm_router.LLMClient")
+    def test_process_success_with_null_token_cost_fields(self, mock_client_class):
+        mock_client = MagicMock()
+        mock_client.call_llm.return_value = {
+            "success": True,
+            "content": "Hi",
+            "tokens_used": None,
+            "cost_usd": None,
+            "latency_ms": 50,
+        }
+        mock_client_class.return_value = mock_client
+        router = LLMRouter(api_key=None)
+        router.client = mock_client
+        result = router.process("Hello", intent="general")
+        assert result["success"] is True
+        assert result["tokens_used"] == 0
+        assert result["cost_usd"] == 0.0
 
     @patch("core.ai.llm_router.LLMClient")
     def test_process_success_when_no_schema_validated_true(self, mock_client_class):
@@ -79,3 +143,4 @@ class TestLLMRouterProcess:
         router.client = mock_client
         result = router.process("Hello", intent="general")
         assert result["success"] is True and result["validated"] is True
+        assert "correlation_id" in result and result["correlation_id"]

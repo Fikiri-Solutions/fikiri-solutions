@@ -9,6 +9,8 @@ import os
 import sys
 from unittest.mock import patch, MagicMock
 
+from flask import Flask, g
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("FLASK_ENV", "test")
 
@@ -67,6 +69,34 @@ class TestSecureSessionManager(unittest.TestCase):
     def test_get_session_expired_returns_none(self, mock_db):
         mock_db.execute_query.return_value = []
         self.assertIsNone(self.manager.get_session("expired_session_id"))
+
+
+class TestLoadSecureSessionJwtFallback(unittest.TestCase):
+    """Bearer JWT populates g.user_id when no session cookie (API client pattern)."""
+
+    @patch("core.jwt_auth.get_jwt_manager")
+    @patch("core.secure_sessions.db_optimizer")
+    def test_bearer_jwt_sets_g_user_id(self, mock_db, mock_get_jwt):
+        mock_db.execute_query.return_value = None
+        mock_get_jwt.return_value.verify_access_token.return_value = {
+            "user_id": 99,
+            "type": "access",
+        }
+
+        from core.secure_sessions import init_secure_sessions
+
+        app = Flask(__name__)
+        app.config["TESTING"] = True
+        init_secure_sessions(app)
+
+        @app.route("/probe")
+        def probe():
+            return {"user_id": g.user_id}
+
+        with app.test_client() as client:
+            rv = client.get("/probe", headers={"Authorization": "Bearer testtoken"})
+            self.assertEqual(rv.status_code, 200)
+            self.assertEqual(rv.get_json().get("user_id"), 99)
 
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@ os.environ.setdefault('SKIP_HEAVY_DEP_CHECKS', 'true')
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask
-from core.public_chatbot_api import public_chatbot_bp, require_api_key
+from core.public_chatbot_api import public_chatbot_bp
 
 
 class TestPublicChatbotAPI(unittest.TestCase):
@@ -41,6 +41,58 @@ class TestPublicChatbotAPI(unittest.TestCase):
             'rate_limit_per_minute': 60,
             'rate_limit_per_hour': 1000
         }
+
+    @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
+    def test_key_status_missing_key_returns_200(self, mock_validate):
+        response = self.client.get('/api/public/chatbot/key-status')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data['success'])
+        self.assertFalse(data['valid'])
+        self.assertEqual(data['error_code'], 'MISSING_API_KEY')
+        mock_validate.assert_not_called()
+
+    @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
+    def test_key_status_invalid_key_returns_200(self, mock_validate):
+        mock_validate.return_value = None
+        response = self.client.get(
+            '/api/public/chatbot/key-status',
+            headers={'X-API-Key': 'fik_invalid'}
+        )
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertFalse(data['valid'])
+        self.assertEqual(data['error_code'], 'INVALID_API_KEY')
+
+    @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
+    def test_key_status_insufficient_scope_returns_200(self, mock_validate):
+        mock_validate.return_value = {
+            **self.mock_api_key_info,
+            'scopes': ['other:read'],
+        }
+        response = self.client.get(
+            '/api/public/chatbot/key-status',
+            headers={'X-API-Key': 'fik_test'}
+        )
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertFalse(data['valid'])
+        self.assertEqual(data['error_code'], 'INSUFFICIENT_SCOPE')
+
+    @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
+    def test_key_status_valid_key_returns_200(self, mock_validate):
+        mock_validate.return_value = self.mock_api_key_info
+        response = self.client.get(
+            '/api/public/chatbot/key-status',
+            headers={'X-API-Key': 'fik_test'}
+        )
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data['valid'])
+
+    def test_key_status_options_returns_204(self):
+        response = self.client.options('/api/public/chatbot/key-status')
+        self.assertEqual(response.status_code, 204)
     
     @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
     @patch('core.public_chatbot_api.api_key_manager.check_rate_limit')

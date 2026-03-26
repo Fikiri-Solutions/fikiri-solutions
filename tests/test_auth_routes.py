@@ -96,9 +96,18 @@ class TestAuthRoutes(unittest.TestCase):
     @patch('routes.auth.log_security_event')
     @patch('routes.auth.secure_session_manager')
     @patch('routes.auth.get_jwt_manager')
+    @patch('routes.auth.check_email_domain_has_mx')
     @patch('routes.auth.user_auth_manager')
-    def test_signup_success(self, mock_user_auth, mock_get_jwt_mgr, mock_session_mgr,
-                            mock_log, mock_analytics, mock_email_jobs):
+    def test_signup_success(
+        self,
+        mock_user_auth,
+        mock_check_email_domain_has_mx,
+        mock_get_jwt_mgr,
+        mock_session_mgr,
+        mock_log,
+        mock_analytics,
+        mock_email_jobs,
+    ):
         mock_user_auth.create_user.return_value = {
             'success': True,
             'user': {
@@ -107,6 +116,12 @@ class TestAuthRoutes(unittest.TestCase):
                 'name': 'New User',
                 'role': 'user'
             }
+        }
+        mock_check_email_domain_has_mx.return_value = {
+            "domain": "example.com",
+            "has_mx": True,
+            "mx_records": 1,
+            "reason": "OK",
         }
         jwt_mgr = MagicMock()
         jwt_mgr.generate_tokens.return_value = {
@@ -137,6 +152,109 @@ class TestAuthRoutes(unittest.TestCase):
         self.assertIn('data', data)
         self.assertIn('tokens', data['data'])
 
+    @patch('routes.auth.email_job_manager')
+    @patch('routes.auth.business_analytics')
+    @patch('routes.auth.log_security_event')
+    @patch('routes.auth.secure_session_manager')
+    @patch('routes.auth.get_jwt_manager')
+    @patch('routes.auth.user_auth_manager')
+    def test_signup_soft_validation_does_not_block(
+        self,
+        mock_user_auth,
+        mock_get_jwt_mgr,
+        mock_session_mgr,
+        mock_log,
+        mock_analytics,
+        mock_email_jobs,
+    ):
+        """Signup should succeed even if helper validators fail (default behavior)."""
+        # Ensure strict mode is disabled for this test.
+        original = os.environ.get("FIKIRI_SIGNUP_STRICT_VALIDATION")
+        os.environ.pop("FIKIRI_SIGNUP_STRICT_VALIDATION", None)
+        try:
+            mock_user_auth.create_user.return_value = {
+                'success': True,
+                'user': {
+                    'id': 2,
+                    'email': 'new@example.com',
+                    'name': 'New User',
+                    'role': 'user'
+                }
+            }
+            jwt_mgr = MagicMock()
+            jwt_mgr.generate_tokens.return_value = {
+                'access_token': 'access',
+                'refresh_token': 'refresh',
+                'expires_in': 1800,
+                'token_type': 'Bearer'
+            }
+            mock_get_jwt_mgr.return_value = jwt_mgr
+            mock_session_mgr.create_session.return_value = (
+                'session-id',
+                {
+                    'name': 'fikiri_session',
+                    'value': 'session-id',
+                    'httponly': True
+                }
+            )
+
+            response = self.client.post('/api/auth/signup', json={
+                'email': 'not-an-email',
+                'password': 'short',
+                'name': 'New User',
+            })
+
+            self.assertEqual(response.status_code, 200)
+            data = json.loads(response.data)
+            self.assertTrue(data.get('success'))
+            self.assertIn('validation_warnings', data['data'])
+            self.assertEqual(
+                data['data']['validation_warnings'][0]['code'],
+                'INVALID_EMAIL',
+            )
+            mock_user_auth.create_user.assert_called_once()
+        finally:
+            if original is None:
+                os.environ.pop("FIKIRI_SIGNUP_STRICT_VALIDATION", None)
+            else:
+                os.environ["FIKIRI_SIGNUP_STRICT_VALIDATION"] = original
+
+    @patch('routes.auth.email_job_manager')
+    @patch('routes.auth.business_analytics')
+    @patch('routes.auth.log_security_event')
+    @patch('routes.auth.secure_session_manager')
+    @patch('routes.auth.get_jwt_manager')
+    @patch('routes.auth.user_auth_manager')
+    def test_signup_strict_validation_blocks_invalid_email(
+        self,
+        mock_user_auth,
+        mock_get_jwt_mgr,
+        mock_session_mgr,
+        mock_log,
+        mock_analytics,
+        mock_email_jobs,
+    ):
+        """In strict mode, invalid inputs should be rejected."""
+        original = os.environ.get("FIKIRI_SIGNUP_STRICT_VALIDATION")
+        os.environ["FIKIRI_SIGNUP_STRICT_VALIDATION"] = "1"
+        try:
+            response = self.client.post('/api/auth/signup', json={
+                'email': 'not-an-email',
+                'password': 'Password123!',
+                'name': 'New User',
+            })
+
+            self.assertEqual(response.status_code, 400)
+            data = json.loads(response.data)
+            self.assertFalse(data.get('success'))
+            self.assertEqual(data.get('code'), 'INVALID_EMAIL')
+            mock_user_auth.create_user.assert_not_called()
+        finally:
+            if original is None:
+                os.environ.pop("FIKIRI_SIGNUP_STRICT_VALIDATION", None)
+            else:
+                os.environ["FIKIRI_SIGNUP_STRICT_VALIDATION"] = original
+
     @patch('routes.auth.db_optimizer')
     @patch('routes.auth.get_jwt_manager')
     def test_refresh_token_uses_db_user(self, mock_get_jwt_mgr, mock_db):
@@ -165,6 +283,16 @@ class TestAuthRoutes(unittest.TestCase):
         mock_db.execute_query.return_value = [{'id': 1, 'email': 'test@example.com', 'name': 'Test', 'role': 'user'}]
 
         response = self.client.get('/api/auth/whoami')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data.get('success'))
+        self.assertIn('user', data.get('data', {}))
+
+    @patch('routes.auth.db_optimizer')
+    def test_whoami_accepts_post_same_as_get(self, mock_db):
+        mock_db.execute_query.return_value = [{'id': 1, 'email': 'test@example.com', 'name': 'Test', 'role': 'user'}]
+
+        response = self.client.post('/api/auth/whoami')
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
         self.assertTrue(data.get('success'))
@@ -216,6 +344,84 @@ class TestAuthRoutes(unittest.TestCase):
         self.assertEqual(data.get('code'), 'INVALID_TOKEN')
 
     @patch('core.rate_limiter.enhanced_rate_limiter')
+    def test_verify_email_missing_token(self, mock_rate):
+        mock_rate.check_rate_limit.return_value = type("R", (), {"allowed": True, "retry_after": 0, "limit": 10, "remaining": 9})()
+        response = self.client.get('/api/auth/verify-email')
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.data)
+        self.assertEqual(data.get('code'), 'MISSING_TOKEN')
+
+    @patch('core.rate_limiter.enhanced_rate_limiter')
+    @patch('routes.auth.user_auth_manager')
+    def test_verify_email_invalid_token(self, mock_user_auth, mock_rate):
+        mock_rate.check_rate_limit.return_value = type("R", (), {"allowed": True, "retry_after": 0, "limit": 10, "remaining": 9})()
+        mock_user_auth.verify_email_token.return_value = {
+            'success': False,
+            'error': 'Invalid or expired verification token',
+            'error_code': 'INVALID_TOKEN'
+        }
+
+        response = self.client.get('/api/auth/verify-email?token=bad')
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.data)
+        self.assertFalse(data.get('success'))
+        self.assertEqual(data.get('code'), 'INVALID_TOKEN')
+
+    @patch('core.rate_limiter.enhanced_rate_limiter')
+    @patch('routes.auth.log_security_event')
+    @patch('routes.auth.user_auth_manager')
+    def test_verify_email_success(self, mock_user_auth, mock_log, mock_rate):
+        mock_rate.check_rate_limit.return_value = type("R", (), {"allowed": True, "retry_after": 0, "limit": 10, "remaining": 9})()
+        mock_user_auth.verify_email_token.return_value = {
+            'success': True,
+            'user': {
+                'id': 1,
+                'email': 'a@b.com',
+                'name': 'User',
+                'role': 'user',
+                'onboarding_completed': False,
+                'onboarding_step': 1,
+                'email_verified': True
+            }
+        }
+
+        response = self.client.get('/api/auth/verify-email?token=good')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data.get('success'))
+        self.assertTrue(data.get('data', {}).get('email_verified'))
+
+    @patch('core.rate_limiter.enhanced_rate_limiter')
+    @patch('core.jwt_auth.get_jwt_manager')
+    @patch('routes.auth.db_optimizer')
+    @patch('routes.auth.user_auth_manager')
+    def test_resend_email_verification_success(self, mock_user_auth, mock_db, mock_get_jwt, mock_rate):
+        mock_rate.check_rate_limit.return_value = type("R", (), {"allowed": True, "retry_after": 0, "limit": 10, "remaining": 9})()
+        mock_get_jwt.return_value.verify_access_token.return_value = {'user_id': 1}
+        mock_db.execute_query.return_value = [{'id': 1, 'email': 'a@b.com', 'name': 'User', 'email_verified': 0}]
+        mock_user_auth.request_email_verification.return_value = {'success': True, 'message': 'Verification email queued'}
+
+        response = self.client.post('/api/auth/resend-email-verification', headers={'Authorization': 'Bearer token'})
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data.get('success'))
+
+    @patch('core.rate_limiter.enhanced_rate_limiter')
+    @patch('core.jwt_auth.get_jwt_manager')
+    @patch('routes.auth.db_optimizer')
+    @patch('routes.auth.user_auth_manager')
+    def test_resend_email_verification_already_verified(self, mock_user_auth, mock_db, mock_get_jwt, mock_rate):
+        mock_rate.check_rate_limit.return_value = type("R", (), {"allowed": True, "retry_after": 0, "limit": 10, "remaining": 9})()
+        mock_get_jwt.return_value.verify_access_token.return_value = {'user_id': 1}
+        mock_db.execute_query.return_value = [{'id': 1, 'email': 'a@b.com', 'name': 'User', 'email_verified': 1}]
+
+        response = self.client.post('/api/auth/resend-email-verification', headers={'Authorization': 'Bearer token'})
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data.get('success'))
+        mock_user_auth.request_email_verification.assert_not_called()
+
+    @patch('core.rate_limiter.enhanced_rate_limiter')
     @patch('routes.auth.log_security_event')
     @patch('routes.auth.user_auth_manager')
     @patch('routes.auth.db_optimizer')
@@ -239,9 +445,9 @@ class TestAuthRoutes(unittest.TestCase):
     @patch('core.secure_sessions.get_current_user_id', return_value=None)
     def test_gmail_status_missing_user(self, mock_get_user):
         response = self.client.get('/api/auth/gmail/status')
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 401)
         data = json.loads(response.data)
-        self.assertEqual(data.get('code'), 'MISSING_USER_ID')
+        self.assertEqual(data.get('code'), 'AUTHENTICATION_REQUIRED')
 
     @patch('routes.auth.db_optimizer')
     @patch('core.secure_sessions.get_current_user_id', return_value=1)
@@ -261,7 +467,7 @@ class TestAuthRoutes(unittest.TestCase):
     @patch('core.secure_sessions.get_current_user_id', return_value=None)
     def test_outlook_status_missing_user(self, mock_get_user):
         response = self.client.get('/api/auth/outlook/status')
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 401)
         data = json.loads(response.data)
         self.assertFalse(data.get('data', {}).get('connected'))
 

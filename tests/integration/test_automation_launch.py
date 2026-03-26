@@ -12,7 +12,7 @@ pytestmark = pytest.mark.integration
 
 
 def _backend_url() -> str:
-    return os.getenv("INTEGRATION_BACKEND_URL", "").rstrip("/")
+    return os.getenv("INTEGRATION_BACKEND_URL", "http://localhost:5000").rstrip("/")
 
 
 def _enabled() -> bool:
@@ -20,10 +20,8 @@ def _enabled() -> bool:
 
 
 def _login(backend_url: str) -> Dict[str, str]:
-    email = os.getenv("INTEGRATION_LOGIN_EMAIL")
-    password = os.getenv("INTEGRATION_LOGIN_PASSWORD")
-    if not (email and password):
-        pytest.skip("INTEGRATION_LOGIN_EMAIL/PASSWORD not set")
+    email = os.getenv("INTEGRATION_LOGIN_EMAIL", "test@example.com")
+    password = os.getenv("INTEGRATION_LOGIN_PASSWORD", "TestPassword123!")
 
     response = requests.post(
         f"{backend_url}/api/auth/login",

@@ -108,6 +108,30 @@ class TestMinimalEmailParser(unittest.TestCase):
         recipients = self.parser.get_recipients(parsed)
         self.assertEqual(recipients, ["a@b.com", "c@d.com", "e@f.com"])
 
+    def test_accessors_tolerate_malformed_headers_body_labels(self):
+        bad = {
+            "headers": "x",
+            "body": "y",
+            "labels": "UNREAD",
+            "attachments": {},
+        }
+        self.assertEqual(self.parser.get_sender(bad), "")
+        self.assertEqual(self.parser.get_subject(bad), "")
+        self.assertEqual(self.parser.get_body_text(bad), "")
+        self.assertFalse(self.parser.is_unread(bad))
+        self.assertFalse(self.parser.has_attachments(bad))
+        self.assertEqual(self.parser.get_attachment_count(bad), 0)
+        self.assertEqual(self.parser.get_recipients(bad), [])
+
+    def test_parse_coerces_non_list_label_ids(self):
+        message = {
+            "id": "m5",
+            "labelIds": "INBOX",
+            "payload": {"mimeType": "text/plain", "headers": [], "body": {}},
+        }
+        parsed = self.parser.parse_message(message)
+        self.assertEqual(parsed["labels"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

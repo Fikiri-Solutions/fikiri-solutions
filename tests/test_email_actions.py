@@ -100,6 +100,73 @@ class TestMinimalEmailActions(unittest.TestCase):
         self.assertTrue(result.get("success"))
         self.actions.db_optimizer.execute_query.assert_called()
 
+    def test_process_email_invalid_parsed(self):
+        result = self.actions.process_email(None, action_type="mark_read", user_id=1)
+        self.assertFalse(result.get("success"))
+        self.assertEqual(
+            result.get("details", {}).get("error"), "invalid_parsed_email"
+        )
+
+    def test_process_email_malformed_headers_does_not_crash(self):
+        bad = {
+            "message_id": "m1",
+            "headers": "not-a-dict",
+            "snippet": "x",
+        }
+        with patch("email_automation.actions.idempotency_manager") as mock_idem, \
+             patch("email_automation.actions.automation_safety_manager") as mock_safety:
+            mock_idem.check_key.return_value = None
+            mock_safety.check_rate_limits.return_value = {"allowed": True}
+            result = self.actions.process_email(bad, action_type="mark_read", user_id=1)
+        self.assertIsInstance(result, dict)
+
+    def test_process_email_safety_non_dict_blocked(self):
+        with patch("email_automation.actions.idempotency_manager") as mock_idem, \
+             patch("email_automation.actions.automation_safety_manager") as mock_safety:
+            mock_idem.check_key.return_value = None
+            mock_safety.check_rate_limits.return_value = "broken"
+            result = self.actions.process_email(
+                self.sample_email, action_type="mark_read", user_id=1
+            )
+        self.assertFalse(result.get("success"))
+        self.assertEqual(
+            result.get("details", {}).get("error"), "safety_blocked"
+        )
+        self.assertEqual(result.get("details", {}).get("raw"), "broken")
+
+    def test_process_email_idempotent_normalizes_non_dict_cache(self):
+        cached = {
+            "status": "completed",
+            "response_data": "not-a-dict",
+        }
+        with patch("email_automation.actions.idempotency_manager") as mock_idem, \
+             patch("email_automation.actions.automation_safety_manager") as mock_safety:
+            mock_idem.check_key.side_effect = [None, cached]
+            mock_safety.check_rate_limits.return_value = {"allowed": True}
+            self.actions._mark_read = MagicMock(
+                return_value={"success": True, "action": "mark_read"}
+            )
+            self.actions.process_email(self.sample_email, action_type="mark_read", user_id=1)
+            second = self.actions.process_email(
+                self.sample_email, action_type="mark_read", user_id=1
+            )
+        self.assertTrue(second.get("success"))
+        self.assertTrue(second.get("details", {}).get("idempotent"))
+
+    def test_process_email_handler_non_dict_normalized(self):
+        with patch("email_automation.actions.idempotency_manager") as mock_idem, \
+             patch("email_automation.actions.automation_safety_manager") as mock_safety:
+            mock_idem.check_key.return_value = None
+            mock_safety.check_rate_limits.return_value = {"allowed": True}
+            self.actions._mark_read = MagicMock(return_value="bad-handler")
+            result = self.actions.process_email(
+                self.sample_email, action_type="mark_read", user_id=1
+            )
+        self.assertFalse(result.get("success"))
+        self.assertEqual(
+            result.get("details", {}).get("error"), "handler_returned_non_dict"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

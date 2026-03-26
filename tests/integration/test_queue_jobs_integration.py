@@ -10,18 +10,35 @@ pytestmark = pytest.mark.integration
 
 
 def _backend_url() -> str:
-    return os.getenv("INTEGRATION_BACKEND_URL", "").rstrip("/")
+    return os.getenv("INTEGRATION_BACKEND_URL", "http://localhost:5000").rstrip("/")
 
 
 def _enabled() -> bool:
     return os.getenv("RUN_INTEGRATION_TESTS") == "1" and bool(_backend_url())
 
 
-def _headers():
+def _login_headers(backend_url: str):
+    email = os.getenv("INTEGRATION_LOGIN_EMAIL", "test@example.com")
+    password = os.getenv("INTEGRATION_LOGIN_PASSWORD", "TestPassword123!")
+    resp = requests.post(
+        f"{backend_url}/api/auth/login",
+        json={"email": email, "password": password},
+        timeout=15,
+    )
+    if resp.status_code != 200:
+        return {}
+    payload = resp.json()
+    token = payload.get("data", {}).get("access_token") or payload.get("data", {}).get("tokens", {}).get("access_token")
+    if not token:
+        return {}
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _headers(backend_url: str):
     token = os.getenv("INTEGRATION_AUTH_TOKEN")
     if token:
         return {"Authorization": f"Bearer {token}"}
-    return {}
+    return _login_headers(backend_url)
 
 
 @pytest.fixture(scope="session")
@@ -34,13 +51,15 @@ def backend_url():
 def test_gmail_sync_job_queue_flow(backend_url):
     user_id = os.getenv("INTEGRATION_GMAIL_SYNC_USER_ID")
     expected = os.getenv("INTEGRATION_GMAIL_SYNC_EXPECT", "oauth_required")
-    if not user_id:
-        pytest.skip("INTEGRATION_GMAIL_SYNC_USER_ID not set")
+    payload = {"user_id": int(user_id)} if user_id else {}
+    headers = _headers(backend_url)
+    if not headers:
+        pytest.skip("Could not obtain integration auth token from env or login")
 
     resp = requests.post(
         f"{backend_url}/api/crm/sync-gmail",
-        json={"user_id": int(user_id)},
-        headers=_headers(),
+        json=payload,
+        headers=headers,
         timeout=15,
     )
 

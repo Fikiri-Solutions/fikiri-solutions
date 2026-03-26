@@ -77,21 +77,25 @@ class TestAIAnalysisAPI(unittest.TestCase):
         mock_validate.return_value = self.mock_api_key_info
         mock_rate_limit.return_value = {'allowed': True, 'remaining': 60, 'limit': 60}
         
-        # Mock AI analysis result
-        mock_analyze.return_value = {
-            'score': 85,
-            'engagement_level': 'high',
-            'recommended_actions': ['Follow up'],
-            'insights': ['High value contact'],
-            'risk_factors': [],
-            'opportunities': ['Potential deal']
-        }
+        # Mock AI analysis result (analyze_contact returns body, correlation_id)
+        mock_analyze.return_value = (
+            {
+                'score': 85,
+                'engagement_level': 'high',
+                'recommended_actions': ['Follow up'],
+                'insights': ['High value contact'],
+                'risk_factors': [],
+                'opportunities': ['Potential deal'],
+            },
+            'corr-contact-1',
+        )
         
         response = self.client.post('/api/public/ai/analyze/contact',
                                    json={
                                        'name': 'John Doe',
                                        'email': 'john@example.com',
-                                       'company': 'Acme Corp'
+                                       'company': 'Acme Corp',
+                                       'correlation_id': 'from-body',
                                    },
                                    headers={'X-API-Key': 'fik_test_key'})
         
@@ -101,6 +105,7 @@ class TestAIAnalysisAPI(unittest.TestCase):
         self.assertIn('analysis', data)
         self.assertEqual(data['analysis']['contact_score'], 85)
         self.assertEqual(data['analysis']['engagement_level'], 'high')
+        self.assertEqual(data['correlation_id'], 'corr-contact-1')
     
     @patch('core.ai_analysis_api.api_key_manager.validate_api_key')
     @patch('core.ai_analysis_api.api_key_manager.check_rate_limit')
@@ -111,15 +116,18 @@ class TestAIAnalysisAPI(unittest.TestCase):
         mock_validate.return_value = self.mock_api_key_info
         mock_rate_limit.return_value = {'allowed': True, 'remaining': 60, 'limit': 60}
         
-        mock_analyze.return_value = {
-            'score': 75,
-            'conversion_probability': 0.75,
-            'priority': 'high',
-            'recommended_actions': ['Qualify'],
-            'insights': ['Strong intent'],
-            'next_steps': ['Schedule call'],
-            'estimated_value': 50000
-        }
+        mock_analyze.return_value = (
+            {
+                'score': 75,
+                'conversion_probability': 0.75,
+                'priority': 'high',
+                'recommended_actions': ['Qualify'],
+                'insights': ['Strong intent'],
+                'next_steps': ['Schedule call'],
+                'estimated_value': 50000,
+            },
+            'corr-lead-1',
+        )
         
         response = self.client.post('/api/public/ai/analyze/lead',
                                    json={
@@ -136,6 +144,7 @@ class TestAIAnalysisAPI(unittest.TestCase):
         self.assertIn('analysis', data)
         self.assertEqual(data['analysis']['lead_score'], 75)
         self.assertEqual(data['analysis']['conversion_probability'], 0.75)
+        self.assertEqual(data['correlation_id'], 'corr-lead-1')
     
     @patch('core.ai_analysis_api.api_key_manager.validate_api_key')
     @patch('core.ai_analysis_api.api_key_manager.check_rate_limit')
@@ -146,15 +155,18 @@ class TestAIAnalysisAPI(unittest.TestCase):
         mock_validate.return_value = self.mock_api_key_info
         mock_rate_limit.return_value = {'allowed': True, 'remaining': 60, 'limit': 60}
         
-        mock_analyze.return_value = {
-            'business_name': 'Acme Corp',
-            'industry': 'Technology',
-            'size_category': 'medium',
-            'key_insights': ['Growing company'],
-            'market_position': 'Established',
-            'growth_potential': 'high',
-            'recommendations': ['Focus on retention']
-        }
+        mock_analyze.return_value = (
+            {
+                'business_name': 'Acme Corp',
+                'industry': 'Technology',
+                'size_category': 'medium',
+                'key_insights': ['Growing company'],
+                'market_position': 'Established',
+                'growth_potential': 'high',
+                'recommendations': ['Focus on retention'],
+            },
+            'corr-biz-1',
+        )
         
         response = self.client.post('/api/public/ai/analyze/business',
                                    json={
@@ -169,6 +181,7 @@ class TestAIAnalysisAPI(unittest.TestCase):
         self.assertTrue(data['success'])
         self.assertIn('summary', data)
         self.assertEqual(data['summary']['size_category'], 'medium')
+        self.assertEqual(data['correlation_id'], 'corr-biz-1')
     
     @patch('core.ai_analysis_api.api_key_manager.validate_api_key')
     @patch('core.ai_analysis_api.api_key_manager.check_rate_limit')

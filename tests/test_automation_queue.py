@@ -24,6 +24,42 @@ class TestAutomationQueue(unittest.TestCase):
         mock_db.execute_query.assert_called()
 
     @patch("services.automation_queue.db_optimizer")
+    def test_queue_automation_job_stores_correlation_on_rule_ids(self, mock_db):
+        mock_db.execute_query.return_value = None
+        from services.automation_queue import AutomationJobManager
+
+        mgr = AutomationJobManager()
+        mgr.queue_automation_job(1, rule_ids=[9], correlation_id="trace-abc")
+        insert_calls = [
+            c for c in mock_db.execute_query.call_args_list
+            if c.args and "INSERT INTO automation_jobs" in (c.args[0] or "")
+        ]
+        self.assertTrue(insert_calls)
+        payload = json.loads(insert_calls[0].args[1][3])
+        self.assertEqual(payload.get("correlation_id"), "trace-abc")
+        self.assertEqual(payload.get("rule_ids"), [9])
+
+    @patch("services.automation_queue.db_optimizer")
+    def test_queue_automation_job_merges_correlation_into_trigger_data(self, mock_db):
+        mock_db.execute_query.return_value = None
+        from services.automation_queue import AutomationJobManager
+
+        mgr = AutomationJobManager()
+        mgr.queue_automation_job(
+            1,
+            trigger_type="lead_created",
+            trigger_data={"lead_id": 5},
+            correlation_id="t-1",
+        )
+        insert_calls = [
+            c for c in mock_db.execute_query.call_args_list
+            if c.args and "INSERT INTO automation_jobs" in (c.args[0] or "")
+        ]
+        payload = json.loads(insert_calls[0].args[1][3])
+        self.assertEqual(payload.get("correlation_id"), "t-1")
+        self.assertEqual(payload.get("trigger_data", {}).get("correlation_id"), "t-1")
+
+    @patch("services.automation_queue.db_optimizer")
     def test_queue_automation_job_returns_none_when_missing_args(self, mock_db):
         from services.automation_queue import AutomationJobManager
 

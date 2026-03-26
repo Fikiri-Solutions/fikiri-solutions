@@ -67,6 +67,22 @@ class TestDashboardAPI(unittest.TestCase):
         self.assertTrue(metrics.get("integrations", {}).get("gmail_connected"))
 
     @patch("analytics.dashboard_api.get_current_user_id", return_value=None)
+    def test_dashboard_root_requires_auth(self, mock_user_id):
+        response = self.client.get("/api/dashboard")
+        self.assertEqual(response.status_code, 401)
+
+    @patch("analytics.dashboard_api.get_current_user_id", return_value=42)
+    def test_dashboard_root_returns_endpoints(self, mock_user_id):
+        response = self.client.get("/api/dashboard")
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data.get("success"))
+        body = data.get("data", {})
+        self.assertEqual(body.get("user_id"), 42)
+        self.assertIn("endpoints", body)
+        self.assertIn("/api/dashboard/metrics", body["endpoints"].values())
+
+    @patch("analytics.dashboard_api.get_current_user_id", return_value=None)
     def test_dashboard_activity_requires_auth(self, mock_user_id):
         response = self.client.get("/api/dashboard/activity")
         self.assertEqual(response.status_code, 401)
