@@ -101,6 +101,13 @@ data/vector_db/
 # Test artifacts
 frontend/playwright-report/
 frontend/test-results/
+frontend/coverage/
+
+# Local / CI artifacts (not source)
+artifacts/
+
+# Large media not needed in repo (use CDN or LFS if required)
+frontend/public/*.mp4
 
 # Node dependencies
 frontend/node_modules/
