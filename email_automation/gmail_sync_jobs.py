@@ -471,6 +471,27 @@ class GmailSyncJobManager:
                     email_id = self._store_email(user_id, message)
                     if email_id:
                         emails_synced += 1
+                        try:
+                            from email_automation.email_event_log import record_email_event
+
+                            sid_rows = db_optimizer.execute_query(
+                                "SELECT id FROM synced_emails WHERE user_id = ? AND gmail_id = ? LIMIT 1",
+                                (user_id, message.get("id")),
+                            )
+                            sid = int(sid_rows[0]["id"]) if sid_rows else None
+                            record_email_event(
+                                user_id,
+                                "email.received",
+                                provider="gmail",
+                                message_id=message.get("id"),
+                                thread_id=message.get("threadId"),
+                                synced_email_id=sid,
+                                payload={"gmail_sync_job_id": job_id},
+                                status="applied",
+                                source="gmail_sync",
+                            )
+                        except Exception as ev_err:
+                            logger.debug("email.received event skipped: %s", ev_err)
 
                         if mailbox_automation_enabled and parser and actions:
                             try:
@@ -484,7 +505,7 @@ class GmailSyncJobManager:
                         
                         # Trigger automation: EMAIL_RECEIVED
                         try:
-                            from core.automation_engine import automation_engine, TriggerType
+                            from services.automation_engine import automation_engine, TriggerType
                             sender_email = message.get('from', '')
                             subject = message.get('subject', '')
                             body_text = message.get('body', '') or message.get('snippet', '')
@@ -494,9 +515,10 @@ class GmailSyncJobManager:
                                     'email_id': email_id,
                                     'sender_email': sender_email,
                                     'subject': subject,
-                                    'text': body_text
+                                    'text': body_text,
                                 },
-                                user_id
+                                user_id,
+                                automation_source="gmail_sync",
                             )
                         except Exception as auto_error:
                             logger.warning(f"Automation trigger failed: {auto_error}")
@@ -901,7 +923,7 @@ class GmailSyncJobManager:
             # Get recent activity
             recent_emails = db_optimizer.execute_query("""
                 SELECT COUNT(*) as count FROM synced_emails 
-                WHERE user_id = ? AND date > datetime('now', '-7 days')
+                WHERE user_id = ? AND datetime(date) > datetime('now', '-7 days')
             """, (user_id,))
             
             return {

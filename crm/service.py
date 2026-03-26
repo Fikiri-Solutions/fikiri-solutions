@@ -6,9 +6,11 @@ Manages leads, contacts, and activities with automatic Gmail integration
 import json
 import logging
 from typing import Dict, Any, List, Optional
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from dataclasses import dataclass, asdict, is_dataclass
+from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 from core.database_optimization import db_optimizer
+from crm.event_log import record_crm_event
 from core.lead_scoring_service import get_lead_scoring_service
 # Gmail OAuth functionality - disabled pending OAuth refactor
 # from core.gmail_oauth import gmail_oauth_manager, gmail_sync_manager
@@ -16,6 +18,61 @@ gmail_oauth_manager = None
 gmail_sync_manager = None
 
 logger = logging.getLogger(__name__)
+
+_ACTIVE_LEADS_SQL = " (withdrawn_at IS NULL) "
+
+
+def _crm_tags_list(raw: Any) -> List[str]:
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        return [str(t) for t in raw]
+    try:
+        parsed = json.loads(raw) if isinstance(raw, str) else raw
+        if isinstance(parsed, list):
+            return [str(t) for t in parsed]
+    except (TypeError, json.JSONDecodeError):
+        pass
+    return []
+
+
+def _crm_meta_dict(raw: Any) -> Dict[str, Any]:
+    if raw is None:
+        return {}
+    if isinstance(raw, dict):
+        return dict(raw)
+    try:
+        if isinstance(raw, str):
+            return json.loads(raw or "{}")
+    except json.JSONDecodeError:
+        return {}
+    return {}
+
+
+def lead_row_to_public_dict(lead_row: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    if not lead_row:
+        return {}
+    row = dict(lead_row)
+    row["tags"] = _crm_tags_list(row.get("tags"))
+    row["metadata"] = _crm_meta_dict(row.get("metadata"))
+    for key in ("created_at", "updated_at", "last_contact"):
+        val = row.get(key)
+        if val is not None and hasattr(val, "isoformat"):
+            row[key] = val.isoformat()
+    return row
+
+
+def lead_dataclass_to_public_dict(lead: Any) -> Dict[str, Any]:
+    if lead is None:
+        return {}
+    if is_dataclass(lead):
+        d = asdict(lead)
+        for k, v in list(d.items()):
+            if hasattr(v, "isoformat"):
+                d[k] = v.isoformat()
+        return d
+    return dict(lead) if isinstance(lead, dict) else {}
+
 
 @dataclass
 class Lead:
@@ -55,6 +112,52 @@ class EnhancedCRMService:
             'email_received', 'email_sent', 'call_made', 'meeting_scheduled',
             'proposal_sent', 'contract_signed', 'follow_up', 'note_added'
         ]
+
+    def get_lead(self, lead_id: int, user_id: int) -> Optional[Dict[str, Any]]:
+        """Return raw lead row as dict, or None if not owned by user."""
+        rows = db_optimizer.execute_query(
+            """SELECT id, user_id, email, name, phone, company, source, stage, score,
+                      created_at, updated_at, last_contact, notes, tags, metadata, withdrawn_at
+               FROM leads WHERE id = ? AND user_id = ?""",
+            (lead_id, user_id),
+        )
+        if not rows:
+            return None
+        return dict(rows[0])
+
+    def list_crm_events(
+        self, lead_id: int, user_id: int, limit: int = 50, offset: int = 0
+    ) -> Dict[str, Any]:
+        """Append-only CRM timeline for a lead (lead + contact entity types)."""
+        limit = min(max(limit, 1), 200)
+        offset = max(offset, 0)
+        own = db_optimizer.execute_query(
+            "SELECT id FROM leads WHERE id = ? AND user_id = ?",
+            (lead_id, user_id),
+        )
+        if not own:
+            return {
+                "success": False,
+                "error": "Lead not found",
+                "error_code": "LEAD_NOT_FOUND",
+            }
+        rows = db_optimizer.execute_query(
+            """
+            SELECT id, created_at, event_type,
+                   entity_type, entity_id, correlation_id, supersedes_event_id,
+                   payload_json, payload_truncated,
+                   status, error_message, source
+            FROM crm_events
+            WHERE user_id = ? AND entity_id = ? AND entity_type IN ('lead', 'contact')
+            ORDER BY datetime(created_at) DESC, id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (user_id, lead_id, limit, offset),
+        )
+        return {
+            "success": True,
+            "data": {"events": [dict(r) for r in (rows or [])], "limit": limit, "offset": offset},
+        }
     
     def get_leads_summary(self, user_id: int, filters: Dict[str, Any] = None, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
         """Get comprehensive leads summary with analytics and pagination"""
@@ -62,6 +165,8 @@ class EnhancedCRMService:
                        created_at, updated_at, last_contact, notes, tags, metadata 
                        FROM leads WHERE user_id = ?"""
         params = [user_id]
+        if not (filters and filters.get("include_withdrawn")):
+            base_query += f" AND {_ACTIVE_LEADS_SQL}"
         
         if filters:
             if filters.get('stage'):
@@ -82,6 +187,8 @@ class EnhancedCRMService:
         
         count_query = "SELECT COUNT(*) as total FROM leads WHERE user_id = ?"
         count_params = [user_id]
+        if not (filters and filters.get("include_withdrawn")):
+            count_query += f" AND {_ACTIVE_LEADS_SQL}"
         if filters:
             if filters.get('stage'):
                 count_query += " AND stage = ?"
@@ -122,11 +229,48 @@ class EnhancedCRMService:
                 return {'success': False, 'error': f'Missing required field: {field}', 'error_code': 'MISSING_FIELD'}
         
         existing = db_optimizer.execute_query(
-            "SELECT id FROM leads WHERE user_id = ? AND email = ?",
+            "SELECT id, withdrawn_at FROM leads WHERE user_id = ? AND email = ?",
             (user_id, lead_data['email'])
         )
         if existing:
-            return {'success': False, 'error': 'Lead with this email already exists', 'error_code': 'LEAD_EXISTS'}
+            row = existing[0]
+            if not row.get("withdrawn_at"):
+                return {
+                    "success": False,
+                    "error": "Lead with this email already exists",
+                    "error_code": "LEAD_EXISTS",
+                }
+            lead_id = row["id"]
+            db_optimizer.execute_query(
+                "UPDATE leads SET withdrawn_at = NULL, updated_at = CURRENT_TIMESTAMP "
+                "WHERE id = ? AND user_id = ?",
+                (lead_id, user_id),
+                fetch=False,
+            )
+            re_upd = {
+                k: v
+                for k, v in lead_data.items()
+                if k
+                in (
+                    "name",
+                    "phone",
+                    "company",
+                    "source",
+                    "stage",
+                    "notes",
+                    "tags",
+                    "metadata",
+                )
+                and v is not None
+                and v != ""
+            }
+            if re_upd:
+                return self.update_lead(lead_id, user_id, re_upd)
+            self._add_lead_activity(lead_id, "note_added", "Lead reactivated after withdraw")
+            return {
+                "success": True,
+                "data": {"lead_id": lead_id, "message": "Lead reactivated successfully"},
+            }
         
         score_result = self._score_lead_data(lead_data, activity_count=0, last_activity=None)
         lead_data['score'] = score_result['score']
@@ -155,20 +299,62 @@ class EnhancedCRMService:
         lead_id = row[0]['id'] if isinstance(row[0], dict) else row[0][0]
         
         self._add_lead_activity(lead_id, 'note_added', "Lead created manually")
+        correlation_id = str(lead_data.get("correlation_id") or uuid4())
         
         try:
-            from core.automation_engine import automation_engine, TriggerType
+            from services.automation_engine import automation_engine, TriggerType
             automation_engine.execute_automation_rules(
                 TriggerType.LEAD_CREATED,
-                {'lead_id': lead_id, 'email': lead_data['email'], 'name': lead_data['name'],
-                 'source': lead_data.get('source', 'manual'), 'score': lead_data.get('score', 0)},
-                user_id
+                {
+                    'lead_id': lead_id,
+                    'email': lead_data['email'],
+                    'name': lead_data['name'],
+                    'source': lead_data.get('source', 'manual'),
+                    'score': lead_data.get('score', 0),
+                    'correlation_id': correlation_id,
+                },
+                user_id,
+                automation_source="crm",
             )
         except Exception as auto_error:
             logger.warning(f"Automation trigger failed: {auto_error}")
+
+        record_crm_event(
+            user_id=user_id,
+            event_type="lead.created",
+            entity_type="lead",
+            entity_id=lead_id,
+            payload={
+                "email": lead_data["email"],
+                "name": lead_data["name"],
+                "source": lead_data.get("source", "manual"),
+                "stage": lead_data.get("stage", "new"),
+                "score": lead_data.get("score", 0),
+            },
+            correlation_id=correlation_id,
+        )
+        record_crm_event(
+            user_id=user_id,
+            event_type="contact.created",
+            entity_type="contact",
+            entity_id=lead_id,
+            payload={
+                "email": lead_data["email"],
+                "name": lead_data["name"],
+                "source": lead_data.get("source", "manual"),
+            },
+            correlation_id=correlation_id,
+        )
         
         logger.info(f"Lead created: {lead_data['email']} for user {user_id}")
-        return {'success': True, 'data': {'lead_id': lead_id, 'message': 'Lead created successfully'}}
+        return {
+            'success': True,
+            'data': {
+                'lead_id': lead_id,
+                'message': 'Lead created successfully',
+                'correlation_id': correlation_id,
+            },
+        }
     
     def update_lead(self, lead_id: int, user_id: int, updates: Dict[str, Any]) -> Dict[str, Any]:
         """Update lead information"""
@@ -185,7 +371,24 @@ class EnhancedCRMService:
                     'error': 'Lead not found',
                     'error_code': 'LEAD_NOT_FOUND'
                 }
-            
+
+            updates = dict(updates)
+            correlation_id = str(updates.get("correlation_id") or uuid4())
+
+            if "sms_consent" in updates:
+                consent_flag = bool(updates.pop("sms_consent"))
+                base_meta = _crm_meta_dict(lead_data[0].get("metadata"))
+                base_meta["sms_consent"] = consent_flag
+                base_meta["sms_consent_at"] = (
+                    datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+                    if consent_flag
+                    else None
+                )
+                extra_meta = updates.pop("metadata", None)
+                if isinstance(extra_meta, dict):
+                    base_meta.update(extra_meta)
+                updates["metadata"] = base_meta
+
             # Build update query
             update_fields = []
             update_values = []
@@ -210,8 +413,11 @@ class EnhancedCRMService:
             
             update_values.extend([lead_id, user_id])
             
-            # Get old stage before update (for automation trigger)
-            old_stage = lead_data[0].get('stage', 'new') if lead_data else 'new'
+            old_row = dict(lead_data[0])
+            old_stage = old_row.get('stage') or 'new'
+            old_score = int(old_row.get('score') or 0)
+            old_tags = _crm_tags_list(old_row.get('tags'))
+            old_meta = _crm_meta_dict(old_row.get('metadata'))
             
             query = f"UPDATE leads SET {', '.join(update_fields)}, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?"
             
@@ -243,19 +449,123 @@ class EnhancedCRMService:
             # Trigger automation: LEAD_STAGE_CHANGED (if stage was updated)
             if 'stage' in updates and updates['stage'] != old_stage:
                 try:
-                    from core.automation_engine import automation_engine, TriggerType
+                    from services.automation_engine import automation_engine, TriggerType
                     automation_engine.execute_automation_rules(
                         TriggerType.LEAD_STAGE_CHANGED,
                         {
                             'lead_id': lead_id,
                             'old_stage': old_stage,
                             'new_stage': updates['stage'],
-                            'email': updated_lead['email']
+                            'email': updated_lead['email'],
+                            'correlation_id': correlation_id,
                         },
-                        user_id
+                        user_id,
+                        automation_source="crm",
                     )
                 except Exception as auto_error:
                     logger.warning(f"Automation trigger failed: {auto_error}")
+
+            new_stage = updated_lead_dict.get('stage') or 'new'
+            new_score = int(updated_lead_dict.get('score') or 0)
+            new_tags = _crm_tags_list(updated_lead_dict.get('tags'))
+            new_meta = _crm_meta_dict(updated_lead_dict.get('metadata'))
+            fields_changed = sorted([k for k in updates if k in allowed_fields])
+
+            record_crm_event(
+                user_id=user_id,
+                event_type="lead.updated",
+                entity_type="lead",
+                entity_id=lead_id,
+                payload={
+                    "fields_changed": fields_changed,
+                    "stage": {"from": old_stage, "to": new_stage},
+                    "score": {"from": old_score, "to": new_score},
+                },
+                correlation_id=correlation_id,
+            )
+            record_crm_event(
+                user_id=user_id,
+                event_type="contact.updated",
+                entity_type="contact",
+                entity_id=lead_id,
+                payload={"fields_changed": fields_changed, "stage": {"from": old_stage, "to": new_stage}},
+                correlation_id=correlation_id,
+            )
+            if new_stage != old_stage:
+                record_crm_event(
+                    user_id=user_id,
+                    event_type="lead.stage_changed",
+                    entity_type="lead",
+                    entity_id=lead_id,
+                    payload={"from": old_stage, "to": new_stage},
+                    correlation_id=correlation_id,
+                )
+            if new_stage == 'closed' and old_stage != 'closed':
+                record_crm_event(
+                    user_id=user_id,
+                    event_type="lead.closed",
+                    entity_type="lead",
+                    entity_id=lead_id,
+                    payload={"stage": new_stage},
+                    correlation_id=correlation_id,
+                )
+            if old_stage == 'closed' and new_stage != 'closed':
+                record_crm_event(
+                    user_id=user_id,
+                    event_type="lead.reopened",
+                    entity_type="lead",
+                    entity_id=lead_id,
+                    payload={"stage": new_stage},
+                    correlation_id=correlation_id,
+                )
+            added_tags = sorted(set(new_tags) - set(old_tags))
+            removed_tags = sorted(set(old_tags) - set(new_tags))
+            if added_tags:
+                record_crm_event(
+                    user_id=user_id,
+                    event_type="lead.tagged",
+                    entity_type="lead",
+                    entity_id=lead_id,
+                    payload={"tags": added_tags},
+                    correlation_id=correlation_id,
+                )
+            if removed_tags:
+                record_crm_event(
+                    user_id=user_id,
+                    event_type="lead.untagged",
+                    entity_type="lead",
+                    entity_id=lead_id,
+                    payload={"tags": removed_tags},
+                    correlation_id=correlation_id,
+                )
+            was_withdrawn = bool(old_meta.get('withdrawn_by_client')) or 'withdrawn' in old_tags
+            now_withdrawn = (
+                bool(new_meta.get('withdrawn_by_client'))
+                or 'withdrawn' in new_tags
+                or 'client_withdrawn' in new_tags
+            )
+            if now_withdrawn and not was_withdrawn:
+                record_crm_event(
+                    user_id=user_id,
+                    event_type="lead.withdrawn",
+                    entity_type="lead",
+                    entity_id=lead_id,
+                    payload={"reason": "metadata_or_tag"},
+                    correlation_id=correlation_id,
+                )
+            if new_score != old_score:
+                record_crm_event(
+                    user_id=user_id,
+                    event_type="lead.scored",
+                    entity_type="lead",
+                    entity_id=lead_id,
+                    payload={
+                        "from": old_score,
+                        "to": new_score,
+                        "quality": new_meta.get('lead_quality'),
+                    },
+                    correlation_id=correlation_id,
+                )
             
             return {
                 'success': True,
@@ -300,6 +610,18 @@ class EnhancedCRMService:
                     (lead_id,),
                     fetch=False
                 )
+
+            record_crm_event(
+                user_id=user_id,
+                event_type="lead.activity_logged",
+                entity_type="lead",
+                entity_id=lead_id,
+                payload={
+                    "activity_id": activity_id,
+                    "activity_type": activity_type,
+                    "description_preview": (description or "")[:500],
+                },
+            )
             
             return {
                 'success': True,
@@ -402,7 +724,7 @@ class EnhancedCRMService:
                    FROM lead_activities la
                    JOIN leads l ON la.lead_id = l.id
                    WHERE l.user_id = ? AND la.activity_type = 'email_received'
-                   AND la.timestamp >= datetime('now', '-7 days')
+                   AND datetime(la.timestamp) >= datetime('now', '-7 days')
                    ORDER BY la.timestamp DESC""",
                 (user_id,)
             )
@@ -459,9 +781,9 @@ class EnhancedCRMService:
         try:
             # Get leads by stage
             pipeline_data = db_optimizer.execute_query(
-                """SELECT stage, COUNT(*) as count, AVG(score) as avg_score
+                f"""SELECT stage, COUNT(*) as count, AVG(score) as avg_score
                    FROM leads
-                   WHERE user_id = ?
+                   WHERE user_id = ? AND {_ACTIVE_LEADS_SQL}
                    GROUP BY stage
                    ORDER BY 
                      CASE stage
@@ -476,12 +798,12 @@ class EnhancedCRMService:
             
             # Get conversion rates
             total_leads = db_optimizer.execute_query(
-                "SELECT COUNT(*) as count FROM leads WHERE user_id = ?",
+                f"SELECT COUNT(*) as count FROM leads WHERE user_id = ? AND {_ACTIVE_LEADS_SQL}",
                 (user_id,)
             )[0]['count']
             
             closed_leads = db_optimizer.execute_query(
-                "SELECT COUNT(*) as count FROM leads WHERE user_id = ? AND stage = 'closed'",
+                f"SELECT COUNT(*) as count FROM leads WHERE user_id = ? AND stage = 'closed' AND {_ACTIVE_LEADS_SQL}",
                 (user_id,)
             )[0]['count']
             
@@ -538,13 +860,13 @@ class EnhancedCRMService:
     
     def _add_lead_activity(self, lead_id: int, activity_type: str, 
                            description: str, metadata: Dict[str, Any] = None) -> int:
-        """Add activity to lead (internal method)"""
-        return db_optimizer.execute_query(
+        """Add activity to lead (internal method). Returns new activity row id."""
+        rid = db_optimizer.execute_insert_returning_id(
             """INSERT INTO lead_activities (lead_id, activity_type, description, metadata) 
                VALUES (?, ?, ?, ?)""",
             (lead_id, activity_type, description, json.dumps(metadata or {})),
-            fetch=False
         )
+        return int(rid or 0)
     
     def _score_lead_data(self, lead_data: Dict[str, Any], activity_count: int, last_activity: Optional[datetime]) -> Dict[str, Any]:
         """Score via LeadScoringService (weighted source/recency/stage/engagement/attributes). See docs/CRM_LEAD_SCORING.md."""
@@ -575,6 +897,7 @@ class EnhancedCRMService:
         if not lead_data:
             return {'success': False, 'error': 'Lead not found', 'error_code': 'LEAD_NOT_FOUND'}
         lead = dict(lead_data[0])
+        old_score = int(lead.get('score') or 0)
         activity_count, last_activity = self._get_lead_activity_metrics(lead_id)
         score_result = self._score_lead_data(lead, activity_count, last_activity)
         metadata = json.loads(lead.get('metadata', '{}'))
@@ -587,6 +910,22 @@ class EnhancedCRMService:
         )
         lead['score'] = score_result['score']
         lead['metadata'] = json.dumps(metadata)
+        new_score = int(score_result['score'])
+        if new_score != old_score:
+            correlation_id = str(uuid4())
+            record_crm_event(
+                user_id=user_id,
+                event_type="lead.scored",
+                entity_type="lead",
+                entity_id=lead_id,
+                payload={
+                    "from": old_score,
+                    "to": new_score,
+                    "quality": score_result.get('quality'),
+                    "source": "recalculate_lead_score",
+                },
+                correlation_id=correlation_id,
+            )
         return {'success': True, 'data': {'lead': self._format_lead(lead)}}
 
     def import_leads(
@@ -611,14 +950,21 @@ class EnhancedCRMService:
                 errors.append({'lead': item, 'error': 'Missing required field: email/name'})
                 continue
             existing = db_optimizer.execute_query(
-                "SELECT id FROM leads WHERE user_id = ? AND email = ?",
+                "SELECT id, withdrawn_at FROM leads WHERE user_id = ? AND email = ?",
                 (user_id, email)
             )
             if existing:
+                lead_id = existing[0]["id"]
                 if on_duplicate == 'skip':
                     skipped_duplicate += 1
                     continue
-                lead_id = existing[0]['id']
+                if existing[0].get("withdrawn_at"):
+                    db_optimizer.execute_query(
+                        "UPDATE leads SET withdrawn_at = NULL, updated_at = CURRENT_TIMESTAMP "
+                        "WHERE id = ? AND user_id = ?",
+                        (lead_id, user_id),
+                        fetch=False,
+                    )
                 if on_duplicate == 'merge':
                     updates = {k: v for k, v in item.items() if k != 'email' and v is not None and v != ''}
                     if not updates:
@@ -662,98 +1008,124 @@ class EnhancedCRMService:
         else:
             return now - timedelta(days=30)  # Default to 30 days
     
-    def delete_contact(self, contact_id: int, user_id: int, soft_delete: bool = False) -> Dict[str, Any]:
+    def delete_contact(
+        self,
+        contact_id: int,
+        user_id: int,
+        soft_delete: bool = False,
+        correlation_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
-        Delete a contact/lead.
-        
-        Args:
-            contact_id: Lead/contact ID to delete
-            user_id: User ID (for ownership verification)
-            soft_delete: If True, mark as deleted instead of hard delete (not yet implemented)
-        
-        Returns:
-            Dict with success status and message
+        Withdraw a lead from active CRM (HTTP DELETE maps here): closed stage, withdrawn_at set,
+        append-only crm_events; lead row and lead_activities are preserved.
+        soft_delete is ignored (withdraw-only); correlation_id should be supplied for cancel flows.
         """
+        _ = soft_delete
         try:
-            # Verify lead ownership
             lead_data = db_optimizer.execute_query(
-                "SELECT id, user_id, email, name FROM leads WHERE id = ? AND user_id = ?",
-                (contact_id, user_id)
+                "SELECT id, user_id, email, name, stage, withdrawn_at FROM leads WHERE id = ? AND user_id = ?",
+                (contact_id, user_id),
             )
-            
             if not lead_data:
                 return {
-                    'success': False,
-                    'error': 'Contact not found or access denied',
-                    'error_code': 'CONTACT_NOT_FOUND'
+                    "success": False,
+                    "error": "Contact not found or access denied",
+                    "error_code": "CONTACT_NOT_FOUND",
                 }
-            
             lead = lead_data[0]
-            lead_email = lead.get('email', '')
-            lead_name = lead.get('name', '')
-            
-            if soft_delete:
-                # Soft delete: mark as deleted (requires deleted_at column)
-                # TODO: Add deleted_at column to leads table for soft delete support
-                logger.warning("Soft delete not yet implemented - performing hard delete")
-            
-            # Delete related activities first (if CASCADE not configured)
-            try:
-                activities_count = db_optimizer.execute_query(
-                    "SELECT COUNT(*) as count FROM lead_activities WHERE lead_id = ?",
-                    (contact_id,)
+            lead_email = lead.get("email", "") or ""
+            lead_name = lead.get("name", "") or ""
+            correlation_id = correlation_id or str(uuid4())
+            if lead.get("withdrawn_at"):
+                record_crm_event(
+                    user_id=user_id,
+                    event_type="lead.withdrawn",
+                    entity_type="lead",
+                    entity_id=contact_id,
+                    payload={"email": lead_email, "idempotent_repeat": True},
+                    correlation_id=correlation_id,
+                    status="noop",
+                    source="crm.delete_contact",
                 )
-                activity_count = activities_count[0]['count'] if activities_count else 0
-                
-                # Delete activities (CASCADE should handle this, but explicit for safety)
-                db_optimizer.execute_query(
-                    "DELETE FROM lead_activities WHERE lead_id = ?",
-                    (contact_id,),
-                    fetch=False
-                )
-                logger.info(f"Deleted {activity_count} activities for lead {contact_id}")
-            except Exception as activity_error:
-                logger.warning(f"Error deleting activities: {activity_error}")
-                # Continue with lead deletion even if activity deletion fails
-            
-            # Delete the lead
-            db_optimizer.execute_query(
-                "DELETE FROM leads WHERE id = ? AND user_id = ?",
-                (contact_id, user_id),
-                fetch=False
-            )
-            
-            logger.info(f"Deleted contact {contact_id} (email: {lead_email}, name: {lead_name}) for user {user_id}", extra={
-                'event': 'contact_deleted',
-                'service': 'crm',
-                'severity': 'INFO',
-                'contact_id': contact_id,
-                'user_id': user_id,
-                'contact_email': lead_email
-            })
-            
-            return {
-                'success': True,
-                'data': {
-                    'contact_id': contact_id,
-                    'message': 'Contact deleted successfully',
-                    'activities_deleted': activity_count
+                return {
+                    "success": True,
+                    "data": {
+                        "contact_id": contact_id,
+                        "message": "Contact already withdrawn",
+                    },
                 }
-            }
-            
-        except Exception as e:
-            logger.error(f"Error deleting contact: {e}", extra={
-                'event': 'contact_delete_failed',
-                'service': 'crm',
-                'severity': 'ERROR',
-                'contact_id': contact_id,
-                'user_id': user_id,
-                'error': str(e)
-            })
+            prior_stage = lead.get("stage") or "new"
+            wtime = datetime.now(timezone.utc).isoformat()
+            db_optimizer.execute_query(
+                """UPDATE leads SET stage = 'closed', withdrawn_at = ?,
+                   updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?""",
+                (wtime, contact_id, user_id),
+                fetch=False,
+            )
+            self._add_lead_activity(
+                contact_id,
+                "note_added",
+                "Lead withdrawn from active CRM; row and history retained",
+            )
+            record_crm_event(
+                user_id=user_id,
+                event_type="lead.withdrawn",
+                entity_type="lead",
+                entity_id=contact_id,
+                payload={
+                    "email": lead_email,
+                    "name": lead_name,
+                    "prior_stage": prior_stage,
+                },
+                correlation_id=correlation_id,
+                status="applied",
+                source="crm.delete_contact",
+            )
+            record_crm_event(
+                user_id=user_id,
+                event_type="contact.withdrawn",
+                entity_type="contact",
+                entity_id=contact_id,
+                payload={"email": lead_email, "prior_stage": prior_stage},
+                correlation_id=correlation_id,
+                status="applied",
+                source="crm.delete_contact",
+            )
+            logger.info(
+                "Withdrew contact %s for user %s",
+                contact_id,
+                user_id,
+                extra={
+                    "event": "contact_withdrawn",
+                    "service": "crm",
+                    "severity": "INFO",
+                    "contact_id": contact_id,
+                    "user_id": user_id,
+                },
+            )
             return {
-                'success': False,
-                'error': str(e),
-                'error_code': 'DELETE_ERROR'
+                "success": True,
+                "data": {
+                    "contact_id": contact_id,
+                    "message": "Contact withdrawn successfully",
+                },
+            }
+        except Exception as e:
+            logger.error(
+                "Error withdrawing contact: %s",
+                e,
+                extra={
+                    "event": "contact_withdraw_failed",
+                    "service": "crm",
+                    "severity": "ERROR",
+                    "contact_id": contact_id,
+                    "user_id": user_id,
+                },
+            )
+            return {
+                "success": False,
+                "error": str(e),
+                "error_code": "DELETE_ERROR",
             }
     
     def _get_leads_analytics(self, user_id: int, leads: List[Lead]) -> Dict[str, Any]:
@@ -801,4 +1173,11 @@ class EnhancedCRMService:
 enhanced_crm_service = EnhancedCRMService()
 
 # Export the enhanced CRM service
-__all__ = ['EnhancedCRMService', 'enhanced_crm_service', 'Lead', 'LeadActivity']
+__all__ = [
+    'EnhancedCRMService',
+    'enhanced_crm_service',
+    'Lead',
+    'LeadActivity',
+    'lead_row_to_public_dict',
+    'lead_dataclass_to_public_dict',
+]

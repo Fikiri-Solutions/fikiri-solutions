@@ -7,12 +7,14 @@ Lightweight email processing actions with AI integration and Gmail API support.
 import json
 import base64
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 from pathlib import Path
 from datetime import datetime, timezone
 from functools import wraps
 from core.idempotency_manager import idempotency_manager, generate_email_operation_key
 from core.automation_safety import automation_safety_manager
+from email_automation.email_event_log import record_email_event
+from email_automation.parser import _safe_labels
 
 # Optional Gmail API integration
 try:
@@ -34,6 +36,15 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+
+def _parsed_headers(parsed_email: Any) -> Dict[str, Any]:
+    """Ensure headers are a dict; malformed payloads must not break .get chains."""
+    if not isinstance(parsed_email, dict):
+        return {}
+    raw = parsed_email.get("headers")
+    return raw if isinstance(raw, dict) else {}
+
+
 def rate_limit_email_action(limit: str = "10/minute"):
     """Decorator for rate limiting email actions"""
     def decorator(func):
@@ -47,6 +58,7 @@ def rate_limit_email_action(limit: str = "10/minute"):
                 return func(*args, **kwargs)
         return wrapper
     return decorator
+
 
 class MinimalEmailActions:
     """Minimal email actions with AI integration and Gmail API support."""
@@ -94,42 +106,70 @@ class MinimalEmailActions:
     def process_email(self, parsed_email: Dict[str, Any], action_type: str = "auto_reply", 
                      user_id: int = None) -> Dict[str, Any]:
         """Process an email with specified action."""
+        if not isinstance(parsed_email, dict):
+            return {
+                "success": False,
+                "action": action_type,
+                "message_id": "",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "user_id": user_id,
+                "details": {"error": "invalid_parsed_email"},
+            }
+
         key = None
         message_id = parsed_email.get("message_id", "")
         if user_id and message_id:
             key = generate_email_operation_key("email_action", user_id, message_id, action_type)
             cached = idempotency_manager.check_key(key)
             if cached and cached.get("status") == "completed":
-                response = cached.get("response_data") or {
-                    "success": True,
-                    "action": action_type,
-                    "message_id": message_id,
-                    "details": {"idempotent": True}
-                }
-                if isinstance(response, dict):
-                    details = response.get("details") or {}
-                    details["idempotent"] = True
-                    response["details"] = details
+                response = cached.get("response_data")
+                if not isinstance(response, dict):
+                    response = {
+                        "success": True,
+                        "action": action_type,
+                        "message_id": message_id,
+                        "details": {"idempotent": True},
+                    }
+                details = response.get("details")
+                if not isinstance(details, dict):
+                    details = {}
+                details["idempotent"] = True
+                response["details"] = details
                 return response
             idempotency_manager.store_key(key, "email_action", user_id, {"email_id": message_id, "action": action_type})
 
-        sender = parsed_email.get("headers", {}).get("from", "")
+        sender = _parsed_headers(parsed_email).get("from", "")
         safety = automation_safety_manager.check_rate_limits(
             user_id=user_id or 0,
             action_type=action_type,
             target_contact=sender or "unknown"
         )
-        if not safety.get("allowed"):
+        if not (isinstance(safety, dict) and safety.get("allowed")):
+            safety_payload = safety if isinstance(safety, dict) else {"raw": str(safety)}
             result = {
                 "success": False,
                 "action": action_type,
                 "message_id": message_id,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "user_id": user_id,
-                "details": {"error": "safety_blocked", **safety},
+                "details": {"error": "safety_blocked", **safety_payload},
             }
             if user_id and message_id:
                 idempotency_manager.update_key_result(key, "failed", result)
+            # Terminal email.failed for orchestrated runs is recorded by pipeline.py
+            if user_id and not parsed_email.get("_correlation_id"):
+                record_email_event(
+                    user_id,
+                    "email.failed",
+                    provider="gmail",
+                    message_id=message_id or None,
+                    thread_id=parsed_email.get("thread_id"),
+                    idempotency_key=key,
+                    payload={"action": action_type, "reason": "safety_blocked"},
+                    status="failed",
+                    error_message="safety_blocked",
+                    source="email_automation.actions",
+                )
             return result
 
         action_handlers = {
@@ -150,8 +190,34 @@ class MinimalEmailActions:
                 "user_id": user_id,
                 "details": {"error": f"Unknown action type: {action_type}"}
             }
+            if user_id and not parsed_email.get("_correlation_id"):
+                record_email_event(
+                    user_id,
+                    "email.failed",
+                    provider="gmail",
+                    message_id=parsed_email.get("message_id") or None,
+                    thread_id=parsed_email.get("thread_id"),
+                    idempotency_key=key,
+                    payload={"unknown_action": action_type},
+                    status="failed",
+                    error_message=f"Unknown action type: {action_type}",
+                    source="email_automation.actions",
+                )
         else:
             result = handler(parsed_email, user_id)
+
+        if not isinstance(result, dict):
+            result = {
+                "success": False,
+                "action": action_type,
+                "message_id": message_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "user_id": user_id,
+                "details": {
+                    "error": "handler_returned_non_dict",
+                    "result_type": type(result).__name__,
+                },
+            }
         
         self.action_log.append(result)
         self.processed_count += 1
@@ -164,8 +230,9 @@ class MinimalEmailActions:
     def _auto_reply(self, parsed_email: Dict[str, Any], user_id: int = None) -> Dict[str, Any]:
         """Generate and send auto-reply for email."""
         try:
-            sender = parsed_email.get("headers", {}).get("from", "")
-            subject = parsed_email.get("headers", {}).get("subject", "")
+            hdr = _parsed_headers(parsed_email)
+            sender = hdr.get("from", "")
+            subject = hdr.get("subject", "")
             message_id = parsed_email.get("message_id", "")
             
             # Extract sender name
@@ -173,12 +240,24 @@ class MinimalEmailActions:
             
             # Generate reply content using AI if available
             reply_content = self._generate_reply_content(sender_name, subject, parsed_email)
-            
+            if user_id:
+                record_email_event(
+                    user_id,
+                    "email.ai_draft_generated",
+                    provider="gmail",
+                    message_id=message_id or None,
+                    thread_id=parsed_email.get("thread_id"),
+                    correlation_id=parsed_email.get("_correlation_id"),
+                    payload={"chars": len(reply_content or "")},
+                    status="applied",
+                    source="email_automation.actions",
+                )
+
             # Send reply via Gmail API if available
             reply_sent = False
             reply_message_id = None
             classification = None
-            
+
             if self.gmail_service:
                 try:
                     reply_message_id = self._send_gmail_reply(
@@ -186,11 +265,38 @@ class MinimalEmailActions:
                     )
                     reply_sent = True
                     logger.info(f"✅ Auto-reply sent via Gmail API: {reply_message_id}")
+                    if user_id and reply_message_id:
+                        record_email_event(
+                            user_id,
+                            "email.reply_sent",
+                            provider="gmail",
+                            message_id=message_id or None,
+                            thread_id=parsed_email.get("thread_id"),
+                            correlation_id=parsed_email.get("_correlation_id"),
+                            payload={
+                                "reply_message_id": reply_message_id,
+                                "channel": "auto_reply",
+                            },
+                            status="applied",
+                            source="email_automation.actions",
+                        )
                 except Exception as e:
                     classification = self._classify_gmail_error(e)
                     logger.error(f"❌ Failed to send Gmail reply: {e}")
                     reply_sent = False
-            
+                    if user_id and not parsed_email.get("_correlation_id"):
+                        record_email_event(
+                            user_id,
+                            "email.failed",
+                            provider="gmail",
+                            message_id=message_id or None,
+                            thread_id=parsed_email.get("thread_id"),
+                            payload={"stage": "send_reply", "classification": classification},
+                            status="failed",
+                            error_message=str(e)[:2000],
+                            source="email_automation.actions",
+                        )
+
             result = {
                 "success": reply_sent if self.gmail_service else True,
                 "action": "auto_reply",
@@ -213,6 +319,18 @@ class MinimalEmailActions:
             return result
             
         except Exception as e:
+            if user_id and not parsed_email.get("_correlation_id"):
+                record_email_event(
+                    user_id,
+                    "email.failed",
+                    provider="gmail",
+                    message_id=parsed_email.get("message_id") or None,
+                    thread_id=parsed_email.get("thread_id"),
+                    payload={"stage": "auto_reply"},
+                    status="failed",
+                    error_message=str(e)[:2000],
+                    source="email_automation.actions",
+                )
             return {
                 "success": False,
                 "action": "auto_reply",
@@ -230,8 +348,9 @@ class MinimalEmailActions:
         
         try:
             # Get original sender
-            original_sender = parsed_email.get("headers", {}).get("from", "")
-            original_subject = parsed_email.get("headers", {}).get("subject", "")
+            oh = _parsed_headers(parsed_email)
+            original_sender = oh.get("from", "")
+            original_subject = oh.get("subject", "")
             
             # Extract email address from sender
             if "<" in original_sender and ">" in original_sender:
@@ -353,6 +472,18 @@ Fikiri Solutions Support Team"""
                 except Exception as e:
                     logger.error(f"❌ Failed to mark as read via Gmail API: {e}")
                     classification = self._classify_gmail_error(e)
+                    if user_id and not parsed_email.get("_correlation_id"):
+                        record_email_event(
+                            user_id,
+                            "email.failed",
+                            provider="gmail",
+                            message_id=message_id or None,
+                            thread_id=parsed_email.get("thread_id"),
+                            payload={"action": "mark_read"},
+                            status="failed",
+                            error_message=str(e)[:2000],
+                            source="email_automation.actions",
+                        )
                     return {
                         "success": False,
                         "action": "mark_read",
@@ -371,7 +502,7 @@ Fikiri Solutions Support Team"""
                 "details": {
                     "marked_read": True,
                     "marked_via_api": marked_read,
-                    "previous_labels": parsed_email.get("labels", [])
+                    "previous_labels": _safe_labels(parsed_email)
                 }
             }
             
@@ -409,6 +540,18 @@ Fikiri Solutions Support Team"""
                 except Exception as e:
                     logger.error(f"❌ Failed to add label via Gmail API: {e}")
                     classification = self._classify_gmail_error(e)
+                    if user_id and not parsed_email.get("_correlation_id"):
+                        record_email_event(
+                            user_id,
+                            "email.failed",
+                            provider="gmail",
+                            message_id=message_id or None,
+                            thread_id=parsed_email.get("thread_id"),
+                            payload={"action": "add_label"},
+                            status="failed",
+                            error_message=str(e)[:2000],
+                            source="email_automation.actions",
+                        )
                     return {
                         "success": False,
                         "action": "add_label",
@@ -418,6 +561,19 @@ Fikiri Solutions Support Team"""
                         "details": {"error": str(e), "error_classification": classification},
                     }
             
+            if user_id and label_added:
+                record_email_event(
+                    user_id,
+                    "email.labeled",
+                    provider="gmail",
+                    message_id=message_id or None,
+                    thread_id=parsed_email.get("thread_id"),
+                    correlation_id=parsed_email.get("_correlation_id"),
+                    payload={"label": label},
+                    status="applied",
+                    source="email_automation.actions",
+                )
+
             result = {
                 "success": True,
                 "action": "add_label",
@@ -427,7 +583,7 @@ Fikiri Solutions Support Team"""
                 "details": {
                     "label_added": label,
                     "added_via_api": label_added,
-                    "previous_labels": parsed_email.get("labels", [])
+                    "previous_labels": _safe_labels(parsed_email)
                 }
             }
             
@@ -450,9 +606,10 @@ Fikiri Solutions Support Team"""
         """Forward email to another address."""
         try:
             message_id = parsed_email.get("message_id", "")
-            sender = parsed_email.get("headers", {}).get("from", "")
-            subject = parsed_email.get("headers", {}).get("subject", "")
-            
+            fh = _parsed_headers(parsed_email)
+            sender = fh.get("from", "")
+            subject = fh.get("subject", "")
+
             # Try to forward via Gmail API
             forwarded = False
             classification = None
@@ -486,6 +643,18 @@ Fikiri Solutions Support Team"""
                 except Exception as e:
                     logger.error(f"❌ Failed to forward via Gmail API: {e}")
                     classification = self._classify_gmail_error(e)
+                    if user_id and not parsed_email.get("_correlation_id"):
+                        record_email_event(
+                            user_id,
+                            "email.failed",
+                            provider="gmail",
+                            message_id=message_id or None,
+                            thread_id=parsed_email.get("thread_id"),
+                            payload={"action": "forward"},
+                            status="failed",
+                            error_message=str(e)[:2000],
+                            source="email_automation.actions",
+                        )
                     return {
                         "success": False,
                         "action": "forward",
@@ -495,6 +664,19 @@ Fikiri Solutions Support Team"""
                         "details": {"error": str(e), "error_classification": classification},
                     }
             
+            if user_id and forwarded:
+                record_email_event(
+                    user_id,
+                    "email.forwarded",
+                    provider="gmail",
+                    message_id=message_id or None,
+                    thread_id=parsed_email.get("thread_id"),
+                    correlation_id=parsed_email.get("_correlation_id"),
+                    payload={"forward_to": forward_to},
+                    status="applied",
+                    source="email_automation.actions",
+                )
+
             result = {
                 "success": forwarded if self.gmail_service else True,
                 "action": "forward",
@@ -544,6 +726,18 @@ Fikiri Solutions Support Team"""
                 except Exception as e:
                     logger.error(f"❌ Failed to archive via Gmail API: {e}")
                     classification = self._classify_gmail_error(e)
+                    if user_id and not parsed_email.get("_correlation_id"):
+                        record_email_event(
+                            user_id,
+                            "email.failed",
+                            provider="gmail",
+                            message_id=message_id or None,
+                            thread_id=parsed_email.get("thread_id"),
+                            payload={"action": "archive"},
+                            status="failed",
+                            error_message=str(e)[:2000],
+                            source="email_automation.actions",
+                        )
                     return {
                         "success": False,
                         "action": "archive",
@@ -553,6 +747,19 @@ Fikiri Solutions Support Team"""
                         "details": {"error": str(e), "error_classification": classification},
                     }
             
+            if user_id and archived:
+                record_email_event(
+                    user_id,
+                    "email.archived",
+                    provider="gmail",
+                    message_id=message_id or None,
+                    thread_id=parsed_email.get("thread_id"),
+                    correlation_id=parsed_email.get("_correlation_id"),
+                    payload={},
+                    status="applied",
+                    source="email_automation.actions",
+                )
+
             result = {
                 "success": True,
                 "action": "archive",
@@ -605,8 +812,11 @@ Fikiri Solutions Support Team"""
             return
         
         try:
-            # Ensure details is JSON string
-            details_json = json.dumps(action_result.get('details', {}))
+            if not isinstance(action_result, dict):
+                return
+            raw_details = action_result.get("details")
+            details_obj = raw_details if isinstance(raw_details, dict) else {}
+            details_json = json.dumps(details_obj, default=str)
             
             self.db_optimizer.execute_query("""
                 INSERT INTO email_actions_log 

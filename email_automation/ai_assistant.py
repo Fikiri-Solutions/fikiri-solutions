@@ -8,6 +8,7 @@ import os
 import json
 import logging
 import asyncio
+import uuid
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
 from pathlib import Path
@@ -85,6 +86,14 @@ class MinimalAIEmailAssistant:
     def is_enabled(self) -> bool:
         """Check if AI assistant is enabled."""
         return self.enabled and self.router.client.is_enabled()
+
+    def _llm_context(self, **kwargs: Any) -> Dict[str, Any]:
+        ctx: Dict[str, Any] = {
+            "source": "email_automation",
+            "correlation_id": str(uuid.uuid4()),
+        }
+        ctx.update(kwargs)
+        return ctx
     
     def _track_ai_usage(self, operation: str, success: bool, tokens_used: int = 0):
         """Track AI usage for analytics."""
@@ -139,7 +148,7 @@ class MinimalAIEmailAssistant:
                 input_data=prompt,
                 intent='classification',
                 output_schema=EmailClassificationSchema,
-                context={'operation': 'email_classification', 'subject': subject}
+                context=self._llm_context(operation='email_classification', subject=subject),
             )
             
             if result['success'] and result.get('validated'):
@@ -249,7 +258,12 @@ class MinimalAIEmailAssistant:
             result = self.router.process(
                 input_data=prompt,
                 intent='email_reply',
-                context={'sender': sender_name, 'subject': subject, 'intent': intent}
+                context=self._llm_context(
+                    operation='email_reply',
+                    sender=sender_name,
+                    subject=subject,
+                    intent_label=intent,
+                ),
             )
             
             if result['success']:
@@ -341,7 +355,7 @@ class MinimalAIEmailAssistant:
             result = self.router.process(
                 input_data=prompt,
                 intent='summarization',
-                context={'operation': 'email_summary', 'subject': subject}
+                context=self._llm_context(operation='email_summary', subject=subject),
             )
 
             if result['success']:
@@ -385,7 +399,7 @@ class MinimalAIEmailAssistant:
             result = self.router.process(
                 input_data=prompt,
                 intent='summarization',
-                context={'operation': 'thread_summarization', 'email_count': len(emails)}
+                context=self._llm_context(operation='thread_summarization', email_count=len(emails)),
             )
             
             if result['success']:

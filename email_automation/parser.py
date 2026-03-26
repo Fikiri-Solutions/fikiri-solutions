@@ -4,12 +4,47 @@ Fikiri Solutions - Minimal Email Parser
 Lightweight email parsing without heavy dependencies.
 """
 
-import json
 import base64
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_headers(pm: Any) -> Dict[str, Any]:
+    if not isinstance(pm, dict):
+        return {}
+    h = pm.get("headers")
+    return h if isinstance(h, dict) else {}
+
+
+def _safe_body(pm: Any) -> Dict[str, Any]:
+    if not isinstance(pm, dict):
+        return {"text": "", "html": ""}
+    b = pm.get("body")
+    return b if isinstance(b, dict) else {"text": "", "html": ""}
+
+
+def _safe_labels(pm: Any) -> List[Any]:
+    if not isinstance(pm, dict):
+        return []
+    raw = pm.get("labels")
+    return raw if isinstance(raw, list) else []
+
+
+def _safe_attachments(pm: Any) -> List[Any]:
+    if not isinstance(pm, dict):
+        return []
+    raw = pm.get("attachments")
+    return raw if isinstance(raw, list) else []
+
+
+def _payload_body_block(payload: Any) -> Dict[str, Any]:
+    if not isinstance(payload, dict):
+        return {}
+    b = payload.get("body")
+    return b if isinstance(b, dict) else {}
+
 
 class MinimalEmailParser:
     """Minimal email parser - lightweight version."""
@@ -49,7 +84,8 @@ class MinimalEmailParser:
             parsed["message_id"] = message.get("id", "")
             parsed["thread_id"] = message.get("threadId", "")
             parsed["snippet"] = message.get("snippet", "")
-            parsed["labels"] = message.get("labelIds", [])
+            _lid = message.get("labelIds", [])
+            parsed["labels"] = _lid if isinstance(_lid, list) else []
             
             # Extract headers
             if 'payload' in message and 'headers' in message['payload']:
@@ -69,30 +105,35 @@ class MinimalEmailParser:
     
     def _extract_body_and_attachments(self, payload: Dict[str, Any], parsed: Dict[str, Any]):
         """Extract body text and attachments from payload."""
+        if not isinstance(payload, dict):
+            return
         mime_type = payload.get('mimeType', '')
-        
+        body_block = _payload_body_block(payload)
+
         if mime_type == 'text/plain':
-            body_data = payload.get('body', {}).get('data', '')
+            body_data = body_block.get('data', '')
             if body_data:
                 parsed["body"]["text"] = self._decode_base64(body_data)
-        
+
         elif mime_type == 'text/html':
-            body_data = payload.get('body', {}).get('data', '')
+            body_data = body_block.get('data', '')
             if body_data:
                 parsed["body"]["html"] = self._decode_base64(body_data)
-        
+
         elif mime_type.startswith('multipart/'):
             parts = payload.get('parts', [])
+            if not isinstance(parts, list):
+                parts = []
             for part in parts:
                 self._extract_body_and_attachments(part, parsed)
-        
+
         # Check for attachments
         if 'filename' in payload and payload['filename']:
             attachment = {
                 "filename": payload['filename'],
                 "mime_type": payload.get('mimeType', ''),
-                "size": payload.get('body', {}).get('size', 0),
-                "attachment_id": payload.get('body', {}).get('attachmentId', '')
+                "size": body_block.get('size', 0),
+                "attachment_id": body_block.get('attachmentId', '')
             }
             parsed["attachments"].append(attachment)
     
@@ -124,17 +165,18 @@ class MinimalEmailParser:
     
     def get_sender(self, parsed_message: Dict[str, Any]) -> str:
         """Extract sender email from parsed message."""
-        return parsed_message.get("headers", {}).get("from", "")
-    
+        return _safe_headers(parsed_message).get("from", "")
+
     def get_subject(self, parsed_message: Dict[str, Any]) -> str:
         """Extract subject from parsed message."""
-        return parsed_message.get("headers", {}).get("subject", "")
-    
+        return _safe_headers(parsed_message).get("subject", "")
+
     def get_recipients(self, parsed_message: Dict[str, Any]) -> List[str]:
         """Extract recipient emails from parsed message."""
-        to = parsed_message.get("headers", {}).get("to", "")
-        cc = parsed_message.get("headers", {}).get("cc", "")
-        bcc = parsed_message.get("headers", {}).get("bcc", "")
+        hdr = _safe_headers(parsed_message)
+        to = hdr.get("to", "")
+        cc = hdr.get("cc", "")
+        bcc = hdr.get("bcc", "")
         
         recipients = []
         if to:
@@ -161,8 +203,9 @@ class MinimalEmailParser:
     
     def get_body_text(self, parsed_message: Dict[str, Any]) -> str:
         """Get the text body of the email."""
-        text_body = parsed_message.get("body", {}).get("text", "")
-        html_body = parsed_message.get("body", {}).get("html", "")
+        body = _safe_body(parsed_message)
+        text_body = body.get("text", "")
+        html_body = body.get("html", "")
         
         # Prefer text, fallback to HTML
         if text_body:
@@ -177,23 +220,19 @@ class MinimalEmailParser:
     
     def is_unread(self, parsed_message: Dict[str, Any]) -> bool:
         """Check if message is unread."""
-        labels = parsed_message.get("labels", [])
-        return "UNREAD" in labels
-    
+        return "UNREAD" in _safe_labels(parsed_message)
+
     def is_important(self, parsed_message: Dict[str, Any]) -> bool:
         """Check if message is marked as important."""
-        labels = parsed_message.get("labels", [])
-        return "IMPORTANT" in labels
-    
+        return "IMPORTANT" in _safe_labels(parsed_message)
+
     def has_attachments(self, parsed_message: Dict[str, Any]) -> bool:
         """Check if message has attachments."""
-        attachments = parsed_message.get("attachments", [])
-        return len(attachments) > 0
-    
+        return len(_safe_attachments(parsed_message)) > 0
+
     def get_attachment_count(self, parsed_message: Dict[str, Any]) -> int:
         """Get number of attachments."""
-        attachments = parsed_message.get("attachments", [])
-        return len(attachments)
+        return len(_safe_attachments(parsed_message))
 
 def parse_email_message(message: Dict[str, Any]) -> Dict[str, Any]:
     """Simple function to parse an email message."""

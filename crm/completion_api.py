@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 from email_automation.followup_system import get_follow_up_system
 from core.reminders_alerts_system import get_reminders_alerts_system
 from core.database_optimization import db_optimizer
+from core.secure_sessions import get_current_user_id
+from crm.service import enhanced_crm_service, lead_dataclass_to_public_dict
 
 logger = logging.getLogger(__name__)
 
@@ -350,38 +352,36 @@ def get_pipeline_leads(user_id):
         logger.error(f"❌ Get pipeline leads error: {e}")
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
-@crm_bp.route('/pipeline/leads/<lead_id>/stage', methods=['PUT'])
+@crm_bp.route('/pipeline/leads/<int:lead_id>/stage', methods=['PUT'])
 def update_lead_stage(lead_id):
-    """Update a lead's pipeline stage"""
+    """Update a lead's pipeline stage (delegates to CRM service for scoring, automations, events)."""
     try:
+        user_id = get_current_user_id() or request.args.get('user_id', type=int)
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "Authentication required",
+                "error_code": "AUTHENTICATION_REQUIRED",
+            }), 401
+
         data = request.get_json()
         if not data or 'stage' not in data:
             return jsonify({"success": False, "error": "Stage not provided"}), 400
-        
-        query = "UPDATE leads SET stage = ?, updated_at = ? WHERE id = ?"
-        values = (data['stage'], datetime.now().isoformat(), lead_id)
-        
-        db_optimizer.execute_query(query, values, fetch=False)
-        
-        # Log the stage change activity
-        activity_query = """
-            INSERT INTO lead_activities (lead_id, activity_type, description, timestamp, metadata)
-            VALUES (?, ?, ?, ?, ?)
-        """
-        
-        activity_values = (
-            lead_id,
-            'stage_changed',
-            f"Lead moved to {data['stage']} stage",
-            datetime.now().isoformat(),
-            json.dumps({'old_stage': 'unknown', 'new_stage': data['stage']})
-        )
-        
-        db_optimizer.execute_query(activity_query, activity_values, fetch=False)
-        
-        logger.info(f"✅ Lead {lead_id} moved to {data['stage']} stage")
-        return jsonify({"success": True, "message": "Lead stage updated"}), 200
-        
+
+        result = enhanced_crm_service.update_lead(lead_id, user_id, {'stage': data['stage']})
+        if not result.get('success'):
+            code = result.get('error_code', 'CRM_UPDATE_ERROR')
+            status = 404 if code == 'LEAD_NOT_FOUND' else 400 if code == 'NO_UPDATES' else 500
+            return jsonify(result), status
+
+        lead_obj = result.get('data', {}).get('lead')
+        logger.info("Lead %s stage updated via pipeline API for user %s", lead_id, user_id)
+        return jsonify({
+            "success": True,
+            "message": "Lead stage updated",
+            "lead": lead_dataclass_to_public_dict(lead_obj),
+        }), 200
+
     except Exception as e:
         logger.error(f"❌ Update lead stage error: {e}")
         return jsonify({"success": False, "error": "Internal server error"}), 500

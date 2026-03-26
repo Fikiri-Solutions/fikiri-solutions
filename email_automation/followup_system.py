@@ -6,6 +6,7 @@ Handles automated follow-ups using OpenAI + Gmail integration
 import json
 import logging
 import os
+import uuid
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -303,8 +304,14 @@ Best regards,
                 "company_name": task_data.get('company', ''),
                 "lead_stage": task_data.get('stage', ''),
                 "service_type": lead_meta.get('service_type', 'our services'),
-                "user_name": "The Fikiri Team"  # Could be fetched from user profile
+                "user_name": "The Fikiri Team",  # Could be fetched from user profile
+                "source": "followup_system",
+                "operation": "followup_personalization",
+                "correlation_id": str(uuid.uuid4()),
             }
+            uid = task_data.get("user_id")
+            if uid is not None:
+                context["user_id"] = uid
             
             # Use LLM router to personalize the content (required by rulepack)
             if self.router and self.router.client.is_enabled():
@@ -329,7 +336,7 @@ Best regards,
                     result = self.router.process(
                         input_data=prompt,
                         intent='email_reply',
-                        context={'operation': 'followup_personalization', **context}
+                        context=context,
                     )
                     
                     if result['success']:
