@@ -367,7 +367,7 @@ const Signup: React.FC = () => {
               )}
               
               {/* Name Fields */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="firstName" className="block text-sm font-medium text-gray-200 mb-2">
                     First Name
@@ -507,7 +507,7 @@ const Signup: React.FC = () => {
               </div>
               
               {/* Password Fields */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="password" className="block text-sm font-medium text-gray-200 mb-2">
                     Password
@@ -529,8 +529,9 @@ const Signup: React.FC = () => {
                     />
                     <button
                       type="button"
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center"
+                      className="absolute inset-y-0 right-0 min-w-[44px] flex items-center justify-center pr-2 touch-manipulation"
                       onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                       {showPassword ? (
                         <EyeOff className="h-5 w-5 text-gray-500 hover:text-gray-700" />
@@ -565,8 +566,9 @@ const Signup: React.FC = () => {
                     />
                     <button
                       type="button"
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center"
+                      className="absolute inset-y-0 right-0 min-w-[44px] flex items-center justify-center pr-2 touch-manipulation"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
                     >
                       {showConfirmPassword ? (
                         <EyeOff className="h-5 w-5 text-gray-500 hover:text-gray-700" />
@@ -634,7 +636,7 @@ const Signup: React.FC = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-brand-primary to-brand-secondary hover:from-brand-secondary hover:to-brand-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="w-full min-h-[44px] touch-manipulation flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-gradient-to-r from-brand-primary to-brand-secondary hover:from-brand-secondary hover:to-brand-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
               >
                 {isLoading ? (
                   <>
@@ -661,25 +663,25 @@ const Signup: React.FC = () => {
                 </div>
               </div>
 
-              <div className="mt-6 grid grid-cols-2 gap-3">
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   type="button"
                   disabled
                   title="Coming soon"
-                  className="w-full inline-flex justify-center py-3 px-4 border border-white/10 rounded-xl bg-white/5 text-sm font-medium text-gray-400 cursor-not-allowed"
+                  className="w-full min-h-[44px] touch-manipulation inline-flex items-center justify-center gap-2 py-3 px-3 sm:px-4 border border-white/10 rounded-xl bg-white/5 text-sm font-medium text-gray-400 cursor-not-allowed"
                 >
-                  <Chrome className="h-5 w-5 mr-2" />
-                  Gmail (coming soon)
+                  <Chrome className="h-5 w-5 shrink-0" aria-hidden />
+                  <span className="text-center leading-snug">Gmail (coming soon)</span>
                 </button>
 
                 <button
                   type="button"
                   disabled
                   title="Coming soon"
-                  className="w-full inline-flex justify-center py-3 px-4 border border-white/10 rounded-xl bg-white/5 text-sm font-medium text-gray-400 cursor-not-allowed"
+                  className="w-full min-h-[44px] touch-manipulation inline-flex items-center justify-center gap-2 py-3 px-3 sm:px-4 border border-white/10 rounded-xl bg-white/5 text-sm font-medium text-gray-400 cursor-not-allowed"
                 >
-                  <Github className="h-5 w-5 mr-2" />
-                  GitHub (coming soon)
+                  <Github className="h-5 w-5 shrink-0" aria-hidden />
+                  <span className="text-center leading-snug">GitHub (coming soon)</span>
                 </button>
               </div>
             </div>
@@ -700,7 +702,7 @@ const Signup: React.FC = () => {
 
           {/* Features Preview */}
           <motion.div 
-            className="mt-8 grid grid-cols-3 gap-4"
+            className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.8 }}

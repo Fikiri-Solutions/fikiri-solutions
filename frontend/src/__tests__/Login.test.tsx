@@ -52,8 +52,8 @@ describe('Login Component', () => {
   it('should render login form', () => {
     renderWithProviders(<Login />)
     
-    expect(screen.getByLabelText(/email address/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^email address$/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
   })
 
@@ -61,7 +61,7 @@ describe('Login Component', () => {
     const user = userEvent.setup()
     renderWithProviders(<Login />)
     
-    const emailInput = screen.getByLabelText(/email address/i)
+    const emailInput = screen.getByLabelText(/^email address$/i)
     await user.type(emailInput, 'invalid-email')
     
     await waitFor(() => {
@@ -73,7 +73,7 @@ describe('Login Component', () => {
     const user = userEvent.setup()
     renderWithProviders(<Login />)
     
-    const passwordInput = screen.getByLabelText(/password/i)
+    const passwordInput = screen.getByLabelText(/^password$/i)
     await user.type(passwordInput, '12345')
     
     await waitFor(() => {
@@ -85,8 +85,8 @@ describe('Login Component', () => {
     const user = userEvent.setup()
     renderWithProviders(<Login />)
     
-    const emailInput = screen.getByLabelText(/email address/i)
-    const passwordInput = screen.getByLabelText(/password/i)
+    const emailInput = screen.getByLabelText(/^email address$/i)
+    const passwordInput = screen.getByLabelText(/^password$/i)
     const submitButton = screen.getByRole('button', { name: /sign in/i })
     
     // Clear any default values and submit
@@ -110,7 +110,7 @@ describe('Login Component', () => {
     const user = userEvent.setup()
     renderWithProviders(<Login />)
     
-    const passwordInput = screen.getByLabelText(/password/i) as HTMLInputElement
+    const passwordInput = screen.getByLabelText(/^password$/i) as HTMLInputElement
     
     expect(passwordInput.type).toBe('password')
     
@@ -130,8 +130,8 @@ describe('Login Component', () => {
   it('should have proper autocomplete attributes', () => {
     renderWithProviders(<Login />)
     
-    const emailInput = screen.getByLabelText(/email address/i)
-    const passwordInput = screen.getByLabelText(/password/i)
+    const emailInput = screen.getByLabelText(/^email address$/i)
+    const passwordInput = screen.getByLabelText(/^password$/i)
     
     expect(emailInput).toHaveAttribute('autocomplete', 'username')
     expect(passwordInput).toHaveAttribute('autocomplete', 'current-password')

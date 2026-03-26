@@ -169,7 +169,7 @@ export const Dashboard: React.FC = () => {
     <div className="bg-white dark:bg-gray-900">
       <div className="container mx-auto px-4 py-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div className="min-w-0">
             <h1 className="text-2xl font-bold text-brand-text dark:text-white">
               Dashboard
@@ -180,10 +180,10 @@ export const Dashboard: React.FC = () => {
           </div>
           <Link
             to="/billing"
-            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+            className="inline-flex items-center justify-center gap-2 min-h-[44px] touch-manipulation w-full sm:w-auto px-4 py-2 sm:py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors shrink-0"
           >
-            <CreditCard className="w-4 h-4" />
-            Billing
+            <CreditCard className="w-4 h-4 shrink-0" aria-hidden />
+            <span>Billing</span>
           </Link>
         </div>
 

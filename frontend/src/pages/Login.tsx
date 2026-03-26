@@ -539,8 +539,9 @@ export const Login: React.FC = () => {
                     />
                     <button
                       type="button"
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center"
+                      className="absolute inset-y-0 right-0 min-w-[44px] flex items-center justify-center pr-2 touch-manipulation"
                       onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                       {showPassword ? (
                         <EyeOff className="h-5 w-5 text-gray-500 hover:text-gray-700" />
@@ -555,7 +556,7 @@ export const Login: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center">
                   <input
                     id="remember-me"
@@ -586,7 +587,7 @@ export const Login: React.FC = () => {
               <button
                 type="submit"
                 disabled={isPending}
-                className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-brand-primary hover:bg-fikiri-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="w-full min-h-[44px] touch-manipulation flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-brand-primary hover:bg-fikiri-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
               >
                 {isPending ? (
                   <>
@@ -613,34 +614,34 @@ export const Login: React.FC = () => {
                 </div>
               </div>
 
-              <div className="mt-6 grid grid-cols-3 gap-3">
+              <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <button
                   type="button"
                   onClick={handleGmailLogin}
-                  className="w-full inline-flex justify-center py-3 px-4 border border-gray-300 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary transition-all duration-200"
+                  className="w-full min-h-[44px] touch-manipulation inline-flex items-center justify-center gap-2 py-3 px-3 sm:px-4 border border-gray-300 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary transition-colors duration-200"
                 >
-                  <Chrome className="h-5 w-5 mr-2" />
-                  Gmail
+                  <Chrome className="h-5 w-5 shrink-0" aria-hidden />
+                  <span className="truncate">Gmail</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={handleMicrosoftLogin}
                   disabled={isMicrosoftLoading}
-                  className="w-full inline-flex justify-center py-3 px-4 border border-gray-300 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full min-h-[44px] touch-manipulation inline-flex items-center justify-center gap-2 py-3 px-3 sm:px-4 border border-gray-300 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Building2 className="h-5 w-5 mr-2" />
-                  {isMicrosoftLoading ? 'Connecting...' : 'Microsoft'}
+                  <Building2 className="h-5 w-5 shrink-0" aria-hidden />
+                  <span className="truncate">{isMicrosoftLoading ? 'Connecting...' : 'Microsoft'}</span>
                 </button>
 
                 <button
                   type="button"
                   disabled
                   title="Coming soon"
-                  className="w-full inline-flex justify-center py-3 px-4 border border-gray-200 rounded-xl shadow-sm bg-gray-50 text-sm font-medium text-gray-400 cursor-not-allowed"
+                  className="w-full min-h-[44px] touch-manipulation inline-flex items-center justify-center gap-2 py-3 px-3 sm:px-4 border border-gray-200 rounded-xl shadow-sm bg-gray-50 text-sm font-medium text-gray-400 cursor-not-allowed"
                 >
-                  <Github className="h-5 w-5 mr-2" />
-                  GitHub (soon)
+                  <Github className="h-5 w-5 shrink-0" aria-hidden />
+                  <span className="truncate">GitHub (soon)</span>
                 </button>
               </div>
             </div>
@@ -650,10 +651,10 @@ export const Login: React.FC = () => {
               <button
                 type="button"
                 onClick={() => window.location.href = '/signup'}
-                className="w-full inline-flex justify-center items-center py-3 px-4 border border-gray-300 rounded-xl shadow-sm bg-gray-50 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary transition-all duration-200"
+                className="w-full min-h-[44px] touch-manipulation inline-flex justify-center items-center gap-2 py-3 px-4 border border-gray-300 rounded-xl shadow-sm bg-gray-50 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary transition-colors duration-200"
               >
-                <UserPlus className="h-5 w-5 mr-2" />
-                Create New Account
+                <UserPlus className="h-5 w-5 shrink-0" aria-hidden />
+                <span>Create New Account</span>
               </button>
             </div>
 

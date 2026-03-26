@@ -243,17 +243,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
       {/* Next Best Action */}
       {nextBestAction && (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{nextBestAction.title}</h3>
               <p className="text-gray-600 dark:text-gray-300">{nextBestAction.description}</p>
             </div>
             <button
+              type="button"
               onClick={() => window.location.href = nextBestAction.href}
-              className="bg-blue-600 dark:bg-blue-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 flex items-center"
+              className="shrink-0 w-full sm:w-auto min-h-[44px] touch-manipulation inline-flex items-center justify-center gap-2 bg-blue-600 dark:bg-blue-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800"
             >
               {nextBestAction.action}
-              <ArrowRight className="h-4 w-4 ml-2" />
+              <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
             </button>
           </div>
         </div>
@@ -266,9 +267,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <button
+            type="button"
             onClick={() => askAI('Who emailed me last?')}
             disabled={isAiLoading}
-            className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-left disabled:opacity-50"
+            className="min-h-[44px] touch-manipulation p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-left disabled:opacity-50"
           >
             <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400 mb-2" />
             <p className="font-medium text-gray-900 dark:text-white">Who emailed me last?</p>
@@ -276,9 +278,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
           </button>
 
           <button
+            type="button"
             onClick={() => askAI('How many leads do I have?')}
             disabled={isAiLoading}
-            className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-left disabled:opacity-50"
+            className="min-h-[44px] touch-manipulation p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-left disabled:opacity-50"
           >
             <Users className="h-5 w-5 text-green-600 dark:text-green-400 mb-2" />
             <p className="font-medium text-gray-900 dark:text-white">How many leads do I have?</p>
@@ -286,9 +289,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
           </button>
 
           <button
+            type="button"
             onClick={() => askAI('Set up an auto-reply rule')}
             disabled={isAiLoading}
-            className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-left disabled:opacity-50"
+            className="min-h-[44px] touch-manipulation p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-left disabled:opacity-50"
           >
             <Zap className="h-5 w-5 text-purple-600 dark:text-purple-400 mb-2" />
             <p className="font-medium text-gray-900 dark:text-white">Set up an auto-reply rule</p>
@@ -372,16 +376,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
           <p className="text-gray-600 dark:text-gray-300 mb-4">
             Connect Gmail to automatically detect leads from your emails, or add your first lead manually.
           </p>
-          <div className="flex justify-center space-x-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-stretch sm:items-center max-w-md mx-auto">
             <button
+              type="button"
               onClick={() => window.location.href = '/onboarding'}
-              className="bg-blue-600 dark:bg-blue-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 dark:hover:bg-blue-600"
+              className="min-h-[44px] touch-manipulation w-full sm:w-auto bg-blue-600 dark:bg-blue-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 dark:hover:bg-blue-600"
             >
               Connect Gmail
             </button>
             <button
+              type="button"
               onClick={() => window.location.href = '/crm'}
-              className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-gray-600"
+              className="min-h-[44px] touch-manipulation w-full sm:w-auto bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-gray-600"
             >
               Add Lead Manually
             </button>
