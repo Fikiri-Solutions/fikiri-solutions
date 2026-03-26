@@ -11,6 +11,14 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from core.database_optimization import db_optimizer
+from core.automation_run_events import (
+    enter_automation_run_if_missing,
+    get_automation_run_id,
+    record_automation_run_event,
+    record_automation_skipped_rule,
+    record_automation_step_finished,
+    record_automation_step_started,
+)
 from core.workflow_followups import schedule_follow_up as workflow_schedule_follow_up
 from crm.service import enhanced_crm_service
 from email_automation.parser import MinimalEmailParser
@@ -325,62 +333,185 @@ class AutomationEngine:
                 'error': str(e),
                 'data': None
             }
-    
-    def execute_automation_rules(self, trigger_type: TriggerType, trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Execute automation rules based on trigger"""
+
+    def run_single_rule(self, rule: AutomationRule, trigger_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Run a single automation rule (used by scheduler time-based execution)."""
+        trigger_data = trigger_data or {}
+        with enter_automation_run_if_missing(trigger_data, "scheduler") as created_ctx:
+            if created_ctx:
+                record_automation_run_event(
+                    rule.user_id,
+                    "automation.triggered",
+                    payload={
+                        "trigger_type": TriggerType.TIME_BASED.value,
+                        "rule_id": rule.id,
+                        "scheduled_run": True,
+                    },
+                )
+            result = self._execute_rule(rule, trigger_data)
+            if get_automation_run_id() and created_ctx:
+                record_automation_run_event(
+                    rule.user_id,
+                    "automation.completed",
+                    status="ok" if result.get("success") else "failed",
+                    payload={"rule_id": rule.id, "mode": "scheduler"},
+                )
+            return result
+
+    def get_due_time_based_rules(self) -> List[tuple]:
+        """Return list of (rule, trigger_data) for due time-based rules in UTC."""
         try:
-            # Get active rules for trigger type (rulepack compliance: specific columns)
-            rules_data = db_optimizer.execute_query(
-                """SELECT id, user_id, name, description, trigger_type, trigger_conditions, 
-                   action_type, action_parameters, status, created_at, updated_at, 
-                   last_executed, execution_count, success_count, error_count 
-                   FROM automation_rules 
-                   WHERE user_id = ? AND trigger_type = ? AND status = ?""",
-                (user_id, trigger_type.value, AutomationStatus.ACTIVE.value)
+            now_utc = datetime.utcnow()
+            default_hour = 9
+            rows = db_optimizer.execute_query(
+                """SELECT * FROM automation_rules
+                   WHERE trigger_type = ? AND status = ?""",
+                (TriggerType.TIME_BASED.value, AutomationStatus.ACTIVE.value)
             )
-            
-            executed_rules = []
-            failed_rules = []
-            
-            for rule_data in rules_data:
+            due = []
+            for rule_data in rows:
+                params = rule_data.get('action_parameters')
+                if isinstance(params, str):
+                    try:
+                        params = json.loads(params) if params else {}
+                    except json.JSONDecodeError:
+                        params = {}
+                frequency = (params.get('frequency') or 'daily').lower()
+                hour = params.get('run_at_hour', default_hour)
+                try:
+                    hour = int(hour)
+                except (TypeError, ValueError):
+                    hour = default_hour
+
+                if now_utc.hour != hour:
+                    continue
+
+                last_executed = rule_data.get('last_executed')
+                if last_executed and isinstance(last_executed, str):
+                    try:
+                        last_executed = datetime.fromisoformat(last_executed.replace('Z', '+00:00'))
+                    except Exception:
+                        last_executed = None
+                if last_executed and last_executed.tzinfo:
+                    last_executed = last_executed.replace(tzinfo=None)
+
+                last_date = last_executed.date() if last_executed else None
+                today = now_utc.date()
+                if frequency == 'daily':
+                    if last_date is not None and last_date >= today:
+                        continue
+                elif frequency == 'weekly':
+                    start_of_week = today - timedelta(days=now_utc.weekday())
+                    if last_date is not None and last_date >= start_of_week:
+                        continue
+                else:
+                    continue
+
                 rule = self._format_rule(rule_data)
-                
-                # Check if trigger conditions are met
-                if self._check_trigger_conditions(rule, trigger_data):
-                    # Execute rule
-                    execution_result = self._execute_rule(rule, trigger_data)
-                    
-                    if execution_result['success']:
-                        executed_rules.append({
-                            'rule_id': rule.id,
-                            'rule_name': rule.name,
-                            'result': execution_result['data']
-                        })
-                    else:
-                        failed_rules.append({
-                            'rule_id': rule.id,
-                            'rule_name': rule.name,
-                            'error': execution_result.get('error'),
-                            'error_code': execution_result.get('error_code'),
-                        })
-            
-            return {
-                'success': True,
-                'data': {
-                    'executed_rules': executed_rules,
-                    'failed_rules': failed_rules,
-                    'total_executed': len(executed_rules),
-                    'total_failed': len(failed_rules)
-                }
-            }
-            
+                due.append((rule, {'scheduled_run': True, 'frequency': frequency}))
+            return due
         except Exception as e:
-            logger.error(f"Error executing automation rules: {e}")
-            return {
-                'success': False,
-                'error': str(e),
-                'data': None
-            }
+            logger.error("get_due_time_based_rules error: %s", e)
+            return []
+    
+    def execute_automation_rules(
+        self,
+        trigger_type: TriggerType,
+        trigger_data: Dict[str, Any],
+        user_id: int,
+        *,
+        automation_source: str = "engine",
+    ) -> Dict[str, Any]:
+        """Execute automation rules based on trigger"""
+        trigger_data = trigger_data or {}
+        with enter_automation_run_if_missing(trigger_data, automation_source) as created_ctx:
+            if created_ctx:
+                record_automation_run_event(
+                    user_id,
+                    "automation.triggered",
+                    payload={"trigger_type": trigger_type.value, "user_id": user_id},
+                )
+            try:
+                # Get active rules for trigger type (rulepack compliance: specific columns)
+                rules_data = db_optimizer.execute_query(
+                    """SELECT id, user_id, name, description, trigger_type, trigger_conditions,
+                       action_type, action_parameters, status, created_at, updated_at,
+                       last_executed, execution_count, success_count, error_count
+                       FROM automation_rules
+                       WHERE user_id = ? AND trigger_type = ? AND status = ?""",
+                    (user_id, trigger_type.value, AutomationStatus.ACTIVE.value),
+                )
+
+                executed_rules = []
+                failed_rules = []
+
+                for rule_data in rules_data:
+                    rule = self._format_rule(rule_data)
+
+                    if not self._check_trigger_conditions(rule, trigger_data):
+                        record_automation_skipped_rule(
+                            user_id, rule, trigger_data, "trigger_conditions_not_met"
+                        )
+                        continue
+
+                    execution_result = self._execute_rule(rule, trigger_data)
+
+                    if execution_result["success"]:
+                        executed_rules.append(
+                            {
+                                "rule_id": rule.id,
+                                "rule_name": rule.name,
+                                "result": execution_result.get("data"),
+                            }
+                        )
+                    else:
+                        failed_rules.append(
+                            {
+                                "rule_id": rule.id,
+                                "rule_name": rule.name,
+                                "error": execution_result.get("error"),
+                                "error_code": execution_result.get("error_code"),
+                            }
+                        )
+
+                if get_automation_run_id() and created_ctx:
+                    st = "ok" if not failed_rules else "partial"
+                    record_automation_run_event(
+                        user_id,
+                        "automation.completed",
+                        status=st,
+                        payload={
+                            "total_executed": len(executed_rules),
+                            "total_failed": len(failed_rules),
+                            "trigger_type": trigger_type.value,
+                        },
+                    )
+
+                return {
+                    "success": True,
+                    "data": {
+                        "executed_rules": executed_rules,
+                        "failed_rules": failed_rules,
+                        "total_executed": len(executed_rules),
+                        "total_failed": len(failed_rules),
+                    },
+                }
+
+            except Exception as e:
+                logger.error(f"Error executing automation rules: {e}")
+                if get_automation_run_id() and created_ctx:
+                    record_automation_run_event(
+                        user_id,
+                        "automation.run_failed",
+                        status="failed",
+                        error_message=str(e)[:2000],
+                        payload={"trigger_type": trigger_type.value},
+                    )
+                return {
+                    "success": False,
+                    "error": str(e),
+                    "data": None,
+                }
     
     def get_automation_suggestions(self, user_id: int) -> Dict[str, Any]:
         """Get automation suggestions based on user's email patterns"""
@@ -474,31 +605,47 @@ class AutomationEngine:
 
     def execute_rules(self, user_id: int, rule_ids: List[int]) -> List[Dict[str, Any]]:
         """Execute specific rules by ID (used by /automation/execute). Runs synchronously."""
-        results = []
-        for rule_id in rule_ids:
-            rule_data = db_optimizer.execute_query(
-                """SELECT id, user_id, name, description, trigger_type, trigger_conditions,
-                   action_type, action_parameters, status, created_at, updated_at,
-                   last_executed, execution_count, success_count, error_count
-                   FROM automation_rules WHERE id = ? AND user_id = ? AND status = ?""",
-                (rule_id, user_id, AutomationStatus.ACTIVE.value)
-            )
-            if not rule_data:
-                results.append({"rule_id": rule_id, "success": False, "error": "Rule not found or inactive"})
-                continue
-            rule = self._format_rule(rule_data[0])
-            # Build synthetic trigger data from trigger type for one-shot run
-            trigger_data = self._synthetic_trigger_data_for_rule(rule)
-            execution_result = self._execute_rule(rule, trigger_data)
-            results.append({
-                "rule_id": rule_id,
-                "rule_name": rule.name,
-                "success": execution_result.get("success", False),
-                "error": execution_result.get("error"),
-                "error_code": execution_result.get("error_code"),
-                "data": execution_result.get("data"),
-            })
-        return results
+        with enter_automation_run_if_missing(None, "api_manual") as created_ctx:
+            if created_ctx:
+                record_automation_run_event(
+                    user_id,
+                    "automation.triggered",
+                    payload={"payload_type": "rule_ids", "rule_ids": list(rule_ids)},
+                )
+            results = []
+            for rule_id in rule_ids:
+                rule_data = db_optimizer.execute_query(
+                    """SELECT id, user_id, name, description, trigger_type, trigger_conditions,
+                       action_type, action_parameters, status, created_at, updated_at,
+                       last_executed, execution_count, success_count, error_count
+                       FROM automation_rules WHERE id = ? AND user_id = ? AND status = ?""",
+                    (rule_id, user_id, AutomationStatus.ACTIVE.value),
+                )
+                if not rule_data:
+                    results.append({"rule_id": rule_id, "success": False, "error": "Rule not found or inactive"})
+                    continue
+                rule = self._format_rule(rule_data[0])
+                trigger_data = self._synthetic_trigger_data_for_rule(rule)
+                execution_result = self._execute_rule(rule, trigger_data)
+                results.append(
+                    {
+                        "rule_id": rule_id,
+                        "rule_name": rule.name,
+                        "success": execution_result.get("success", False),
+                        "error": execution_result.get("error"),
+                        "error_code": execution_result.get("error_code"),
+                        "data": execution_result.get("data"),
+                    }
+                )
+            if get_automation_run_id() and created_ctx:
+                any_fail = any(not r.get("success") for r in results)
+                record_automation_run_event(
+                    user_id,
+                    "automation.completed",
+                    status="ok" if not any_fail else "partial",
+                    payload={"results_count": len(results), "any_failure": any_fail},
+                )
+            return results
 
     def _synthetic_trigger_data_for_rule(self, rule: AutomationRule) -> Dict[str, Any]:
         """Build minimal trigger data for a rule when running by ID (e.g. test)."""
@@ -527,7 +674,21 @@ class AutomationEngine:
             return {"success": False, "error": "Rule not found", "error_code": "RULE_NOT_FOUND"}
         rule = self._format_rule(rule_data[0])
         trigger_data = test_data if test_data else self._synthetic_trigger_data_for_rule(rule)
-        result = self._execute_rule(rule, trigger_data)
+        with enter_automation_run_if_missing(trigger_data, "test") as created_ctx:
+            if created_ctx:
+                record_automation_run_event(
+                    user_id,
+                    "automation.triggered",
+                    payload={"mode": "test", "rule_id": rule_id},
+                )
+            result = self._execute_rule(rule, trigger_data)
+            if get_automation_run_id() and created_ctx:
+                record_automation_run_event(
+                    user_id,
+                    "automation.completed",
+                    status="ok" if result.get("success") else "failed",
+                    payload={"mode": "test", "rule_id": rule_id},
+                )
         result["rule_id"] = rule_id
         return result
 
@@ -607,32 +768,37 @@ class AutomationEngine:
     
     def _execute_rule(self, rule: AutomationRule, trigger_data: Dict[str, Any]) -> Dict[str, Any]:
         """Execute automation rule"""
+        user_id = rule.user_id
         try:
-            # Get action handler
             action_handler = self.action_handlers.get(rule.action_type)
             if not action_handler:
-                return {
-                    'success': False,
-                    'error': f'No handler for action type: {rule.action_type}'
-                }
-            
-            # Execute action
-            result = action_handler(rule.action_parameters, trigger_data, rule.user_id)
-            
-            # Update rule execution stats
-            self._update_rule_stats(rule.id, result['success'])
-            
-            # Log execution
-            self._log_execution(rule.id, rule.user_id, trigger_data, result)
-            
-            return result
-            
+                res = {"success": False, "error": f"No handler for action type: {rule.action_type}"}
+                if get_automation_run_id():
+                    record_automation_step_finished(user_id, rule, trigger_data, res)
+                return res
+
+            if get_automation_run_id():
+                record_automation_step_started(user_id, rule, trigger_data)
+            try:
+                result = action_handler(rule.action_parameters, trigger_data, user_id)
+                self._update_rule_stats(rule.id, result["success"])
+                self._log_execution(rule.id, user_id, trigger_data, result)
+                if get_automation_run_id():
+                    record_automation_step_finished(user_id, rule, trigger_data, result)
+                return result
+            except Exception as handler_err:
+                logger.error(f"Error executing rule {rule.id}: {handler_err}")
+                err_res = {"success": False, "error": str(handler_err)}
+                if get_automation_run_id():
+                    record_automation_step_finished(user_id, rule, trigger_data, err_res)
+                return err_res
+
         except Exception as e:
             logger.error(f"Error executing rule {rule.id}: {e}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            err_res = {"success": False, "error": str(e)}
+            if get_automation_run_id():
+                record_automation_step_finished(user_id, rule, trigger_data, err_res)
+            return err_res
     
     def _execute_send_email(self, parameters: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Execute send email action. Stub: Gmail send not integrated."""
@@ -898,7 +1064,7 @@ class AutomationEngine:
                 """SELECT la.activity_type, COUNT(*) as count
                    FROM lead_activities la
                    JOIN leads l ON la.lead_id = l.id
-                   WHERE l.user_id = ? AND la.timestamp >= datetime('now', '-30 days')
+                   WHERE l.user_id = ? AND datetime(la.timestamp) >= datetime('now', '-30 days')
                    GROUP BY la.activity_type""",
                 (user_id,)
             )
@@ -1019,6 +1185,62 @@ class AutomationEngine:
                     'success': True,
                     'data': {'lead_id': lead_id, 'score': score, 'min_score': min_score}
                 }
+
+            # Gmail → CRM preset: create or update lead from inbound email (matches core.automation_engine)
+            if trigger_data.get('sender_email') and not action_data.get('lead_id'):
+                sender_email = (trigger_data.get('sender_email') or '').strip()
+                if not sender_email:
+                    return {'success': False, 'error': 'sender_email required for email → CRM'}
+                sender_name = trigger_data.get('sender_name') or sender_email.split('@')[0]
+                target_stage = action_data.get('target_stage', 'new')
+                existing = db_optimizer.execute_query(
+                    "SELECT id FROM leads WHERE user_id = ? AND lower(email) = lower(?)",
+                    (user_id, sender_email),
+                )
+                if existing:
+                    lead_id = existing[0]['id']
+                    if target_stage:
+                        db_optimizer.execute_query(
+                            "UPDATE leads SET stage = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?",
+                            (target_stage, lead_id, user_id),
+                            fetch=False,
+                        )
+                    enhanced_crm_service.add_lead_activity(
+                        lead_id,
+                        user_id,
+                        'note_added',
+                        f"Gmail → CRM: stage set to {target_stage}",
+                    )
+                    return {
+                        'success': True,
+                        'data': {
+                            'lead_id': lead_id,
+                            'action': 'lead_updated',
+                            'message': f'Lead updated to {target_stage} stage',
+                        },
+                    }
+                lead_result = enhanced_crm_service.create_lead(
+                    user_id,
+                    {
+                        'email': sender_email,
+                        'name': sender_name,
+                        'source': 'gmail',
+                        'stage': target_stage,
+                        'correlation_id': trigger_data.get('correlation_id'),
+                    },
+                )
+                if lead_result.get('success'):
+                    new_id = lead_result['data']['lead_id']
+                    return {
+                        'success': True,
+                        'data': {
+                            'lead_id': new_id,
+                            'action': 'lead_created',
+                            'message': f'Lead created in {target_stage} stage',
+                        },
+                    }
+                return {'success': False, 'error': lead_result.get('error', 'Failed to create lead')}
+
             lead_id = action_data.get('lead_id') or trigger_data.get('lead_id')
             field_name = action_data.get('field_name')
             field_value = action_data.get('field_value')
@@ -1112,26 +1334,66 @@ class AutomationEngine:
             logger.error(f"Error generating document: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _execute_send_sms(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Send SMS via Twilio when configured; otherwise log only."""
+    def _execute_send_sms(
+        self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int
+    ) -> Dict[str, Any]:
+        """Send SMS via Twilio when configured; requires lead_id and leads.metadata.sms_consent."""
         try:
-            phone_number = action_data.get('phone_number')
-            message = action_data.get('message', '')
-            lead_id = action_data.get('lead_id')
-            if not phone_number or not message:
-                return {'success': False, 'error': 'phone_number and message required'}
-            to = str(phone_number).strip()
-            if not to.startswith('+'):
-                digits = ''.join(c for c in to if c.isdigit())
-                to = ('+' + digits) if len(digits) == 11 and digits.startswith('1') else ('+1' + digits) if len(digits) == 10 else ('+' + digits)
-            status = 'sent'
+            from core.sms_consent import lead_row_allows_sms, lead_sms_destination_matches
+
+            lead_id = action_data.get("lead_id") or trigger_data.get("lead_id")
+            phone_number = action_data.get("phone_number")
+            message = action_data.get("message", "")
+            if not lead_id:
+                return {
+                    "success": False,
+                    "error": "lead_id required for SMS (consent is verified per lead)",
+                    "error_code": "SMS_LEAD_REQUIRED",
+                }
+            if not message:
+                return {"success": False, "error": "message required"}
+            row = db_optimizer.execute_query(
+                "SELECT id, phone, metadata FROM leads WHERE id = ? AND user_id = ?",
+                (lead_id, user_id),
+            )
+            if not row:
+                return {"success": False, "error": "Lead not found", "error_code": "LEAD_NOT_FOUND"}
+            lead = row[0]
+            ok, reason = lead_row_allows_sms(lead)
+            if not ok:
+                return {
+                    "success": False,
+                    "error": reason,
+                    "error_code": "SMS_CONSENT_REQUIRED",
+                }
+            lead_phone = lead.get("phone") or ""
+            if not str(lead_phone).strip():
+                return {"success": False, "error": "Lead has no phone number"}
+            if not lead_sms_destination_matches(lead_phone, phone_number):
+                return {
+                    "success": False,
+                    "error": "phone_number does not match lead phone (consent applies to lead record only)",
+                    "error_code": "SMS_PHONE_MISMATCH",
+                }
+            to = str(lead_phone).strip()
+            if not to.startswith("+"):
+                digits = "".join(c for c in to if c.isdigit())
+                to = (
+                    ("+" + digits)
+                    if len(digits) == 11 and digits.startswith("1")
+                    else ("+1" + digits)
+                    if len(digits) == 10
+                    else ("+" + digits)
+                )
+            status = "skipped"
             error_msg = None
-            account_sid = os.getenv('TWILIO_ACCOUNT_SID')
-            auth_token = os.getenv('TWILIO_AUTH_TOKEN')
-            messaging_sid = os.getenv('TWILIO_MESSAGING_SERVICE_SID')
+            account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+            auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+            messaging_sid = os.getenv("TWILIO_MESSAGING_SERVICE_SID")
             if account_sid and auth_token and messaging_sid:
                 try:
                     from twilio.rest import Client
+
                     client = Client(account_sid, auth_token)
                     msg = client.messages.create(
                         messaging_service_sid=messaging_sid,
@@ -1139,8 +1401,9 @@ class AutomationEngine:
                         to=to,
                     )
                     logger.info("Twilio SMS sent to %s sid=%s", to, msg.sid)
+                    status = "sent"
                 except Exception as e:
-                    status = 'failed'
+                    status = "failed"
                     error_msg = str(e)
                     logger.exception("Twilio SMS error to %s", to)
             else:
@@ -1154,10 +1417,10 @@ class AutomationEngine:
                 )
             except Exception:
                 pass
-            return {'success': status == 'sent', 'error': error_msg} if error_msg else {'success': True}
+            return {"success": status == "sent", "error": error_msg}
         except Exception as e:
             logger.error("Error sending SMS: %s", e)
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
     
     def _execute_create_invoice(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Create an invoice"""
@@ -1207,5 +1470,22 @@ class AutomationEngine:
 # Global automation engine instance
 automation_engine = AutomationEngine()
 
+def run_due_time_based_automations() -> Dict[str, Any]:
+    """Run all due time-based automation rules (daily/weekly). Called from scheduler."""
+    try:
+        due = automation_engine.get_due_time_based_rules()
+        executed = 0
+        failed = 0
+        for rule, trigger_data in due:
+            result = automation_engine.run_single_rule(rule, trigger_data)
+            if result.get('success'):
+                executed += 1
+            else:
+                failed += 1
+        return {'executed': executed, 'failed': failed, 'due_count': len(due)}
+    except Exception as e:
+        logger.error("run_due_time_based_automations error: %s", e)
+        return {'executed': 0, 'failed': 0, 'due_count': 0, 'error': str(e)}
+
 # Export the automation engine
-__all__ = ['AutomationEngine', 'automation_engine', 'AutomationRule', 'AutomationExecution', 'TriggerType', 'ActionType', 'AutomationStatus']
+__all__ = ['AutomationEngine', 'automation_engine', 'AutomationRule', 'AutomationExecution', 'TriggerType', 'ActionType', 'AutomationStatus', 'run_due_time_based_automations']

@@ -53,7 +53,10 @@
         LeadCapture: instance.leadCapture,
         Forms: instance.forms,
         init: FikiriSDK.init,
-        version: SDK_VERSION
+        version: SDK_VERSION,
+        validatePublicApiKey: function() {
+          return this._instance.validatePublicApiKey();
+        }
       };
       
       return instance;
@@ -69,6 +72,39 @@
       if (config.timeout) this.timeout = config.timeout;
       if (config.features) this.features = config.features;
       if (config.debug !== undefined) this.debug = config.debug;
+    }
+
+    /**
+     * Check whether the configured API key can call the public chatbot (HTTP 200 + JSON; no 401).
+     */
+    async validatePublicApiKey() {
+      if (!this.apiKey) {
+        return {
+          success: true,
+          valid: false,
+          error_code: 'MISSING_API_KEY',
+          message: 'API key is required. Call Fikiri.init({ apiKey: "..." }) first.'
+        };
+      }
+      try {
+        const data = await this._request('/api/public/chatbot/key-status', {
+          method: 'GET',
+          maxRetries: 0
+        });
+        return {
+          success: true,
+          valid: !!data.valid,
+          error_code: data.error_code || null,
+          message: data.message || null
+        };
+      } catch (e) {
+        return {
+          success: false,
+          valid: false,
+          error_code: e.errorCode || 'NETWORK_ERROR',
+          message: e.message || 'Network error'
+        };
+      }
     }
 
     /**
@@ -128,8 +164,13 @@
           }
 
           if (!response.ok) {
-            const error = await response.json().catch(() => ({ error: 'Request failed' }));
-            throw new Error(error.error || `HTTP ${response.status}`);
+            const body = await response.json().catch(() => ({}));
+            const msg = body.error || body.message || `HTTP ${response.status}`;
+            const err = new Error(msg);
+            err.httpStatus = response.status;
+            err.errorCode = body.error_code || null;
+            err.body = body;
+            throw err;
           }
 
           const data = await response.json();
@@ -286,6 +327,23 @@
     }
   }
 
+  function chatbotErrorUserMessage(error) {
+    var code = error && error.errorCode;
+    if (code === 'MISSING_API_KEY' || code === 'INVALID_API_KEY') {
+      return 'Chat is not available: check your site API key in the Fikiri dashboard.';
+    }
+    if (code === 'INSUFFICIENT_SCOPE') {
+      return 'Chat is not available: this key does not include chatbot access.';
+    }
+    if (code === 'RATE_LIMIT_EXCEEDED') {
+      return 'Too many messages right now. Please wait a moment and try again.';
+    }
+    if (error && error.message && /API key/i.test(error.message)) {
+      return error.message;
+    }
+    return 'Sorry, something went wrong. Please try again.';
+  }
+
   /**
    * Chatbot Widget UI
    */
@@ -376,8 +434,8 @@
           this.addMessage('bot', 'Sorry, I encountered an error. Please try again.');
         }
       } catch (error) {
-        this.addMessage('bot', 'Sorry, I encountered an error. Please try again.');
-        this.sdk._log('Chatbot error', { error: error.message });
+        this.addMessage('bot', chatbotErrorUserMessage(error));
+        this.sdk._log('Chatbot error', { error: error.message, errorCode: error.errorCode });
       } finally {
         this.input.disabled = false;
         this.input.focus();

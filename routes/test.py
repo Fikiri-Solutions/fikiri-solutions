@@ -9,21 +9,50 @@ import os
 import json
 import base64
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Import testing modules
 from core.api_validation import handle_api_errors, create_success_response, create_error_response
+from core.request_correlation import get_or_create_correlation_id
 from core.user_auth import user_auth_manager
 from email_automation.ai_assistant import MinimalAIEmailAssistant
 from email_automation.parser import MinimalEmailParser
 from email_automation.actions import MinimalEmailActions
 from core.minimal_ml_scoring import MinimalMLScoring
 from crm.service import enhanced_crm_service
+from core.feature_flags import get_feature_flags
+from core.minimal_vector_search import get_vector_search
 
 # Helper function for backward compatibility
 def create_ai_assistant(api_key=None):
     """Create AI assistant instance (backward compatibility)"""
     return MinimalAIEmailAssistant(api_key=api_key)
+
+
+def create_test_response(
+    success: bool,
+    data: dict,
+    message: str,
+    error_code: str = None,
+    *,
+    correlation_id: str = None,
+):
+    """Consistent response contract for /api/test/* endpoints.
+
+    We keep HTTP 200 so the frontend can trust `response.data.success`
+    without axios treating it as a transport error.
+    """
+    payload = {
+        "success": bool(success),
+        "message": message,
+        "timestamp": None,
+        "data": data,
+    }
+    if error_code:
+        payload["error_code"] = error_code
+    if correlation_id:
+        payload["correlation_id"] = correlation_id
+    return jsonify(payload), 200
 from core.secure_sessions import get_current_user_id
 
 logger = logging.getLogger(__name__)
@@ -45,7 +74,8 @@ def debug_endpoint():
             'timestamp': datetime.now().isoformat()
         }
         
-        return create_success_response(debug_info, 'Debug information retrieved')
+        cid = get_or_create_correlation_id(request, None)
+        return create_success_response(debug_info, 'Debug information retrieved', correlation_id=cid)
         
     except Exception as e:
         logger.error(f"Debug endpoint error: {e}")
@@ -92,6 +122,7 @@ def test_signup_step():
 def test_email_parser():
     """Test email parsing functionality"""
     data = request.get_json() or {}
+    cid = get_or_create_correlation_id(request, data)
     
     # Use default test email if not provided
     default_email = """Subject: Test Email - Inquiry about Services
@@ -132,16 +163,25 @@ test@example.com"""
         
         parsed_result = parser.parse_message(mock_message)
         
-        return create_success_response({
-            'original_content': email_content,
-            'parsed_result': parsed_result
-        }, 'Email parsing test completed')
+        return create_success_response(
+            {
+                'original_content': email_content,
+                'parsed_result': parsed_result,
+            },
+            'Email parsing test completed',
+            correlation_id=cid,
+        )
         
     except Exception as e:
         logger.error(f"Email parser test error: {e}")
         import traceback
         logger.error(f"Email parser test traceback: {traceback.format_exc()}")
-        return create_error_response(f"Email parser test failed: {str(e)}", 500, 'EMAIL_PARSER_TEST_ERROR')
+        return create_error_response(
+            f"Email parser test failed: {str(e)}",
+            500,
+            'EMAIL_PARSER_TEST_ERROR',
+            correlation_id=cid,
+        )
 
 @test_bp.route('/test/email-actions', methods=['POST'])
 @handle_api_errors
@@ -150,6 +190,7 @@ def test_email_actions():
     data = request.get_json()
     if not data:
         return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
+    cid = get_or_create_correlation_id(request, data)
 
     try:
         actions = MinimalEmailActions()
@@ -159,15 +200,24 @@ def test_email_actions():
         
         action_result = actions.execute_action(action_type, email_id, data.get('params', {}))
         
-        return create_success_response({
-            'action_type': action_type,
-            'email_id': email_id,
-            'action_result': action_result
-        }, 'Email action test completed')
+        return create_success_response(
+            {
+                'action_type': action_type,
+                'email_id': email_id,
+                'action_result': action_result,
+            },
+            'Email action test completed',
+            correlation_id=cid,
+        )
         
     except Exception as e:
         logger.error(f"Email actions test error: {e}")
-        return create_error_response("Email actions test failed", 500, 'EMAIL_ACTIONS_TEST_ERROR')
+        return create_error_response(
+            "Email actions test failed",
+            500,
+            'EMAIL_ACTIONS_TEST_ERROR',
+            correlation_id=cid,
+        )
 
 @test_bp.route('/test/crm', methods=['POST'])
 @handle_api_errors
@@ -255,24 +305,33 @@ def test_ai_assistant():
     try:
         api_key = os.getenv('OPENAI_API_KEY')
         if not api_key:
-            return create_success_response({
-                'success': False,
-                'classification': {
-                    'confidence': 0,
-                    'intent': 'unknown',
-                    'suggested_action': 'configure_openai',
-                    'urgency': 'low'
+            # HTTP 200 + success: endpoint handled the request; stats report missing key.
+            return create_test_response(
+                True,
+                {
+                    'classification': {
+                        'confidence': 0,
+                        'intent': 'unknown',
+                        'suggested_action': 'configure_openai',
+                        'urgency': 'low',
+                    },
+                    'response': (
+                        'OpenAI API key not configured. '
+                        'Configure OPENAI_API_KEY to run live assistant checks.'
+                    ),
+                    'contact_info': {},
+                    'stats': {
+                        'api_key_configured': False,
+                        'client_initialized': False,
+                        'enabled': False,
+                    },
                 },
-                'response': 'OpenAI API key not configured. Please configure it in your environment variables.',
-                'contact_info': {},
-                'stats': {
-                    'api_key_configured': False,
-                    'client_initialized': False,
-                    'enabled': False
-                }
-            }, 'AI assistant test completed (no API key)')
+                'OpenAI API key not configured (diagnostics only)',
+                error_code='OPENAI_NOT_CONFIGURED',
+            )
 
         assistant = create_ai_assistant(api_key)
+        start_time = datetime.now(timezone.utc)
         
         # Classify intent first
         intent_result = assistant.classify_email_intent(content, subject)
@@ -284,12 +343,50 @@ def test_ai_assistant():
         # Extract contact info
         contact_info = assistant.extract_contact_info(content)
         
+        end_time = datetime.now(timezone.utc)
+
+        # Infer operational success for this test window from recorded usage events.
+        operational_success = True
+        error_code = None
+        redis_client = getattr(assistant, 'redis_client', None)
+        if redis_client:
+            try:
+                relevant_ops = {'classify_intent', 'generate_response', 'extract_contact'}
+                records = redis_client.lrange('fikiri:ai:usage', 0, 200) or []
+                failures = []
+                for record in records:
+                    try:
+                        parsed = json.loads(record)
+                    except Exception:
+                        continue
+                    op = parsed.get('operation')
+                    if op not in relevant_ops:
+                        continue
+                    ts = parsed.get('timestamp')
+                    if not ts:
+                        continue
+                    try:
+                        parsed_ts = datetime.fromisoformat(ts)
+                    except Exception:
+                        continue
+                    if not (start_time <= parsed_ts <= end_time):
+                        continue
+                    if parsed.get('success') is False:
+                        failures.append(op)
+                if failures:
+                    operational_success = False
+                    error_code = 'AI_LLM_FAILURE'
+            except Exception:
+                operational_success = True
+
         # Get AI stats
         ai_stats = assistant.get_ai_stats()
         
         # Return format matching what frontend expects
-        return create_success_response({
-            'success': True,
+        return create_test_response(
+            operational_success,
+            {
+                'success': operational_success,
             'classification': intent_result,
             'response': response,
             'contact_info': contact_info,
@@ -298,11 +395,29 @@ def test_ai_assistant():
                 'client_initialized': True,
                 'enabled': ai_stats.get('enabled', True)
             }
-        }, 'AI assistant test completed')
+            },
+            'AI assistant test completed' if operational_success else 'AI assistant test failed (LLM call(s) failed)',
+            error_code=error_code
+        )
         
     except Exception as e:
         logger.error(f"AI assistant test error: {e}")
-        return create_error_response("AI assistant test failed", 500, 'AI_ASSISTANT_TEST_ERROR')
+        return create_test_response(
+            False,
+            {
+                'success': False,
+                'classification': {},
+                'response': '',
+                'contact_info': {},
+                'stats': {
+                    'api_key_configured': True,
+                    'client_initialized': False,
+                    'enabled': False
+                }
+            },
+            'AI assistant test failed',
+            error_code='AI_ASSISTANT_TEST_ERROR'
+        )
 
 @test_bp.route('/test/openai-key', methods=['GET'])
 @handle_api_errors
@@ -350,6 +465,18 @@ def test_ml_scoring():
     try:
         scorer = MinimalMLScoring()
         
+        # If we can't persist ML scoring logs, the test isn't truly successful.
+        scoring_log_exists = False
+        if getattr(scorer, 'db_optimizer', None):
+            try:
+                rows = scorer.db_optimizer.execute_query(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='ml_scoring_log'",
+                    fetch=True
+                )
+                scoring_log_exists = bool(rows)
+            except Exception:
+                scoring_log_exists = False
+        
         # Test 1: High-value lead (should score high)
         high_value_email = {
             'subject': 'URGENT: Need Premium Services - Budget $50,000',
@@ -394,7 +521,8 @@ def test_ml_scoring():
             ),
             'model_type_present': 'model_type' in high_score_result,
             'recommended_action_present': 'recommended_action' in high_score_result,
-            'confidence_valid': 0 <= high_score_result.get('confidence', 0) <= 1
+            'confidence_valid': 0 <= high_score_result.get('confidence', 0) <= 1,
+            'ml_scoring_log_table_exists': scoring_log_exists,
         }
         
         # Calculate pass rate
@@ -403,7 +531,7 @@ def test_ml_scoring():
         pass_rate = (passed_checks / total_checks) * 100
         
         # Determine overall test status
-        test_passed = pass_rate >= 80  # 80% of checks must pass
+        test_passed = (pass_rate >= 80) and scoring_log_exists  # Require persistence availability
         
         # Build comprehensive response
         test_summary = {
@@ -472,19 +600,103 @@ def test_ml_scoring():
             }
         }
         
-        if test_passed:
-            return create_success_response(test_summary, 'ML scoring test PASSED - All validations successful')
-        else:
-            return create_success_response(
-                test_summary, 
-                f'ML scoring test PARTIALLY PASSED - {pass_rate:.1f}% of checks passed'
-            )
+        return create_test_response(
+            test_passed,
+            {
+                **test_summary,
+                # Keep the inner contract explicit.
+                'success': test_passed,
+            },
+            (
+                'ML scoring test PASSED - All validations successful'
+                if test_passed
+                else f'ML scoring test failed - {pass_rate:.1f}% checks passed; persistence unavailable'
+            ),
+            error_code='ML_SCORING_LOG_UNAVAILABLE' if not scoring_log_exists else None,
+        )
         
     except Exception as e:
         logger.error(f"ML scoring test error: {e}")
         import traceback
         logger.error(f"ML scoring test traceback: {traceback.format_exc()}")
-        return create_error_response(f"ML scoring test failed: {str(e)}", 500, 'ML_SCORING_TEST_ERROR')
+        return create_test_response(
+            False,
+            {
+                'success': False,
+                'test_status': 'FAILED',
+            },
+            'ML scoring test failed',
+            error_code='ML_SCORING_TEST_ERROR'
+        )
+
+@test_bp.route('/test/vector-search', methods=['POST'])
+@handle_api_errors
+def test_vector_search():
+    """Lightweight vector search test with consistent configured/unconfigured contract."""
+    data = request.get_json() or {}
+
+    query = (data.get('query') or 'Fikiri Solutions').strip()
+    top_k = data.get('top_k', 3)
+    threshold = data.get('threshold', 0.6)
+
+    try:
+        flags = get_feature_flags()
+        if not flags.is_enabled("vector_search"):
+            return jsonify({
+                "success": False,
+                "service": "vector-search",
+                "message": "Vector search feature is disabled",
+                "error_code": "VECTOR_NOT_CONFIGURED",
+                "timestamp": None
+            }), 200
+
+        vs = get_vector_search()
+
+        try:
+            results = vs.search_similar(
+                query,
+                top_k=int(top_k),
+                threshold=float(threshold),
+            )
+        except Exception as search_error:
+            logger.warning("Vector search test query failed: %s", search_error)
+            return jsonify({
+                "success": False,
+                "service": "vector-search",
+                "message": "Vector search is not available for this test",
+                "error_code": "VECTOR_NOT_CONFIGURED",
+                "timestamp": None
+            }), 200
+
+        # Keep the response small and UI-friendly.
+        matches = []
+        for match in (results or [])[: int(top_k)]:
+            matches.append({
+                "similarity": match.get("similarity"),
+                "metadata": match.get("metadata", {})
+            })
+
+        return jsonify({
+            "success": True,
+            "service": "vector-search",
+            "message": "Vector search test completed",
+            "timestamp": None,
+            "data": {
+                "query": query,
+                "match_count": len(results or []),
+                "matches": matches,
+            }
+        }), 200
+
+    except Exception as e:
+        logger.exception("Vector search test failed: %s", e)
+        return jsonify({
+            "success": False,
+            "service": "vector-search",
+            "message": "Vector search test failed",
+            "error_code": "VECTOR_SEARCH_TEST_FAILED",
+            "timestamp": None
+        }), 200
 
 @test_bp.route('/ai/test', methods=['POST'])
 @handle_api_errors

@@ -36,9 +36,11 @@ class Config:
     )
     
     # Frontend Configuration
-    FRONTEND_URL = (
-        "https://fikirisolutions.com" if IS_PRODUCTION
-        else "http://localhost:5173"
+    # Allow overriding via env var so email links and redirects match the
+    # actual local Vite port (often 5174 in this repo).
+    FRONTEND_URL = os.getenv(
+        "FRONTEND_URL",
+        "https://fikirisolutions.com" if IS_PRODUCTION else "http://localhost:5174",
     )
     
     # CORS Configuration
@@ -46,7 +48,9 @@ class Config:
         "https://fikirisolutions.com",
         "https://www.fikirisolutions.com",
         "http://localhost:5173",
-        "http://127.0.0.1:5173"
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
     ]
     
     # Security Configuration

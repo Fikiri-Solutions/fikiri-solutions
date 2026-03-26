@@ -7,6 +7,7 @@ Step 1: Appointment CRUD (no calendar yet)
 from flask import Blueprint, request, jsonify
 from datetime import datetime
 import logging
+import json
 
 from core.appointments_service import AppointmentsService, SUGGESTED_SLOTS_COUNT, DEFAULT_SLOT_DURATION_MINUTES
 from core.jwt_auth import jwt_required, get_current_user
@@ -14,11 +15,25 @@ from core.api_validation import handle_api_errors, create_success_response, crea
 from core.integrations.calendar.calendar_manager import CalendarManager
 from core.integrations.integration_framework import integration_manager
 from datetime import timedelta
+from core.database_optimization import db_optimizer
 
 logger = logging.getLogger(__name__)
 
 # Create appointments blueprint
 appointments_bp = Blueprint("appointments", __name__, url_prefix="/api/appointments")
+
+MAX_STORED_PAYLOAD_CHARS = 200_000
+
+
+def _stringify_payload(payload: object) -> tuple[str, bool]:
+    """Best-effort JSON serialization with truncation cap."""
+    try:
+        payload_json = json.dumps(payload, ensure_ascii=False)
+    except Exception:
+        payload_json = str(payload)
+    if len(payload_json) > MAX_STORED_PAYLOAD_CHARS:
+        return payload_json[:MAX_STORED_PAYLOAD_CHARS] + "...", True
+    return payload_json, False
 
 
 @appointments_bp.route('', methods=['POST'])
@@ -47,6 +62,37 @@ def create_appointment():
             start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
             end_time = datetime.fromisoformat(end_time_str.replace('Z', '+00:00'))
         except ValueError as e:
+            # Best-effort persist intake failure for debugging
+            try:
+                payload_json, payload_truncated = _stringify_payload(data)
+                db_optimizer.execute_query(
+                    """
+                    INSERT INTO customer_appointment_intake_submissions (
+                        user_id, source, appointment_id, customer_name, customer_email, customer_phone,
+                        service_type, requested_date, requested_time, timezone, status, error_message,
+                        payload_json, payload_truncated
+                    )
+                    VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        user_id,
+                        data.get('source') or 'website',
+                        data.get('contact_name') if isinstance(data, dict) else None,
+                        data.get('contact_email') if isinstance(data, dict) else None,
+                        data.get('contact_phone') if isinstance(data, dict) else None,
+                        data.get('service_type') or data.get('title'),
+                        start_time_str[:10] if isinstance(start_time_str, str) and len(start_time_str) >= 10 else None,
+                        start_time_str[11:] if isinstance(start_time_str, str) and len(start_time_str) >= 11 else None,
+                        data.get('timezone') or (start_time_str.endswith('Z') and 'UTC'),
+                        'failed',
+                        str(e)[:5000],
+                        payload_json,
+                        1 if payload_truncated else 0,
+                    ),
+                    fetch=False,
+                )
+            except Exception:
+                pass
             return create_error_response(f"Invalid date format: {e}", 400, 'INVALID_DATE')
         
         # Create appointment
@@ -66,12 +112,79 @@ def create_appointment():
         )
         
         logger.info(f"✅ Created appointment {appointment['id']} for user {user_id}")
+
+        # Best-effort persist intake success (ground truth)
+        try:
+            payload_json, payload_truncated = _stringify_payload(data)
+            requested_date = start_time_str[:10] if isinstance(start_time_str, str) and len(start_time_str) >= 10 else None
+            requested_time = start_time_str[11:] if isinstance(start_time_str, str) and len(start_time_str) >= 11 else None
+            timezone = data.get('timezone') or ('UTC' if isinstance(start_time_str, str) and start_time_str.endswith('Z') else None)
+            db_optimizer.execute_query(
+                """
+                INSERT INTO customer_appointment_intake_submissions (
+                    user_id, source, appointment_id, customer_name, customer_email, customer_phone,
+                    service_type, requested_date, requested_time, timezone, status, error_message,
+                    payload_json, payload_truncated
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    data.get('source') or 'booking',
+                    appointment.get('id'),
+                    data.get('contact_name'),
+                    data.get('contact_email'),
+                    data.get('contact_phone'),
+                    data.get('service_type') or data.get('title'),
+                    requested_date,
+                    requested_time,
+                    timezone,
+                    'completed',
+                    None,
+                    payload_json,
+                    1 if payload_truncated else 0,
+                ),
+                fetch=False,
+            )
+        except Exception:
+            pass
+
         return create_success_response(appointment, 201)
         
     except ValueError as e:
         return create_error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
         logger.error(f"❌ Failed to create appointment: {e}")
+        # Best-effort persist intake failure
+        try:
+            data = request.get_json(silent=True) or {}
+            payload_json, payload_truncated = _stringify_payload(data)
+            db_optimizer.execute_query(
+                """
+                INSERT INTO customer_appointment_intake_submissions (
+                    user_id, source, appointment_id, customer_name, customer_email, customer_phone,
+                    service_type, requested_date, requested_time, timezone, status, error_message,
+                    payload_json, payload_truncated
+                )
+                VALUES (?, ?, NULL, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?)
+                """,
+                (
+                    user.get('id') if isinstance(user, dict) else 0,
+                    data.get('source') or 'booking',
+                    data.get('contact_name'),
+                    data.get('contact_email'),
+                    data.get('contact_phone'),
+                    data.get('service_type') or data.get('title'),
+                    data.get('timezone'),
+                    'failed',
+                    str(e)[:5000],
+                    payload_json,
+                    1 if payload_truncated else 0,
+                ),
+                fetch=False,
+            )
+        except Exception:
+            pass
         return create_error_response("Failed to create appointment", 500, 'CREATE_ERROR')
 
 
@@ -151,12 +264,86 @@ def update_appointment(appointment_id):
         appointment = service.update_appointment(appointment_id, updates)
         
         logger.info(f"✅ Updated appointment {appointment_id} for user {user_id}")
+
+        # Best-effort persist intake for reschedule / updates
+        try:
+            payload_json, payload_truncated = _stringify_payload(data)
+            status = 'rescheduled' if ('start_time' in updates or 'end_time' in updates) else 'completed'
+
+            start_for_request = updates.get('start_time')
+            requested_date = start_for_request[:10] if isinstance(start_for_request, str) and len(start_for_request) >= 10 else None
+            requested_time = start_for_request[11:] if isinstance(start_for_request, str) and len(start_for_request) >= 11 else None
+            timezone = data.get('timezone') or ('UTC' if isinstance(start_for_request, str) and start_for_request.endswith('Z') else None)
+
+            db_optimizer.execute_query(
+                """
+                INSERT INTO customer_appointment_intake_submissions (
+                    user_id, source, appointment_id, customer_name, customer_email, customer_phone,
+                    service_type, requested_date, requested_time, timezone, status, error_message,
+                    payload_json, payload_truncated
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    data.get('source') or 'booking',
+                    appointment_id,
+                    appointment.get('contact_name') if isinstance(appointment, dict) else None,
+                    appointment.get('contact_email') if isinstance(appointment, dict) else None,
+                    appointment.get('contact_phone') if isinstance(appointment, dict) else None,
+                    updates.get('service_type') if isinstance(updates, dict) and updates.get('service_type') else updates.get('title'),
+                    requested_date,
+                    requested_time,
+                    timezone if timezone else None,
+                    status,
+                    None,
+                    payload_json,
+                    1 if payload_truncated else 0,
+                ),
+                fetch=False,
+            )
+        except Exception:
+            pass
+
         return create_success_response(appointment)
         
     except ValueError as e:
         return create_error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
         logger.error(f"❌ Failed to update appointment: {e}")
+        # Best-effort persist intake failure
+        try:
+            data = request.get_json(silent=True) or {}
+            payload_json, payload_truncated = _stringify_payload(data)
+            db_optimizer.execute_query(
+                """
+                INSERT INTO customer_appointment_intake_submissions (
+                    user_id, source, appointment_id, customer_name, customer_email, customer_phone,
+                    service_type, requested_date, requested_time, timezone, status, error_message,
+                    payload_json, payload_truncated
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user.get('id') if isinstance(user, dict) else 0,
+                    data.get('source') or 'booking',
+                    appointment_id,
+                    data.get('contact_name'),
+                    data.get('contact_email'),
+                    data.get('contact_phone'),
+                    data.get('service_type') or data.get('title'),
+                    None,
+                    None,
+                    data.get('timezone'),
+                    'failed',
+                    str(e)[:5000],
+                    payload_json,
+                    1 if payload_truncated else 0,
+                ),
+                fetch=False,
+            )
+        except Exception:
+            pass
         return create_error_response("Failed to update appointment", 500, 'UPDATE_ERROR')
 
 
@@ -173,12 +360,85 @@ def cancel_appointment(appointment_id):
         appointment = service.cancel_appointment(appointment_id)
         
         logger.info(f"✅ Canceled appointment {appointment_id} for user {user_id}")
+
+        # Best-effort persist intake for cancellation
+        try:
+            data = request.get_json(silent=True) or {}
+            payload_json, payload_truncated = _stringify_payload(data)
+            start_time_val = appointment.get('start_time') if isinstance(appointment, dict) else None
+            requested_date = start_time_val[:10] if isinstance(start_time_val, str) and len(start_time_val) >= 10 else None
+            requested_time = start_time_val[11:] if isinstance(start_time_val, str) and len(start_time_val) >= 11 else None
+            timezone = data.get('timezone') or ('UTC' if isinstance(start_time_val, str) and start_time_val.endswith('Z') else None)
+
+            db_optimizer.execute_query(
+                """
+                INSERT INTO customer_appointment_intake_submissions (
+                    user_id, source, appointment_id, customer_name, customer_email, customer_phone,
+                    service_type, requested_date, requested_time, timezone, status, error_message,
+                    payload_json, payload_truncated
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    'booking',
+                    appointment_id,
+                    appointment.get('contact_name') if isinstance(appointment, dict) else None,
+                    appointment.get('contact_email') if isinstance(appointment, dict) else None,
+                    appointment.get('contact_phone') if isinstance(appointment, dict) else None,
+                    appointment.get('title') if isinstance(appointment, dict) else None,
+                    requested_date,
+                    requested_time,
+                    timezone,
+                    'cancelled',
+                    None,
+                    payload_json,
+                    1 if payload_truncated else 0,
+                ),
+                fetch=False,
+            )
+        except Exception:
+            pass
+
         return create_success_response(appointment)
         
     except ValueError as e:
         return create_error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
         logger.error(f"❌ Failed to cancel appointment: {e}")
+        # Best-effort persist intake failure
+        try:
+            data = request.get_json(silent=True) or {}
+            payload_json, payload_truncated = _stringify_payload(data)
+            db_optimizer.execute_query(
+                """
+                INSERT INTO customer_appointment_intake_submissions (
+                    user_id, source, appointment_id, customer_name, customer_email, customer_phone,
+                    service_type, requested_date, requested_time, timezone, status, error_message,
+                    payload_json, payload_truncated
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    data.get('source') or 'booking',
+                    appointment_id,
+                    data.get('contact_name'),
+                    data.get('contact_email'),
+                    data.get('contact_phone'),
+                    data.get('service_type') or data.get('title'),
+                    None,
+                    None,
+                    data.get('timezone'),
+                    'failed',
+                    str(e)[:5000],
+                    payload_json,
+                    1 if payload_truncated else 0,
+                ),
+                fetch=False,
+            )
+        except Exception:
+            pass
         return create_error_response("Failed to cancel appointment", 500, 'CANCEL_ERROR')
 
 

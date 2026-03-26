@@ -12,10 +12,15 @@ import io
 import csv
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 # Import business logic modules
-from crm.service import enhanced_crm_service
+from crm.service import (
+    enhanced_crm_service,
+    lead_row_to_public_dict,
+    lead_dataclass_to_public_dict,
+)
 from core.database_optimization import db_optimizer
 try:
     from core.ai_budget_guardrails import ai_budget_guardrails
@@ -31,6 +36,8 @@ except ModuleNotFoundError:
             pass
     ai_budget_guardrails = _StubBudgetGuardrails()
 from core.api_validation import handle_api_errors, create_success_response, create_error_response
+from core.request_correlation import get_or_create_correlation_id
+from core.correlation_trace import fetch_correlation_trace
 from services.automation_engine import AutomationEngine, TriggerType
 # Create automation_engine instance for backward compatibility
 automation_engine = AutomationEngine()
@@ -45,12 +52,13 @@ from email_automation.service_manager import IMAPProvider
 from core.user_auth import user_auth_manager
 from core.workflow_followups import schedule_follow_up, execute_due_follow_ups
 from core.workflow_documents import generate_document
+from core.tier_usage_caps import check_tier_usage_cap, record_monthly_usage
+from core.request_user_id import resolve_request_user_id
 
 logger = logging.getLogger(__name__)
 
 # Create business blueprint
 business_bp = Blueprint("business_routes", __name__, url_prefix="/api")
-
 
 def _require_paid_plan(user_id: int) -> bool:
     if not db_optimizer.table_exists("subscriptions"):
@@ -68,12 +76,22 @@ def _require_paid_plan(user_id: int) -> bool:
         logger.warning("Plan check failed: %s", e)
         return True
 
+
+def _check_tier_usage_cap(user_id: int, usage_type: str, projected_increment: int = 1):
+    """Return a 402 response when projected usage exceeds plan cap; otherwise None."""
+    allowed, msg, code = check_tier_usage_cap(
+        user_id, usage_type, projected_increment=projected_increment, db=db_optimizer
+    )
+    if not allowed:
+        return create_error_response(msg, 402, code)
+    return None
+
 # CRM Routes
 @business_bp.route('/crm/leads', methods=['GET'])
 @handle_api_errors
 def get_leads():
     """Get all leads for authenticated user with pagination"""
-    user_id = get_current_user_id() or request.args.get('user_id', type=int)
+    user_id = resolve_request_user_id(request, current_user_id=get_current_user_id(), allow_query=True)
     if not user_id:
         return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
 
@@ -177,28 +195,43 @@ def create_lead():
         if field not in data or not data[field]:
             return create_error_response(f"{field} is required", 400, 'MISSING_FIELD')
 
+    correlation_id = get_or_create_correlation_id(request, data)
     lead_data = {
         'name': data['name'],
         'email': data['email'],
         'company': data.get('company', ''),
         'phone': data.get('phone', ''),
         'source': data.get('source', 'website'),
-        'status': data.get('status', 'new'),
-        'notes': data.get('notes', '')
+        'stage': data.get('stage') or data.get('status', 'new'),
+        'notes': data.get('notes', ''),
+        'correlation_id': correlation_id,
     }
 
-    lead = enhanced_crm_service.create_lead(user_id, lead_data)
-    if not lead:
-        return create_error_response("Failed to create lead", 500, 'CRM_CREATE_ERROR')
-    
-    return create_success_response({'lead': lead}, 'Lead created successfully')
+    result = enhanced_crm_service.create_lead(user_id, lead_data)
+    if not result.get('success'):
+        code = result.get('error_code', 'CRM_CREATE_ERROR')
+        status = 409 if code == 'LEAD_EXISTS' else 400 if code == 'MISSING_FIELD' else 500
+        return create_error_response(
+            result.get('error', 'Failed to create lead'),
+            status,
+            code,
+            correlation_id=correlation_id,
+        )
+
+    lead_id = result['data']['lead_id']
+    row = enhanced_crm_service.get_lead(lead_id, user_id)
+    return create_success_response(
+        {'lead': lead_row_to_public_dict(row)},
+        'Lead created successfully',
+        correlation_id=result['data'].get('correlation_id') or correlation_id,
+    )
 
 
 @business_bp.route('/crm/leads/import', methods=['POST'])
 @handle_api_errors
 def import_leads():
     """Import/migrate leads via JSON payload"""
-    user_id = get_current_user_id() or request.args.get('user_id', type=int)
+    user_id = resolve_request_user_id(request, current_user_id=get_current_user_id(), allow_query=True)
     if not user_id:
         return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
 
@@ -474,15 +507,25 @@ def update_lead(lead_id):
     if not data:
         return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
 
-    lead = enhanced_crm_service.get_lead(lead_id)
-    if not lead or lead['user_id'] != user_id:
+    row = enhanced_crm_service.get_lead(lead_id, user_id)
+    if not row:
         return create_error_response("Lead not found", 404, 'LEAD_NOT_FOUND')
 
-    updated_lead = enhanced_crm_service.update_lead(lead_id, data)
-    if not updated_lead:
-        return create_error_response("Failed to update lead", 500, 'CRM_UPDATE_ERROR')
-    
-    return create_success_response({'lead': updated_lead}, 'Lead updated successfully')
+    payload = dict(data)
+    if 'stage' not in payload and 'status' in payload:
+        payload['stage'] = payload['status']
+
+    result = enhanced_crm_service.update_lead(lead_id, user_id, payload)
+    if not result.get('success'):
+        ec = result.get('error_code', 'CRM_UPDATE_ERROR')
+        status = 404 if ec == 'LEAD_NOT_FOUND' else 400
+        return create_error_response(result.get('error', 'Failed to update lead'), status, ec)
+
+    lead_obj = result['data']['lead']
+    return create_success_response(
+        {'lead': lead_dataclass_to_public_dict(lead_obj)},
+        'Lead updated successfully'
+    )
 
 @business_bp.route('/crm/contacts/<int:contact_id>', methods=['DELETE'])
 @business_bp.route('/crm/leads/<int:contact_id>', methods=['DELETE'])
@@ -495,8 +538,15 @@ def delete_contact(contact_id):
     
     # Check if soft_delete is requested (query parameter)
     soft_delete = request.args.get('soft_delete', 'false').lower() == 'true'
+    body_for_corr = request.get_json(silent=True) or {}
+    correlation_id = get_or_create_correlation_id(request, body_for_corr)
     
-    result = enhanced_crm_service.delete_contact(contact_id, user_id, soft_delete=soft_delete)
+    result = enhanced_crm_service.delete_contact(
+        contact_id,
+        user_id,
+        soft_delete=soft_delete,
+        correlation_id=correlation_id,
+    )
     
     if not result.get('success'):
         error_code = result.get('error_code', 'DELETE_ERROR')
@@ -504,12 +554,14 @@ def delete_contact(contact_id):
         return create_error_response(
             result.get('error', 'Failed to delete contact'),
             status_code,
-            error_code
+            error_code,
+            correlation_id=correlation_id,
         )
     
     return create_success_response(
         result.get('data', {}),
-        'Contact deleted successfully'
+        result.get('data', {}).get('message') or 'Contact withdrawn successfully',
+        correlation_id=correlation_id,
     )
 
 
@@ -517,7 +569,7 @@ def delete_contact(contact_id):
 @handle_api_errors
 def recalculate_lead_score(lead_id):
     """Recalculate lead score and quality"""
-    user_id = get_current_user_id() or request.args.get('user_id', type=int)
+    user_id = resolve_request_user_id(request, current_user_id=get_current_user_id(), allow_query=True)
     if not user_id:
         return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
 
@@ -538,18 +590,23 @@ def add_lead_activity(lead_id):
     if not data:
         return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
 
-    activity_data = {
-        'type': data.get('type', 'note'),
-        'description': data.get('description', ''),
-        'due_date': data.get('due_date'),
-        'completed': data.get('completed', False)
-    }
+    activity_type = data.get('type', 'note')
+    description = data.get('description', '')
+    meta = {}
+    if 'due_date' in data:
+        meta['due_date'] = data['due_date']
+    if 'completed' in data:
+        meta['completed'] = data['completed']
 
-    activity = enhanced_crm_service.add_lead_activity(lead_id, activity_data)
-    if not activity:
-        return create_error_response("Failed to add activity", 500, 'CRM_ACTIVITY_ERROR')
-    
-    return create_success_response({'activity': activity}, 'Activity added successfully')
+    result = enhanced_crm_service.add_lead_activity(
+        lead_id, user_id, activity_type, description, meta if meta else None
+    )
+    if not result.get('success'):
+        ec = result.get('error_code', 'CRM_ACTIVITY_ERROR')
+        status = 404 if ec == 'LEAD_NOT_FOUND' else 500
+        return create_error_response(result.get('error', 'Failed to add activity'), status, ec)
+
+    return create_success_response({'activity': result['data']}, 'Activity added successfully')
 
 @business_bp.route('/crm/leads/<int:lead_id>/activities', methods=['GET'])
 @handle_api_errors
@@ -559,12 +616,38 @@ def get_lead_activities(lead_id):
     if not user_id:
         return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
 
-    lead = enhanced_crm_service.get_lead(lead_id)
-    if not lead or lead['user_id'] != user_id:
+    row = enhanced_crm_service.get_lead(lead_id, user_id)
+    if not row:
         return create_error_response("Lead not found", 404, 'LEAD_NOT_FOUND')
 
-    activities = enhanced_crm_service.get_lead_activities(lead_id)
-    return create_success_response({'activities': activities}, 'Activities retrieved successfully')
+    result = enhanced_crm_service.get_lead_activities(lead_id, user_id)
+    if not result.get('success'):
+        return create_error_response(result.get('error', 'Failed to load activities'), 500, 'CRM_ERROR')
+
+    acts = result['data'].get('activities', [])
+    serialized = [lead_dataclass_to_public_dict(a) for a in acts]
+    return create_success_response({'activities': serialized}, 'Activities retrieved successfully')
+
+
+@business_bp.route('/crm/leads/<int:lead_id>/events', methods=['GET'])
+@handle_api_errors
+def list_lead_crm_events(lead_id):
+    """Append-only CRM event timeline for a lead (audit / integrations)."""
+    user_id = resolve_request_user_id(request, current_user_id=get_current_user_id(), allow_query=True)
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+    limit = min(max(request.args.get('limit', type=int, default=50), 1), 200)
+    offset = max(request.args.get('offset', type=int, default=0), 0)
+    result = enhanced_crm_service.list_crm_events(lead_id, user_id, limit=limit, offset=offset)
+    if not result.get('success'):
+        return create_error_response(
+            result.get('error', 'Lead not found'),
+            404,
+            result.get('error_code', 'LEAD_NOT_FOUND'),
+        )
+    return create_success_response(result['data'], 'CRM events retrieved successfully')
+
 
 @business_bp.route('/crm/pipeline', methods=['GET'])
 @handle_api_errors
@@ -582,24 +665,7 @@ def get_pipeline():
 def sync_gmail():
     """Sync Gmail emails and contacts to CRM"""
     try:
-        user_id = get_current_user_id()
-        # Fallback: allow user_id from request body for development/testing
-        if not user_id:
-            data = request.get_json() or {}
-            user_id_raw = data.get('user_id')
-            if user_id_raw:
-                try:
-                    user_id = int(user_id_raw)
-                except (ValueError, TypeError):
-                    user_id = None
-            if user_id:
-                # Validate that the user exists
-                user_check = db_optimizer.execute_query(
-                    "SELECT id FROM users WHERE id = ? AND is_active = 1 LIMIT 1",
-                    (user_id,)
-                )
-                if not user_check:
-                    return create_error_response("Invalid user ID", 401, 'INVALID_USER_ID')
+        user_id = resolve_request_user_id(request, current_user_id=get_current_user_id(), allow_body=True)
         
         if not user_id:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
@@ -765,15 +831,7 @@ def sync_gmail():
 def sync_outlook():
     """Sync Outlook emails and contacts to CRM"""
     try:
-        user_id = get_current_user_id()
-        if not user_id:
-            data = request.get_json() or {}
-            user_id = data.get('user_id')
-            if user_id:
-                try:
-                    user_id = int(user_id)
-                except (ValueError, TypeError):
-                    user_id = None
+        user_id = resolve_request_user_id(request, current_user_id=get_current_user_id(), allow_body=True)
         
         if not user_id:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
@@ -834,27 +892,118 @@ def sync_outlook():
         logger.error(f"Outlook sync traceback: {traceback.format_exc()}")
         return create_error_response("Failed to sync Outlook", 500, 'OUTLOOK_SYNC_ERROR')
 
+
+def _gmail_metadata_message_to_email_dict(msg_detail):
+    """Inbox list row without body (Gmail format=metadata)."""
+    headers = msg_detail.get('payload', {}).get('headers', [])
+    subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
+    from_header = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown')
+    date = next((h['value'] for h in headers if h['name'] == 'Date'), '')
+    mid = msg_detail.get('id')
+    snippet = msg_detail.get('snippet', '') or ''
+    return {
+        'id': mid,
+        'subject': subject,
+        'from': from_header,
+        'from_name': from_header.split('<')[0].strip().replace('"', '') if '<' in from_header else from_header,
+        'date': date,
+        'snippet': snippet,
+        'body': '',
+        'unread': 'UNREAD' in msg_detail.get('labelIds', []),
+        'has_attachments': 'attachmentId' in str(msg_detail.get('payload', {})),
+        'thread_id': msg_detail.get('threadId'),
+    }
+
+
+def _gmail_full_message_to_email_dict(msg_detail, gmail_message_id):
+    """Full parse for body + embedded-image proxy URLs (Gmail format=full)."""
+    import base64
+
+    headers = msg_detail['payload'].get('headers', [])
+    subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
+    from_header = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown')
+    date = next((h['value'] for h in headers if h['name'] == 'Date'), '')
+    body_html = ''
+    body_text = ''
+    embedded_images = {}
+
+    def extract_from_part(part):
+        nonlocal body_html, body_text, embedded_images
+        mime_type = part.get('mimeType', '')
+        ph = part.get('headers', [])
+        content_id = None
+        for header in ph:
+            if header.get('name', '').lower() == 'content-id':
+                content_id = header.get('value', '').strip('<>')
+                break
+        if content_id and part.get('body', {}).get('attachmentId'):
+            embedded_images[content_id] = {
+                'attachment_id': part['body']['attachmentId'],
+                'mime_type': mime_type,
+                'filename': part.get('filename', ''),
+            }
+        if mime_type == 'text/html':
+            data = part.get('body', {}).get('data', '')
+            if data and not body_html:
+                try:
+                    body_html = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+                except Exception as e:
+                    logger.debug(f"Failed to decode HTML part: {e}")
+        elif mime_type == 'text/plain':
+            data = part.get('body', {}).get('data', '')
+            if data and not body_text:
+                try:
+                    body_text = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+                except Exception as e:
+                    logger.debug(f"Failed to decode text part: {e}")
+        if 'parts' in part:
+            for subpart in part['parts']:
+                extract_from_part(subpart)
+
+    payload = msg_detail.get('payload', {})
+    if 'parts' in payload:
+        for part in payload['parts']:
+            extract_from_part(part)
+    else:
+        extract_from_part(payload)
+    body = body_html if body_html else body_text
+    if body_html and embedded_images:
+        for cid, img_info in embedded_images.items():
+            proxy_url = f"/api/business/email/{gmail_message_id}/embedded-image/{img_info['attachment_id']}"
+            cid_escaped = re.escape(cid.strip('<>'))
+            body = re.sub(
+                rf'src=["\']cid:{cid_escaped}["\']',
+                f'src="{proxy_url}"',
+                body,
+                flags=re.IGNORECASE,
+            )
+            body = re.sub(rf'cid:{cid_escaped}', proxy_url, body, flags=re.IGNORECASE)
+            body = re.sub(
+                rf'src=["\']{cid_escaped}["\']',
+                f'src="{proxy_url}"',
+                body,
+                flags=re.IGNORECASE,
+            )
+    return {
+        'id': msg_detail.get('id', gmail_message_id),
+        'subject': subject,
+        'from': from_header,
+        'from_name': from_header.split('<')[0].strip().replace('"', '') if '<' in from_header else from_header,
+        'date': date,
+        'snippet': msg_detail.get('snippet', ''),
+        'body': body,
+        'unread': 'UNREAD' in msg_detail.get('labelIds', []),
+        'has_attachments': 'attachmentId' in str(msg_detail.get('payload', {})),
+        'thread_id': msg_detail.get('threadId'),
+    }
+
+
 @business_bp.route('/email/messages', methods=['GET'])
 @handle_api_errors
 def get_emails():
     """Get emails for authenticated user"""
     try:
-        user_id = get_current_user_id()
-        
-        # Fallback: allow user_id from query parameter for development/testing
-        # This allows /inbox to work without requiring session authentication
-        if not user_id:
-            user_id = request.args.get('user_id', type=int)
-            if user_id:
-                # Validate that the user exists
-                user_check = db_optimizer.execute_query(
-                    "SELECT id FROM users WHERE id = ? AND is_active = 1 LIMIT 1",
-                    (user_id,)
-                )
-                if not user_check:
-                    logger.warning(f"Invalid user_id from query parameter: {user_id}")
-                    return create_error_response("Invalid user ID", 401, 'INVALID_USER_ID')
-                logger.info(f"Using user_id from query parameter: {user_id}")
+        user_id = resolve_request_user_id(request, current_user_id=get_current_user_id(), allow_query=True)
         
         if not user_id:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
@@ -863,7 +1012,9 @@ def get_emails():
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
         use_synced = request.args.get('use_synced', 'true').lower() == 'true'  # Default to synced emails for speed
-        
+        # List views should omit full bodies (smaller JSON, faster DB). Detail: GET /email/messages/<id>
+        include_body = request.args.get('include_body', 'false').lower() == 'true'
+
         # Enforce maximum limit to prevent unbounded queries (rulepack compliance)
         if limit > 500:
             limit = 500
@@ -875,32 +1026,53 @@ def get_emails():
         # Try to use synced emails first if requested and available
         if use_synced:
             try:
-                # Check if synced_emails table exists and has data (rulepack compliance: pagination with offset)
-                # Support both Gmail and Outlook emails
-                synced_emails_data = db_optimizer.execute_query("""
-                    SELECT COALESCE(external_id, gmail_id) as email_id, provider, subject, sender, recipient, date, body, labels
-                    FROM synced_emails 
-                    WHERE user_id = ?
-                    ORDER BY date DESC
-                    LIMIT ? OFFSET ?
-                """, (user_id, limit, offset))
-                
+                # List without full body: SUBSTR only (less I/O + smaller payloads). Tests may mock `body` without body_preview.
+                if include_body:
+                    synced_sql = """
+                        SELECT COALESCE(external_id, gmail_id) as email_id, provider, subject, sender, recipient, date, body, labels
+                        FROM synced_emails
+                        WHERE user_id = ?
+                        ORDER BY date DESC
+                        LIMIT ? OFFSET ?
+                    """
+                else:
+                    synced_sql = """
+                        SELECT COALESCE(external_id, gmail_id) as email_id, provider, subject, sender, recipient, date,
+                               SUBSTR(COALESCE(body, ''), 1, 500) as body_preview, labels
+                        FROM synced_emails
+                        WHERE user_id = ?
+                        ORDER BY date DESC
+                        LIMIT ? OFFSET ?
+                    """
+                synced_emails_data = db_optimizer.execute_query(synced_sql, (user_id, limit, offset))
+
                 if synced_emails_data and len(synced_emails_data) > 0:
                     emails = []
                     for email_row in synced_emails_data:
-                        import json
                         labels = json.loads(email_row.get('labels', '[]')) if email_row.get('labels') else []
                         is_unread = 'UNREAD' not in labels  # Inverted: if UNREAD is not in labels, it's read
-                        
+
                         # Apply filter
                         if filter_type == 'unread' and is_unread:
                             continue
                         if filter_type == 'read' and not is_unread:
                             continue
-                        
+
                         email_id = email_row.get('email_id') or email_row.get('gmail_id')
                         provider = email_row.get('provider', 'gmail')
-                        
+
+                        if include_body:
+                            raw_body = email_row.get('body') or ''
+                            snippet = (raw_body or '')[:100]
+                            out_body = raw_body
+                        else:
+                            preview = email_row.get('body_preview')
+                            if preview is None:
+                                preview = (email_row.get('body') or '')[:500]
+                            preview = preview or ''
+                            snippet = preview[:100]
+                            out_body = ''
+
                         emails.append({
                             'id': email_id,
                             'provider': provider,
@@ -908,8 +1080,8 @@ def get_emails():
                             'from': email_row.get('sender', 'Unknown'),
                             'from_name': email_row.get('sender', 'Unknown').split('<')[0].strip().replace('"', '') if '<' in email_row.get('sender', '') else email_row.get('sender', 'Unknown'),
                             'date': email_row.get('date', ''),
-                            'snippet': (email_row.get('body', '') or '')[:100],  # First 100 chars as snippet
-                            'body': email_row.get('body', ''),
+                            'snippet': snippet,
+                            'body': out_body,
                             'unread': not is_unread,  # Inverted logic
                             'has_attachments': False,  # Not stored in synced_emails
                             'thread_id': None  # Not stored in synced_emails
@@ -971,129 +1143,47 @@ def get_emails():
             
             messages = results.get('messages', [])
             emails = []
-            
-            for msg in messages:
-                try:
-                    msg_detail = gmail_service.users().messages().get(
-                        userId='me',
-                        id=msg['id'],
-                        format='full'
-                    ).execute()
-                    
-                    headers = msg_detail['payload'].get('headers', [])
-                    subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
-                    from_header = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown')
-                    date = next((h['value'] for h in headers if h['name'] == 'Date'), '')
-                    
-                    # Extract body - prefer HTML, fallback to plain text
-                    body_html = ''
-                    body_text = ''
-                    embedded_images = {}  # Map of cid -> attachment_id for embedded images
-                    
-                    def extract_from_part(part):
-                        """Recursively extract body from part"""
-                        nonlocal body_html, body_text, embedded_images
-                        embedded_images = embedded_images  # satisfy F824: nonlocal is mutated
-                        import base64
-                        mime_type = part.get('mimeType', '')
-                        
-                        # Check for embedded images (Content-ID)
-                        headers = part.get('headers', [])
-                        content_id = None
-                        for header in headers:
-                            if header.get('name', '').lower() == 'content-id':
-                                content_id = header.get('value', '').strip('<>')
-                                break
-                        
-                        if content_id and part.get('body', {}).get('attachmentId'):
-                            # This is an embedded image
-                            embedded_images[content_id] = {
-                                'attachment_id': part['body']['attachmentId'],
-                                'mime_type': mime_type,
-                                'filename': part.get('filename', '')
-                            }
-                        
-                        if mime_type == 'text/html':
-                            data = part.get('body', {}).get('data', '')
-                            if data and not body_html:
-                                try:
-                                    body_html = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
-                                except Exception as e:
-                                    logger.debug(f"Failed to decode HTML part: {e}")
-                        elif mime_type == 'text/plain':
-                            data = part.get('body', {}).get('data', '')
-                            if data and not body_text:
-                                try:
-                                    body_text = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
-                                except Exception as e:
-                                    logger.debug(f"Failed to decode text part: {e}")
-                        
-                        # Recursively check nested parts
-                        if 'parts' in part:
-                            for subpart in part['parts']:
-                                extract_from_part(subpart)
-                    
-                    payload = msg_detail.get('payload', {})
-                    if 'parts' in payload:
-                        for part in payload['parts']:
-                            extract_from_part(part)
-                    else:
-                        extract_from_part(payload)
-                    
-                    # Prefer HTML over plain text
-                    body = body_html if body_html else body_text
-                    
-                    # Replace cid: references with proxy URLs for embedded images.
-                    # Use relative path so the frontend loads images from the same origin as the page
-                    # (avoids CSP img-src blocking and CORS; frontend rewrites to absolute as needed).
-                    if body_html and embedded_images:
-                        import re
-                        for cid, img_info in embedded_images.items():
-                            proxy_url = f"/api/business/email/{msg['id']}/embedded-image/{img_info['attachment_id']}"
-                            
-                            # Escape the CID for regex (remove angle brackets if present)
-                            cid_escaped = re.escape(cid.strip('<>'))
-                            
-                            # Replace in src attributes: src="cid:..." or src='cid:...'
-                            body = re.sub(
-                                rf'src=["\']cid:{cid_escaped}["\']',
-                                f'src="{proxy_url}"',
-                                body,
-                                flags=re.IGNORECASE
-                            )
-                            
-                            # Replace standalone cid: references (for background images, etc.)
-                            body = re.sub(
-                                rf'cid:{cid_escaped}',
-                                proxy_url,
-                                body,
-                                flags=re.IGNORECASE
-                            )
-                            
-                            # Also handle Content-ID without cid: prefix (some email clients)
-                            body = re.sub(
-                                rf'src=["\']{cid_escaped}["\']',
-                                f'src="{proxy_url}"',
-                                body,
-                                flags=re.IGNORECASE
-                            )
-                    
-                    emails.append({
-                        'id': msg['id'],
-                        'subject': subject,
-                        'from': from_header,
-                        'from_name': from_header.split('<')[0].strip().replace('"', '') if '<' in from_header else from_header,
-                        'date': date,
-                        'snippet': msg_detail.get('snippet', ''),
-                        'body': body,
-                        'unread': 'UNREAD' in msg_detail.get('labelIds', []),
-                        'has_attachments': 'attachmentId' in str(msg_detail.get('payload', {})),
-                        'thread_id': msg_detail.get('threadId')
-                    })
-                except Exception as e:
-                    logger.warning(f"Failed to process message {msg.get('id')}: {e}")
-                    continue
-            
+
+            if not include_body:
+
+                def _fetch_metadata(mid: str):
+                    try:
+                        return gmail_service.users().messages().get(
+                            userId='me',
+                            id=mid,
+                            format='metadata',
+                            metadataHeaders=['Subject', 'From', 'Date'],
+                        ).execute()
+                    except Exception as e:
+                        logger.warning("Gmail metadata fetch failed for %s: %s", mid, e)
+                        return None
+
+                by_id = {}
+                if messages:
+                    max_workers = min(8, max(1, len(messages)))
+                    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+                        future_map = {pool.submit(_fetch_metadata, m['id']): m['id'] for m in messages}
+                        for fut in as_completed(future_map):
+                            md = fut.result()
+                            if md and md.get('id'):
+                                by_id[md['id']] = _gmail_metadata_message_to_email_dict(md)
+                for m in messages:
+                    row = by_id.get(m['id'])
+                    if row:
+                        emails.append(row)
+            else:
+                for msg in messages:
+                    try:
+                        msg_detail = gmail_service.users().messages().get(
+                            userId='me',
+                            id=msg['id'],
+                            format='full',
+                        ).execute()
+                        emails.append(_gmail_full_message_to_email_dict(msg_detail, msg['id']))
+                    except Exception as e:
+                        logger.warning(f"Failed to process message {msg.get('id')}: {e}")
+                        continue
+
             # Return with pagination metadata (Gmail API pagination)
             next_page_token = results.get('nextPageToken')
             return create_success_response({
@@ -1121,6 +1211,70 @@ def get_emails():
         logger.error(f"Get emails error: {e}")
         return create_error_response("Failed to retrieve emails", 500, 'EMAIL_ERROR')
 
+
+@business_bp.route('/email/messages/<email_id>', methods=['GET'])
+@handle_api_errors
+def get_email_message_detail(email_id):
+    """Return one email with full body (synced DB first, then Gmail API)."""
+    try:
+        user_id = resolve_request_user_id(request, current_user_id=get_current_user_id(), allow_query=True)
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+        rows = db_optimizer.execute_query(
+            """
+            SELECT COALESCE(external_id, gmail_id) as email_id, provider, subject, sender, recipient, date, body, labels
+            FROM synced_emails
+            WHERE user_id = ? AND (external_id = ? OR gmail_id = ?)
+            LIMIT 1
+            """,
+            (user_id, email_id, email_id),
+        )
+        if rows:
+            email_row = rows[0]
+            labels = json.loads(email_row.get('labels', '[]')) if email_row.get('labels') else []
+            is_unread = 'UNREAD' not in labels
+            eid = email_row.get('email_id')
+            raw_body = email_row.get('body') or ''
+            email = {
+                'id': eid,
+                'provider': email_row.get('provider', 'gmail'),
+                'subject': email_row.get('subject', 'No Subject'),
+                'from': email_row.get('sender', 'Unknown'),
+                'from_name': email_row.get('sender', 'Unknown').split('<')[0].strip().replace('"', '')
+                if '<' in email_row.get('sender', '')
+                else email_row.get('sender', 'Unknown'),
+                'date': email_row.get('date', ''),
+                'snippet': raw_body[:200] if raw_body else '',
+                'body': raw_body,
+                'unread': not is_unread,
+                'has_attachments': False,
+                'thread_id': None,
+            }
+            return create_success_response({'email': email}, 'Email retrieved')
+
+        try:
+            from integrations.gmail.gmail_client import gmail_client
+
+            gmail_service = gmail_client.get_gmail_service_for_user(user_id)
+        except RuntimeError:
+            return create_error_response("Email not found", 404, 'EMAIL_NOT_FOUND')
+
+        try:
+            msg_detail = gmail_service.users().messages().get(
+                userId='me', id=email_id, format='full'
+            ).execute()
+        except Exception:
+            return create_error_response("Email not found", 404, 'EMAIL_NOT_FOUND')
+
+        email = _gmail_full_message_to_email_dict(msg_detail, email_id)
+        email['provider'] = 'gmail'
+        return create_success_response({'email': email}, 'Email retrieved from Gmail')
+    except Exception as e:
+        logger.error(f"get_email_message_detail error: {e}")
+        return create_error_response("Failed to load email", 500, 'EMAIL_DETAIL_ERROR')
+
+
 @business_bp.route('/ai/analyze-email', methods=['POST'])
 @handle_api_errors
 def analyze_email():
@@ -1138,6 +1292,10 @@ def analyze_email():
         
         if not content:
             return create_error_response("Email content is required", 400, 'MISSING_CONTENT')
+
+        tier_limit_error = _check_tier_usage_cap(user_id, "ai_responses", projected_increment=1)
+        if tier_limit_error:
+            return tier_limit_error
 
         budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
         if not budget_decision.allowed:
@@ -1218,6 +1376,10 @@ def generate_reply():
         if not content:
             return create_error_response("Email content is required", 400, 'MISSING_CONTENT')
 
+        tier_limit_error = _check_tier_usage_cap(user_id, "ai_responses", projected_increment=1)
+        if tier_limit_error:
+            return tier_limit_error
+
         budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
         if not budget_decision.allowed:
             return create_error_response(
@@ -1296,6 +1458,10 @@ def send_email():
         if not body:
             return create_error_response("Email body is required", 400, 'MISSING_BODY')
 
+        tier_limit_error = _check_tier_usage_cap(user_id, "email_processing", projected_increment=1)
+        if tier_limit_error:
+            return tier_limit_error
+
         # Check Gmail connection
         token_status = oauth_token_manager.get_token_status(user_id, "gmail")
         if not token_status.get('success') or not token_status.get('has_token'):
@@ -1323,6 +1489,7 @@ def send_email():
             sent_message = gmail_service.users().messages().send(
                 userId='me', body=message
             ).execute()
+            record_monthly_usage(user_id, "email_processing", 1, db=db_optimizer)
             
             return create_success_response(
                 {
@@ -1422,12 +1589,7 @@ def archive_email():
 def get_automation_rules():
     """Get automation rules for authenticated user"""
     try:
-        # Try to get user_id from session/JWT first
-        user_id = get_current_user_id()
-        
-        # Fallback: allow user_id from query parameter for development/testing
-        if not user_id:
-            user_id = request.args.get('user_id', type=int)
+        user_id = resolve_request_user_id(request, current_user_id=get_current_user_id(), allow_query=True)
         if not user_id:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
 
@@ -1640,12 +1802,7 @@ def update_automation_rule(rule_id):
 def get_automation_suggestions():
     """Get AI-powered automation suggestions"""
     try:
-        # Try to get user_id from session/JWT first
-        user_id = get_current_user_id()
-        
-        # Fallback: allow user_id from query parameter for development/testing
-        if not user_id:
-            user_id = request.args.get('user_id', type=int)
+        user_id = resolve_request_user_id(request, current_user_id=get_current_user_id(), allow_query=True)
         if not user_id:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
 
@@ -1696,15 +1853,22 @@ def execute_automation():
 
         rule_ids = data['rule_ids']
         idempotency_key = data.get('idempotency_key')
+        correlation_id = get_or_create_correlation_id(request, data)
 
         from services.automation_queue import automation_job_manager
         job_id = automation_job_manager.queue_automation_job(
             user_id,
             rule_ids=rule_ids,
             idempotency_key=idempotency_key,
+            correlation_id=correlation_id,
         )
         if not job_id:
-            return create_error_response("Duplicate run (idempotency) or queue failed", 409, 'DUPLICATE_OR_QUEUE_FAILED')
+            return create_error_response(
+                "Duplicate run (idempotency) or queue failed",
+                409,
+                'DUPLICATE_OR_QUEUE_FAILED',
+                correlation_id=correlation_id,
+            )
 
         try:
             from core.redis_queues import get_automation_queue
@@ -1716,7 +1880,8 @@ def execute_automation():
                 aq.enqueue_job('process_automation_run', {'job_id': job_id}, max_retries=2)
                 return create_success_response(
                     {'job_id': job_id, 'status': 'queued'},
-                    'Automation job queued'
+                    'Automation job queued',
+                    correlation_id=correlation_id,
                 )
         except Exception as queue_err:
             logger.warning("Automation queue enqueue failed, running sync: %s", queue_err)
@@ -1726,21 +1891,32 @@ def execute_automation():
             return create_error_response(
                 result.get('error', 'Action not implemented'),
                 501,
-                'NOT_IMPLEMENTED'
+                'NOT_IMPLEMENTED',
+                correlation_id=correlation_id,
             )
         if not result.get('success'):
             return create_error_response(
                 result.get('error', 'Execution failed'),
                 500,
-                'AUTOMATION_EXECUTION_ERROR'
+                'AUTOMATION_EXECUTION_ERROR',
+                correlation_id=correlation_id,
             )
         return create_success_response(
-            {'job_id': job_id, 'status': 'completed', 'execution_results': result.get('execution_results', [])},
-            'Automation rules executed successfully'
+            {
+                'job_id': job_id,
+                'status': 'completed',
+                'execution_results': result.get('execution_results', []),
+            },
+            'Automation rules executed successfully',
+            correlation_id=correlation_id,
         )
     except Exception as e:
         logger.error(f"Execute automation error: {e}")
-        return create_error_response("Failed to execute automation rules", 500, 'AUTOMATION_EXECUTION_ERROR')
+        return create_error_response(
+            "Failed to execute automation rules",
+            500,
+            'AUTOMATION_EXECUTION_ERROR',
+        )
 
 @business_bp.route('/automation/jobs/<job_id>', methods=['GET'])
 @handle_api_errors
@@ -1755,10 +1931,28 @@ def get_automation_job_status(job_id):
         status = automation_job_manager.get_job_status(job_id, user_id=user_id)
         if not status:
             return create_error_response("Job not found", 404, 'JOB_NOT_FOUND')
-        return create_success_response(status, 'Job status retrieved')
+        cid = status.get("correlation_id")
+        return create_success_response(status, 'Job status retrieved', correlation_id=cid)
     except Exception as e:
         logger.error(f"Get automation job status error: {e}")
         return create_error_response("Failed to get job status", 500, 'AUTOMATION_JOB_ERROR')
+
+
+@business_bp.route('/debug/correlation/<string:correlation_id>', methods=['GET'])
+@handle_api_errors
+def debug_correlation_trace(correlation_id):
+    """Stitched view of domain event rows for one correlation_id (current user only)."""
+    if os.getenv("FIKIRI_CORRELATION_TRACE", "1").lower() in ("0", "false", "no"):
+        return create_error_response("Correlation trace disabled", 404, "TRACE_DISABLED")
+    user_id = get_current_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, "AUTHENTICATION_REQUIRED")
+    trace = fetch_correlation_trace(user_id, correlation_id)
+    if trace.get("error") == "invalid_correlation_id":
+        return create_error_response("Invalid correlation_id", 400, "INVALID_CORRELATION_ID")
+    cid = trace.get("correlation_id")
+    return create_success_response(trace, "Correlation trace", correlation_id=cid)
+
 
 @business_bp.route('/automation/queue-stats', methods=['GET'])
 @handle_api_errors
@@ -1828,12 +2022,7 @@ def automation_kill_switch():
 def get_automation_safety_status():
     """Get automation safety status"""
     try:
-        # Try to get user_id from session/JWT first
-        user_id = get_current_user_id()
-        
-        # Fallback: allow user_id from query parameter for development/testing
-        if not user_id:
-            user_id = request.args.get('user_id', type=int)
+        user_id = resolve_request_user_id(request, current_user_id=get_current_user_id(), allow_query=True)
         if not user_id:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
 
@@ -1868,14 +2057,9 @@ def get_automation_safety_status():
 def get_automation_logs():
     """Get automation execution logs"""
     try:
-        # Try to get user_id from session/JWT first
-        user_id = get_current_user_id()
-        
-        # Fallback: allow user_id from query parameter for development/testing
+        user_id = resolve_request_user_id(request, current_user_id=get_current_user_id(), allow_query=True)
         if not user_id:
-            user_id = request.args.get('user_id', type=int)
-            if not user_id:
-                return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
         
         rule_id = request.args.get('rule_id', type=int)
         slug = request.args.get('slug')
@@ -2567,6 +2751,43 @@ def get_embedded_image(email_id, attachment_id):
         logger.error(f"❌ Get embedded image failed: {e}")
         return create_error_response(str(e), 500, 'DOWNLOAD_FAILED')
 
+def _ensure_automation_preset_lead_id(user_id: int, min_score: int = 6) -> int:
+    """Pick a lead owned by the user for preset tests, or create a disposable sample lead."""
+    rows = db_optimizer.execute_query(
+        """
+        SELECT id, score FROM leads
+        WHERE user_id = ?
+          AND (withdrawn_at IS NULL OR withdrawn_at = '')
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (user_id,),
+    )
+    if rows:
+        lid = rows[0]['id']
+        sc = rows[0].get('score') or 0
+        if sc < min_score:
+            db_optimizer.execute_query(
+                "UPDATE leads SET score = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?",
+                (min_score + 1, lid, user_id),
+                fetch=False,
+            )
+        return lid
+    created = enhanced_crm_service.create_lead(
+        user_id,
+        {
+            'email': f'automation-preset-{user_id}@example.test',
+            'name': 'Automation preset sample',
+            'source': 'automation_preset',
+            'stage': 'new',
+            'score': min_score + 1,
+        },
+    )
+    if not created.get('success'):
+        raise ValueError(created.get('error') or 'Could not create sample lead for preset test')
+    return created['data']['lead_id']
+
+
 @business_bp.route('/automation/test/preset', methods=['POST'])
 @handle_api_errors
 def test_automation_preset():
@@ -2585,7 +2806,22 @@ def test_automation_preset():
         preset = data.get('preset_id')
         if not preset:
             return create_error_response("preset_id is required", 400, 'MISSING_PRESET_ID')
-        
+
+        correlation_id = get_or_create_correlation_id(request, data)
+
+        sample_lead_id = None
+        if preset in ('lead_scoring', 'calendar_followups'):
+            try:
+                sample_lead_id = _ensure_automation_preset_lead_id(user_id)
+            except ValueError as e:
+                logger.warning("Automation preset sample lead: %s", e)
+                return create_error_response(
+                    str(e),
+                    500,
+                    'PRESET_SAMPLE_LEAD_FAILED',
+                    correlation_id=correlation_id,
+                )
+
         preset_map = {
             'gmail_crm': {
                 'trigger': TriggerType.EMAIL_RECEIVED,
@@ -2593,7 +2829,7 @@ def test_automation_preset():
             },
             'lead_scoring': {
                 'trigger': TriggerType.LEAD_CREATED,
-                'data': {'lead_id': 1, 'source': 'gmail', 'score': 7}
+                'data': {'lead_id': sample_lead_id, 'source': 'gmail', 'score': 7}
             },
             'slack_digest': {
                 'trigger': TriggerType.TIME_BASED,
@@ -2605,7 +2841,7 @@ def test_automation_preset():
             },
             'calendar_followups': {
                 'trigger': TriggerType.LEAD_STAGE_CHANGED,
-                'data': {'lead_id': 1, 'old_stage': 'qualified', 'new_stage': 'booked'}
+                'data': {'lead_id': sample_lead_id, 'old_stage': 'qualified', 'new_stage': 'booked'}
             }
         }
         
@@ -2613,18 +2849,31 @@ def test_automation_preset():
         if not mapping:
             return create_error_response("Unknown preset", 400, 'UNKNOWN_PRESET')
         
-        result = automation_engine.execute_automation_rules(mapping['trigger'], mapping['data'], user_id)
+        trigger_data = {**mapping['data'], 'correlation_id': correlation_id}
+        result = automation_engine.execute_automation_rules(
+            mapping['trigger'], trigger_data, user_id, automation_source="api_preset"
+        )
         failed = result.get('data', {}).get('failed_rules', [])
         not_impl = next((f for f in failed if f.get('error_code') == 'NOT_IMPLEMENTED'), None)
         if not_impl:
             return create_error_response(
                 not_impl.get('error') or 'Action not implemented',
                 501,
-                'NOT_IMPLEMENTED'
+                'NOT_IMPLEMENTED',
+                correlation_id=correlation_id,
             )
         if result.get('success'):
-            return create_success_response(result.get('data', {}), 'Preset executed')
-        return create_error_response(result.get('error', 'Execution failed'), 500, 'AUTOMATION_EXECUTION_ERROR')
+            return create_success_response(
+                result.get('data', {}),
+                'Preset executed',
+                correlation_id=correlation_id,
+            )
+        return create_error_response(
+            result.get('error', 'Execution failed'),
+            500,
+            'AUTOMATION_EXECUTION_ERROR',
+            correlation_id=correlation_id,
+        )
         
     except Exception as e:
         logger.error(f"Automation preset test error: {e}")

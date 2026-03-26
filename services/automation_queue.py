@@ -12,6 +12,11 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 
 from core.database_optimization import db_optimizer
+from core.automation_run_events import (
+    automation_run_context,
+    ensure_automation_run_events_table,
+    record_automation_run_event,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -90,8 +95,41 @@ class AutomationJobManager:
                 "CREATE INDEX IF NOT EXISTS idx_automation_jobs_user_status ON automation_jobs (user_id, status)",
                 fetch=False,
             )
+            ensure_automation_run_events_table()
+            self._reconcile_stale_jobs()
         except Exception as e:
             logger.error("Automation jobs table init failed: %s", e)
+
+    def _reconcile_stale_jobs(self):
+        """Mark stale running/retrying jobs dead on startup to avoid stuck-state conflicts."""
+        try:
+            stale_minutes = int(os.getenv("AUTOMATION_JOB_STALE_MINUTES", "30"))
+        except ValueError:
+            stale_minutes = 30
+
+        threshold = f"-{max(1, stale_minutes)} minutes"
+        try:
+            db_optimizer.execute_query(
+                """
+                UPDATE automation_jobs
+                SET status = ?, completed_at = ?, error_message = COALESCE(
+                    error_message,
+                    'Marked dead during startup reconciliation (stale running/retrying job)'
+                )
+                WHERE status IN (?, ?)
+                  AND datetime(COALESCE(started_at, created_at)) < datetime('now', ?)
+                """,
+                (
+                    AUTOMATION_JOB_DEAD,
+                    _utcnow_iso(),
+                    AUTOMATION_JOB_RUNNING,
+                    AUTOMATION_JOB_RETRYING,
+                    threshold,
+                ),
+                fetch=False,
+            )
+        except Exception as e:
+            logger.warning("Automation stale job reconciliation failed: %s", e)
 
     def queue_automation_job(
         self,
@@ -101,14 +139,17 @@ class AutomationJobManager:
         trigger_data: Optional[Dict[str, Any]] = None,
         idempotency_key: Optional[str] = None,
         max_attempts: int = MAX_ATTEMPTS_DEFAULT,
+        correlation_id: Optional[str] = None,
     ) -> Optional[str]:
         """
         Create a job record and return job_id. Caller should then enqueue to Redis if connected.
         If idempotency_key is provided and a recent job with that key is queued, running, or success, returns None (duplicate).
+
+        correlation_id is stored on the job payload so automation_run_events and workers share the same trace as CRM/email/AI.
         """
         if rule_ids is not None:
             payload_type = "rule_ids"
-            payload = {"rule_ids": rule_ids}
+            payload: Dict[str, Any] = {"rule_ids": rule_ids}
         elif trigger_type is not None:
             payload_type = "trigger"
             payload = {"trigger_type": trigger_type, "trigger_data": trigger_data or {}}
@@ -116,10 +157,21 @@ class AutomationJobManager:
             logger.error("queue_automation_job: need rule_ids or trigger_type")
             return None
 
+        if correlation_id and str(correlation_id).strip():
+            cid = str(correlation_id).strip()
+            payload["correlation_id"] = cid
+            if payload_type == "trigger":
+                td = payload.get("trigger_data")
+                if not isinstance(td, dict):
+                    td = {}
+                if td.get("correlation_id") is None:
+                    td = {**td, "correlation_id": cid}
+                    payload["trigger_data"] = td
+
         if idempotency_key:
             existing = db_optimizer.execute_query(
                 """SELECT job_id, status FROM automation_jobs
-                   WHERE idempotency_key = ? AND status IN (?, ?, ?) AND created_at > datetime('now', ?)
+                   WHERE idempotency_key = ? AND status IN (?, ?, ?) AND datetime(created_at) > datetime('now', ?)
                    ORDER BY created_at DESC LIMIT 1""",
                 (idempotency_key, AUTOMATION_JOB_QUEUED, AUTOMATION_JOB_RUNNING, AUTOMATION_JOB_SUCCESS, f"-{IDEMPOTENCY_TTL_SECONDS} seconds"),
             )
@@ -172,85 +224,146 @@ class AutomationJobManager:
         attempt = job["attempt"] + 1
         max_attempts = job["max_attempts"]
 
-        try:
-            db_optimizer.execute_query(
-                """UPDATE automation_jobs SET status = ?, started_at = ?, attempt = ?
-                   WHERE job_id = ?""",
-                (AUTOMATION_JOB_RUNNING, _utcnow_iso(), attempt, job_id),
-                fetch=False,
+        corr: Optional[str] = None
+        td = payload.get("trigger_data")
+        if isinstance(td, dict) and td.get("correlation_id") is not None:
+            corr = str(td["correlation_id"])
+        if corr is None and payload.get("correlation_id") is not None:
+            corr = str(payload["correlation_id"])
+
+        def _audit_completed(status: str, **extra: Any) -> None:
+            record_automation_run_event(
+                user_id,
+                "automation.completed",
+                status=status,
+                payload={"payload_type": payload_type, "job_id": job_id, "attempt": attempt, **extra},
             )
-        except Exception as e:
-            logger.warning("Update job started_at failed: %s", e)
 
-        try:
-            if payload_type == "rule_ids":
-                execution_results = engine.execute_rules(user_id, payload["rule_ids"])
-                not_impl = [r for r in execution_results if r.get("error_code") == "NOT_IMPLEMENTED"]
-                if not_impl:
-                    err = not_impl[0].get("error", "Action not implemented")
-                    self._complete_job(job_id, AUTOMATION_JOB_FAILED, error_message=err, result={"execution_results": execution_results})
-                    return {"success": False, "error": err, "error_code": "NOT_IMPLEMENTED", "status": "failed", "execution_results": execution_results}
-                failed = [r for r in execution_results if not r.get("success")]
-                if failed:
-                    err = failed[0].get("error", "One or more rules failed")
-                    self._complete_job(job_id, AUTOMATION_JOB_FAILED, error_message=err, result={"execution_results": execution_results})
-                    return {"success": False, "error": err, "status": "failed", "execution_results": execution_results}
-                self._complete_job(job_id, AUTOMATION_JOB_SUCCESS, result={"execution_results": execution_results})
-                return {"success": True, "status": "success", "execution_results": execution_results}
-
-            if payload_type == "trigger":
-                from services.automation_engine import TriggerType
-                try:
-                    trigger_type = TriggerType(payload["trigger_type"])
-                except ValueError:
-                    self._complete_job(job_id, AUTOMATION_JOB_FAILED, error_message="Invalid trigger_type")
-                    return {"success": False, "error": "Invalid trigger_type", "status": "failed"}
-                trigger_data = payload.get("trigger_data") or {}
-                result = engine.execute_automation_rules(trigger_type, trigger_data, user_id)
-                if not result.get("success"):
-                    err = result.get("error", "Execution failed")
-                    self._complete_job(job_id, AUTOMATION_JOB_FAILED, error_message=err, result=result)
-                    return {"success": False, "error": err, "status": "failed", "data": result.get("data")}
-                failed = result.get("data", {}).get("failed_rules", [])
-                not_impl = next((f for f in failed if f.get("error_code") == "NOT_IMPLEMENTED"), None)
-                if not_impl:
-                    err = not_impl.get("error") or "Action not implemented"
-                    self._complete_job(job_id, AUTOMATION_JOB_FAILED, error_message=err, result=result)
-                    return {"success": False, "error": err, "error_code": "NOT_IMPLEMENTED", "status": "failed"}
-                if failed:
-                    err = failed[0].get("error") or "One or more rules failed"
-                    self._complete_job(job_id, AUTOMATION_JOB_FAILED, error_message=err, result=result)
-                    return {"success": False, "error": err, "status": "failed"}
-                self._complete_job(job_id, AUTOMATION_JOB_SUCCESS, result=result.get("data"))
-                return {"success": True, "status": "success", "data": result.get("data")}
-
-            self._complete_job(job_id, AUTOMATION_JOB_FAILED, error_message=f"Unknown payload_type: {payload_type}")
-            return {"success": False, "error": f"Unknown payload_type: {payload_type}", "status": "failed"}
-
-        except Exception as e:
-            logger.exception("Automation job %s failed", job_id)
-            if attempt >= max_attempts:
-                self._complete_job(job_id, AUTOMATION_JOB_DEAD, error_message=str(e))
-                return {"success": False, "error": str(e), "status": "dead"}
+        with automation_run_context(
+            run_id=job_id,
+            job_id=job_id,
+            correlation_id=corr,
+            attempt=attempt,
+            source="queue_worker",
+        ):
             try:
                 db_optimizer.execute_query(
-                    """UPDATE automation_jobs SET status = ?, error_message = ?, attempt = ?
+                    """UPDATE automation_jobs SET status = ?, started_at = ?, attempt = ?
                        WHERE job_id = ?""",
-                    (AUTOMATION_JOB_RETRYING, str(e), attempt, job_id),
+                    (AUTOMATION_JOB_RUNNING, _utcnow_iso(), attempt, job_id),
                     fetch=False,
                 )
-            except Exception as upd_err:
-                logger.warning("Update job retrying failed: %s", upd_err)
+            except Exception as e:
+                logger.warning("Update job started_at failed: %s", e)
+
+            triggered_payload: Dict[str, Any] = {
+                "payload_type": payload_type,
+                "attempt": attempt,
+            }
+            if payload_type == "rule_ids":
+                triggered_payload["rule_ids"] = payload.get("rule_ids")
+            elif payload_type == "trigger":
+                triggered_payload["trigger_type"] = payload.get("trigger_type")
+            record_automation_run_event(
+                user_id,
+                "automation.triggered",
+                payload=triggered_payload,
+            )
+
             try:
-                from core.redis_queues import get_automation_queue
-                aq = get_automation_queue()
-                if aq.is_connected():
-                    delay_sec = min(300, max(1, int(0.5 * (2 ** attempt))))
-                    aq.enqueue_job("process_automation_run", {"job_id": job_id}, delay=delay_sec)
-                    logger.info("Re-enqueued job %s for retry in %ss (attempt %s)", job_id, delay_sec, attempt)
-            except Exception as enq_err:
-                logger.warning("Re-enqueue for retry failed: %s", enq_err)
-            return {"success": False, "error": str(e), "status": "retrying", "attempt": attempt}
+                if payload_type == "rule_ids":
+                    execution_results = engine.execute_rules(user_id, payload["rule_ids"])
+                    not_impl = [r for r in execution_results if r.get("error_code") == "NOT_IMPLEMENTED"]
+                    if not_impl:
+                        err = not_impl[0].get("error", "Action not implemented")
+                        self._complete_job(job_id, AUTOMATION_JOB_FAILED, error_message=err, result={"execution_results": execution_results})
+                        _audit_completed("failed", error=err, execution_results=len(execution_results))
+                        return {"success": False, "error": err, "error_code": "NOT_IMPLEMENTED", "status": "failed", "execution_results": execution_results}
+                    failed = [r for r in execution_results if not r.get("success")]
+                    if failed:
+                        err = failed[0].get("error", "One or more rules failed")
+                        self._complete_job(job_id, AUTOMATION_JOB_FAILED, error_message=err, result={"execution_results": execution_results})
+                        _audit_completed("partial" if any(r.get("success") for r in execution_results) else "failed", error=err)
+                        return {"success": False, "error": err, "status": "failed", "execution_results": execution_results}
+                    self._complete_job(job_id, AUTOMATION_JOB_SUCCESS, result={"execution_results": execution_results})
+                    _audit_completed("ok", execution_results=len(execution_results))
+                    return {"success": True, "status": "success", "execution_results": execution_results}
+
+                if payload_type == "trigger":
+                    from services.automation_engine import TriggerType
+                    try:
+                        trigger_type = TriggerType(payload["trigger_type"])
+                    except ValueError:
+                        self._complete_job(job_id, AUTOMATION_JOB_FAILED, error_message="Invalid trigger_type")
+                        _audit_completed("failed", error="Invalid trigger_type")
+                        return {"success": False, "error": "Invalid trigger_type", "status": "failed"}
+                    trigger_data = payload.get("trigger_data") or {}
+                    result = engine.execute_automation_rules(
+                        trigger_type, trigger_data, user_id, automation_source="queue_worker"
+                    )
+                    if not result.get("success"):
+                        err = result.get("error", "Execution failed")
+                        self._complete_job(job_id, AUTOMATION_JOB_FAILED, error_message=err, result=result)
+                        _audit_completed("failed", error=err)
+                        return {"success": False, "error": err, "status": "failed", "data": result.get("data")}
+                    failed = result.get("data", {}).get("failed_rules", [])
+                    not_impl = next((f for f in failed if f.get("error_code") == "NOT_IMPLEMENTED"), None)
+                    if not_impl:
+                        err = not_impl.get("error") or "Action not implemented"
+                        self._complete_job(job_id, AUTOMATION_JOB_FAILED, error_message=err, result=result)
+                        _audit_completed("failed", error=err)
+                        return {"success": False, "error": err, "error_code": "NOT_IMPLEMENTED", "status": "failed"}
+                    if failed:
+                        err = failed[0].get("error") or "One or more rules failed"
+                        self._complete_job(job_id, AUTOMATION_JOB_FAILED, error_message=err, result=result)
+                        _audit_completed("partial")
+                        return {"success": False, "error": err, "status": "failed"}
+                    self._complete_job(job_id, AUTOMATION_JOB_SUCCESS, result=result.get("data"))
+                    _audit_completed("ok", total_executed=result.get("data", {}).get("total_executed"))
+                    return {"success": True, "status": "success", "data": result.get("data")}
+
+                self._complete_job(job_id, AUTOMATION_JOB_FAILED, error_message=f"Unknown payload_type: {payload_type}")
+                _audit_completed("failed", error=f"Unknown payload_type: {payload_type}")
+                return {"success": False, "error": f"Unknown payload_type: {payload_type}", "status": "failed"}
+
+            except Exception as e:
+                logger.exception("Automation job %s failed", job_id)
+                if attempt >= max_attempts:
+                    self._complete_job(job_id, AUTOMATION_JOB_DEAD, error_message=str(e))
+                    record_automation_run_event(
+                        user_id,
+                        "automation.run_failed",
+                        status="failed",
+                        error_message=str(e)[:2000],
+                        payload={"job_id": job_id, "attempt": attempt, "terminal": True},
+                    )
+                    return {"success": False, "error": str(e), "status": "dead"}
+                record_automation_run_event(
+                    user_id,
+                    "automation.retried",
+                    status="retrying",
+                    error_message=str(e)[:2000],
+                    payload={"job_id": job_id, "attempt": attempt, "max_attempts": max_attempts},
+                )
+                try:
+                    db_optimizer.execute_query(
+                        """UPDATE automation_jobs SET status = ?, error_message = ?, attempt = ?
+                           WHERE job_id = ?""",
+                        (AUTOMATION_JOB_RETRYING, str(e), attempt, job_id),
+                        fetch=False,
+                    )
+                except Exception as upd_err:
+                    logger.warning("Update job retrying failed: %s", upd_err)
+                try:
+                    from core.redis_queues import get_automation_queue
+                    aq = get_automation_queue()
+                    if aq.is_connected():
+                        delay_sec = min(300, max(1, int(0.5 * (2 ** attempt))))
+                        aq.enqueue_job("process_automation_run", {"job_id": job_id}, delay=delay_sec)
+                        logger.info("Re-enqueued job %s for retry in %ss (attempt %s)", job_id, delay_sec, attempt)
+                except Exception as enq_err:
+                    logger.warning("Re-enqueue for retry failed: %s", enq_err)
+                return {"success": False, "error": str(e), "status": "retrying", "attempt": attempt}
 
     def _complete_job(
         self,
@@ -278,7 +391,10 @@ class AutomationJobManager:
 
     def get_job_status(self, job_id: str, user_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
         """Return job status and result for API."""
-        query = "SELECT job_id, user_id, payload_type, status, attempt, max_attempts, created_at, started_at, completed_at, error_message, result_json FROM automation_jobs WHERE job_id = ?"
+        query = (
+            "SELECT job_id, user_id, payload_type, payload_json, status, attempt, max_attempts, "
+            "created_at, started_at, completed_at, error_message, result_json FROM automation_jobs WHERE job_id = ?"
+        )
         params = [job_id]
         if user_id is not None:
             query += " AND user_id = ?"
@@ -298,7 +414,20 @@ class AutomationJobManager:
             "started_at": r["started_at"],
             "completed_at": r["completed_at"],
             "error_message": r["error_message"],
+            "correlation_id": None,
         }
+        pj = r.get("payload_json")
+        if pj:
+            try:
+                payload = json.loads(pj)
+                cid = payload.get("correlation_id")
+                if cid is not None and str(cid).strip():
+                    out["correlation_id"] = str(cid).strip()
+                td = payload.get("trigger_data")
+                if out["correlation_id"] is None and isinstance(td, dict) and td.get("correlation_id"):
+                    out["correlation_id"] = str(td["correlation_id"]).strip()
+            except Exception:
+                pass
         if r.get("result_json"):
             try:
                 out["result"] = json.loads(r["result_json"])
@@ -313,7 +442,7 @@ class AutomationJobManager:
         try:
             rows = db_optimizer.execute_query(
                 """SELECT status, COUNT(*) as cnt FROM automation_jobs
-                   WHERE created_at > datetime('now', '-7 days')
+                   WHERE datetime(created_at) > datetime('now', '-7 days')
                    GROUP BY status"""
             )
             by_status = {r["status"]: r["cnt"] for r in rows} if rows else {}
@@ -333,7 +462,7 @@ class AutomationJobManager:
         """Return queue depth plus success rate and p95 duration for observability."""
         depth = self.get_queue_depth()
         try:
-            where = "created_at > datetime('now', ?)"
+            where = "datetime(created_at) > datetime('now', ?)"
             params: List[Any] = [f"-{hours} hours"]
             if user_id is not None:
                 where += " AND user_id = ?"
@@ -357,7 +486,7 @@ class AutomationJobManager:
             duration_rows = db_optimizer.execute_query(
                 f"""SELECT started_at, completed_at FROM automation_jobs
                     WHERE status = ? AND started_at IS NOT NULL AND completed_at IS NOT NULL
-                    AND created_at > datetime('now', ?){user_clause}""",
+                    AND datetime(created_at) > datetime('now', ?){user_clause}""",
                 tuple(duration_params),
             )
             durations_sec = []

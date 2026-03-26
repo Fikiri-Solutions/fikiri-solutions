@@ -7,6 +7,8 @@ Extracted from app.py for better maintainability
 from flask import Blueprint, request, jsonify
 import logging
 import json
+import base64
+import os
 from datetime import datetime
 
 # Import user management modules
@@ -23,6 +25,10 @@ logger = logging.getLogger(__name__)
 
 # Create user blueprint
 user_bp = Blueprint("user", __name__, url_prefix="/api")
+
+# Branding / logo upload constraints
+LOGO_MAX_BYTES = 1024 * 1024  # 1 MB
+ALLOWED_LOGO_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
 @user_bp.route('/user/profile', methods=['GET'])
 @handle_api_errors
@@ -186,13 +192,133 @@ def update_user_profile():
         logger.error(f"Update user profile error: {e}")
         return create_error_response("Failed to update profile", 500, 'PROFILE_UPDATE_ERROR')
 
+@user_bp.route('/user/customization/logo', methods=['GET'])
+@handle_api_errors
+@jwt_required
+def get_customization_logo():
+    """Get the authenticated user's uploaded logo (data URL)."""
+    try:
+        user_data = get_current_user()
+        user_id = (user_data or {}).get('user_id') or get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+        row = db_optimizer.execute_query(
+            "SELECT logo_data_url FROM user_customizations WHERE user_id = ?",
+            (user_id,)
+        )
+        logo_data_url = row[0].get('logo_data_url') if row else None
+
+        return create_success_response(
+            {'customization': {'logoUrl': logo_data_url}},
+            'Customization logo retrieved successfully'
+        )
+    except Exception as e:
+        logger.error(f"Get customization logo error: {e}")
+        return create_error_response("Failed to get customization logo", 500, 'LOGO_FETCH_ERROR')
+
+
+@user_bp.route('/user/customization/logo', methods=['POST'])
+@handle_api_errors
+@jwt_required
+def upload_customization_logo():
+    """Upload and persist the authenticated user's logo."""
+    try:
+        user_data = get_current_user()
+        user_id = (user_data or {}).get('user_id') or get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+        file = request.files.get('file')
+        if not file or not file.filename:
+            return create_error_response("No file uploaded", 400, 'NO_FILE')
+
+        ext = os.path.splitext(file.filename.lower())[1]
+        if ext not in ALLOWED_LOGO_EXTENSIONS:
+            return create_error_response("Invalid file type", 400, 'INVALID_FILE_TYPE')
+
+        content = file.read()
+        if len(content) > LOGO_MAX_BYTES:
+            return create_error_response(
+                f"File too large (max {LOGO_MAX_BYTES // (1024 * 1024)} MB)",
+                400,
+                'FILE_TOO_LARGE'
+            )
+
+        mime_by_ext = {
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.gif': 'image/gif',
+            '.webp': 'image/webp',
+        }
+        mime = mime_by_ext.get(ext, 'application/octet-stream')
+
+        encoded = base64.b64encode(content).decode('utf-8')
+        logo_data_url = f"data:{mime};base64,{encoded}"
+
+        # Upsert logo for this user
+        db_optimizer.execute_query(
+            """
+            INSERT INTO user_customizations (user_id, logo_data_url, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id) DO UPDATE
+            SET logo_data_url = excluded.logo_data_url,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (user_id, logo_data_url),
+            fetch=False
+        )
+
+        log_activity_event(
+            user_id,
+            'logo_uploaded',
+            message="User uploaded a customization logo",
+            metadata={'file_extension': ext},
+            request=request
+        )
+
+        return create_success_response(
+            {'customization': {'logoUrl': logo_data_url}},
+            'Logo uploaded successfully'
+        )
+    except Exception as e:
+        logger.error(f"Upload customization logo error: {e}")
+        return create_error_response("Failed to upload logo", 500, 'LOGO_UPLOAD_ERROR')
+
+@user_bp.route('/user/customization/logo', methods=['DELETE'])
+@handle_api_errors
+@jwt_required
+def delete_customization_logo():
+    """Remove the authenticated user's persisted logo."""
+    try:
+        user_data = get_current_user()
+        user_id = (user_data or {}).get('user_id') or get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+        db_optimizer.execute_query(
+            "DELETE FROM user_customizations WHERE user_id = ?",
+            (user_id,),
+            fetch=False
+        )
+
+        return create_success_response(
+            {'customization': {'logoUrl': None}},
+            'Logo deleted successfully'
+        )
+    except Exception as e:
+        logger.error(f"Delete customization logo error: {e}")
+        return create_error_response("Failed to delete logo", 500, 'LOGO_DELETE_ERROR')
+
 @user_bp.route('/user/onboarding-step', methods=['PUT'])
 @handle_api_errors
 @jwt_required
 def update_onboarding_step():
     """Update user onboarding step"""
     try:
-        user_id = get_current_user_id()
+        user_data = get_current_user()
+        user_id = (user_data or {}).get('user_id') or get_current_user_id()
         if not user_id:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
 

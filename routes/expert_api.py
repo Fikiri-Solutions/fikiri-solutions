@@ -6,8 +6,9 @@ Endpoints for expert teams, escalated questions, and Q&A management
 
 import json
 import logging
+import uuid
 from flask import Blueprint, request, jsonify
-from typing import Dict, Any
+from typing import Any, Dict, Optional
 
 from core.expert_escalation import get_escalation_engine, EscalationStatus
 from core.expert_manager import get_expert_manager
@@ -29,6 +30,16 @@ expert_manager = get_expert_manager()
 feedback_system = get_feedback_system()
 faq_system = get_smart_faq()
 knowledge_base = get_knowledge_base()
+
+
+def _coerce_int_user_id(value: Any) -> Optional[int]:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
 
 # Expert Teams Endpoints
 
@@ -218,14 +229,18 @@ def respond_to_question(question_id):
     faq_id = None
     kb_document_id = None
     if add_to_kb:
-        # Add as FAQ
+        tw = _coerce_int_user_id(getattr(escalated, "user_id", None))
+        cid = str(uuid.uuid4())
         faq_id = faq_system.add_faq(
             question=escalated.question,
             answer=response_text,
-            category='general',
+            category="general",
             keywords=[],
             variations=[],
-            priority=1
+            priority=1,
+            user_id=_coerce_int_user_id(user_id),
+            source="expert_api",
+            correlation_id=cid,
         )
         
         # Update response with FAQ ID
@@ -265,18 +280,28 @@ def add_question_to_kb(question_id):
     faq_id = None
     kb_document_id = None
     
+    cid = str(uuid.uuid4())
+    tw = _coerce_int_user_id(getattr(escalated, "user_id", None))
+    actor = _coerce_int_user_id(user_id)
     if as_faq:
-        # Add as FAQ
         faq_id = faq_system.add_faq(
             question=escalated.question,
             answer=answer,
-            category='general',
+            category="general",
             keywords=[],
             variations=[],
-            priority=1
+            priority=1,
+            user_id=actor if actor is not None else tw,
+            source="expert_api",
+            correlation_id=cid,
         )
     else:
-        # Add as KB document
+        kb_meta: Dict[str, Any] = {
+            "escalated_question_id": question_id,
+            "tenant_id": tenant_id,
+        }
+        if tw is not None:
+            kb_meta["user_id"] = tw
         kb_document_id = knowledge_base.add_document(
             title=escalated.question,
             content=answer,
@@ -284,9 +309,12 @@ def add_question_to_kb(question_id):
             document_type=DocumentType.ARTICLE,
             tags=[],
             keywords=[],
-            category='general',
-            author='expert',
-            metadata={'escalated_question_id': question_id, 'tenant_id': tenant_id}
+            category="general",
+            author="expert",
+            metadata=kb_meta,
+            correlation_id=cid,
+            source="expert_api",
+            user_id=actor,
         )
     
     # Update expert response

@@ -239,16 +239,17 @@ def sync_outlook_emails(user_id: int, limit: int = 50, days: int = 30) -> Dict[s
                 emails_synced += 1
                 
                 # Trigger automation for EMAIL_RECEIVED
-                from core.automation_engine import automation_engine, TriggerType
+                from services.automation_engine import automation_engine, TriggerType
                 automation_engine.execute_automation_rules(
                     TriggerType.EMAIL_RECEIVED,
                     {
                         'email_id': email_id,
                         'sender_email': sender_email,
                         'subject': subject,
-                        'text': body_preview
+                        'text': body_preview,
                     },
-                    user_id
+                    user_id,
+                    automation_source="outlook_sync",
                 )
                 
             except Exception as e:
@@ -285,5 +286,4 @@ def sync_outlook_emails(user_id: int, limit: int = 50, days: int = 30) -> Dict[s
             'error': str(e),
             'count': 0
         }
-
 

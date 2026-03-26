@@ -9,16 +9,24 @@ from functools import wraps
 import time
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Import our authentication modules
 from core.user_auth import user_auth_manager
-from core.jwt_auth import get_jwt_manager, jwt_required
+from core.jwt_auth import get_jwt_manager, jwt_required, get_current_user
 from core.secure_sessions import secure_session_manager, get_current_user_id
-from core.api_validation import validate_api_request, handle_api_errors, create_success_response, create_error_response
+from core.api_validation import (
+    validate_api_request,
+    handle_api_errors,
+    create_success_response,
+    create_error_response,
+    validate_email,
+)
+from core.email_provider_verifier import check_email_domain_has_mx
 from core.rate_limiter import rate_limit
 from core.database_optimization import db_optimizer
 from core.enterprise_logging import log_security_event
+from core.request_user_id import resolve_request_user_id
 from services.business_operations import business_analytics
 from email_automation.jobs import email_job_manager
 
@@ -83,6 +91,7 @@ def api_login():
             'email': user_data['email'],
             'name': user_data['name'],
             'role': user_data['role'],
+            'email_verified': bool(user_dict.get('email_verified', False)),
             'onboarding_completed': user_dict.get('onboarding_completed', False),
             'onboarding_step': user_dict.get('onboarding_step', 1),
             'last_login': datetime.now().isoformat()
@@ -120,6 +129,47 @@ def api_signup():
     for field in required_fields:
         if field not in data or not data[field]:
             return create_error_response(f"{field} is required", 400, 'MISSING_FIELD')
+
+    # Soft validation by default: we run helper validators, but do not block signup.
+    # Turn on strict mode to enforce these validations by setting:
+    #   FIKIRI_SIGNUP_STRICT_VALIDATION=1
+    signup_strict = os.getenv("FIKIRI_SIGNUP_STRICT_VALIDATION") == "1"
+    # When enabled, invalid email domains that do not publish MX records will block signup.
+    signup_strict_email_provider = os.getenv("FIKIRI_SIGNUP_STRICT_EMAIL_PROVIDER") == "1"
+    validation_warnings = []
+
+    # Email validation (format only)
+    email_raw = str(data.get("email", "")).strip()
+    # Typical SaaS onboarding criteria: enforce max length to avoid pathological inputs.
+    email_is_valid = len(email_raw) <= 255 and validate_email(email_raw)
+    if not email_is_valid:
+        validation_warnings.append({
+            "code": "INVALID_EMAIL",
+            "field": "email",
+            "message": "Invalid email format"
+        })
+
+    # Email provider legitimacy heuristic (DNS MX lookup).
+    # Soft by default: warning only. Strict mode can block signups.
+    if email_is_valid and "@" in email_raw:
+        domain = email_raw.split("@", 1)[1].strip()
+        mx_result = check_email_domain_has_mx(domain)
+        if mx_result.get("has_mx") is False:
+            validation_warnings.append({
+                "code": "SUSPICIOUS_EMAIL_DOMAIN",
+                "field": "email",
+                "message": "Email domain does not appear to receive email (no MX records).",
+            })
+
+    if (signup_strict or signup_strict_email_provider) and validation_warnings:
+        # Return the first failing validation (deterministic ordering).
+        first = validation_warnings[0]
+        return create_error_response(
+            first["message"],
+            400,
+            first["code"],
+            field=first.get("field"),
+        )
 
     try:
         user_result = user_auth_manager.create_user(
@@ -191,18 +241,34 @@ def api_signup():
         except Exception as e:
             logger.warning(f"Failed to queue welcome email: {e}")
 
+        # Verification email should be non-blocking for onboarding.
+        try:
+            user_auth_manager.request_email_verification(
+                user_id=user_data['id'],
+                email=user_data['email'],
+                name=user_data['name'],
+            )
+        except Exception as e:
+            logger.warning(f"Failed to queue verification email: {e}")
+
         response_data = {
             'user': {
                 'id': user_data['id'],
                 'email': user_data['email'],
                 'name': user_data['name'],
                 'role': user_data['role'],
+                'email_verified': bool(user_dict.get('email_verified', False)),
                 'onboarding_completed': False,
                 'onboarding_step': 1
             },
             'tokens': tokens,
             'session_id': session_id
         }
+        if validation_warnings:
+            # Include warnings for easier frontend UX; non-blocking by default.
+            response_data['validation_warnings'] = [
+                {k: v for k, v in w.items() if k != "errors"} for w in validation_warnings
+            ]
 
         response, status_code = create_success_response(response_data, "Account created successfully")
         
@@ -227,6 +293,97 @@ def api_signup():
         import traceback
         logger.error(f"Signup traceback: {traceback.format_exc()}")
         return create_error_response("Registration failed. Please try again.", 500, "SIGNUP_ERROR")
+
+@auth_bp.route('/verify-email', methods=['GET', 'POST'])
+@handle_api_errors
+@rate_limit('email_verification_attempts', lambda *args, **kwargs: request.remote_addr)
+def api_verify_email():
+    """Verify a user's email address using a token sent via email."""
+    token = None
+    if request.method == 'GET':
+        token = request.args.get('token', '')
+    else:
+        body = request.get_json(silent=True) or {}
+        token = body.get('token', '')
+
+    token = str(token).strip() if token else ''
+    if not token:
+        return create_error_response("Verification token is required", 400, 'MISSING_TOKEN')
+
+    result = user_auth_manager.verify_email_token(token)
+    if result.get('success'):
+        try:
+            log_security_event(
+                event_type="email_verification_completed",
+                severity="info",
+                details={"user_id": (result.get('user') or {}).get('id')}
+            )
+        except Exception as e:
+            logger.warning(f"Security logging failed for email verification: {e}")
+
+        return create_success_response(result.get('user'), "Email verified successfully")
+
+    return create_error_response(
+        result.get('error', 'Email verification failed'),
+        400,
+        result.get('error_code', 'INVALID_TOKEN')
+    )
+
+@auth_bp.route('/resend-email-verification', methods=['POST'])
+@handle_api_errors
+@jwt_required
+@rate_limit('email_verification_attempts', lambda *args, **kwargs: request.remote_addr)
+def api_resend_email_verification():
+    """Resend the email verification message (rate-limited, authenticated)."""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+        user_id = current_user.get('user_id')
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+        user_rows = db_optimizer.execute_query(
+            "SELECT id, email, name, email_verified FROM users WHERE id = ? AND is_active = 1",
+            (user_id,)
+        )
+        if not user_rows:
+            return create_error_response("User not found", 404, 'USER_NOT_FOUND')
+
+        user_row = user_rows[0]
+        user_row_dict = dict(user_row) if not hasattr(user_row, 'get') else user_row
+        email_verified = bool(user_row_dict.get('email_verified', False))
+        user_email = user_row_dict.get('email')
+        user_name = user_row_dict.get('name')
+
+        if email_verified:
+            return create_success_response(
+                {'message': 'Email already verified'},
+                'No verification needed'
+            )
+
+        result = user_auth_manager.request_email_verification(
+            user_id=int(user_id),
+            email=str(user_email or ''),
+            name=user_name,
+        )
+
+        if result.get('success'):
+            return create_success_response(
+                {'message': result.get('message', 'Verification email queued')},
+                'Verification email queued'
+            )
+
+        return create_error_response(
+            result.get('error', 'Failed to queue verification email'),
+            400,
+            result.get('error_code', 'EMAIL_VERIFICATION_ERROR')
+        )
+
+    except Exception as e:
+        logger.error(f"Resend email verification error: {e}")
+        return create_error_response("Failed to resend verification email", 500, 'EMAIL_VERIFICATION_RESEND_ERROR')
 
 @auth_bp.route('/forgot-password', methods=['POST'])
 @handle_api_errors  
@@ -397,7 +554,7 @@ def reset_rate_limit():
         
         return create_success_response("Rate limit reset successfully", {
             'ip_address': ip_address,
-            'reset_time': datetime.utcnow().isoformat()
+            'reset_time': datetime.now(timezone.utc).isoformat()
         })
         
     except Exception as e:
@@ -409,15 +566,9 @@ def reset_rate_limit():
 def api_gmail_status():
     """Get Gmail connection status for a user"""
     try:
-        # Try to get user_id from session/JWT first
-        from core.secure_sessions import get_current_user_id
-        user_id = get_current_user_id()
-        
-        # Fallback: allow user_id from query parameter for development/testing
+        user_id = resolve_request_user_id(request, allow_query=True)
         if not user_id:
-            user_id = request.args.get('user_id', type=int)
-            if not user_id:
-                return create_error_response("User ID is required", 400, 'MISSING_USER_ID')
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
         
         # Check Gmail token status - check gmail_tokens table (where tokens are actually stored)
         try:
@@ -533,18 +684,9 @@ def api_gmail_status():
 def api_outlook_status():
     """Get Outlook connection status for a user"""
     try:
-        from core.secure_sessions import get_current_user_id
-        user_id = get_current_user_id()
-        
-        # Fallback: allow user_id from query parameter for development/testing
+        user_id = resolve_request_user_id(request, allow_query=True)
         if not user_id:
-            user_id = request.args.get('user_id', type=int)
-            if not user_id:
-                return create_success_response({
-                    'connected': False,
-                    'status': 'not_connected',
-                    'error': 'User ID required'
-                }, 'Outlook connection status retrieved')
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
         
         # Check outlook_tokens table
         try:
@@ -853,7 +995,7 @@ def api_logout():
             response.headers.add('Access-Control-Allow-Credentials', 'true')
         return response, 500
 
-@auth_bp.route('/whoami', methods=['GET'])
+@auth_bp.route('/whoami', methods=['GET', 'POST'])
 @handle_api_errors
 def api_whoami():
     """Debug endpoint to check authentication state"""
@@ -887,7 +1029,7 @@ def api_whoami():
         if user_id:
             from core.database_optimization import db_optimizer
             users = db_optimizer.execute_query(
-                "SELECT id, email, name, role, onboarding_completed, onboarding_step FROM users WHERE id = ?",
+                "SELECT id, email, name, role, email_verified, onboarding_completed, onboarding_step FROM users WHERE id = ?",
                 (user_id,)
             )
             if users:

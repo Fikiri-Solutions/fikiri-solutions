@@ -14,6 +14,7 @@ from core.minimal_config import get_config
 # from core.gmail_oauth import gmail_oauth_manager
 gmail_oauth_manager = None
 from core.database_optimization import db_optimizer
+from email_automation.email_event_log import record_email_event
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,14 @@ class EmailActionHandler:
             if response.status_code == 200:
                 # Log the action
                 self._log_email_action(user_id, email_id, 'archive', {})
-                
+                record_email_event(
+                    user_id,
+                    "email.archived",
+                    provider="gmail",
+                    message_id=email_id,
+                    status="applied",
+                    source="email_action_handlers",
+                )
                 logger.info(f"✅ Email archived: {email_id}")
                 return {"success": True, "message": "Email archived successfully"}
             else:
@@ -148,7 +156,15 @@ Subject: {subject}
                     'to_email': to_email,
                     'message': message
                 })
-                
+                record_email_event(
+                    user_id,
+                    "email.forwarded",
+                    provider="gmail",
+                    message_id=email_id,
+                    payload={"to_email": to_email},
+                    status="applied",
+                    source="email_action_handlers",
+                )
                 logger.info(f"✅ Email forwarded: {email_id} to {to_email}")
                 return {"success": True, "message": "Email forwarded successfully"}
             else:
@@ -203,7 +219,15 @@ Subject: {subject}
             if response.status_code == 200:
                 # Log the action
                 self._log_email_action(user_id, email_id, 'tag', {'tags': tags})
-                
+                record_email_event(
+                    user_id,
+                    "email.labeled",
+                    provider="gmail",
+                    message_id=email_id,
+                    payload={"tags": tags},
+                    status="applied",
+                    source="email_action_handlers",
+                )
                 logger.info(f"✅ Email tagged: {email_id} with {tags}")
                 return {"success": True, "message": f"Email tagged with: {', '.join(tags)}"}
             else:
@@ -278,7 +302,24 @@ Subject: {subject}
                     'ai_response': ai_response,
                     'to_email': from_email
                 })
-                
+                record_email_event(
+                    user_id,
+                    "email.ai_draft_generated",
+                    provider="gmail",
+                    message_id=email_id,
+                    payload={"chars": len(ai_response or ""), "stage": "before_send_api"},
+                    status="applied",
+                    source="email_action_handlers",
+                )
+                record_email_event(
+                    user_id,
+                    "email.reply_sent",
+                    provider="gmail",
+                    message_id=email_id,
+                    payload={"to_email": from_email, "channel": "ai_response"},
+                    status="applied",
+                    source="email_action_handlers",
+                )
                 logger.info(f"✅ AI response sent: {email_id}")
                 return {"success": True, "message": "AI response sent successfully"}
             else:

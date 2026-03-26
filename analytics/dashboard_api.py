@@ -18,8 +18,33 @@ from core.billing_manager import FikiriBillingManager
 logger = logging.getLogger(__name__)
 billing_manager = FikiriBillingManager()
 
+# Align dashboard lead counts with CRM active list (withdrawn leads retained in DB)
+_LEADS_ACTIVE_FILTER = " AND (withdrawn_at IS NULL)"
+
 # Create Blueprint
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api/dashboard')
+
+
+@dashboard_bp.route('', methods=['GET'])
+@handle_api_errors
+def get_dashboard_index():
+    """Stable entrypoint for clients that probe GET /api/dashboard (sub-routes live under this prefix)."""
+    user_id = get_current_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+    return create_success_response(
+        {
+            "endpoints": {
+                "metrics": "/api/dashboard/metrics",
+                "activity": "/api/dashboard/activity",
+                "timeseries": "/api/dashboard/timeseries",
+                "services": "/api/dashboard/services",
+            },
+            "user_id": user_id,
+        },
+        "Dashboard API",
+    )
+
 
 INDUSTRY_PROMPTS: Dict[str, Dict[str, Any]] = {
     "real_estate": {
@@ -156,7 +181,7 @@ def debug_dashboard():
         # Test leads query
         try:
             leads_data = db_optimizer.execute_query(
-                "SELECT COUNT(*) as count FROM leads WHERE user_id = ?",
+                "SELECT COUNT(*) as count FROM leads WHERE user_id = ?" + _LEADS_ACTIVE_FILTER,
                 (user_id,)
             )
             debug_info['queries_tested'].append({
@@ -261,7 +286,7 @@ def get_dashboard_metrics():
         # Try to get leads count
         try:
             leads_data = db_optimizer.execute_query(
-                "SELECT COUNT(*) as count FROM leads WHERE user_id = ?",
+                "SELECT COUNT(*) as count FROM leads WHERE user_id = ?" + _LEADS_ACTIVE_FILTER,
                 (user_id,)
             )
             if leads_data and len(leads_data) > 0:
@@ -277,7 +302,9 @@ def get_dashboard_metrics():
         # Try to get recent leads
         try:
             recent_leads_data = db_optimizer.execute_query(
-                "SELECT COUNT(*) as count FROM leads WHERE user_id = ? AND created_at >= datetime('now', '-7 days')",
+                "SELECT COUNT(*) as count FROM leads WHERE user_id = ?"
+                + _LEADS_ACTIVE_FILTER
+                + " AND datetime(created_at) >= datetime('now', '-7 days')",
                 (user_id,)
             )
             if recent_leads_data and len(recent_leads_data) > 0:
@@ -610,7 +637,7 @@ def get_dashboard_timeseries():
             """
             SELECT DATE(created_at) AS day, COUNT(*) AS value
             FROM leads
-            WHERE user_id = ? AND DATE(created_at) >= ?
+            WHERE user_id = ? AND DATE(created_at) >= ? AND (withdrawn_at IS NULL)
             GROUP BY DATE(created_at)
             """,
             (user_id, start_date.isoformat())
@@ -678,11 +705,13 @@ def get_dashboard_timeseries():
         range_params_previous = (user_id, previous_start.isoformat(), previous_end.isoformat())
 
         current_leads = _range_total(
-            "SELECT COUNT(*) AS value FROM leads WHERE user_id = ? AND DATE(created_at) BETWEEN ? AND ?",
+            "SELECT COUNT(*) AS value FROM leads WHERE user_id = ? AND DATE(created_at) BETWEEN ? AND ?"
+            + _LEADS_ACTIVE_FILTER,
             range_params_current
         )
         previous_leads = _range_total(
-            "SELECT COUNT(*) AS value FROM leads WHERE user_id = ? AND DATE(created_at) BETWEEN ? AND ?",
+            "SELECT COUNT(*) AS value FROM leads WHERE user_id = ? AND DATE(created_at) BETWEEN ? AND ?"
+            + _LEADS_ACTIVE_FILTER,
             range_params_previous
         )
         current_emails = _range_total(

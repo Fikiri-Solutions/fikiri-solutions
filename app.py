@@ -4,8 +4,10 @@ Fikiri Solutions - Production-Ready Flask Application
 Enterprise-grade modular architecture with comprehensive monitoring
 """
 
+import json
 import os
 import time
+import uuid
 import logging
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify
@@ -58,7 +60,7 @@ from core.secure_sessions import secure_session_manager, init_secure_sessions
 from core.idempotency_manager import idempotency_manager
 from core.rate_limiter import enhanced_rate_limiter
 from core.redis_sessions import init_flask_sessions
-from core.security import init_security
+from core.security import init_security, resolve_flask_limiter_storage_uri
 
 # Optional Flask-Limiter for health check exemptions (single instance, init_app in setup_routes)
 try:
@@ -67,6 +69,7 @@ try:
     LIMITER_AVAILABLE = True
     _app_limiter = Limiter(
         key_func=get_remote_address,
+        storage_uri=resolve_flask_limiter_storage_uri(),
         default_limits=[
             os.getenv("APP_RATE_LIMIT_PER_HOUR", "1000 per hour"),
             os.getenv("APP_RATE_LIMIT_PER_MINUTE", "100 per minute"),
@@ -175,7 +178,7 @@ def create_app():
     CORS(app, 
          resources={r"/api/*": {"origins": get_cors_origins()}},
          methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
-         allow_headers=['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRFToken', 'Accept', 'Cache-Control', 'Pragma', 'x-cache-version', 'x-deployment-timestamp', 'expires'],
+         allow_headers=['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRFToken', 'Accept', 'Cache-Control', 'Pragma', 'x-cache-version', 'x-deployment-timestamp', 'expires', 'x-correlation-id'],
          supports_credentials=True,
          max_age=3600,
          vary_header=True,
@@ -198,7 +201,7 @@ def create_app():
                     origin.startswith('http://172.')):
                     response = jsonify({})
                     response.headers.add("Access-Control-Allow-Origin", origin)
-                    response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Requested-With,X-CSRFToken,Accept,Cache-Control,Pragma,x-cache-version,x-deployment-timestamp,expires")
+                    response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Requested-With,X-CSRFToken,Accept,Cache-Control,Pragma,x-cache-version,x-deployment-timestamp,expires,x-correlation-id")
                     response.headers.add("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS,PATCH,HEAD")
                     response.headers.add("Access-Control-Allow-Credentials", "true")
                     response.headers.add("Access-Control-Max-Age", "3600")
@@ -315,9 +318,8 @@ def initialize_services(app):
         services['feature_flags'] = get_feature_flags()
         services['email_manager'] = EmailServiceManager()
 
-        # ✅ Security / session layers
-        jwt_manager = get_jwt_manager()
-        jwt_manager._initialize_tables()
+        # ✅ Security / session layers (get_jwt_manager() builds tables in JWTAuthManager.__init__)
+        get_jwt_manager()
         init_flask_sessions(app)
         if callable(init_secure_sessions):
             init_secure_sessions(app)
@@ -462,7 +464,13 @@ def setup_routes(app):
                 redis_status = 'disconnected'
         except Exception:
             redis_status = 'disconnected'
-        overall = 'ok' if db_status == 'connected' else 'degraded'
+        # Public contract: healthy | degraded | unhealthy (uptime monitors expect these)
+        if db_status != 'connected':
+            overall = 'unhealthy'
+        elif redis_status != 'connected':
+            overall = 'degraded'
+        else:
+            overall = 'healthy'
         return jsonify({
             'status': overall,
             'database': db_status,
@@ -473,6 +481,49 @@ def setup_routes(app):
             'service': 'fikiri-backend',
             'environment': os.getenv('FLASK_ENV', 'production')
         })
+
+    @app.route('/api/errors', methods=['POST'])
+    def ingest_client_error():
+        """
+        React ErrorBoundary client error reports (JSON). No auth; bounded payload; logs only.
+        """
+        max_bytes = 64 * 1024
+        cl = request.content_length
+        if cl is not None and cl > max_bytes:
+            return jsonify({'ok': True}), 202
+        raw = request.get_data(cache=True, as_text=True) or ''
+        if len(raw.encode('utf-8', errors='replace')) > max_bytes:
+            return jsonify({'ok': True}), 202
+        try:
+            payload = json.loads(raw) if raw.strip() else {}
+        except (json.JSONDecodeError, TypeError):
+            return jsonify({'ok': True}), 202
+        if not isinstance(payload, dict):
+            return jsonify({'ok': True}), 202
+
+        msg = str(payload.get('message') or '')[:500]
+        url = str(payload.get('url') or '')[:500]
+        ts = str(payload.get('timestamp') or '')[:80]
+        uid = str(payload.get('userId') or '')[:64]
+        stack = str(payload.get('stack') or '')[:4000]
+        comp = str(payload.get('componentStack') or '')[:4000]
+        ua = str(payload.get('userAgent') or '')[:300]
+
+        logger.warning(
+            "frontend_client_error | ts=%s url=%s user_ref=%s msg=%s",
+            ts,
+            url,
+            uid,
+            msg,
+        )
+        if stack or comp:
+            logger.debug(
+                "frontend_client_error stacks | stack=%s | componentStack=%s | ua=%s",
+                stack[:2000],
+                comp[:2000],
+                ua,
+            )
+        return jsonify({'ok': True}), 200
     
     # Single limiter attached to app so exemptions apply
     if LIMITER_AVAILABLE and _app_limiter is not None:
@@ -480,6 +531,7 @@ def setup_routes(app):
             _app_limiter.init_app(app)
             _app_limiter.exempt(health_summary)
             _app_limiter.exempt(api_health_check)
+            _app_limiter.exempt(ingest_client_error)
         except Exception as e:
             logger.warning(f"⚠️ Failed to exempt health check routes from rate limiting: {e}")
 
@@ -688,10 +740,19 @@ if os.getenv('FLASK_ENV') == 'development':
                 from core.ai.llm_router import LLMRouter
                 router = LLMRouter()
                 if router and router.client and router.client.is_enabled():
+                    hdr_cid = request.headers.get("X-Correlation-ID")
+                    correlation_id = (
+                        str(hdr_cid).strip() if hdr_cid and str(hdr_cid).strip() else str(uuid.uuid4())
+                    )
                     llm_result = router.process(
                         input_data=message,
                         intent='general',
-                        context={'channel': 'ai_response_direct'}
+                        context={
+                            'channel': 'ai_response_direct',
+                            'source': 'ai_response_direct',
+                            'user_id': user_id,
+                            'correlation_id': correlation_id,
+                        },
                     )
                     if llm_result.get('success'):
                         ai_budget_guardrails.record_ai_usage(user_id, 1)
@@ -732,7 +793,16 @@ if __name__ == '__main__':
 
     if app.socketio:
         logger.info(f"🚀 Starting Flask server with SocketIO on port {port}")
-        app.socketio.run(app, host='0.0.0.0', port=port, debug=debug, use_reloader=False)
+        # Flask-SocketIO 5.6+ refuses to run Werkzeug in non-TTY environments unless
+        # we explicitly allow it. Safe to allow only in development.
+        app.socketio.run(
+            app,
+            host='0.0.0.0',
+            port=port,
+            debug=debug,
+            use_reloader=False,
+            allow_unsafe_werkzeug=debug,
+        )
     else:
         logger.info(f"🚀 Starting Flask server on port {port}")
         app.run(host='0.0.0.0', port=port, debug=debug, threaded=True, use_reloader=False)

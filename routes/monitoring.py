@@ -15,6 +15,7 @@ from core.api_validation import handle_api_errors, create_success_response, crea
 from core.secure_sessions import get_current_user_id
 from core.database_optimization import db_optimizer
 from core.oauth_token_manager import oauth_token_manager
+from core.request_user_id import resolve_request_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -170,14 +171,9 @@ def gmail_status():
 def email_sync_status():
     """Get email synchronization status"""
     try:
-        # Try to get user_id from session/JWT first
-        user_id = get_current_user_id()
-        
-        # Fallback: allow user_id from query parameter for development/testing
+        user_id = resolve_request_user_id(request, allow_query=True)
         if not user_id:
-            user_id = request.args.get('user_id', type=int)
-            if not user_id:
-                return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
 
         # First, check if Gmail is connected - check gmail_tokens table (where tokens are actually stored)
         gmail_connected = False
@@ -383,7 +379,7 @@ def email_sync_status():
                                 recent_sync_check = db_optimizer.execute_query("""
                                     SELECT COUNT(*) as count 
                                     FROM synced_emails 
-                                    WHERE user_id = ? AND created_at > datetime('now', '-5 minutes')
+                                    WHERE user_id = ? AND datetime(created_at) > datetime('now', '-5 minutes')
                                 """, (user_id,))
                                 if recent_sync_check and len(recent_sync_check) > 0:
                                     recent_count = recent_sync_check[0].get('count', 0) if isinstance(recent_sync_check[0], dict) else recent_sync_check[0][0] if len(recent_sync_check[0]) > 0 else 0
