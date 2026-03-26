@@ -10,8 +10,10 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify
 
 from core.api_validation import handle_api_errors, create_success_response, create_error_response
+from core.request_correlation import get_or_create_correlation_id
 from core.ai.llm_router import LLMRouter
 from core.ai_budget_guardrails import ai_budget_guardrails
+from core.tier_usage_caps import check_tier_usage_cap
 from core.secure_sessions import get_current_user_id
 from core.jwt_auth import jwt_required, get_current_user
 
@@ -129,12 +131,15 @@ def ai_chat():
         data = request.get_json()
         if not data:
             return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
-        
+
+        correlation_id = get_or_create_correlation_id(request, data)
         message = data.get('message', '')
         context = data.get('context', {})
         
         if not message:
-            return create_error_response("Message is required", 400, 'MISSING_MESSAGE')
+            return create_error_response(
+                "Message is required", 400, 'MISSING_MESSAGE', correlation_id=correlation_id
+            )
         
         # Try to get user_id from JWT token first, then fall back to request body
         user_id = None
@@ -157,12 +162,25 @@ def ai_chat():
         if not user_id:
             user_id = data.get('user_id')
             if not user_id:
-                return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+                return create_error_response(
+                    "Authentication required",
+                    401,
+                    'AUTHENTICATION_REQUIRED',
+                    correlation_id=correlation_id,
+                )
         
         # Try real LLM first; fall back to contextual response on failure
         try:
             router = _get_llm_router()
             if router and router.client and router.client.is_enabled():
+                allowed, msg, code = check_tier_usage_cap(user_id, "ai_responses", projected_increment=1)
+                if not allowed:
+                    return create_error_response(
+                        msg,
+                        402,
+                        code,
+                        correlation_id=correlation_id,
+                    )
                 budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
                 if not budget_decision.allowed:
                     return create_error_response(
@@ -170,7 +188,8 @@ def ai_chat():
                         if budget_decision.reason == "monthly_budget_cap_reached"
                         else "AI monthly budget approval required.",
                         402,
-                        "AI_BUDGET_SOFT_STOP"
+                        "AI_BUDGET_SOFT_STOP",
+                        correlation_id=correlation_id,
                     )
                 llm_result = router.process(
                     input_data=message,
@@ -178,6 +197,8 @@ def ai_chat():
                     context={
                         'user_id': user_id,
                         'channel': 'ai_chat',
+                        'source': 'ai_chat',
+                        'correlation_id': correlation_id,
                         'suggested_actions': _get_suggested_actions(message),
                     }
                 )
@@ -188,9 +209,14 @@ def ai_chat():
                         'service_queries': [],
                         'suggested_actions': _get_suggested_actions(message),
                         'confidence': 0.75,
-                        'success': True
+                        'success': True,
+                        'correlation_id': llm_result.get('correlation_id') or correlation_id,
                     }
-                    return create_success_response(response_data, "AI response generated")
+                    return create_success_response(
+                        response_data,
+                        "AI response generated",
+                        correlation_id=llm_result.get('correlation_id') or correlation_id,
+                    )
                 logger.warning("LLM router failed, falling back: %s", llm_result.get('error'))
         except Exception as llm_error:
             logger.error("LLM chat failed, falling back: %s", llm_error)
@@ -203,9 +229,12 @@ def ai_chat():
                 'service_queries': [],
                 'suggested_actions': _get_suggested_actions(message),
                 'confidence': 0.6,
-                'success': True
+                'success': True,
+                'correlation_id': correlation_id,
             }
-            return create_success_response(response_data, "AI response generated")
+            return create_success_response(
+                response_data, "AI response generated", correlation_id=correlation_id
+            )
         except Exception as fallback_error:
             logger.error(f"Response generation failed: {fallback_error}")
             response_data = {
@@ -213,9 +242,14 @@ def ai_chat():
                 'service_queries': [],
                 'suggested_actions': _get_suggested_actions(message),
                 'confidence': 0.4,
-                'success': True
+                'success': True,
+                'correlation_id': correlation_id,
             }
-            return create_success_response(response_data, "AI response generated (simple fallback)")
+            return create_success_response(
+                response_data,
+                "AI response generated (simple fallback)",
+                correlation_id=correlation_id,
+            )
         
     except Exception as e:
         logger.error(f"AI chat endpoint error: {e}")

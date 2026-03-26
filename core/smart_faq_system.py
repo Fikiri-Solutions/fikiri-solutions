@@ -30,6 +30,23 @@ class FAQCategory(Enum):
     LANDSCAPING = "landscaping"
     AUTOMATION = "automation"
 
+
+_ALLOWED_FAQ_MUTATION_FIELDS = frozenset(
+    {"question", "answer", "category", "keywords", "variations", "priority"}
+)
+
+
+def _normalize_faq_category(category: Any) -> FAQCategory:
+    if isinstance(category, FAQCategory):
+        return category
+    if isinstance(category, str):
+        try:
+            return FAQCategory(category)
+        except ValueError:
+            return FAQCategory.GENERAL
+    return FAQCategory.GENERAL
+
+
 class MatchConfidence(Enum):
     """FAQ match confidence levels"""
     EXACT = "exact"           # 95-100%
@@ -53,6 +70,7 @@ class FAQEntry:
     usage_count: int = 0
     helpful_votes: int = 0
     unhelpful_votes: int = 0
+    user_id: Optional[int] = None  # None = visible to all users/tenants
 
 @dataclass
 class FAQMatch:
@@ -79,6 +97,7 @@ class SmartFAQSystem:
     def __init__(self):
         self.config = get_config()
         self.faq_entries = self._load_default_faqs()
+        self._hydrate_persisted_faqs()
         self.stop_words = {
             'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from',
             'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the',
@@ -384,8 +403,55 @@ class SmartFAQSystem:
             faqs[faq.id] = faq
         
         return faqs
+
+    def _hydrate_persisted_faqs(self) -> None:
+        try:
+            from core.chatbot_content_events import hydration_enabled, load_persisted_faqs
+
+            if not hydration_enabled():
+                return
+            for row in load_persisted_faqs():
+                try:
+                    cat = FAQCategory(row["category"])
+                except ValueError:
+                    cat = FAQCategory.GENERAL
+                fe = FAQEntry(
+                    id=row["faq_id"],
+                    question=row["question"],
+                    answer=row["answer"],
+                    category=cat,
+                    keywords=row["keywords"],
+                    variations=row["variations"],
+                    priority=row.get("priority") or 1,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                    user_id=row.get("user_id"),
+                )
+                self.faq_entries[fe.id] = fe
+        except Exception as exc:
+            logger.warning("FAQ hydrate skipped: %s", exc)
+
+    @staticmethod
+    def _faq_visible_for_tenant(faq: FAQEntry, user_id: Optional[int]) -> bool:
+        """Global FAQs (user_id is None) are visible to everyone. Scoped FAQs only for that tenant."""
+        if faq.user_id is None:
+            return True
+        if user_id is None:
+            return False
+        return faq.user_id == user_id
+
+    def _faq_snapshot(self, faq: FAQEntry) -> Dict[str, Any]:
+        return {
+            "question": faq.question,
+            "answer": faq.answer,
+            "category": faq.category.value,
+            "keywords": list(faq.keywords),
+            "variations": list(faq.variations),
+            "priority": faq.priority,
+            "user_id": faq.user_id,
+        }
     
-    def search_faqs(self, query: str, max_results: int = 5) -> FAQResponse:
+    def search_faqs(self, query: str, max_results: int = 5, user_id: Optional[int] = None) -> FAQResponse:
         """Search FAQs with intelligent matching"""
         start_time = datetime.now()
         
@@ -398,19 +464,19 @@ class SmartFAQSystem:
             matches = []
             
             # 1. Exact question matching
-            exact_matches = self._find_exact_matches(cleaned_query)
+            exact_matches = self._find_exact_matches(cleaned_query, user_id)
             matches.extend(exact_matches)
             
             # 2. Variation matching
-            variation_matches = self._find_variation_matches(cleaned_query)
+            variation_matches = self._find_variation_matches(cleaned_query, user_id)
             matches.extend(variation_matches)
             
             # 3. Keyword matching
-            keyword_matches = self._find_keyword_matches(query_keywords)
+            keyword_matches = self._find_keyword_matches(query_keywords, user_id)
             matches.extend(keyword_matches)
             
             # 4. Semantic matching (simplified)
-            semantic_matches = self._find_semantic_matches(cleaned_query)
+            semantic_matches = self._find_semantic_matches(cleaned_query, user_id)
             matches.extend(semantic_matches)
             
             # Remove duplicates and sort by confidence
@@ -424,7 +490,9 @@ class SmartFAQSystem:
             best_match = final_matches[0] if final_matches else None
             
             # Generate suggested questions
-            suggested_questions = self._generate_suggested_questions(query_keywords, final_matches)
+            suggested_questions = self._generate_suggested_questions(
+                query_keywords, final_matches, user_id
+            )
             
             # Generate fallback response if no good matches
             fallback_response = None
@@ -480,11 +548,13 @@ class SmartFAQSystem:
         
         return keywords
     
-    def _find_exact_matches(self, query: str) -> List[FAQMatch]:
+    def _find_exact_matches(self, query: str, user_id: Optional[int] = None) -> List[FAQMatch]:
         """Find exact question matches"""
         matches = []
         
         for faq in self.faq_entries.values():
+            if not self._faq_visible_for_tenant(faq, user_id):
+                continue
             cleaned_question = self._clean_query(faq.question)
             
             # Calculate similarity
@@ -501,11 +571,13 @@ class SmartFAQSystem:
         
         return matches
     
-    def _find_variation_matches(self, query: str) -> List[FAQMatch]:
+    def _find_variation_matches(self, query: str, user_id: Optional[int] = None) -> List[FAQMatch]:
         """Find matches in question variations"""
         matches = []
         
         for faq in self.faq_entries.values():
+            if not self._faq_visible_for_tenant(faq, user_id):
+                continue
             for variation in faq.variations:
                 cleaned_variation = self._clean_query(variation)
                 similarity = SequenceMatcher(None, query, cleaned_variation).ratio()
@@ -521,7 +593,9 @@ class SmartFAQSystem:
         
         return matches
     
-    def _find_keyword_matches(self, query_keywords: List[str]) -> List[FAQMatch]:
+    def _find_keyword_matches(
+        self, query_keywords: List[str], user_id: Optional[int] = None
+    ) -> List[FAQMatch]:
         """Find matches based on keyword overlap - optimized with inverted index"""
         matches = []
         query_set = set(query_keywords)
@@ -539,6 +613,8 @@ class SmartFAQSystem:
         # Calculate confidence for matched FAQs
         for faq_id, matched_keywords in faq_matches.items():
             faq = self.faq_entries[faq_id]
+            if not self._faq_visible_for_tenant(faq, user_id):
+                continue
             overlap = matched_keywords
             
             # Calculate confidence based on overlap ratio and FAQ priority
@@ -557,7 +633,7 @@ class SmartFAQSystem:
         
         return matches
     
-    def _find_semantic_matches(self, query: str) -> List[FAQMatch]:
+    def _find_semantic_matches(self, query: str, user_id: Optional[int] = None) -> List[FAQMatch]:
         """Find semantic matches (simplified approach)"""
         matches = []
         
@@ -581,6 +657,8 @@ class SmartFAQSystem:
                 for faq_id in faq_ids:
                     if faq_id in self.faq_entries:
                         faq = self.faq_entries[faq_id]
+                        if not self._faq_visible_for_tenant(faq, user_id):
+                            continue
                         matches.append(FAQMatch(
                             faq_entry=faq,
                             confidence=0.6,  # Medium confidence for semantic matches
@@ -602,7 +680,12 @@ class SmartFAQSystem:
         
         return list(seen_faqs.values())
     
-    def _generate_suggested_questions(self, query_keywords: List[str], matches: List[FAQMatch]) -> List[str]:
+    def _generate_suggested_questions(
+        self,
+        query_keywords: List[str],
+        matches: List[FAQMatch],
+        user_id: Optional[int] = None,
+    ) -> List[str]:
         """Generate suggested questions based on query and matches"""
         suggestions = []
         
@@ -610,8 +693,13 @@ class SmartFAQSystem:
         if matches:
             categories = set(match.faq_entry.category for match in matches)
             for category in categories:
-                category_faqs = [faq for faq in self.faq_entries.values() 
-                               if faq.category == category and faq.priority >= 4]
+                category_faqs = [
+                    faq
+                    for faq in self.faq_entries.values()
+                    if faq.category == category
+                    and faq.priority >= 4
+                    and self._faq_visible_for_tenant(faq, user_id)
+                ]
                 category_faqs.sort(key=lambda f: f.priority, reverse=True)
                 
                 for faq in category_faqs[:2]:  # Top 2 from each category
@@ -620,7 +708,11 @@ class SmartFAQSystem:
         
         # Add general popular questions if no matches
         if not suggestions:
-            popular_faqs = [faq for faq in self.faq_entries.values() if faq.priority >= 4]
+            popular_faqs = [
+                faq
+                for faq in self.faq_entries.values()
+                if faq.priority >= 4 and self._faq_visible_for_tenant(faq, user_id)
+            ]
             popular_faqs.sort(key=lambda f: f.priority, reverse=True)
             
             for faq in popular_faqs[:3]:
@@ -647,10 +739,21 @@ class SmartFAQSystem:
         
         return fallback_responses[0]  # Default fallback
     
-    def add_faq(self, question: str, answer: str, category: FAQCategory, 
-                keywords: List[str], variations: List[str] = None, priority: int = 1) -> str:
+    def add_faq(
+        self,
+        question: str,
+        answer: str,
+        category: FAQCategory,
+        keywords: List[str],
+        variations: List[str] = None,
+        priority: int = 1,
+        user_id: Optional[int] = None,
+        source: str = "smart_faq",
+        correlation_id: Optional[str] = None,
+    ) -> str:
         """Add a new FAQ entry"""
         try:
+            category = _normalize_faq_category(category)
             faq_id = str(uuid.uuid4())
             
             faq = FAQEntry(
@@ -662,11 +765,26 @@ class SmartFAQSystem:
                 variations=variations or [],
                 priority=priority,
                 created_at=datetime.now(),
-                updated_at=datetime.now()
+                updated_at=datetime.now(),
+                user_id=user_id,
             )
             
             self.faq_entries[faq_id] = faq
+            self._build_keyword_index()
             logger.info(f"✅ Added FAQ: {faq_id}")
+
+            try:
+                from core.chatbot_content_events import persist_faq_created
+
+                persist_faq_created(
+                    faq_id=faq_id,
+                    user_id=user_id,
+                    source=source,
+                    correlation_id=correlation_id,
+                    snapshot_after=self._faq_snapshot(faq),
+                )
+            except Exception as persist_exc:
+                logger.warning("FAQ persist (non-fatal): %s", persist_exc)
             
             return faq_id
             
@@ -674,21 +792,49 @@ class SmartFAQSystem:
             logger.error(f"❌ Failed to add FAQ: {e}")
             raise
     
-    def update_faq(self, faq_id: str, updates: Dict[str, Any]) -> bool:
+    def update_faq(
+        self,
+        faq_id: str,
+        updates: Dict[str, Any],
+        *,
+        user_id: Optional[int] = None,
+        source: str = "smart_faq",
+        correlation_id: Optional[str] = None,
+    ) -> bool:
         """Update an existing FAQ entry"""
         try:
             if faq_id not in self.faq_entries:
                 return False
             
             faq = self.faq_entries[faq_id]
+            before = self._faq_snapshot(faq)
             
-            # Update fields
+            # Update fields (never id, user_id, counters, or timestamps via dict)
             for field, value in updates.items():
+                if field not in _ALLOWED_FAQ_MUTATION_FIELDS:
+                    continue
+                if field == "category":
+                    value = _normalize_faq_category(value)
                 if hasattr(faq, field):
                     setattr(faq, field, value)
             
             faq.updated_at = datetime.now()
+            self._build_keyword_index()
             logger.info(f"✅ Updated FAQ: {faq_id}")
+
+            try:
+                from core.chatbot_content_events import persist_faq_updated
+
+                persist_faq_updated(
+                    faq_id=faq_id,
+                    user_id=user_id if user_id is not None else faq.user_id,
+                    source=source,
+                    correlation_id=correlation_id,
+                    snapshot_before=before,
+                    snapshot_after=self._faq_snapshot(faq),
+                )
+            except Exception as persist_exc:
+                logger.warning("FAQ update persist (non-fatal): %s", persist_exc)
             
             return True
             
@@ -696,14 +842,37 @@ class SmartFAQSystem:
             logger.error(f"❌ Failed to update FAQ: {e}")
             return False
     
-    def delete_faq(self, faq_id: str) -> bool:
+    def delete_faq(
+        self,
+        faq_id: str,
+        *,
+        user_id: Optional[int] = None,
+        source: str = "smart_faq",
+        correlation_id: Optional[str] = None,
+    ) -> bool:
         """Delete an FAQ entry"""
         try:
-            if faq_id in self.faq_entries:
-                del self.faq_entries[faq_id]
-                logger.info(f"✅ Deleted FAQ: {faq_id}")
-                return True
-            return False
+            if faq_id not in self.faq_entries:
+                return False
+            faq = self.faq_entries[faq_id]
+            before = self._faq_snapshot(faq)
+            del self.faq_entries[faq_id]
+            self._build_keyword_index()
+            logger.info(f"✅ Deleted FAQ: {faq_id}")
+
+            try:
+                from core.chatbot_content_events import persist_faq_deleted
+
+                persist_faq_deleted(
+                    faq_id=faq_id,
+                    user_id=user_id if user_id is not None else faq.user_id,
+                    source=source,
+                    correlation_id=correlation_id,
+                    snapshot_before=before,
+                )
+            except Exception as persist_exc:
+                logger.warning("FAQ delete persist (non-fatal): %s", persist_exc)
+            return True
             
         except Exception as e:
             logger.error(f"❌ Failed to delete FAQ: {e}")

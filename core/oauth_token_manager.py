@@ -430,7 +430,7 @@ class OAuthTokenManager:
                 """
                 SELECT COUNT(*) FROM oauth_refresh_failures 
                 WHERE user_id = ? AND service = ? 
-                AND created_at > datetime('now', '-15 minutes')
+                AND datetime(created_at) > datetime('now', '-15 minutes')
                 """,
                 (user_id, service)
             )
@@ -551,7 +551,7 @@ class OAuthTokenManager:
                 """
                 SELECT COUNT(*) as failure_count FROM oauth_refresh_failures 
                 WHERE user_id = ? AND service = ? 
-                AND created_at > datetime('now', '-1 hour')
+                AND datetime(created_at) > datetime('now', '-1 hour')
                 """,
                 (user_id, service)
             )

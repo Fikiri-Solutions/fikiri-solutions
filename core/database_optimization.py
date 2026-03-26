@@ -237,6 +237,50 @@ class DatabaseOptimizer:
             if 'subject' not in lead_columns:
                 cursor.execute("ALTER TABLE leads ADD COLUMN subject TEXT")
                 logger.info("✅ Added subject column to leads table")
+            if 'withdrawn_at' not in lead_columns:
+                cursor.execute("ALTER TABLE leads ADD COLUMN withdrawn_at TIMESTAMP")
+                logger.info("✅ Added withdrawn_at column to leads table")
+
+            cursor.execute("PRAGMA table_info(crm_events)")
+            crm_event_columns = [row[1] for row in cursor.fetchall()]
+            if crm_event_columns:
+                if "user_id" not in crm_event_columns:
+                    cursor.execute("ALTER TABLE crm_events ADD COLUMN user_id INTEGER")
+                    if "tenant_user_id" in crm_event_columns:
+                        cursor.execute(
+                            "UPDATE crm_events SET user_id = tenant_user_id "
+                            "WHERE user_id IS NULL"
+                        )
+                    logger.info("✅ Added user_id column to crm_events")
+                if "status" not in crm_event_columns:
+                    cursor.execute("ALTER TABLE crm_events ADD COLUMN status TEXT")
+                    logger.info("✅ Added status column to crm_events")
+                if "error_message" not in crm_event_columns:
+                    cursor.execute("ALTER TABLE crm_events ADD COLUMN error_message TEXT")
+                    logger.info("✅ Added error_message column to crm_events")
+                if "source" not in crm_event_columns:
+                    cursor.execute("ALTER TABLE crm_events ADD COLUMN source TEXT")
+                    logger.info("✅ Added source column to crm_events")
+                if "created_at" not in crm_event_columns:
+                    cursor.execute(
+                        "ALTER TABLE crm_events ADD COLUMN created_at TIMESTAMP"
+                    )
+                    if "occurred_at" in crm_event_columns:
+                        cursor.execute(
+                            "UPDATE crm_events SET created_at = occurred_at "
+                            "WHERE created_at IS NULL"
+                        )
+                    else:
+                        cursor.execute(
+                            "UPDATE crm_events SET created_at = CURRENT_TIMESTAMP "
+                            "WHERE created_at IS NULL"
+                        )
+                    logger.info("✅ Added created_at column to crm_events")
+                if "occurred_at" in crm_event_columns:
+                    cursor.execute(
+                        "UPDATE crm_events SET created_at = occurred_at "
+                        "WHERE created_at IS NULL AND occurred_at IS NOT NULL"
+                    )
 
             # Chatbot query log: confidence breakdown for eval
             cursor.execute("PRAGMA table_info(chatbot_query_log)")
@@ -244,6 +288,15 @@ class DatabaseOptimizer:
             if qlog_columns and 'metadata' not in qlog_columns:
                 cursor.execute("ALTER TABLE chatbot_query_log ADD COLUMN metadata TEXT")
                 logger.info("✅ Added metadata column to chatbot_query_log")
+            if qlog_columns and 'correlation_id' not in qlog_columns:
+                cursor.execute("ALTER TABLE chatbot_query_log ADD COLUMN correlation_id TEXT")
+                logger.info("✅ Added correlation_id column to chatbot_query_log")
+            if qlog_columns and 'content_fingerprint' not in qlog_columns:
+                cursor.execute("ALTER TABLE chatbot_query_log ADD COLUMN content_fingerprint TEXT")
+                logger.info("✅ Added content_fingerprint column to chatbot_query_log")
+
+            # Chatbot tables: canonical user_id (drop legacy tenant_user_id)
+            self._migrate_chatbot_tables_user_id(cursor)
 
             # Conversation feedback: store confidence etc. with feedback
             cursor.execute("PRAGMA table_info(conversation_feedback)")
@@ -264,6 +317,101 @@ class DatabaseOptimizer:
                     logger.info("✅ Added is_read column to synced_emails table")
         except Exception as e:
             logger.warning(f"Migration warning: {e}")
+
+    def _migrate_chatbot_tables_user_id(self, cursor) -> None:
+        """Align chatbot_* tables with canonical user_id; remove tenant_user_id."""
+        cursor.execute("PRAGMA table_info(chatbot_content_events)")
+        ev_cols = [row[1] for row in cursor.fetchall()]
+        if ev_cols:
+            if "tenant_user_id" in ev_cols:
+                cursor.execute("DROP INDEX IF EXISTS idx_chatbot_content_events_tenant_time")
+                if "user_id" not in ev_cols:
+                    cursor.execute(
+                        "ALTER TABLE chatbot_content_events ADD COLUMN user_id INTEGER"
+                    )
+                    cursor.execute(
+                        "UPDATE chatbot_content_events SET user_id = tenant_user_id"
+                    )
+                    logger.info("✅ Added user_id to chatbot_content_events (backfilled)")
+                else:
+                    cursor.execute(
+                        "UPDATE chatbot_content_events SET user_id = COALESCE("
+                        "user_id, tenant_user_id)"
+                    )
+                try:
+                    cursor.execute(
+                        "ALTER TABLE chatbot_content_events DROP COLUMN tenant_user_id"
+                    )
+                    logger.info("✅ Dropped tenant_user_id from chatbot_content_events")
+                except Exception as drop_exc:  # noqa: BLE001
+                    logger.warning(
+                        "Could not DROP tenant_user_id from chatbot_content_events: %s",
+                        drop_exc,
+                    )
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_chatbot_content_events_user_time
+                ON chatbot_content_events (user_id, created_at DESC)
+                """
+            )
+
+        cursor.execute("PRAGMA table_info(chatbot_faq_current)")
+        faq_cols = [row[1] for row in cursor.fetchall()]
+        if faq_cols:
+            if "tenant_user_id" in faq_cols:
+                cursor.execute("DROP INDEX IF EXISTS idx_chatbot_faq_current_tenant")
+                if "user_id" not in faq_cols:
+                    cursor.execute("ALTER TABLE chatbot_faq_current ADD COLUMN user_id INTEGER")
+                    cursor.execute(
+                        "UPDATE chatbot_faq_current SET user_id = tenant_user_id"
+                    )
+                    logger.info("✅ Added user_id to chatbot_faq_current (backfilled)")
+                else:
+                    cursor.execute(
+                        "UPDATE chatbot_faq_current SET user_id = COALESCE("
+                        "user_id, tenant_user_id)"
+                    )
+                try:
+                    cursor.execute(
+                        "ALTER TABLE chatbot_faq_current DROP COLUMN tenant_user_id"
+                    )
+                    logger.info("✅ Dropped tenant_user_id from chatbot_faq_current")
+                except Exception as drop_exc:  # noqa: BLE001
+                    logger.warning(
+                        "Could not DROP tenant_user_id from chatbot_faq_current: %s",
+                        drop_exc,
+                    )
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_chatbot_faq_current_user
+                ON chatbot_faq_current (user_id)
+                """
+            )
+
+        cursor.execute("PRAGMA table_info(chatbot_kb_current)")
+        kb_cols = [row[1] for row in cursor.fetchall()]
+        if kb_cols and "tenant_user_id" in kb_cols:
+            if "user_id" not in kb_cols:
+                cursor.execute("ALTER TABLE chatbot_kb_current ADD COLUMN user_id INTEGER")
+                cursor.execute(
+                    "UPDATE chatbot_kb_current SET user_id = tenant_user_id"
+                )
+                logger.info("✅ Added user_id to chatbot_kb_current (backfilled)")
+            else:
+                cursor.execute(
+                    "UPDATE chatbot_kb_current SET user_id = COALESCE("
+                    "user_id, tenant_user_id)"
+                )
+            try:
+                cursor.execute(
+                    "ALTER TABLE chatbot_kb_current DROP COLUMN tenant_user_id"
+                )
+                logger.info("✅ Dropped tenant_user_id from chatbot_kb_current")
+            except Exception as drop_exc:  # noqa: BLE001
+                logger.warning(
+                    "Could not DROP tenant_user_id from chatbot_kb_current: %s",
+                    drop_exc,
+                )
     
     def _create_metrics_table(self, cursor):
         """Create table for persistent query performance metrics"""
@@ -513,6 +661,70 @@ class DatabaseOptimizer:
                 FOREIGN KEY (lead_id) REFERENCES leads (id) ON DELETE CASCADE
             )
         """)
+
+        # Append-only CRM audit / timeline (mutations also recorded from crm/service.py)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS crm_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                event_type TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id INTEGER NOT NULL,
+                correlation_id TEXT,
+                supersedes_event_id INTEGER,
+                payload_json TEXT,
+                payload_truncated INTEGER NOT NULL DEFAULT 0,
+                status TEXT,
+                error_message TEXT,
+                source TEXT,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_crm_events_tenant_entity_time
+            ON crm_events (user_id, entity_type, entity_id, created_at DESC)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_crm_events_tenant_occurred
+            ON crm_events (user_id, created_at DESC)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_crm_events_tenant_event_type
+            ON crm_events (user_id, event_type, created_at DESC)
+        """)
+
+        # Append-only AI lifecycle (LLM router + future approval/execution)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ai_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                user_id INTEGER,
+                event_type TEXT NOT NULL,
+                entity_type TEXT NOT NULL DEFAULT 'ai',
+                entity_id INTEGER,
+                correlation_id TEXT,
+                supersedes_event_id INTEGER,
+                status TEXT,
+                error_message TEXT,
+                source TEXT,
+                payload_json TEXT,
+                payload_truncated INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_ai_events_user_created
+            ON ai_events (user_id, created_at DESC)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_ai_events_correlation
+            ON ai_events (correlation_id, created_at DESC)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_ai_events_type_created
+            ON ai_events (event_type, created_at DESC)
+        """)
         
         # Email templates table
         cursor.execute("""
@@ -560,6 +772,203 @@ class DatabaseOptimizer:
                 UNIQUE(user_id)
             )
         """)
+
+        # User customization / branding (logo, colors, etc.)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_customizations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                logo_data_url TEXT,
+                accent_color TEXT,
+                company_name TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                UNIQUE(user_id)
+            )
+        """)
+
+        # Public customer submissions (contact form, etc.)
+        # Stored to DB so we can route/triage later even if email providers fail temporarily.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS customer_contact_submissions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                form_type TEXT NOT NULL DEFAULT 'contact',
+                name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                phone TEXT,
+                company TEXT,
+                subject TEXT,
+                message TEXT NOT NULL,
+                email_subject TEXT,
+                to_email TEXT,
+                from_email TEXT,
+                payload_json TEXT,          -- best-effort raw request payload (JSON-serialized)
+                payload_truncated BOOLEAN DEFAULT 0,
+                send_status TEXT NOT NULL DEFAULT 'pending',  -- pending, sent, failed
+                send_error TEXT,
+                request_ip TEXT,
+                user_agent TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_customer_contact_submissions_email
+            ON customer_contact_submissions (email)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_customer_contact_submissions_created_at
+            ON customer_contact_submissions (created_at)
+        """)
+
+        # Backfill schema for existing DBs (dev envs may already have this table)
+        cursor.execute("PRAGMA table_info(customer_contact_submissions)")
+        columns = [r['name'] for r in cursor.fetchall()]
+        if 'payload_json' not in columns:
+            cursor.execute("ALTER TABLE customer_contact_submissions ADD COLUMN payload_json TEXT")
+        if 'payload_truncated' not in columns:
+            cursor.execute("ALTER TABLE customer_contact_submissions ADD COLUMN payload_truncated BOOLEAN DEFAULT 0")
+
+        # Public intake submissions (webhook forms / lead captures)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS customer_form_intake_submissions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,              -- authenticated API key owner (if provided)
+                api_key_id TEXT,
+                form_id TEXT,
+                source TEXT,
+                email TEXT,
+                name TEXT,
+                phone TEXT,
+                company TEXT,
+                subject TEXT,
+                payload_json TEXT,
+                payload_truncated BOOLEAN DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'received', -- received, completed, deduplicated, failed, honeypot_filled, updated, cancelled
+                error TEXT,
+                lead_id TEXT,
+                client_submission_id TEXT,
+                supersedes_intake_id INTEGER,
+                request_ip TEXT,
+                user_agent TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_customer_form_intake_email
+            ON customer_form_intake_submissions (email)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_customer_form_intake_created_at
+            ON customer_form_intake_submissions (created_at)
+        """)
+
+        cursor.execute("PRAGMA table_info(customer_form_intake_submissions)")
+        _form_intake_cols = [r["name"] for r in cursor.fetchall()]
+        if "client_submission_id" not in _form_intake_cols:
+            cursor.execute(
+                "ALTER TABLE customer_form_intake_submissions ADD COLUMN client_submission_id TEXT"
+            )
+        if "supersedes_intake_id" not in _form_intake_cols:
+            cursor.execute(
+                "ALTER TABLE customer_form_intake_submissions ADD COLUMN supersedes_intake_id INTEGER"
+            )
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_customer_form_intake_user_form_client_submission
+            ON customer_form_intake_submissions (user_id, form_id, client_submission_id)
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS customer_lead_capture_intake_submissions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                api_key_id TEXT,
+                source TEXT,
+                email TEXT,
+                name TEXT,
+                phone TEXT,
+                company TEXT,
+                payload_json TEXT,
+                payload_truncated BOOLEAN DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'received', -- received, completed, deduplicated, failed
+                error TEXT,
+                lead_id TEXT,
+                request_ip TEXT,
+                user_agent TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_customer_lead_capture_email
+            ON customer_lead_capture_intake_submissions (email)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_customer_lead_capture_created_at
+            ON customer_lead_capture_intake_submissions (created_at)
+        """)
+
+        # Appointment / booking intake (authenticated flows)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS customer_appointment_intake_submissions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                source TEXT,
+                appointment_id INTEGER,
+                customer_name TEXT,
+                customer_email TEXT,
+                customer_phone TEXT,
+                service_type TEXT,
+                requested_date TEXT,
+                requested_time TEXT,
+                timezone TEXT,
+                status TEXT NOT NULL DEFAULT 'received',  -- received, completed, rescheduled, cancelled, failed, deduplicated
+                error_message TEXT,
+                payload_json TEXT,
+                payload_truncated BOOLEAN DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (appointment_id) REFERENCES appointments (id) ON DELETE SET NULL,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_customer_appointment_intake_user_id
+            ON customer_appointment_intake_submissions (user_id)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_customer_appointment_intake_appointment_id
+            ON customer_appointment_intake_submissions (appointment_id)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_customer_appointment_intake_customer_email
+            ON customer_appointment_intake_submissions (customer_email)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_customer_appointment_intake_created_at
+            ON customer_appointment_intake_submissions (created_at)
+        """)
+
+        # Backfill for existing DBs missing columns (best-effort).
+        cursor.execute("PRAGMA table_info(customer_appointment_intake_submissions)")
+        cols = [r['name'] for r in cursor.fetchall()]
+        # These columns are intentionally safe to backfill with ALTER TABLE.
+        if 'payload_truncated' not in cols:
+            cursor.execute("ALTER TABLE customer_appointment_intake_submissions ADD COLUMN payload_truncated BOOLEAN DEFAULT 0")
+        if 'payload_json' not in cols:
+            cursor.execute("ALTER TABLE customer_appointment_intake_submissions ADD COLUMN payload_json TEXT")
+        if 'updated_at' not in cols:
+            cursor.execute("ALTER TABLE customer_appointment_intake_submissions ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
         
         # Data retention logs table
         cursor.execute("""
@@ -732,7 +1141,10 @@ class DatabaseOptimizer:
                 tenant_id TEXT,
                 user_id TEXT,
                 llm_trace_id TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                metadata TEXT,
+                correlation_id TEXT,
+                content_fingerprint TEXT
             )
         """)
 
@@ -751,6 +1163,82 @@ class DatabaseOptimizer:
                 prompt_version TEXT,
                 retriever_version TEXT
             )
+        """)
+
+        # Append-only chatbot / FAQ / KB content events (audit + rollback-ready snapshots)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS chatbot_content_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                user_id INTEGER,
+                source TEXT,
+                event_type TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                correlation_id TEXT,
+                supersedes_event_id INTEGER,
+                payload_json TEXT,
+                payload_truncated INTEGER NOT NULL DEFAULT 0,
+                status TEXT DEFAULT 'applied',
+                error_message TEXT
+            )
+        """)
+        # idx_chatbot_content_events_user_time is created in _migrate_chatbot_tables_user_id
+        # so existing DBs get user_id column before indexing.
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_chatbot_content_events_entity
+            ON chatbot_content_events (entity_type, entity_id, created_at DESC)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_chatbot_content_events_correlation
+            ON chatbot_content_events (correlation_id)
+        """)
+
+        # Durable current-state rows for FAQ (serving + sync with events)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS chatbot_faq_current (
+                faq_id TEXT PRIMARY KEY,
+                user_id INTEGER,
+                question TEXT NOT NULL,
+                answer TEXT NOT NULL,
+                category TEXT NOT NULL,
+                keywords_json TEXT,
+                variations_json TEXT,
+                priority INTEGER NOT NULL DEFAULT 1,
+                content_version INTEGER NOT NULL DEFAULT 1,
+                last_event_id INTEGER,
+                vector_key TEXT,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        # idx_chatbot_faq_current_user is created in _migrate_chatbot_tables_user_id
+
+        # Durable current-state rows for knowledge documents
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS chatbot_kb_current (
+                doc_id TEXT PRIMARY KEY,
+                user_id INTEGER,
+                tenant_id TEXT,
+                title TEXT NOT NULL,
+                content TEXT NOT NULL,
+                summary TEXT,
+                document_type TEXT NOT NULL,
+                format TEXT NOT NULL DEFAULT 'markdown',
+                category TEXT,
+                tags_json TEXT,
+                keywords_json TEXT,
+                author TEXT,
+                metadata_json TEXT,
+                content_version INTEGER NOT NULL DEFAULT 1,
+                last_event_id INTEGER,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_chatbot_kb_current_tenant_id
+            ON chatbot_kb_current (tenant_id)
         """)
         
         # KPI tracking table for historical KPI data
@@ -1125,13 +1613,57 @@ class DatabaseOptimizer:
         """)
         
         cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_email_actions_success 
+            CREATE INDEX IF NOT EXISTS idx_email_actions_success
             ON email_actions_log (success)
         """)
-    
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS email_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                user_id INTEGER NOT NULL,
+                event_type TEXT NOT NULL,
+                provider TEXT,
+                message_id TEXT,
+                thread_id TEXT,
+                synced_email_id INTEGER,
+                lead_id INTEGER,
+                correlation_id TEXT,
+                supersedes_event_id INTEGER,
+                idempotency_key TEXT,
+                payload_json TEXT,
+                payload_truncated INTEGER NOT NULL DEFAULT 0,
+                status TEXT,
+                error_message TEXT,
+                source TEXT,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_email_events_user_created
+            ON email_events (user_id, created_at DESC)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_email_events_user_message
+            ON email_events (user_id, message_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_email_events_user_correlation
+            ON email_events (user_id, correlation_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_email_events_user_type_created
+            ON email_events (user_id, event_type, created_at DESC)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_email_events_lead
+            ON email_events (lead_id)
+            WHERE lead_id IS NOT NULL
+        """)
+
     def _create_indexes(self, cursor):
         """Create optimized indexes for better query performance"""
-        
+
         indexes = [
             # Users table indexes
             ("idx_users_email", "users", ["email"]),
@@ -1282,7 +1814,7 @@ class DatabaseOptimizer:
             SELECT l.*, u.name as user_name, u.email as user_email
             FROM leads l
             JOIN users u ON l.user_id = u.id
-            WHERE l.created_at >= datetime('now', '-30 days')
+            WHERE datetime(l.created_at) >= datetime('now', '-30 days')
             ORDER BY l.created_at DESC
         """)
         
@@ -1504,6 +2036,18 @@ class DatabaseOptimizer:
                                          user_id=user_id, endpoint=endpoint)
             logger.error(f"Query execution error: {e}")
             raise
+
+    def execute_insert_returning_id(self, query: str, params: Tuple = None) -> Optional[int]:
+        """Run INSERT on a single connection and return lastrowid (SQLite). Best-effort for Postgres."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            rid = getattr(cursor, "lastrowid", None)
+            conn.commit()
+            return int(rid) if rid is not None else None
     
     def _record_query_metrics(self, query: str, execution_time: float, 
                             rows_affected: int, success: bool, error: str = None,

@@ -38,6 +38,48 @@ except ImportError:
     REDIS_AVAILABLE = False
     logger.warning("Redis not available. Install with: pip install redis")
 
+
+def resolve_flask_limiter_storage_uri() -> str:
+    """
+    Storage URI for Flask-Limiter (shared with limits library).
+    Prefer Redis when REDIS_URL resolves and a client can connect; else memory://.
+    No logging — safe to call at app module import time.
+    """
+    try:
+        try:
+            from core.redis_connection_helper import _resolve_redis_url
+            redis_url = _resolve_redis_url() or os.getenv("REDIS_URL", "") or ""
+        except Exception:
+            redis_url = os.getenv("REDIS_URL", "") or ""
+        if redis_url.startswith(("redis://", "rediss://")):
+            if redis_url.startswith("rediss://") and "ssl_cert_reqs=" not in redis_url:
+                sep = "&" if "?" in redis_url else "?"
+                redis_url = f"{redis_url}{sep}ssl_cert_reqs=none"
+            try:
+                from core.redis_connection_helper import get_redis_client
+
+                if get_redis_client(decode_responses=True, db=0):
+                    return redis_url
+            except Exception:
+                pass
+        return "memory://"
+    except Exception:
+        return "memory://"
+
+
+def _security_redis_client_for_decorators():
+    """Redis client for custom rate_limit_by_* decorators (optional)."""
+    try:
+        from core.redis_connection_helper import _resolve_redis_url, get_redis_client
+
+        redis_url = _resolve_redis_url() or os.getenv("REDIS_URL", "") or ""
+        if redis_url.startswith(("redis://", "rediss://")):
+            return get_redis_client(decode_responses=True, db=0)
+    except Exception:
+        pass
+    return None
+
+
 def init_security(app: Flask):
     """Initialize security middleware and configurations"""
     
@@ -49,62 +91,39 @@ def init_security(app: Flask):
     else:
         logger.warning("⚠️ ProxyFix not available - install werkzeug for production deployments")
     
-    # Initialize shared storage for rate limiting (prefer Redis, fallback to in-memory).
-    storage_uri = 'memory://'
-    redis_client = None
-    
-    # Try to use Redis if we can configure it properly
-    # For now, we'll use in-memory storage since RedisStorage doesn't accept
-    # a pre-configured client with SSL settings
-    try:
-        try:
-            from core.redis_connection_helper import _resolve_redis_url
-            redis_url = _resolve_redis_url() or os.getenv('REDIS_URL', '') or ''
-        except Exception:
-            redis_url = os.getenv('REDIS_URL', '')
-        if redis_url and (redis_url.startswith('redis://') or redis_url.startswith('rediss://')):
-            # Flask-Limiter uses limits + redis-py. For rediss endpoints, add TLS override
-            # in URL query to match redis_connection_helper behavior.
-            if redis_url.startswith('rediss://') and 'ssl_cert_reqs=' not in redis_url:
-                sep = '&' if '?' in redis_url else '?'
-                redis_url = f"{redis_url}{sep}ssl_cert_reqs=none"
-            try:
-                from core.redis_connection_helper import get_redis_client
-                redis_client = get_redis_client(decode_responses=True, db=0)
-                if redis_client:
-                    storage_uri = redis_url
-                    logger.info("✅ Rate limiter will use Redis shared storage")
-                else:
-                    storage_uri = 'memory://'
-                    logger.warning("⚠️ Redis not available, using in-memory rate limiting")
-            except Exception as e:
-                logger.warning(f"⚠️ Redis connection test failed: {e}, using in-memory")
-                storage_uri = 'memory://'
-        else:
-            # No Redis URL configured
-            storage_uri = 'memory://'
-            logger.info("ℹ️ No Redis URL configured, using in-memory rate limiting")
-    except Exception as e:
-        logger.warning(f"⚠️ Error configuring rate limiter storage: {e}, using in-memory")
-        storage_uri = 'memory://'
-    
-    # Initialize rate limiter
+    redis_client = _security_redis_client_for_decorators()
+
+    # Flask-Limiter: reuse instance if setup_routes (app.py) already bound one with storage_uri.
+    existing_limiter = None
+    if getattr(app, "extensions", None):
+        existing_limiter = app.extensions.get("limiter")
+
+    storage_uri = resolve_flask_limiter_storage_uri()
     limiter = None
     if FLASK_AVAILABLE:
         try:
-            limiter = Limiter(
-                key_func=get_remote_address,
-                storage_uri=storage_uri,
-                default_limits=[
-                    os.getenv("APP_RATE_LIMIT_PER_HOUR", "1000 per hour"),
-                    os.getenv("APP_RATE_LIMIT_PER_MINUTE", "100 per minute"),
-                ]
-            )
-            limiter.init_app(app)
-            if storage_uri == 'memory://':
-                logger.info("✅ Rate limiter initialized (in-memory storage - limits reset on restart)")
+            if existing_limiter is not None:
+                limiter = existing_limiter
+                logger.info("ℹ️ Flask-Limiter already on app (Redis/memory from factory); reusing instance")
             else:
-                logger.info(f"✅ Rate limiter initialized with Redis: {redis_url.split('@')[-1] if '@' in redis_url else 'localhost'}")
+                if storage_uri == "memory://":
+                    logger.info("ℹ️ No Redis URL or Redis unreachable, using in-memory rate limiting")
+                else:
+                    logger.info("✅ Rate limiter will use Redis shared storage")
+                limiter = Limiter(
+                    key_func=get_remote_address,
+                    storage_uri=storage_uri,
+                    default_limits=[
+                        os.getenv("APP_RATE_LIMIT_PER_HOUR", "1000 per hour"),
+                        os.getenv("APP_RATE_LIMIT_PER_MINUTE", "100 per minute"),
+                    ],
+                )
+                limiter.init_app(app)
+                if storage_uri == "memory://":
+                    logger.info("✅ Rate limiter initialized (in-memory storage - limits reset on restart)")
+                else:
+                    host_hint = storage_uri.split("@")[-1] if "@" in storage_uri else "localhost"
+                    logger.info("✅ Rate limiter initialized with Redis: %s", host_hint)
         except Exception as e:
             logger.error(f"❌ Failed to initialize rate limiter: {e}")
             logger.warning("⚠️ Rate limiting disabled due to initialization error")
@@ -135,7 +154,7 @@ def init_security(app: Flask):
         CORS(app, 
              origins=cors_origins,
              methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-             allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
+             allow_headers=['Content-Type', 'Authorization', 'X-Requested-With', 'x-correlation-id'],
              supports_credentials=True,
              max_age=3600
         )

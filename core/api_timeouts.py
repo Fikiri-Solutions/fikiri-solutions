@@ -6,12 +6,28 @@ Helper functions to add timeouts to external API calls.
 
 import os
 import logging
+import threading
 from typing import Any, Callable
 from functools import wraps
 import signal
 from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
+
+
+def _can_use_sigalrm() -> bool:
+    """
+    SIGALRM is only valid on the main thread (and not on Windows without it).
+    Flask/Werkzeug serves each request on a worker thread, so signal-based
+    timeouts must be skipped there — callers still run; Stripe/HTTP stacks
+    apply their own socket timeouts.
+    """
+    if not hasattr(signal, "SIGALRM"):
+        return False
+    try:
+        return threading.current_thread() is threading.main_thread()
+    except Exception:  # noqa: BLE001 — be conservative
+        return False
 
 # Default timeouts (seconds)
 DEFAULT_OPENAI_TIMEOUT = int(os.getenv("OPENAI_TIMEOUT", "30"))
@@ -34,9 +50,7 @@ def timeout_context(seconds: int):
         with timeout_context(30):
             result = slow_operation()
     """
-    if not hasattr(signal, 'SIGALRM'):
-        # Windows/other platforms - timeout not supported via signal
-        logger.warning("Timeout context not supported on this platform (requires SIGALRM)")
+    if not _can_use_sigalrm():
         yield
         return
     
@@ -66,13 +80,10 @@ def with_timeout(timeout_seconds: int):
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
-            if hasattr(signal, 'SIGALRM'):
+            if _can_use_sigalrm():
                 with timeout_context(timeout_seconds):
                     return func(*args, **kwargs)
-            else:
-                # Fallback: just call function (timeout not supported)
-                logger.warning(f"Timeout not supported on this platform for {func.__name__}")
-                return func(*args, **kwargs)
+            return func(*args, **kwargs)
         return wrapper
     return decorator
 
@@ -91,13 +102,10 @@ def gmail_execute_with_timeout(execute_func, timeout: int = DEFAULT_GMAIL_TIMEOU
     Raises:
         TimeoutError: If operation exceeds timeout
     """
-    if hasattr(signal, 'SIGALRM'):
+    if _can_use_sigalrm():
         with timeout_context(timeout):
             return execute_func()
-    else:
-        # Fallback: execute without timeout (not ideal but works)
-        logger.warning("Gmail timeout not supported on this platform")
-        return execute_func()
+    return execute_func()
 
 
 def stripe_call_with_timeout(func: Callable, *args, timeout: int = DEFAULT_STRIPE_TIMEOUT, **kwargs):
@@ -118,10 +126,7 @@ def stripe_call_with_timeout(func: Callable, *args, timeout: int = DEFAULT_STRIP
     Raises:
         TimeoutError: If operation exceeds timeout
     """
-    if hasattr(signal, 'SIGALRM'):
+    if _can_use_sigalrm():
         with timeout_context(timeout):
             return func(*args, **kwargs)
-    else:
-        # Fallback: execute without timeout
-        logger.warning("Stripe timeout not supported on this platform")
-        return func(*args, **kwargs)
+    return func(*args, **kwargs)

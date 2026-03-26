@@ -153,7 +153,7 @@ class IdempotencyManager:
             key_data = db_optimizer.execute_query("""
                 SELECT id, key_hash, operation_type, user_id, request_data, response_data, status, created_at, expires_at, metadata 
                 FROM idempotency_keys 
-                WHERE key_hash = ? AND expires_at > datetime('now')
+                WHERE key_hash = ? AND datetime(expires_at) > datetime('now')
             """, (key,))
             
             if key_data:
@@ -269,7 +269,7 @@ class IdempotencyManager:
             # Clean database
             db_optimizer.execute_query("""
                 DELETE FROM idempotency_keys 
-                WHERE expires_at < datetime('now')
+                WHERE datetime(expires_at) < datetime('now')
             """, fetch=False)
             
             # Clean Redis (TTL handles expiration automatically)
@@ -292,7 +292,7 @@ class IdempotencyManager:
                     COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_keys,
                     COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_keys
                 FROM idempotency_keys
-                WHERE expires_at > datetime('now')
+                WHERE datetime(expires_at) > datetime('now')
             """)
             
             if stats:

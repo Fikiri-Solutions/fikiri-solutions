@@ -61,7 +61,7 @@ class CleanupScheduler:
                         c = process_due_calendar_reminders()
                         if c.get("reminded"):
                             logger.info("Calendar reminders: reminded=%s", c.get("reminded"))
-                        from core.automation_engine import run_due_time_based_automations
+                        from services.automation_engine import run_due_time_based_automations
                         tb = run_due_time_based_automations()
                         if tb.get("due_count", 0) > 0:
                             logger.info("Time-based automations: due=%s executed=%s failed=%s", tb.get("due_count"), tb.get("executed"), tb.get("failed"))
@@ -159,4 +159,3 @@ class CleanupScheduler:
 
 # Global cleanup scheduler instance
 cleanup_scheduler = CleanupScheduler()
-

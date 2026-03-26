@@ -83,6 +83,7 @@ class EnhancedRateLimiter:
             'api_ip': RateLimit('api_ip', RateLimitType.IP, 200, 3600, 'API per IP limit'),
             'login_attempts': RateLimit('login_attempts', RateLimitType.IP, 20, 900, 'Login attempts per IP'),
             'signup_attempts': RateLimit('signup_attempts', RateLimitType.IP, 3, 3600, 'Signup attempts per IP'),
+            'email_verification_attempts': RateLimit('email_verification_attempts', RateLimitType.IP, 10, 3600, 'Email verification resend per IP'),
             'email_send': RateLimit('email_send', RateLimitType.USER, 50, 3600, 'Email sending per user'),
             'gmail_sync': RateLimit('gmail_sync', RateLimitType.USER, 10, 3600, 'Gmail sync per user'),
             'onboarding': RateLimit('onboarding', RateLimitType.USER, 20, 3600, 'Onboarding operations per user'),
@@ -519,7 +520,7 @@ class EnhancedRateLimiter:
                     SUM(violation_count) as total_violations,
                     MAX(last_violation) as last_violation
                 FROM rate_limit_violations 
-                WHERE last_violation > datetime('now', '-24 hours')
+                WHERE datetime(last_violation) > datetime('now', '-24 hours')
                 GROUP BY limit_name
                 ORDER BY total_violations DESC
             """)

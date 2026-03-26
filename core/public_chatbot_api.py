@@ -8,8 +8,8 @@ import logging
 import os
 import re
 import uuid
-from typing import Dict, Any, Optional, List
-from datetime import datetime
+from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify, g
 from functools import wraps
 
@@ -26,6 +26,11 @@ from core.feature_flags import get_feature_flags
 from core.expert_escalation import get_escalation_engine
 from core.chatbot_feedback import get_feedback_system
 from crm.service import enhanced_crm_service
+from core.chatbot_content_events import (
+    content_fingerprint_from_sources,
+    record_chatbot_response_generated,
+)
+from core.request_correlation import get_or_create_correlation_id
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +79,7 @@ def _record_billing_usage(user_id: Optional[int], usage_type: str, quantity: int
     if not db_optimizer.table_exists("billing_usage"):
         return
     try:
-        month = datetime.utcnow().strftime("%Y-%m")
+        month = datetime.now(timezone.utc).strftime("%Y-%m")
         db_optimizer.execute_query(
             "INSERT INTO billing_usage (user_id, month, usage_type, quantity) VALUES (?, ?, ?, ?)",
             (user_id, month, usage_type, quantity),
@@ -172,6 +177,21 @@ def _combine_confidence(retrieval_conf: float, llm_conf: Optional[float], weight
     return round(min(1.0, max(0.0, combined)), 4)
 
 
+def _api_key_user_id_as_int(user_id: Optional[Any]) -> Optional[int]:
+    if user_id is None or isinstance(user_id, bool):
+        return None
+    if isinstance(user_id, int):
+        return user_id
+    if isinstance(user_id, str):
+        s = user_id.strip()
+        if s.isdigit():
+            try:
+                return int(s)
+            except ValueError:
+                return None
+    return None
+
+
 def _low_confidence_message() -> str:
     """Response when combined confidence is below threshold."""
     return (
@@ -219,24 +239,40 @@ def _safe_fallback_response() -> str:
     return "I don't have enough verified information to answer that. If you share more details or contact info, I can connect you with our team."
 
 
+def _parse_request_api_key() -> Optional[str]:
+    """Read API key from X-API-Key or Authorization: Bearer."""
+    api_key = request.headers.get("X-API-Key") or request.headers.get("Authorization")
+    if api_key and api_key.startswith("Bearer "):
+        api_key = api_key[7:]
+    if not api_key or not str(api_key).strip():
+        return None
+    return str(api_key).strip()
+
+
+def _scopes_allow_for_endpoint(key_info: Dict[str, Any], endpoint: str) -> bool:
+    """Whether key scopes satisfy the route (matches prior require_api_key rules)."""
+    allowed_scopes = set(key_info.get("scopes", []))
+    if not endpoint:
+        return "chatbot:query" in allowed_scopes
+    if endpoint.startswith("ai_analysis."):
+        return "ai:analyze" in allowed_scopes
+    required_scope = f"{endpoint.split('.')[-1]}:query"
+    return required_scope in allowed_scopes or "chatbot:query" in allowed_scopes
+
+
 def require_api_key(f):
     """Decorator to require API key authentication"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Get API key from header
-        api_key = request.headers.get('X-API-Key') or request.headers.get('Authorization')
-        
-        # Extract from Bearer token format
-        if api_key and api_key.startswith('Bearer '):
-            api_key = api_key[7:]
-        
+        api_key = _parse_request_api_key()
+
         if not api_key:
             return jsonify({
                 "success": False,
                 "error": "API key required",
                 "error_code": "MISSING_API_KEY"
             }), 401
-        
+
         # Validate API key
         key_info = api_key_manager.validate_api_key(api_key)
         if not key_info:
@@ -245,17 +281,14 @@ def require_api_key(f):
                 "error": "Invalid or expired API key",
                 "error_code": "INVALID_API_KEY"
             }), 401
-        
-        # Check required scope (chatbot vs AI analysis)
-        allowed_scopes = set(key_info.get('scopes', []))
+
         endpoint = request.endpoint or ""
-        if endpoint.startswith("ai_analysis."):
-            required_scope = "ai:analyze"
-            has_scope = required_scope in allowed_scopes
-        else:
-            required_scope = f"{endpoint.split('.')[-1]}:query" if endpoint else "chatbot:query"
-            has_scope = required_scope in allowed_scopes or "chatbot:query" in allowed_scopes
-        if not has_scope:
+        if not _scopes_allow_for_endpoint(key_info, endpoint):
+            required_scope = (
+                "ai:analyze"
+                if endpoint.startswith("ai_analysis.")
+                else f"{endpoint.split('.')[-1]}:query" if endpoint else "chatbot:query"
+            )
             return jsonify({
                 "success": False,
                 "error": f"Insufficient permissions. Required scope: {required_scope}",
@@ -302,6 +335,61 @@ def record_api_usage(response_status: int = None, response_time_ms: int = None):
         logger.error(f"Failed to record API usage: {e}")
 
 
+@public_chatbot_bp.route("/key-status", methods=["GET", "OPTIONS"])
+@handle_api_errors
+def public_chatbot_key_status():
+    """
+    Lightweight key check for embeds. Always returns HTTP 200 with JSON so clients
+    can validate keys without 401 noise in the browser network tab.
+    """
+    if request.method == "OPTIONS":
+        return "", 204
+
+    raw = _parse_request_api_key()
+    if not raw:
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "valid": False,
+                    "error_code": "MISSING_API_KEY",
+                    "message": "Send header X-API-Key with your Fikiri API key.",
+                }
+            ),
+            200,
+        )
+
+    key_info = api_key_manager.validate_api_key(raw)
+    if not key_info:
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "valid": False,
+                    "error_code": "INVALID_API_KEY",
+                    "message": "This API key is not valid or was revoked.",
+                }
+            ),
+            200,
+        )
+
+    query_endpoint = "public_chatbot.public_chatbot_query"
+    if not _scopes_allow_for_endpoint(key_info, query_endpoint):
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "valid": False,
+                    "error_code": "INSUFFICIENT_SCOPE",
+                    "message": "This API key does not include chatbot query access.",
+                }
+            ),
+            200,
+        )
+
+    return jsonify({"success": True, "valid": True}), 200
+
+
 @public_chatbot_bp.route('/query', methods=['POST', 'OPTIONS'])
 @handle_api_errors
 @require_api_key
@@ -330,7 +418,7 @@ def public_chatbot_query():
             "conversation_id": "generated-or-provided-id"
         }
     """
-    start_time = datetime.utcnow()
+    start_time = datetime.now(timezone.utc)
     
     try:
         data = request.json or {}
@@ -346,6 +434,8 @@ def public_chatbot_query():
                 "error": "Query is required",
                 "error_code": "MISSING_QUERY"
             }), 400
+
+        correlation_id = get_or_create_correlation_id(request, data)
         
         # Get tenant isolation from API key
         tenant_id = g.api_key_info.get('tenant_id')
@@ -355,8 +445,11 @@ def public_chatbot_query():
         if tenant_id:
             context['tenant_id'] = tenant_id
         
-        # Search FAQs + knowledge base
-        faq_results = faq_system.search_faqs(query, max_results=3)
+        # Search FAQs + knowledge base (tenant-scoped FAQs when numeric user_id on API key)
+        tenant_scope_uid = _api_key_user_id_as_int(user_id)
+        faq_results = faq_system.search_faqs(
+            query, max_results=3, user_id=tenant_scope_uid
+        )
         # Pass tenant_id filter for multi-tenant isolation
         kb_filters = {}
         if tenant_id:
@@ -439,7 +532,13 @@ def public_chatbot_query():
                 input_data=prompt,
                 intent="chatbot_response",
                 output_schema=CHATBOT_RESPONSE_SCHEMA_V1,
-                context={"conversation_id": conversation_id, "tenant_id": tenant_id}
+                context={
+                    "conversation_id": conversation_id,
+                    "tenant_id": tenant_id,
+                    "user_id": user_id,
+                    "source": "public_chatbot",
+                    "correlation_id": correlation_id,
+                },
             )
             llm_attempted = True
             if llm_result.get("success") and llm_result.get("validated"):
@@ -536,6 +635,7 @@ def public_chatbot_query():
             "llm_confidence": llm_confidence,
             "confidence_threshold": threshold,
         }
+        content_fp = content_fingerprint_from_sources(sources)
         try:
             if db_optimizer.table_exists("chatbot_query_log"):
                 meta_json = json.dumps(log_metadata)[:10000]
@@ -554,25 +654,57 @@ def public_chatbot_query():
                 try:
                     db_optimizer.execute_query(
                         """INSERT INTO chatbot_query_log
-                           (conversation_id, message_id, query, response, confidence, fallback_used, sources_json, tenant_id, user_id, llm_trace_id, metadata)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        base_params + (meta_json,),
+                           (conversation_id, message_id, query, response, confidence, fallback_used, sources_json, tenant_id, user_id, llm_trace_id, metadata, correlation_id, content_fingerprint)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        base_params + (meta_json, correlation_id, content_fp or None),
                         fetch=False,
                     )
                 except Exception:
-                    db_optimizer.execute_query(
-                        """INSERT INTO chatbot_query_log
-                           (conversation_id, message_id, query, response, confidence, fallback_used, sources_json, tenant_id, user_id, llm_trace_id)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        base_params,
-                        fetch=False,
-                    )
+                    try:
+                        db_optimizer.execute_query(
+                            """INSERT INTO chatbot_query_log
+                               (conversation_id, message_id, query, response, confidence, fallback_used, sources_json, tenant_id, user_id, llm_trace_id, metadata, correlation_id)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            base_params + (meta_json, correlation_id),
+                            fetch=False,
+                        )
+                    except Exception:
+                        try:
+                            db_optimizer.execute_query(
+                                """INSERT INTO chatbot_query_log
+                                   (conversation_id, message_id, query, response, confidence, fallback_used, sources_json, tenant_id, user_id, llm_trace_id, metadata)
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                base_params + (meta_json,),
+                                fetch=False,
+                            )
+                        except Exception:
+                            db_optimizer.execute_query(
+                                """INSERT INTO chatbot_query_log
+                                   (conversation_id, message_id, query, response, confidence, fallback_used, sources_json, tenant_id, user_id, llm_trace_id)
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                base_params,
+                                fetch=False,
+                            )
         except Exception as log_err:
             logger.warning("Chatbot query log insert failed: %s", log_err)
 
+        record_chatbot_response_generated(
+            message_id=message_id,
+            conversation_id=conversation_id,
+            user_id=tenant_scope_uid,
+            correlation_id=correlation_id,
+            query_excerpt=query,
+            response_excerpt=answer,
+            sources=sources,
+            content_fingerprint=content_fp,
+            llm_trace_id=llm_trace_id,
+            confidence=confidence,
+            fallback_used=fallback_used,
+        )
+
         
         # Calculate response time
-        response_time_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        response_time_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
         
         # Record usage
         record_api_usage(response_status=200, response_time_ms=response_time_ms)
@@ -594,6 +726,7 @@ def public_chatbot_query():
             "llm_confidence": llm_confidence,
             "conversation_id": conversation_id,
             "message_id": message_id,
+            "correlation_id": correlation_id,
             "tenant_id": tenant_id,
             "schema_version": "v1",
             "fallback_used": fallback_used,
@@ -705,7 +838,7 @@ def public_chatbot_health():
     """
     return jsonify({
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "service": "public-chatbot-api"
     })
 

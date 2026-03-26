@@ -5,7 +5,8 @@ Schema-validated endpoints for contacts, leads, and business summary analysis
 
 import json
 import logging
-from typing import Dict, Any, Optional, List
+import uuid
+from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 from flask import Blueprint, request, jsonify, g
 from marshmallow import Schema, fields, ValidationError, validate
@@ -16,6 +17,8 @@ from core.api_validation import handle_api_errors, create_error_response
 from core.ai.llm_router import LLMRouter
 from core.ai.schemas import LeadAnalysisSchema as LeadAnalysisOutputSchema
 from core.ai_budget_guardrails import ai_budget_guardrails
+from core.request_correlation import get_or_create_correlation_id
+from core.tier_usage_caps import check_tier_usage_cap
 
 logger = logging.getLogger(__name__)
 
@@ -35,26 +38,41 @@ def _call_llm_json(
     max_tokens: int = 500,
     intent: Optional[str] = None,
     output_schema: Optional[Dict[str, Any]] = None,
-) -> Optional[Dict[str, Any]]:
+    correlation_id: Optional[str] = None,
+) -> Tuple[Optional[Dict[str, Any]], str]:
     """Call LLM router and parse JSON response. Optional output_schema validates LLM output."""
     if not llm_router or not llm_router.client or not llm_router.client.is_enabled():
-        return None
+        cid = correlation_id or str(uuid.uuid4())
+        return None, cid
+
+    cid = (
+        str(correlation_id).strip()
+        if correlation_id and str(correlation_id).strip()
+        else str(uuid.uuid4())
+    )
+    ctx: Dict[str, Any] = {
+        "max_tokens": max_tokens,
+        "source": "ai_analysis",
+        "correlation_id": cid,
+    }
 
     result = llm_router.process(
         input_data=prompt,
         intent=intent or 'extraction',
-        context={'max_tokens': max_tokens},
+        context=ctx,
         output_schema=output_schema,
     )
 
+    eff_cid = str(result.get("correlation_id") or cid).strip() or cid
+
     if not result.get('success'):
         logger.error("AI analysis LLM failed: %s", result.get('error'))
-        return None
+        return None, eff_cid
 
     try:
-        return json.loads(result.get('content', '') or '{}')
+        return json.loads(result.get('content', '') or '{}'), eff_cid
     except Exception:
-        return None
+        return None, eff_cid
 
 
 # Schema Definitions for Request Validation
@@ -68,6 +86,7 @@ class ContactAnalysisSchema(Schema):
     job_title = fields.Str(validate=validate.Length(max=255), allow_none=True)
     notes = fields.Str(allow_none=True)
     metadata = fields.Dict(allow_none=True)
+    correlation_id = fields.Str(validate=validate.Length(max=128), allow_none=True)
 
 
 class LeadAnalysisSchema(Schema):
@@ -80,6 +99,7 @@ class LeadAnalysisSchema(Schema):
     status = fields.Str(validate=validate.OneOf(['new', 'contacted', 'qualified', 'converted', 'lost']), allow_none=True)
     notes = fields.Str(allow_none=True)
     metadata = fields.Dict(allow_none=True)
+    correlation_id = fields.Str(validate=validate.Length(max=128), allow_none=True)
 
 
 class BusinessSummarySchema(Schema):
@@ -92,6 +112,7 @@ class BusinessSummarySchema(Schema):
     revenue_range = fields.Str(validate=validate.Length(max=50), allow_none=True)
     location = fields.Str(validate=validate.Length(max=255), allow_none=True)
     metadata = fields.Dict(allow_none=True)
+    correlation_id = fields.Str(validate=validate.Length(max=128), allow_none=True)
 
 
 # Response Schemas
@@ -172,7 +193,9 @@ class BusinessSummaryResponse:
 
 # AI Analysis Functions
 
-def analyze_contact(contact_data: Dict[str, Any]) -> Dict[str, Any]:
+def analyze_contact(
+    contact_data: Dict[str, Any], *, correlation_id: Optional[str] = None
+) -> Tuple[Dict[str, Any], str]:
     """Analyze contact using AI"""
     if not llm_router:
         raise ValueError("AI assistant not available")
@@ -198,7 +221,7 @@ def analyze_contact(contact_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     
     try:
-        analysis = _call_llm_json(prompt, max_tokens=500)
+        analysis, cid = _call_llm_json(prompt, max_tokens=500, correlation_id=correlation_id)
         if analysis is None:
             analysis = {
                 "score": 50,
@@ -208,14 +231,16 @@ def analyze_contact(contact_data: Dict[str, Any]) -> Dict[str, Any]:
                 "risk_factors": [],
                 "opportunities": []
             }
-        return analysis
+        return analysis, cid
         
     except Exception as e:
         logger.error(f"Contact analysis failed: {e}")
         raise
 
 
-def analyze_lead(lead_data: Dict[str, Any]) -> Dict[str, Any]:
+def analyze_lead(
+    lead_data: Dict[str, Any], *, correlation_id: Optional[str] = None
+) -> Tuple[Dict[str, Any], str]:
     """Analyze lead using AI"""
     if not llm_router:
         raise ValueError("AI assistant not available")
@@ -241,11 +266,12 @@ def analyze_lead(lead_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     
     try:
-        analysis = _call_llm_json(
+        analysis, cid = _call_llm_json(
             prompt,
             max_tokens=500,
             intent='extraction',
             output_schema=LeadAnalysisOutputSchema,
+            correlation_id=correlation_id,
         )
         if analysis is None:
             analysis = {
@@ -257,14 +283,16 @@ def analyze_lead(lead_data: Dict[str, Any]) -> Dict[str, Any]:
                 "next_steps": ["Schedule discovery call"],
                 "estimated_value": 0
             }
-        return analysis
+        return analysis, cid
         
     except Exception as e:
         logger.error(f"Lead analysis failed: {e}")
         raise
 
 
-def analyze_business(business_data: Dict[str, Any]) -> Dict[str, Any]:
+def analyze_business(
+    business_data: Dict[str, Any], *, correlation_id: Optional[str] = None
+) -> Tuple[Dict[str, Any], str]:
     """Analyze business using AI"""
     if not llm_router:
         raise ValueError("AI assistant not available")
@@ -291,7 +319,9 @@ def analyze_business(business_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     
     try:
-        analysis = _call_llm_json(prompt, max_tokens=800)
+        analysis, cid = _call_llm_json(
+            prompt, max_tokens=800, correlation_id=correlation_id
+        )
         if analysis is None:
             analysis = {
                 "business_name": business_data.get('business_name', ''),
@@ -302,7 +332,7 @@ def analyze_business(business_data: Dict[str, Any]) -> Dict[str, Any]:
                 "growth_potential": "unknown",
                 "recommendations": []
             }
-        return analysis
+        return analysis, cid
         
     except Exception as e:
         logger.error(f"Business analysis failed: {e}")
@@ -352,6 +382,10 @@ def analyze_contact_endpoint():
         if hasattr(g, 'api_key_info') and isinstance(getattr(g, 'api_key_info'), dict):
             user_id = g.api_key_info.get('user_id')
         if user_id is not None:
+            allowed, msg, code = check_tier_usage_cap(user_id, "ai_responses", projected_increment=1)
+            if not allowed:
+                record_api_usage(response_status=402)
+                return create_error_response(msg, 402, code)
             budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
             if not budget_decision.allowed:
                 record_api_usage(response_status=402)
@@ -373,13 +407,17 @@ def analyze_contact_endpoint():
                 "error": "Validation error",
                 "errors": err.messages
             }), 400
-        
+
+        correlation_id = get_or_create_correlation_id(request, validated_data)
         # Perform AI analysis
-        analysis_result = analyze_contact(validated_data)
+        analysis_result, used_cid = analyze_contact(
+            validated_data, correlation_id=correlation_id
+        )
         
         # Build response
         response_obj = ContactAnalysisResponse(analysis_result)
         response_data = response_obj.to_dict()
+        response_data["correlation_id"] = used_cid
         
         # Record usage
         response_time_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
@@ -440,6 +478,10 @@ def analyze_lead_endpoint():
         if hasattr(g, 'api_key_info') and isinstance(getattr(g, 'api_key_info'), dict):
             user_id = g.api_key_info.get('user_id')
         if user_id is not None:
+            allowed, msg, code = check_tier_usage_cap(user_id, "ai_responses", projected_increment=1)
+            if not allowed:
+                record_api_usage(response_status=402)
+                return create_error_response(msg, 402, code)
             budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
             if not budget_decision.allowed:
                 record_api_usage(response_status=402)
@@ -460,10 +502,14 @@ def analyze_lead_endpoint():
                 "error": "Validation error",
                 "errors": err.messages
             }), 400
-        
-        analysis_result = analyze_lead(validated_data)
+
+        correlation_id = get_or_create_correlation_id(request, validated_data)
+        analysis_result, used_cid = analyze_lead(
+            validated_data, correlation_id=correlation_id
+        )
         response_obj = LeadAnalysisResponse(analysis_result)
         response_data = response_obj.to_dict()
+        response_data["correlation_id"] = used_cid
         
         response_time_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
         record_api_usage(response_status=200, response_time_ms=response_time_ms)
@@ -523,6 +569,10 @@ def analyze_business_endpoint():
         if hasattr(g, 'api_key_info') and isinstance(getattr(g, 'api_key_info'), dict):
             user_id = g.api_key_info.get('user_id')
         if user_id is not None:
+            allowed, msg, code = check_tier_usage_cap(user_id, "ai_responses", projected_increment=1)
+            if not allowed:
+                record_api_usage(response_status=402)
+                return create_error_response(msg, 402, code)
             budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
             if not budget_decision.allowed:
                 record_api_usage(response_status=402)
@@ -543,10 +593,14 @@ def analyze_business_endpoint():
                 "error": "Validation error",
                 "errors": err.messages
             }), 400
-        
-        analysis_result = analyze_business(validated_data)
+
+        correlation_id = get_or_create_correlation_id(request, validated_data)
+        analysis_result, used_cid = analyze_business(
+            validated_data, correlation_id=correlation_id
+        )
         response_obj = BusinessSummaryResponse(analysis_result)
         response_data = response_obj.to_dict()
+        response_data["correlation_id"] = used_cid
         
         response_time_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
         record_api_usage(response_status=200, response_time_ms=response_time_ms)

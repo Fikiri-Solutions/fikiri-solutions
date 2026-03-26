@@ -6,7 +6,7 @@ Searchable knowledge repository with document indexing and retrieval
 import json
 import logging
 import re
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from enum import Enum
@@ -17,6 +17,22 @@ from pathlib import Path
 from core.minimal_config import get_config
 
 logger = logging.getLogger(__name__)
+
+
+def _coerce_metadata_user_id(raw: Any) -> Optional[int]:
+    """Match API/chatbot coercion: int or digit str; bool rejected (bool subclasses int)."""
+    if raw is None or isinstance(raw, bool):
+        return None
+    if isinstance(raw, int):
+        return raw
+    if isinstance(raw, str):
+        s = raw.strip()
+        if s.isdigit():
+            try:
+                return int(s)
+            except ValueError:
+                return None
+    return None
 
 
 def _get_vector_search():
@@ -64,6 +80,24 @@ class KnowledgeDocument:
     search_rank: float = 1.0
     metadata: Dict[str, Any] = None
 
+
+_ALLOWED_KB_MUTATION_FIELDS = frozenset(
+    {
+        "title",
+        "content",
+        "summary",
+        "document_type",
+        "format",
+        "tags",
+        "keywords",
+        "category",
+        "author",
+        "version",
+        "metadata",
+    }
+)
+
+
 @dataclass
 class SearchResult:
     """Knowledge base search result"""
@@ -90,9 +124,73 @@ class KnowledgeBaseSystem:
     def __init__(self):
         self.config = get_config()
         self.documents = self._load_default_documents()
+        self._hydrate_persisted_kb_documents()
         self.search_index = self._build_search_index()
         
         logger.info("📚 Knowledge base system initialized")
+
+    def _hydrate_persisted_kb_documents(self) -> None:
+        try:
+            from core.chatbot_content_events import kb_hydration_enabled, load_persisted_kb_rows
+
+            if not kb_hydration_enabled():
+                return
+            for row in load_persisted_kb_rows():
+                try:
+                    dt = DocumentType(row["document_type"])
+                except ValueError:
+                    dt = DocumentType.FAQ
+                try:
+                    fmt = ContentFormat(row.get("format") or "markdown")
+                except ValueError:
+                    fmt = ContentFormat.MARKDOWN
+                md = dict(row["metadata"] if isinstance(row.get("metadata"), dict) else {})
+                if row.get("tenant_id") and "tenant_id" not in md:
+                    md["tenant_id"] = row["tenant_id"]
+                if row.get("user_id") is not None and "user_id" not in md:
+                    md["user_id"] = row["user_id"]
+                doc = KnowledgeDocument(
+                    id=row["doc_id"],
+                    title=row["title"],
+                    content=row["content"],
+                    summary=row.get("summary") or "",
+                    document_type=dt,
+                    format=fmt,
+                    tags=row["tags"],
+                    keywords=row["keywords"],
+                    category=row.get("category") or "general",
+                    author=row.get("author") or "",
+                    version="1.0",
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                    metadata=md,
+                )
+                self.documents[doc.id] = doc
+        except Exception as exc:
+            logger.warning("KB hydrate skipped: %s", exc)
+
+    @staticmethod
+    def _tenant_scope_from_metadata(metadata: Dict[str, Any]) -> Tuple[Optional[int], Optional[str]]:
+        uid = metadata.get("user_id")
+        user_id = _coerce_metadata_user_id(uid)
+        tid = metadata.get("tenant_id")
+        tenant_id = tid if isinstance(tid, str) else None
+        return user_id, tenant_id
+
+    def _kb_snapshot(self, document: KnowledgeDocument) -> Dict[str, Any]:
+        return {
+            "title": document.title,
+            "content": document.content,
+            "summary": document.summary or "",
+            "document_type": document.document_type.value,
+            "format": document.format.value,
+            "category": document.category,
+            "tags": list(document.tags),
+            "keywords": list(document.keywords),
+            "author": document.author,
+            "metadata": dict(document.metadata or {}),
+            "version": document.version,
+        }
     
     def _load_default_documents(self) -> Dict[str, KnowledgeDocument]:
         """Load default knowledge base documents"""
@@ -1154,10 +1252,21 @@ Need help setting up? Contact our landscaping specialists at landscaping@fikiris
         
         return suggestions[:5]  # Limit to 5 suggestions
     
-    def add_document(self, title: str, content: str, summary: Optional[str] = None,
-                    document_type: DocumentType = None, tags: List[str] = None,
-                    keywords: List[str] = None, category: str = "general", author: Optional[str] = None,
-                    metadata: Dict[str, Any] = None) -> str:
+    def add_document(
+        self,
+        title: str,
+        content: str,
+        summary: Optional[str] = None,
+        document_type: DocumentType = None,
+        tags: List[str] = None,
+        keywords: List[str] = None,
+        category: str = "general",
+        author: Optional[str] = None,
+        metadata: Dict[str, Any] = None,
+        correlation_id: Optional[str] = None,
+        source: str = "knowledge_base",
+        user_id: Optional[int] = None,
+    ) -> str:
         """Add new document to knowledge base."""
         if summary is None:
             summary = (content or "")[:500] or ""
@@ -1195,22 +1304,49 @@ Need help setting up? Contact our landscaping specialists at landscaping@fikiris
             self._update_search_index(doc_id, document)
             
             logger.info(f"✅ Added knowledge document: {doc_id}")
+
+            try:
+                from core.chatbot_content_events import persist_kb_document_created
+
+                tu, tid = self._tenant_scope_from_metadata(document.metadata or {})
+                persist_kb_document_created(
+                    doc_id=doc_id,
+                    tenant_id=tid,
+                    user_id=user_id if user_id is not None else tu,
+                    source=source,
+                    correlation_id=correlation_id,
+                    snapshot_after=self._kb_snapshot(document),
+                )
+            except Exception as persist_exc:
+                logger.warning("KB create persist (non-fatal): %s", persist_exc)
+
             return doc_id
             
         except Exception as e:
             logger.error(f"❌ Failed to add document: {e}")
             raise
     
-    def update_document(self, doc_id: str, updates: Dict[str, Any]) -> bool:
+    def update_document(
+        self,
+        doc_id: str,
+        updates: Dict[str, Any],
+        *,
+        correlation_id: Optional[str] = None,
+        source: str = "knowledge_base",
+        user_id: Optional[int] = None,
+    ) -> bool:
         """Update existing document and sync to vector index when vector_id is present."""
         try:
             if doc_id not in self.documents:
                 return False
 
             document = self.documents[doc_id]
+            before = self._kb_snapshot(document)
 
-            # Update fields
+            # Update fields (never id, counters, ranks, or timestamps via dict)
             for field, value in updates.items():
+                if field not in _ALLOWED_KB_MUTATION_FIELDS:
+                    continue
                 if hasattr(document, field):
                     setattr(document, field, value)
 
@@ -1275,19 +1411,44 @@ Need help setting up? Contact our landscaping specialists at landscaping@fikiris
                     logger.warning("Vector self-heal (re-add) failed for doc %s: %s", doc_id, ve)
 
             logger.info(f"✅ Updated knowledge document: {doc_id}")
+
+            try:
+                from core.chatbot_content_events import persist_kb_document_updated
+
+                tu, tid = self._tenant_scope_from_metadata(document.metadata or {})
+                persist_kb_document_updated(
+                    doc_id=doc_id,
+                    tenant_id=tid,
+                    user_id=user_id if user_id is not None else tu,
+                    source=source,
+                    correlation_id=correlation_id,
+                    snapshot_before=before,
+                    snapshot_after=self._kb_snapshot(document),
+                )
+            except Exception as persist_exc:
+                logger.warning("KB update persist (non-fatal): %s", persist_exc)
+
             return True
 
         except Exception as e:
             logger.error(f"❌ Failed to update document: {e}")
             return False
     
-    def delete_document(self, doc_id: str) -> bool:
+    def delete_document(
+        self,
+        doc_id: str,
+        *,
+        correlation_id: Optional[str] = None,
+        source: str = "knowledge_base",
+        user_id: Optional[int] = None,
+    ) -> bool:
         """Delete document from knowledge base and remove from vector index when vector_id is present."""
         try:
             if doc_id not in self.documents:
                 return False
 
             document = self.documents[doc_id]
+            before = self._kb_snapshot(document)
             vector_id = None
             meta = getattr(document, "metadata", None)
             if isinstance(meta, dict):
@@ -1307,6 +1468,21 @@ Need help setting up? Contact our landscaping specialists at landscaping@fikiris
             del self.documents[doc_id]
             self._remove_from_search_index(doc_id)
             logger.info(f"✅ Deleted knowledge document: {doc_id}")
+
+            try:
+                from core.chatbot_content_events import persist_kb_document_deleted
+
+                tu, _tid = self._tenant_scope_from_metadata(before.get("metadata") or {})
+                persist_kb_document_deleted(
+                    doc_id=doc_id,
+                    user_id=user_id if user_id is not None else tu,
+                    source=source,
+                    correlation_id=correlation_id,
+                    snapshot_before=before,
+                )
+            except Exception as persist_exc:
+                logger.warning("KB delete persist (non-fatal): %s", persist_exc)
+
             return True
 
         except Exception as e:

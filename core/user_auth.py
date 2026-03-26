@@ -192,12 +192,7 @@ class UserAuthManager:
             metadata = json.loads(user_dict.get('metadata', '{}'))
             salt = metadata.get('salt', '')
             
-            # Debug logging
-            logger.info(f"Authentication attempt for {email}")
-            logger.info(f"User ID: {user_dict.get('id')}")
-            logger.info(f"Password hash length: {len(user_dict.get('password_hash', ''))}")
-            logger.info(f"Salt length: {len(salt)}")
-            logger.info(f"Metadata: {metadata}")
+            logger.info("Authentication attempt for user_id=%s email=%s", user_dict.get("id"), email)
             
             # Verify password
             password_hash = user_dict.get('password_hash', '')
@@ -292,7 +287,7 @@ class UserAuthManager:
                 """SELECT s.*, u.* FROM user_sessions s
                    JOIN users u ON s.user_id = u.id
                    WHERE s.session_id = ? AND s.is_valid = 1 
-                   AND s.expires_at > datetime('now')""",
+                   AND datetime(s.expires_at) > datetime('now')""",
                 (session_id,)
             )
             
@@ -463,6 +458,177 @@ class UserAuthManager:
                 'error_code': 'PASSWORD_RESET_ERROR'
             }
     
+    def request_email_verification(self, user_id: int, email: str, name: str = None) -> Dict[str, Any]:
+        """
+        Request email verification by storing a token + expiry in users.metadata and queueing
+        a verification email.
+        """
+        try:
+            user_rows = db_optimizer.execute_query(
+                "SELECT id, metadata FROM users WHERE id = ? AND is_active = 1",
+                (user_id,)
+            )
+            if not user_rows:
+                return {
+                    'success': False,
+                    'error': 'User not found',
+                    'error_code': 'USER_NOT_FOUND'
+                }
+
+            user_row = user_rows[0]
+            raw_metadata = user_row.get('metadata') if hasattr(user_row, 'get') else user_row[0]
+
+            metadata: Dict[str, Any] = {}
+            if isinstance(raw_metadata, str):
+                try:
+                    metadata = json.loads(raw_metadata or '{}') if raw_metadata else {}
+                except Exception:
+                    metadata = {}
+            elif isinstance(raw_metadata, dict):
+                metadata = raw_metadata
+
+            verification_token = secrets.token_urlsafe(32)
+            verification_expires = int(time.time()) + 3600  # 1 hour
+
+            metadata['email_verification_token'] = verification_token
+            metadata['email_verification_expires'] = verification_expires
+
+            db_optimizer.execute_query(
+                "UPDATE users SET metadata = ? WHERE id = ?",
+                (json.dumps(metadata), user_id),
+                fetch=False
+            )
+
+            # Queue verification email (non-critical; caller may choose to ignore failures)
+            from email_automation.jobs import email_job_manager
+            email_job_manager.queue_email_verification_email(
+                user_id=user_id,
+                email=email,
+                name=name or 'User',
+                verification_token=verification_token,
+                expires_in_seconds=3600,
+            )
+
+            logger.info(f"Email verification requested for user_id={user_id}")
+            return {'success': True, 'message': 'Verification email queued'}
+
+        except Exception as e:
+            logger.error(f"Error requesting email verification: {e}")
+            return {
+                'success': False,
+                'error': 'Failed to process email verification request',
+                'error_code': 'EMAIL_VERIFICATION_REQUEST_ERROR'
+            }
+
+    def verify_email_token(self, token: str) -> Dict[str, Any]:
+        """Verify email with a token stored in users.metadata."""
+        try:
+            if not token:
+                return {
+                    'success': False,
+                    'error': 'Verification token is required',
+                    'error_code': 'MISSING_TOKEN'
+                }
+
+            # Token is stored in metadata; validate token first via SQL.
+            # Note: we validate expiry in Python after fetching metadata.
+            user_rows = db_optimizer.execute_query(
+                """
+                SELECT id, email, name, role, onboarding_completed, onboarding_step, email_verified, metadata
+                FROM users
+                WHERE json_extract(metadata, '$.email_verification_token') = ?
+                  AND is_active = 1
+                """,
+                (token,)
+            )
+
+            if not user_rows:
+                return {
+                    'success': False,
+                    'error': 'Invalid or expired verification token',
+                    'error_code': 'INVALID_TOKEN'
+                }
+
+            user_row = user_rows[0]
+            metadata_raw = user_row.get('metadata')
+
+            metadata: Dict[str, Any] = {}
+            if isinstance(metadata_raw, str):
+                try:
+                    metadata = json.loads(metadata_raw or '{}') if metadata_raw else {}
+                except Exception:
+                    metadata = {}
+            elif isinstance(metadata_raw, dict):
+                metadata = metadata_raw
+
+            expires = metadata.get('email_verification_expires')
+            try:
+                expires_int = int(expires) if expires is not None else None
+            except Exception:
+                expires_int = None
+
+            now = int(time.time())
+            if not expires_int or now >= expires_int:
+                # Clear stale token so users don't get stuck retrying expired tokens.
+                metadata.pop('email_verification_token', None)
+                metadata.pop('email_verification_expires', None)
+                db_optimizer.execute_query(
+                    "UPDATE users SET metadata = ? WHERE id = ?",
+                    (json.dumps(metadata), user_row.get('id')),
+                    fetch=False
+                )
+                return {
+                    'success': False,
+                    'error': 'Verification link has expired',
+                    'error_code': 'TOKEN_EXPIRED'
+                }
+
+            user_id = user_row.get('id')
+            updated_metadata = metadata.copy()
+            updated_metadata.pop('email_verification_token', None)
+            updated_metadata.pop('email_verification_expires', None)
+
+            db_optimizer.execute_query(
+                """
+                UPDATE users
+                SET email_verified = 1, metadata = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND is_active = 1
+                """,
+                (json.dumps(updated_metadata), user_id),
+                fetch=False
+            )
+
+            updated_user = self.get_user_by_id(user_id)
+            if not updated_user:
+                # Token was valid but user record disappeared; treat as invalid.
+                return {
+                    'success': False,
+                    'error': 'Verification failed',
+                    'error_code': 'USER_NOT_FOUND'
+                }
+
+            return {
+                'success': True,
+                'message': 'Email verified successfully',
+                'user': {
+                    'id': updated_user.id,
+                    'email': updated_user.email,
+                    'name': updated_user.name,
+                    'role': updated_user.role,
+                    'onboarding_completed': updated_user.onboarding_completed,
+                    'onboarding_step': updated_user.onboarding_step,
+                    'email_verified': True,
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"Error verifying email token: {e}")
+            return {
+                'success': False,
+                'error': 'Email verification failed',
+                'error_code': 'EMAIL_VERIFICATION_ERROR'
+            }
+
     def reset_user_password(self, user_id: int, new_password: str) -> Dict[str, Any]:
         """Reset user password with new password"""
         try:
@@ -614,7 +780,7 @@ class UserAuthManager:
         """Clean up expired sessions"""
         try:
             result = db_optimizer.execute_query(
-                "UPDATE user_sessions SET is_valid = 0 WHERE expires_at < datetime('now')",
+                "UPDATE user_sessions SET is_valid = 0 WHERE datetime(expires_at) < datetime('now')",
                 fetch=False
             )
             return result

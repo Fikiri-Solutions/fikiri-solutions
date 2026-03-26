@@ -20,7 +20,11 @@ class FeatureLevel(Enum):
     ADVANCED = "advanced"            # Heavy ML (PyTorch, scikit-learn)
     FULL_AI = "full_ai"              # All AI capabilities
 
-SKIP_HEAVY_CHECKS = os.getenv("SKIP_HEAVY_DEP_CHECKS", "false").lower() == "true"
+_flask_env = os.getenv("FLASK_ENV", "production").lower()
+# In development/test we default to skipping heavy dependency import checks to
+# avoid native-extension / OpenMP contention during API boot.
+_default_skip_heavy = "true" if _flask_env in ("development", "test") else "false"
+SKIP_HEAVY_CHECKS = os.getenv("SKIP_HEAVY_DEP_CHECKS", _default_skip_heavy).lower() == "true"
 
 
 class FeatureFlags:

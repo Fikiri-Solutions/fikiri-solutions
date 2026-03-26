@@ -48,9 +48,13 @@ class MinimalMLScoring:
         # Vector search for hybrid ranking
         self.vector_search = None
         self._initialize_vector_search()
-        
-        # Initialize ML models
-        self._initialize_ml_models()
+
+        # ML model initialization is intentionally lazy to avoid
+        # native extension / OpenMP startup contention during API boot.
+        self._ml_models_initialized = False
+        self.scoring_model = None
+        self.scaler = None
+        self.model_type = "rule_based"
         
         # Historical calibration data
         self.calibration_data = []
@@ -88,6 +92,21 @@ class MinimalMLScoring:
                 logger.info("ℹ️ Vector search not available for hybrid ranking")
         except Exception as e:
             logger.warning(f"Vector search initialization failed: {e}")
+
+    def _ensure_ml_models_initialized(self):
+        """Lazy-load ML models on first scoring request."""
+        if self._ml_models_initialized:
+            return
+        self._ml_models_initialized = True
+
+        try:
+            self._initialize_ml_models()
+        except Exception as e:
+            # Never fail request due to ML availability; fall back to rules.
+            logger.warning(f"ML model lazy initialization failed: {e}, using rule-based scoring")
+            self.scoring_model = None
+            self.scaler = None
+            self.model_type = "rule_based"
     
     def _initialize_ml_models(self):
         """Initialize real ML models if available."""
@@ -179,6 +198,8 @@ class MinimalMLScoring:
                 scores["semantic_similarity_score"] = self._score_semantic_similarity(email_content)
             
             # Calculate weighted total score
+            # Ensure native ML libraries are initialized only when needed.
+            self._ensure_ml_models_initialized()
             if self.model_type != "rule_based" and self.scoring_model:
                 total_score = self._predict_with_ml_model(scores)
             else:

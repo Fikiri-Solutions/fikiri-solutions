@@ -349,15 +349,16 @@ def init_sentry(app):
     )
     
     logger.info("Sentry initialized for error tracking and performance monitoring")
-    
-    # Example: Send logs directly to Sentry using Sentry's logger
-    sentry_sdk.logger.info("Sentry logging initialized - logs will be sent to Sentry")
-    sentry_sdk.logger.warning("This is a warning message sent to Sentry")
-    
-    # Example: Using Python's built-in logging (automatically forwarded to Sentry)
-    logger.info("This log will be automatically sent to Sentry")
-    logger.warning("User login failed - this will be sent to Sentry")
-    logger.error("Something went wrong - this will be sent to Sentry")
+
+    if os.getenv("SENTRY_VERIFY_EVENTS", "").lower() in ("1", "true", "yes"):
+        try:
+            sentry_sdk.capture_message(
+                "Sentry verify ping (set SENTRY_VERIFY_EVENTS=0 after confirming delivery)",
+                level="info",
+            )
+            logger.info("Sentry verify: sent info-level capture_message (check your Sentry project)")
+        except Exception as e:
+            logger.warning("Sentry verify ping failed: %s", e)
 
 def before_send_filter(event, hint):
     """Filter events before sending to Sentry with enhanced safety"""
@@ -621,6 +622,7 @@ class PerformanceMonitor:
     """Monitor application performance and send alerts with persistence"""
     
     def __init__(self):
+        self._metrics_lock = threading.Lock()
         self.alert_manager = alert_manager
         self.performance_thresholds = {
             'response_time_ms': 1000,  # 1 second
@@ -671,37 +673,39 @@ class PerformanceMonitor:
             )
     
     def _persist_performance_metrics(self, metrics: Dict[str, Any]):
-        """Persist performance metrics to file"""
+        """Persist performance metrics to file (locked read-modify-write + atomic replace)."""
         try:
-            metrics_file = Path('data/performance_metrics.json')
-            metrics_file.parent.mkdir(exist_ok=True)
-            
-            # Load existing metrics
-            if metrics_file.exists():
-                try:
-                    with open(metrics_file, 'r') as f:
-                        content = f.read().strip()
-                        if content:  # Guard against empty files
-                            all_metrics = json.loads(content)
-                        else:
-                            all_metrics = []
-                except (json.JSONDecodeError, ValueError) as e:
-                    logger.warning(f"Corrupted performance metrics file: {metrics_file}. Starting fresh.")
+            with self._metrics_lock:
+                metrics_file = Path('data/performance_metrics.json')
+                metrics_file.parent.mkdir(parents=True, exist_ok=True)
+
+                if metrics_file.exists():
+                    try:
+                        with open(metrics_file, 'r') as f:
+                            content = f.read().strip()
+                            if content:
+                                all_metrics = json.loads(content)
+                            else:
+                                all_metrics = []
+                    except (json.JSONDecodeError, ValueError):
+                        logger.warning(
+                            "Corrupted performance metrics file: %s. Starting fresh.", metrics_file
+                        )
+                        all_metrics = []
+                else:
                     all_metrics = []
-            else:
-                all_metrics = []
-            
-            # Add new metrics
-            all_metrics.append(metrics)
-            
-            # Keep only last 1000 records
-            if len(all_metrics) > 1000:
-                all_metrics = all_metrics[-1000:]
-            
-            # Save back to file
-            with open(metrics_file, 'w') as f:
-                json.dump(all_metrics, f, indent=2)
-                
+
+                all_metrics.append(metrics)
+                if len(all_metrics) > 1000:
+                    all_metrics = all_metrics[-1000:]
+
+                tmp_path = metrics_file.with_suffix('.json.tmp')
+                with open(tmp_path, 'w') as f:
+                    json.dump(all_metrics, f, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(tmp_path, metrics_file)
+
         except Exception as e:
             logger.warning(f"Failed to persist performance metrics: {e}")
     

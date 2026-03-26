@@ -306,7 +306,7 @@ class AutomationSafetyManager:
                 """
                 SELECT COUNT(*) as count FROM automation_action_log 
                 WHERE user_id = ? AND target_contact = ? AND action_type = ? 
-                AND created_at > datetime('now', '-{} hours')
+                AND datetime(created_at) > datetime('now', '-{} hours')
                 """.format(hours),
                 (user_id, target_contact, action_type)
             )
@@ -324,7 +324,7 @@ class AutomationSafetyManager:
             result = self.db_optimizer.execute_query(
                 """
                 SELECT COUNT(*) as count FROM automation_action_log 
-                WHERE user_id = ? AND created_at > datetime('now', '-{} minutes')
+                WHERE user_id = ? AND datetime(created_at) > datetime('now', '-{} minutes')
                 """.format(minutes),
                 (user_id,)
             )
@@ -345,7 +345,7 @@ class AutomationSafetyManager:
             result = self.db_optimizer.execute_query(
                 """
                 SELECT COUNT(*) as count FROM oauth_failure_log 
-                WHERE user_id = ? AND created_at > datetime('now', '-{} minutes')
+                WHERE user_id = ? AND datetime(created_at) > datetime('now', '-{} minutes')
                 """.format(config.oauth_failure_window_minutes),
                 (user_id,)
             )
@@ -392,7 +392,7 @@ class AutomationSafetyManager:
                 oauth_failures = self.db_optimizer.execute_query(
                     """
                     SELECT COUNT(*) as failure_count FROM oauth_failure_log 
-                    WHERE user_id = ? AND created_at > datetime('now', '-{} minutes')
+                    WHERE user_id = ? AND datetime(created_at) > datetime('now', '-{} minutes')
                     """.format(config.oauth_failure_window_minutes),
                     (user_id,)
                 )

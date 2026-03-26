@@ -10,7 +10,7 @@ Implements:
 import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
 from core.database_optimization import db_optimizer
@@ -73,12 +73,12 @@ class AIBudgetGuardrails:
             logger.warning("AI budget guardrail tables init failed: %s", e)
 
     def _month(self) -> str:
-        return datetime.utcnow().strftime("%Y-%m")
+        return datetime.now(timezone.utc).strftime("%Y-%m")
 
     def _subscription_tier(self, user_id: int) -> str:
         try:
             if not db_optimizer.table_exists("subscriptions"):
-                return "free"
+                return "starter"
             rows = db_optimizer.execute_query(
                 """
                 SELECT status, tier
@@ -90,12 +90,12 @@ class AIBudgetGuardrails:
                 (user_id,),
             )
             if not rows:
-                return "free"
+                return "starter"
             status = (rows[0].get("status") or "").lower()
             tier = (rows[0].get("tier") or "starter").lower()
             return tier if status in {"active", "trialing"} else "free"
         except Exception:
-            return "free"
+            return "starter"
 
     def _budget_cap_usd(self, tier: str) -> float:
         env_map = {
@@ -268,4 +268,3 @@ class AIBudgetGuardrails:
 
 
 ai_budget_guardrails = AIBudgetGuardrails()
-

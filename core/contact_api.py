@@ -6,7 +6,9 @@ UTF-8, strict text limits to keep cost and abuse low.
 import logging
 import re
 import os
+import json
 from flask import Blueprint, request, jsonify
+from core.database_optimization import db_optimizer
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +143,52 @@ def submit_contact():
     body = "\n".join(lines)
 
     sent = _send_contact_email(CONTACT_TO_EMAIL, email_subject, body)
+
+    # Persist customer submission so it isn't lost if email sending is temporarily failing.
+    # Best-effort only: contact should still return its normal response even if DB insert fails.
+    try:
+        payload = {
+            "name": name,
+            "email": email,
+            "phone": phone or None,
+            "company": company or None,
+            "subject": subject or None,
+            "message": message,
+        }
+        payload_json = json.dumps(payload, ensure_ascii=False)
+        db_optimizer.execute_query(
+            """
+            INSERT INTO customer_contact_submissions (
+                form_type, name, email, phone, company, subject, message,
+                email_subject, to_email, from_email, payload_json, payload_truncated,
+                send_status, send_error,
+                request_ip, user_agent
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                'contact',
+                name,
+                email,
+                phone or None,
+                company or None,
+                subject or None,
+                message,
+                email_subject,
+                CONTACT_TO_EMAIL,
+                CONTACT_FROM_EMAIL,
+                payload_json,
+                0,
+                'sent' if sent else 'failed',
+                None if sent else 'email_send_failed',
+                request.remote_addr,
+                request.headers.get('User-Agent'),
+            ),
+            fetch=False,
+        )
+    except Exception as e:
+        logger.error("Failed to persist contact submission: %s", e)
+
     if not sent:
         return jsonify({"success": False, "error": "Unable to send message. Please try again later."}), 503
     return jsonify({"success": True, "message": "Thank you. We will get back to you soon."}), 200

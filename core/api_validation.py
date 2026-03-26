@@ -260,32 +260,51 @@ CHAT_SCHEMA = {
     }
 }
 
-def create_success_response(data: Any = None, message: str = "Success") -> tuple:
-    """Create a standardized success response"""
+def create_success_response(
+    data: Any = None,
+    message: str = "Success",
+    *,
+    correlation_id: Optional[str] = None,
+) -> tuple:
+    """Create a standardized success response. Optional correlation_id for cross-domain tracing."""
     response = {
         'success': True,
         'message': message,
         'timestamp': None
     }
-    
+
+    if correlation_id:
+        response['correlation_id'] = correlation_id
+
     if data is not None:
         response['data'] = data
-    
+
     return jsonify(response), 200
 
-def create_error_response(message: str, status_code: int = 400, error_code: str = None, field: str = None) -> tuple:
-    """Create a standardized error response"""
+
+def create_error_response(
+    message: str,
+    status_code: int = 400,
+    error_code: str = None,
+    field: str = None,
+    *,
+    correlation_id: Optional[str] = None,
+) -> tuple:
+    """Create a standardized error response. Optional correlation_id matches success envelope."""
     response = {
         'success': False,
         'error': message,
         'timestamp': None
     }
-    
+
     if error_code:
         response['code'] = error_code
-    
+
     if field:
         response['field'] = field
-    
+
+    if correlation_id:
+        response['correlation_id'] = correlation_id
+
     return jsonify(response), status_code
 

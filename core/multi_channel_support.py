@@ -454,9 +454,15 @@ class MultiChannelSupportSystem:
                 except Exception as e:
                     logger.warning(f"Context response failed: {e}")
             
-            # 2. FAQ System
+            # 2. FAQ System (numeric channel user_id → tenant-scoped FAQs)
             try:
-                faq_response = self.faq_system.search_faqs(message.content, max_results=3)
+                ch_tenant: Optional[int] = None
+                uid_raw = getattr(message, "user_id", None)
+                if uid_raw is not None and str(uid_raw).isdigit():
+                    ch_tenant = int(str(uid_raw))
+                faq_response = self.faq_system.search_faqs(
+                    message.content, max_results=3, user_id=ch_tenant
+                )
                 
                 if faq_response.success and faq_response.best_match and faq_response.best_match.confidence > 0.7:
                     best_match = faq_response.best_match
