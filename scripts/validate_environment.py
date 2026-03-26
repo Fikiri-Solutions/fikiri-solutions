@@ -100,7 +100,8 @@ class EnvironmentValidator:
         
         self.optional_vars = {
             'REDIS_URL': 'Redis connection for caching',
-            'SMTP_HOST': 'SMTP server for email sending',
+            'SMTP_HOST': 'SMTP server for email sending (or use SMTP_SERVER as alias)',
+            'SMTP_SERVER': 'Alias for SMTP_HOST used by some mail paths',
             'SMTP_PORT': 'SMTP server port',
             'SMTP_USERNAME': 'SMTP authentication username',
             'SMTP_PASSWORD': 'SMTP authentication password'

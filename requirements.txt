@@ -38,6 +38,7 @@ flask-limiter>=3.5.0
 flask-restx>=1.2.0
 gunicorn>=20.0.0
 marshmallow>=3.20.0  # Schema validation for API endpoints
+dnspython>=2.0.0
 
 # Monitoring and Alerting
 sentry-sdk[flask]>=2.35.0

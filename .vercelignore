@@ -1,0 +1,23 @@
+# Keep upload under Vercel 15k file limit. Root Directory in project = frontend.
+# Exclude backend, docs, and heavy dirs so only frontend (and minimal root) upload.
+analytics/
+core/
+crm/
+docs/
+email_automation/
+integrations/
+routes/
+scripts/
+tests/
+app.py
+render.yaml
+*.py
+requirements.txt
+env.template
+.venv/
+.venv
+frontend/node_modules/
+frontend/coverage/
+frontend/dist/
+frontend/playwright-report/
+frontend/test-results/

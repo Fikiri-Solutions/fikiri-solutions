@@ -37,6 +37,7 @@ Copy `env.template` to `.env`. Key variables:
 - **Outlook:** `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID`, `MICROSOFT_REDIRECT_URI`
 - **Database:** `SQLITE_DATABASE_URL` (dev) or `DATABASE_URL` (production)
 - **Redis:** `REDIS_URL` (caching, rate limits, queues)
+- **Transactional email (SMTP):** `SMTP_USERNAME`, `SMTP_PASSWORD`, `FROM_EMAIL` — required for verification/welcome/reset emails. Gmail: use an App Password; see [docs/DEV_SMTP_VERIFICATION.md](docs/DEV_SMTP_VERIFICATION.md).
 - **Stripe (billing):** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
 
 See `env.template` for the full list and section comments.
