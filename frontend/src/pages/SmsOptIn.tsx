@@ -21,7 +21,7 @@ const SmsOptIn: React.FC = () => {
       <>
         <Helmet>
           <title>SMS Opt-In - Fikiri Solutions</title>
-          <meta name="description" content="SMS opt-in process and express consent disclosure for Fikiri Solutions account and security text messages (CTIA/TCPA compliant)" />
+          <meta name="description" content="Consent to receive SMS text messages from Fikiri Solutions LLC. Opt-in language and proof of consent for toll-free verification." />
         </Helmet>
 
         <div className="min-h-screen bg-gray-900 text-white">
@@ -46,33 +46,47 @@ const SmsOptIn: React.FC = () => {
             <div className="bg-gray-800 rounded-lg p-8 shadow-xl">
               <h1 className="text-3xl font-bold text-center mb-2 text-brand-primary flex items-center justify-center gap-2">
                 <MessageSquare className="h-8 w-8" />
-                SMS Opt-In &amp; Express Consent
+                SMS &amp; Text Message Opt-In
               </h1>
-              <p className="text-center text-gray-400 text-sm mb-8">Fikiri Solutions LLC – Account &amp; security text messages only (transactional)</p>
+              <p className="text-center text-gray-400 text-sm mb-6">Fikiri Solutions LLC – consent to receive SMS text messages</p>
+
+              {/* Prominent consent statement (Error 30513: clear language requesting consent for SMS) */}
+              <section className="mb-8 rounded-lg border-2 border-brand-primary/50 bg-gray-900/80 p-6">
+                <h2 className="text-lg font-semibold text-white mb-3">Consent to receive SMS text messages</h2>
+                <p className="text-white text-lg leading-relaxed">
+                  Users consent by checking a box that states:
+                </p>
+                <p className="mt-3 text-xl font-semibold text-brand-primary leading-snug">
+                  &ldquo;{SMS_CONSENT.checkboxLabel}&rdquo;
+                </p>
+                <p className="mt-4 text-gray-400 text-sm">
+                  This consent is collected only via our web form (signup and account settings). It is separate from our Privacy Policy and Terms of Service. The checkbox is unchecked by default.
+                </p>
+              </section>
 
               <section className="mb-8">
-                <h2 className="text-xl font-semibold text-white mb-4">Express consent workflow</h2>
+                <h2 className="text-xl font-semibold text-white mb-4">Where we collect consent</h2>
                 <p className="text-gray-300 leading-relaxed mb-4">
-                  We collect <strong>express consent</strong> for text messages (SMS) via a web form in two places. Consent is voluntary, informed, and requires an intentional action (unchecked-by-default checkbox + optional mobile number).
+                  We collect consent for <strong>SMS text messages</strong> via a web form in two places. The consent checkbox is <strong>unchecked by default</strong>.
                 </p>
                 <ul className="list-disc list-inside text-gray-300 space-y-2 mb-4">
-                  <li><Link to="/signup" className="text-brand-primary hover:underline">{siteUrl}/signup</Link> – During account registration: optional mobile number field and a consent checkbox that is <strong>unchecked by default</strong>.</li>
-                  <li>Account Settings (after login) – Profile tab: optional phone number and a consent checkbox that is <strong>unchecked by default</strong> to enable SMS notifications.</li>
+                  <li><Link to="/signup" className="text-brand-primary hover:underline">{siteUrl}/signup</Link> – Signup form: optional mobile number and consent checkbox (unchecked by default).</li>
+                  <li>Account Settings → Profile – Optional phone number and consent checkbox (unchecked by default).</li>
                 </ul>
                 <p className="text-gray-300 leading-relaxed">
-                  The user must voluntarily enter their mobile number and <strong>check the box</strong> to opt in. We do not send any SMS until both the number and consent are provided.
+                  We send SMS only after the user enters a mobile number and checks the consent box. No messages are sent without this explicit opt-in.
                 </p>
               </section>
 
               <section className="mb-8 rounded-lg border border-gray-600 bg-gray-900/50 p-6">
-                <h2 className="text-xl font-semibold text-white mb-4">Exact opt-in language (shown at point of collection)</h2>
-                <p className="text-gray-400 text-sm mb-2 uppercase tracking-wide">Upfront disclosure (above phone field and checkbox)</p>
-                <p className="text-gray-300 leading-relaxed mb-6 whitespace-pre-line">
+                <h2 className="text-xl font-semibold text-white mb-4">Exact language on the opt-in form</h2>
+                <p className="text-gray-400 text-sm mb-2 uppercase tracking-wide">Disclosure above the checkbox</p>
+                <p className="text-gray-300 leading-relaxed mb-6">
                   {SMS_CONSENT.upfrontDisclosure}
                 </p>
-                <p className="text-gray-400 text-sm mb-2 uppercase tracking-wide">Consent checkbox label (explicit request for text messages/SMS)</p>
-                <p className="text-gray-300 leading-relaxed font-medium">
-                  &ldquo;{SMS_CONSENT.checkboxLabel}&rdquo;
+                <p className="text-gray-400 text-sm mb-2 uppercase tracking-wide">Checkbox label (user must check to opt in)</p>
+                <p className="text-white font-medium text-base">
+                  {SMS_CONSENT.checkboxLabel}
                 </p>
               </section>
 

@@ -2,15 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Building2, TrendingUp, Settings, CheckCircle, Loader2 } from 'lucide-react';
 import { useToast } from './Toast';
 import { useAuth } from '../contexts/AuthContext';
-import { apiClient } from '../services/apiClient';
-
-interface IndustryPrompt {
-  industry: string;
-  tone: string;
-  focus_areas: string[];
-  tools: string[];
-  pricing_tier: string;
-}
+import { apiClient, type IndustryPromptConfig, type IndustryUsageMetrics } from '../services/apiClient';
 
 interface PricingTier {
   name: string;
@@ -36,7 +28,7 @@ export const IndustryAutomation: React.FC = () => {
   const [isLoadingPrompts, setIsLoadingPrompts] = useState<boolean>(true);
   const [isLoadingTiers, setIsLoadingTiers] = useState<boolean>(true);
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState<boolean>(true);
-  const [prompts, setPrompts] = useState<Record<string, IndustryPrompt>>({});
+  const [prompts, setPrompts] = useState<Record<string, IndustryPromptConfig>>({});
   const [pricingTiers, setPricingTiers] = useState<Record<string, PricingTier>>({});
   const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
   const [toolsUsed, setToolsUsed] = useState<any[]>([]);
@@ -47,113 +39,19 @@ export const IndustryAutomation: React.FC = () => {
     fetchIndustryPrompts();
     fetchPricingTiers();
     fetchClientAnalytics();
-  }, [clientId]);
+  }, [user?.id]);
 
   const fetchIndustryPrompts = async () => {
     setIsLoadingPrompts(true);
     try {
-      // Mock data for now - replace with actual API call when backend endpoints are ready
-      const mockPrompts = {
-        real_estate: {
-          industry: 'real_estate',
-          tone: 'professional',
-          focus_areas: ['property listings', 'client consultations', 'market analysis', 'showings scheduling'],
-          tools: ['calendar', 'crm', 'property_api', 'market_data'],
-          pricing_tier: 'business'
-        },
-        property_management: {
-          industry: 'property_management',
-          tone: 'professional',
-          focus_areas: ['tenant communication', 'maintenance requests', 'lease renewals', 'rent collection'],
-          tools: ['calendar', 'crm', 'payment_processor', 'maintenance_tracker'],
-          pricing_tier: 'growth'
-        },
-        construction: {
-          industry: 'construction',
-          tone: 'professional',
-          focus_areas: ['project quotes', 'client communication', 'scheduling', 'material orders'],
-          tools: ['calendar', 'quote_generator', 'project_manager', 'inventory'],
-          pricing_tier: 'growth'
-        },
-        legal_services: {
-          industry: 'legal_services',
-          tone: 'professional',
-          focus_areas: ['client intake', 'appointment scheduling', 'document management', 'case updates'],
-          tools: ['calendar', 'crm', 'document_storage', 'compliance_checker'],
-          pricing_tier: 'business'
-        },
-        cleaning_services: {
-          industry: 'cleaning_services',
-          tone: 'friendly',
-          focus_areas: ['service scheduling', 'quote requests', 'recurring appointments', 'customer follow-up'],
-          tools: ['calendar', 'quote_generator', 'recurring_scheduler', 'crm'],
-          pricing_tier: 'starter'
-        },
-        auto_services: {
-          industry: 'auto_services',
-          tone: 'friendly',
-          focus_areas: ['appointment booking', 'service reminders', 'estimate requests', 'customer follow-up'],
-          tools: ['calendar', 'quote_generator', 'reminder_system', 'crm'],
-          pricing_tier: 'starter'
-        },
-        event_planning: {
-          industry: 'event_planning',
-          tone: 'friendly',
-          focus_areas: ['client consultations', 'vendor coordination', 'timeline management', 'follow-up'],
-          tools: ['calendar', 'crm', 'project_manager', 'vendor_portal'],
-          pricing_tier: 'growth'
-        },
-        fitness_wellness: {
-          industry: 'fitness_wellness',
-          tone: 'motivational',
-          focus_areas: ['class scheduling', 'membership inquiries', 'appointment booking', 'wellness tips'],
-          tools: ['calendar', 'crm', 'class_scheduler', 'payment_processor'],
-          pricing_tier: 'starter'
-        },
-        beauty_spa: {
-          industry: 'beauty_spa',
-          tone: 'friendly',
-          focus_areas: ['appointment booking', 'service inquiries', 'reminders', 'promotions'],
-          tools: ['calendar', 'crm', 'reminder_system', 'promotion_manager'],
-          pricing_tier: 'starter'
-        },
-        accounting_consulting: {
-          industry: 'accounting_consulting',
-          tone: 'professional',
-          focus_areas: ['client onboarding', 'appointment scheduling', 'document requests', 'tax reminders'],
-          tools: ['calendar', 'crm', 'document_storage', 'reminder_system'],
-          pricing_tier: 'business'
-        },
-        restaurant: {
-          industry: 'restaurant',
-          tone: 'friendly',
-          focus_areas: ['reservation management', 'menu recommendations', 'special promotions', 'catering inquiries'],
-          tools: ['reservation_system', 'menu_api', 'promotion_tracker', 'crm'],
-          pricing_tier: 'growth'
-        },
-        medical_practice: {
-          industry: 'medical_practice',
-          tone: 'professional',
-          focus_areas: ['appointment scheduling', 'patient reminders', 'HIPAA compliance', 'follow-up care'],
-          tools: ['calendar', 'patient_portal', 'compliance_checker', 'reminder_system'],
-          pricing_tier: 'business'
-        },
-        enterprise_solutions: {
-          industry: 'enterprise_solutions',
-          tone: 'professional',
-          focus_areas: ['custom workflows', 'multi-industry support', 'advanced analytics', 'white-label options'],
-          tools: ['custom_api', 'white_label', 'dedicated_support', 'advanced_analytics'],
-          pricing_tier: 'enterprise'
-        }
-      };
-      setPrompts(mockPrompts);
+      const promptsData = await apiClient.getIndustryPrompts();
+      setPrompts(promptsData);
     } catch (error) {
       addToast({ 
         type: 'error', 
         title: 'Load Failed', 
         message: 'Failed to load industry prompts. Using fallback data.' 
       });
-      // Set fallback data
       setPrompts({
         real_estate: {
           industry: 'real_estate',
@@ -178,34 +76,8 @@ export const IndustryAutomation: React.FC = () => {
   const fetchPricingTiers = async () => {
     setIsLoadingTiers(true);
     try {
-      // Mock data for now - replace with actual API call when backend endpoints are ready
-      const mockTiers = {
-        starter: {
-          name: 'Starter',
-          price: 39,
-          responses_limit: 200,
-          features: ['Basic AI responses', 'Email automation', 'Simple CRM', '500 emails/month']
-        },
-        growth: {
-          name: 'Growth',
-          price: 79,
-          responses_limit: 800,
-          features: ['Advanced AI responses', 'Advanced CRM', 'Priority support', '2,000 emails/month']
-        },
-        business: {
-          name: 'Business',
-          price: 199,
-          responses_limit: 4000,
-          features: ['White-label options', 'Custom integrations', 'Phone support', '10,000 emails/month']
-        },
-        enterprise: {
-          name: 'Enterprise',
-          price: 399,
-          responses_limit: 'unlimited',
-          features: ['Custom AI training', 'Dedicated support', 'SLA guarantee', 'Unlimited emails']
-        }
-      };
-      setPricingTiers(mockTiers);
+      const pricing = await apiClient.getIndustryPricingTiers();
+      setPricingTiers(pricing);
     } catch (error) {
       addToast({ 
         type: 'error', 
@@ -216,7 +88,7 @@ export const IndustryAutomation: React.FC = () => {
       setPricingTiers({
         starter: {
           name: 'Starter',
-          price: 39,
+          price: 49,
           responses_limit: 200,
           features: ['Basic AI responses', 'Email automation', 'Simple CRM', '500 emails/month']
         }
@@ -229,15 +101,8 @@ export const IndustryAutomation: React.FC = () => {
   const fetchClientAnalytics = async () => {
     setIsLoadingAnalytics(true);
     try {
-      // Mock data for now - replace with actual API call when backend endpoints are ready
-      const mockAnalytics = {
-        tier: 'growth',
-        responses: 1250,
-        tool_calls: 45,
-        tokens: 125000,
-        monthly_cost: 79
-      };
-      setUsageMetrics(mockAnalytics);
+      const usage = await apiClient.getIndustryUsage(getUserId());
+      setUsageMetrics(usage as IndustryUsageMetrics);
     } catch (error) {
       addToast({ 
         type: 'error', 
@@ -463,14 +328,14 @@ export const IndustryAutomation: React.FC = () => {
                     }
                     acc[category].push({ industry, config });
                     return acc;
-                  }, {} as Record<string, Array<{industry: string, config: IndustryPrompt}>>)
-                ).map(([category, industries]: [string, Array<{industry: string, config: IndustryPrompt}>]) => (
+                  }, {} as Record<string, Array<{industry: string, config: IndustryPromptConfig}>>)
+                ).map(([category, industries]: [string, Array<{industry: string, config: IndustryPromptConfig}>]) => (
                   <div key={category} className="space-y-3">
                     <h3 className="text-lg font-medium text-brand-text dark:text-white border-b border-brand-text/10 dark:border-gray-700 pb-2">
                       {category}
                     </h3>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-                      {industries.map(({ industry, config }: {industry: string, config: IndustryPrompt}) => (
+                      {industries.map(({ industry, config }: {industry: string, config: IndustryPromptConfig}) => (
                         <button
                           key={industry}
                           onClick={() => setSelectedIndustry(industry)}

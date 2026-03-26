@@ -83,7 +83,11 @@ export const Services: React.FC = () => {
             return {
               ...service,
               enabled: apiService.status === 'active' || apiService.status === 'healthy',
-              settings: service.settings // Keep existing settings, API doesn't return settings in getServices()
+              // Merge saved settings into defaults so we don't silently clobber user configuration.
+              settings: {
+                ...service.settings,
+                ...(apiService.settings || {})
+              } as any,
             } as typeof service
           }
           return service
@@ -222,11 +226,20 @@ export const Services: React.FC = () => {
       }
       
       // Service test result
+      const payload = result ?? {}
+      const successFromPayload = payload.success !== undefined ? payload.success : true
+      const errorFromPayload =
+        payload.error ||
+        payload.message ||
+        payload?.data?.error ||
+        payload?.data?.message
+
       setTestResult({
         serviceId,
         serviceName: service?.name || serviceId,
-        success: true,
-        data: result
+        success: Boolean(successFromPayload),
+        data: result,
+        error: successFromPayload ? undefined : (errorFromPayload || 'Service test failed')
       })
     } catch (error) {
       // Service test failed

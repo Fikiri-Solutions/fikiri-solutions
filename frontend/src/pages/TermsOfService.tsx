@@ -1,9 +1,24 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Home, Shield } from 'lucide-react';
 import { RadiantLayout } from '../components/radiant';
 import { PublicChatbotWidget } from '../components/PublicChatbotWidget';
+import { useAuth } from '../contexts/AuthContext';
 
 const TermsOfService: React.FC = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
+  const homeTo = isAuthenticated && user?.onboarding_completed ? '/dashboard' : '/';
+
+  const handleBack = () => {
+    if (window.history.length > 2) {
+      navigate(-1);
+    } else {
+      navigate(homeTo);
+    }
+  };
+
   return (
     <RadiantLayout>
     <>
@@ -14,6 +29,31 @@ const TermsOfService: React.FC = () => {
       
       <div className="min-h-screen bg-gray-900 text-white">
         <div className="container mx-auto px-4 py-8 max-w-4xl">
+          {/* Navigation Buttons - match PrivacyPolicy for consistent back/dashboard behavior */}
+          <div className="mb-6 flex flex-wrap items-center gap-4">
+            <button
+              onClick={handleBack}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
+            <button
+              onClick={() => navigate(homeTo)}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              <Home className="h-4 w-4" />
+              Home
+            </button>
+            <button
+              onClick={() => navigate('/privacy')}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              <Shield className="h-4 w-4" />
+              Privacy Policy
+            </button>
+          </div>
+
           <div className="bg-gray-800 rounded-lg p-8 shadow-xl">
             <h1 className="text-4xl font-bold text-center mb-8 text-brand-primary">
                   Terms of Service
@@ -22,7 +62,7 @@ const TermsOfService: React.FC = () => {
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300 mb-6">
                 <strong>Effective Date:</strong> October 18, 2025<br />
-                <strong>Last Updated:</strong> October 18, 2025
+                <strong>Last Updated:</strong> March 12, 2026
               </p>
 
               <section className="mb-8">
@@ -101,6 +141,79 @@ const TermsOfService: React.FC = () => {
                   <li><strong>Security:</strong> Implementing appropriate security measures</li>
                   <li><strong>User Consent:</strong> Obtaining explicit user consent for data access</li>
                 </ul>
+              </section>
+
+              <section className="mb-8">
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Intellectual Property</h2>
+                <p className="text-gray-300 mb-3">
+                  Fikiri Solutions owns all rights in the Service, including the software, branding, trademarks, and documentation. 
+                  You may not copy, modify, distribute, or create derivative works of our Service or content without written permission.
+                </p>
+                <p className="text-gray-300">
+                  You retain ownership of the content and data you submit (e.g., emails, contacts). By using the Service, you grant us 
+                  a limited license to process that data solely to provide and improve the Service, in accordance with our{" "}
+                  <a href="/privacy" className="text-brand-primary hover:text-muted-foreground">Privacy Policy</a>.
+                </p>
+              </section>
+
+              <section className="mb-8">
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Payment and Subscription Terms</h2>
+                <p className="text-gray-300 mb-3">
+                  Paid plans are billed according to the cycle you choose (e.g., monthly or annually). Fees are due in advance and 
+                  may auto-renew unless you cancel before the renewal date. We may change fees with reasonable notice; continued use 
+                  after the change constitutes acceptance.
+                </p>
+                <p className="text-gray-300">
+                  Refunds are handled in accordance with our billing policy at the time of purchase. Chargebacks or disputed payments 
+                  may result in suspension of access until resolved.
+                </p>
+              </section>
+
+              <section className="mb-8">
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Disclaimer of Warranty and Limitation of Liability</h2>
+                <p className="text-gray-300 mb-3">
+                  <strong>Disclaimer:</strong> The Service is provided "as is" and "as available" without warranties of any kind, 
+                  express or implied, including but not limited to merchantability, fitness for a particular purpose, or non-infringement. 
+                  We do not warrant that the Service will be uninterrupted, error-free, or secure.
+                </p>
+                <p className="text-gray-300">
+                  <strong>Limitation of liability:</strong> To the maximum extent permitted by law, Fikiri Solutions and its affiliates 
+                  shall not be liable for any indirect, incidental, special, consequential, or punitive damages, or for loss of profits, 
+                  data, or goodwill. Our total liability for any claims arising from or related to the Service shall not exceed the 
+                  amount you paid us in the twelve (12) months preceding the claim, or one hundred U.S. dollars ($100), whichever is greater.
+                </p>
+              </section>
+
+              <section className="mb-8">
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Account Termination</h2>
+                <p className="text-gray-300 mb-3">
+                  We reserve the right to suspend or terminate your account and access to the Service at any time, with or without 
+                  notice, if we believe you have violated these Terms, our Acceptable Use Policy, or for any other reason we deem 
+                  necessary to protect the Service or other users.
+                </p>
+                <p className="text-gray-300">
+                  You may close your account at any time through your account settings or by contacting us. Upon termination, your 
+                  right to use the Service ceases; we may retain or delete your data in accordance with our Privacy Policy and 
+                  applicable law.
+                </p>
+              </section>
+
+              <section className="mb-8">
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Privacy and Data</h2>
+                <p className="text-gray-300">
+                  How we collect, use, and protect your data is described in our{" "}
+                  <a href="/privacy" className="text-brand-primary hover:text-muted-foreground">Privacy Policy</a>. 
+                  By using the Service, you consent to those practices.
+                </p>
+              </section>
+
+              <section className="mb-8">
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Governing Law and Disputes</h2>
+                <p className="text-gray-300">
+                  These Terms are governed by the laws of the United States and the State of Delaware, without regard to conflict 
+                  of law principles. Any dispute arising from these Terms or the Service shall be resolved in the state or federal 
+                  courts located in Delaware, and you consent to the personal jurisdiction of such courts.
+                </p>
               </section>
 
               <section className="mb-8">

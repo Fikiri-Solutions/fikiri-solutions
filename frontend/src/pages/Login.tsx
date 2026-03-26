@@ -10,13 +10,36 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { apiClient } from '../services/apiClient'
 
 export const Login: React.FC = () => {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(() => {
+    if (typeof window === 'undefined') return false
+    try {
+      return localStorage.getItem('fikiri-remember-me') === 'true'
+    } catch {
+      return false
+    }
+  })
+  const [email, setEmail] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    try {
+      if (localStorage.getItem('fikiri-remember-me') === 'true') {
+        return localStorage.getItem('fikiri-remember-email') || ''
+      }
+    } catch { /* ignore */ }
+    return ''
+  })
+  const [password, setPassword] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    try {
+      if (localStorage.getItem('fikiri-remember-me') === 'true') {
+        return localStorage.getItem('fikiri-remember-password') || ''
+      }
+    } catch { /* ignore */ }
+    return ''
+  })
   const [error, setError] = useState('')
   const [emailError, setEmailError] = useState('')
   const [passwordError, setPasswordError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const [isMicrosoftLoading, setIsMicrosoftLoading] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -25,24 +48,20 @@ export const Login: React.FC = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
-  // Load saved credentials on component mount
+  // When "Remember me" is checked and we have saved credentials, keep form in sync (e.g. after navigation)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const savedEmail = localStorage.getItem('fikiri-remember-email')
-        const savedPassword = localStorage.getItem('fikiri-remember-password')
-        const savedRememberMe = localStorage.getItem('fikiri-remember-me')
-        
-        if (savedEmail && savedPassword && savedRememberMe === 'true') {
-          setEmail(savedEmail)
-          setPassword(savedPassword)
-          setRememberMe(true)
-        }
-      } catch (error) {
-        console.error('Error loading saved credentials:', error)
+    if (typeof window === 'undefined' || !rememberMe) return
+    try {
+      const savedEmail = localStorage.getItem('fikiri-remember-email')
+      const savedPassword = localStorage.getItem('fikiri-remember-password')
+      if (savedEmail && savedPassword) {
+        setEmail((prev) => (prev !== savedEmail ? savedEmail : prev))
+        setPassword((prev) => (prev !== savedPassword ? savedPassword : prev))
       }
+    } catch (err) {
+      console.error('Error loading saved credentials:', err)
     }
-  }, [])
+  }, [rememberMe])
 
   // Track mouse position for interactive background
   useEffect(() => {
@@ -458,7 +477,15 @@ export const Login: React.FC = () => {
               </p>
             </div>
             
-            <form className="space-y-6" onSubmit={handleSubmit}>
+            <form
+              id="login-form"
+              name="login"
+              method="post"
+              action="#"
+              className="space-y-6"
+              onSubmit={handleSubmit}
+              autoComplete="on"
+            >
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-4">
                   <p className="text-sm text-red-700">{error}</p>
@@ -478,7 +505,7 @@ export const Login: React.FC = () => {
                       id="email"
                       name="email"
                       type="email"
-                      autoComplete="email"
+                      autoComplete="username"
                       required
                       className={`w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-all duration-200 ${emailError ? 'border-red-500 focus:ring-red-500' : ''}`}
                       placeholder="Enter your email"
@@ -534,11 +561,13 @@ export const Login: React.FC = () => {
                     id="remember-me"
                     name="remember-me"
                     type="checkbox"
+                    autoComplete="off"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
                     className="h-4 w-4 text-brand-primary focus:ring-brand-primary border-gray-300 rounded"
+                    aria-describedby="remember-me-label"
                   />
-                  <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
+                  <label id="remember-me-label" htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
                     Remember me
                   </label>
                 </div>

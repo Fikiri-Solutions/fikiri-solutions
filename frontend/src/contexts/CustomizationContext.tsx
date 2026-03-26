@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
+import { apiClient } from '../services/apiClient'
+import { useAuth } from './AuthContext'
 
 export interface UserCustomization {
   accentColor: string
@@ -33,6 +35,7 @@ const defaultCustomization: UserCustomization = {
 }
 
 export const CustomizationProvider: React.FC<CustomizationProviderProps> = ({ children }) => {
+  const { isAuthenticated, isLoading } = useAuth()
   const [customization, setCustomization] = useState<UserCustomization>(defaultCustomization)
 
   // Load customization from localStorage on mount
@@ -49,6 +52,33 @@ export const CustomizationProvider: React.FC<CustomizationProviderProps> = ({ ch
       }
     }
   }, [])
+
+  // Load persisted logo from the backend only when authenticated (endpoint is JWT-only).
+  // If the backend has no logo, we keep the localStorage value.
+  useEffect(() => {
+    if (isLoading || !isAuthenticated) {
+      return
+    }
+
+    let cancelled = false
+
+    const run = async () => {
+      try {
+        const res = await apiClient.getUserCustomizationLogo()
+        if (cancelled) return
+        if (res.logoUrl) {
+          setCustomization(prev => ({ ...prev, logoUrl: res.logoUrl }))
+        }
+      } catch {
+        // Ignore: customization should still work with localStorage alone.
+      }
+    }
+
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthenticated, isLoading])
 
   // Save customization to localStorage
   useEffect(() => {

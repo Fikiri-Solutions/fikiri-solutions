@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Upload, RotateCcw, X } from 'lucide-react'
 import { useCustomization } from '../contexts/CustomizationContext'
+import { apiClient } from '../services/apiClient'
 
 interface CustomizationPanelProps {
   isOpen: boolean
@@ -22,6 +23,7 @@ export const CustomizationPanel: React.FC<CustomizationPanelProps> = ({ isOpen, 
   const { customization, updateCustomization, resetCustomization } = useCustomization()
   const [customColor, setCustomColor] = useState(customization.accentColor)
   const [companyName, setCompanyName] = useState(customization.companyName || '')
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
 
   const handleColorChange = (color: string) => {
     setCustomColor(color)
@@ -33,7 +35,7 @@ export const CustomizationPanel: React.FC<CustomizationPanelProps> = ({ isOpen, 
     updateCustomization({ companyName: name })
   }
 
-  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
       const reader = new FileReader()
@@ -43,12 +45,35 @@ export const CustomizationPanel: React.FC<CustomizationPanelProps> = ({ isOpen, 
       }
       reader.readAsDataURL(file)
     }
+
+    if (!file) return
+
+    setIsUploadingLogo(true)
+    try {
+      const res = await apiClient.uploadUserCustomizationLogo(file)
+      if (res.logoUrl) {
+        updateCustomization({ logoUrl: res.logoUrl })
+      }
+    } catch (err) {
+      // Keep the local preview even if persistence fails.
+      console.error('Logo upload failed:', err)
+    } finally {
+      setIsUploadingLogo(false)
+    }
   }
 
-  const handleReset = () => {
+  const handleReset = async () => {
     resetCustomization()
     setCustomColor('#3B82F6')
     setCompanyName('Fikiri Solutions')
+
+    try {
+      await apiClient.deleteUserCustomizationLogo()
+      updateCustomization({ logoUrl: undefined })
+    } catch (err) {
+      // If deletion fails, local reset still applies; next refresh may restore persisted value.
+      console.error('Logo delete failed:', err)
+    }
   }
 
   if (!isOpen) return null
@@ -100,14 +125,21 @@ export const CustomizationPanel: React.FC<CustomizationPanelProps> = ({ isOpen, 
                         className="h-10 w-10 rounded-lg object-cover"
                       />
                     )}
-                    <label className="flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                    <label
+                      className={`flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors ${
+                        isUploadingLogo ? 'opacity-60 cursor-not-allowed' : ''
+                      }`}
+                    >
                       <Upload className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Upload Logo</span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        {isUploadingLogo ? 'Uploading...' : 'Upload Logo'}
+                      </span>
                       <input
                         type="file"
                         accept="image/*"
                         onChange={handleLogoUpload}
                         className="hidden"
+                        disabled={isUploadingLogo}
                       />
                     </label>
                   </div>

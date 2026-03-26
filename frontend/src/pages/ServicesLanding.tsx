@@ -34,7 +34,7 @@ export const ServicesLanding: React.FC = () => {
   const pricingTiers = [
     {
       name: "Starter",
-      price: "$39",
+      price: "$49",
       period: "/month",
       description: "Perfect for small businesses",
       features: [
@@ -49,7 +49,7 @@ export const ServicesLanding: React.FC = () => {
     },
     {
       name: "Growth",
-      price: "$79",
+      price: "$99",
       period: "/month",
       description: "For growing businesses",
       features: [
@@ -83,7 +83,7 @@ export const ServicesLanding: React.FC = () => {
     },
     {
       name: "Enterprise",
-      price: "$399",
+      price: "$499",
       period: "/month",
       description: "For large organizations",
       features: [

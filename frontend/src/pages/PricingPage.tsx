@@ -128,13 +128,13 @@ const PricingPage: React.FC = () => {
   const pricingTiers: PricingTier[] = [
     {
       name: 'Starter',
-      price: billingPeriod === 'monthly' ? 39 : (39 * 12) - Math.round(39 * 12 * 0.10), // Exactly 10% discount
+      price: billingPeriod === 'monthly' ? 49 : (49 * 12) - Math.round(49 * 12 * 0.10), // Exactly 10% discount
       period: billingPeriod === 'monthly' ? '/month' : '/year',
-      description: 'Perfect for small businesses getting started with automation',
+      description: 'For small businesses getting started with verified core automation',
       responses_limit: 200,
       features: [
         '200 AI responses per month',
-        'Basic email automation',
+        'Core email automation (verified actions)',
         'Simple CRM integration',
         '500 emails/month',
         'Community support',
@@ -145,9 +145,9 @@ const PricingPage: React.FC = () => {
     },
     {
       name: 'Growth',
-      price: billingPeriod === 'monthly' ? 79 : (79 * 12) - Math.round(79 * 12 * 0.10), // Exactly 10% discount
+      price: billingPeriod === 'monthly' ? 99 : (99 * 12) - Math.round(99 * 12 * 0.10), // Exactly 10% discount
       period: billingPeriod === 'monthly' ? '/month' : '/year',
-      description: 'For growing businesses that need advanced automation',
+      description: 'For growing businesses that need higher limits and broader automation',
       responses_limit: 800,
       features: [
         '800 AI responses per month',
@@ -157,7 +157,7 @@ const PricingPage: React.FC = () => {
         'Priority email support',
         'Advanced analytics',
         'Basic integrations',
-        'Workflow automation'
+        'Workflow automation (includes partial actions)'
       ],
       highlighted: true,
       popular: true,
@@ -168,7 +168,7 @@ const PricingPage: React.FC = () => {
       name: 'Business',
       price: billingPeriod === 'monthly' ? 199 : (199 * 12) - Math.round(199 * 12 * 0.10), // Exactly 10% discount
       period: billingPeriod === 'monthly' ? '/month' : '/year',
-      description: 'For established businesses needing comprehensive solutions',
+      description: 'For established businesses needing comprehensive workflows and support',
       responses_limit: 4000,
       features: [
         '4,000 AI responses per month',
@@ -186,9 +186,9 @@ const PricingPage: React.FC = () => {
     },
     {
       name: 'Enterprise',
-      price: billingPeriod === 'monthly' ? 399 : (399 * 12) - Math.round(399 * 12 * 0.10), // Exactly 10% discount
+      price: billingPeriod === 'monthly' ? 499 : (499 * 12) - Math.round(499 * 12 * 0.10), // Exactly 10% discount
       period: billingPeriod === 'monthly' ? '/month' : '/year',
-      description: 'For large organizations with custom requirements',
+      description: 'For large organizations with custom requirements and governance',
       responses_limit: 'unlimited',
       features: [
         'Unlimited AI responses',
@@ -218,14 +218,14 @@ const PricingPage: React.FC = () => {
       name: 'Property Management',
       icon: '🏘️',
       tier: 'Growth',
-      price: billingPeriod === 'monthly' ? 79 : (79 * 12) - Math.round(79 * 12 * 0.10), // Exactly 10% discount
+      price: billingPeriod === 'monthly' ? 99 : (99 * 12) - Math.round(99 * 12 * 0.10), // Exactly 10% discount
       features: ['Tenant communication', 'Maintenance requests', 'Lease renewals', 'Rent collection']
     },
     {
       name: 'Construction',
       icon: '🔨',
       tier: 'Growth',
-      price: billingPeriod === 'monthly' ? 79 : (79 * 12) - Math.round(79 * 12 * 0.10), // Exactly 10% discount
+      price: billingPeriod === 'monthly' ? 99 : (99 * 12) - Math.round(99 * 12 * 0.10), // Exactly 10% discount
       features: ['Project quotes', 'Client communication', 'Scheduling', 'Material orders']
     },
     {
@@ -239,35 +239,35 @@ const PricingPage: React.FC = () => {
       name: 'Cleaning Services',
       icon: '🧹',
       tier: 'Starter',
-      price: billingPeriod === 'monthly' ? 39 : (39 * 12) - Math.round(39 * 12 * 0.10), // Exactly 10% discount
+      price: billingPeriod === 'monthly' ? 49 : (49 * 12) - Math.round(49 * 12 * 0.10), // Exactly 10% discount
       features: ['Service scheduling', 'Quote requests', 'Recurring appointments', 'Customer follow-up']
     },
     {
       name: 'Auto Services',
       icon: '🚗',
       tier: 'Starter',
-      price: billingPeriod === 'monthly' ? 39 : (39 * 12) - Math.round(39 * 12 * 0.10), // Exactly 10% discount
+      price: billingPeriod === 'monthly' ? 49 : (49 * 12) - Math.round(49 * 12 * 0.10), // Exactly 10% discount
       features: ['Appointment booking', 'Service reminders', 'Estimate requests', 'Customer follow-up']
     },
     {
       name: 'Event Planning',
       icon: '🎉',
       tier: 'Growth',
-      price: billingPeriod === 'monthly' ? 79 : (79 * 12) - Math.round(79 * 12 * 0.10), // Exactly 10% discount
+      price: billingPeriod === 'monthly' ? 99 : (99 * 12) - Math.round(99 * 12 * 0.10), // Exactly 10% discount
       features: ['Client consultations', 'Vendor coordination', 'Timeline management', 'Follow-up']
     },
     {
       name: 'Fitness & Wellness',
       icon: '💪',
       tier: 'Starter',
-      price: billingPeriod === 'monthly' ? 39 : (39 * 12) - Math.round(39 * 12 * 0.10), // Exactly 10% discount
+      price: billingPeriod === 'monthly' ? 49 : (49 * 12) - Math.round(49 * 12 * 0.10), // Exactly 10% discount
       features: ['Class scheduling', 'Membership inquiries', 'Appointment booking', 'Wellness tips']
     },
     {
       name: 'Beauty & Spa',
       icon: '💅',
       tier: 'Starter',
-      price: billingPeriod === 'monthly' ? 39 : (39 * 12) - Math.round(39 * 12 * 0.10), // Exactly 10% discount
+      price: billingPeriod === 'monthly' ? 49 : (49 * 12) - Math.round(49 * 12 * 0.10), // Exactly 10% discount
       features: ['Appointment booking', 'Service inquiries', 'Reminders', 'Promotions']
     },
     {
@@ -281,7 +281,7 @@ const PricingPage: React.FC = () => {
       name: 'Restaurant',
       icon: '🍽️',
       tier: 'Growth',
-      price: billingPeriod === 'monthly' ? 79 : (79 * 12) - Math.round(79 * 12 * 0.10), // Exactly 10% discount
+      price: billingPeriod === 'monthly' ? 99 : (99 * 12) - Math.round(99 * 12 * 0.10), // Exactly 10% discount
       features: ['Reservation management', 'Menu recommendations', 'Special promotions', 'Catering inquiries']
     },
     {
@@ -295,7 +295,7 @@ const PricingPage: React.FC = () => {
       name: 'Enterprise Solutions',
       icon: '🏢',
       tier: 'Enterprise',
-      price: billingPeriod === 'monthly' ? 399 : (399 * 12) - Math.round(399 * 12 * 0.10), // Exactly 10% discount
+      price: billingPeriod === 'monthly' ? 499 : (499 * 12) - Math.round(499 * 12 * 0.10), // Exactly 10% discount
       features: ['Custom workflows', 'Multi-industry support', 'Advanced analytics', 'White-label options']
     }
   ];
@@ -305,11 +305,11 @@ const PricingPage: React.FC = () => {
       category: 'Core Features',
       features: [
         { name: 'AI Responses per month', starter: '200', growth: '800', business: '4,000', enterprise: 'Unlimited' },
-        { name: 'Email automation', starter: true, growth: true, business: true, enterprise: true },
+        { name: 'Core email automation', starter: true, growth: true, business: true, enterprise: true },
         { name: 'Email limit per month', starter: '500', growth: '2,000', business: '10,000', enterprise: 'Unlimited' },
         { name: 'CRM integration', starter: 'Basic', growth: 'Advanced', business: 'Advanced', enterprise: 'Custom' },
         { name: 'Analytics', starter: 'Basic', growth: 'Advanced', business: 'Advanced', enterprise: 'Custom' },
-        { name: 'Integrations', starter: 'Basic', growth: 'Basic', business: 'Custom', enterprise: 'Custom' }
+        { name: 'Integrations', starter: 'Optional add-ons', growth: 'Optional add-ons', business: 'Custom', enterprise: 'Custom' }
       ]
     },
     {
@@ -346,6 +346,10 @@ const PricingPage: React.FC = () => {
               </h1>
               <p className="text-xl text-muted-foreground mb-4">
                 Get all the Fikiri Solutions features — pay for what you use
+              </p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Verified now: core CRM, lead capture, and core automation actions. Optional integrations: Gmail, Outlook, Twilio, Slack, Stripe.
+                Some advanced automation actions are marked partial or coming soon.
               </p>
               <p className="text-sm text-muted-foreground mb-8">
                 {purchaseType === 'trial' ? (
@@ -559,10 +563,10 @@ const PricingPage: React.FC = () => {
                 </ul>
 
                 <button
-                  onClick={() => navigate('/industry')}
+                  onClick={() => navigate('/analytics')}
                   className="w-full mt-4 py-2 px-4 bg-brand-primary hover:bg-fikiri-400 text-white font-medium rounded-lg transition-all duration-300"
                 >
-                  Try {industry.name} AI
+                  View Usage Analytics
                 </button>
               </motion.div>
             ))}
@@ -669,6 +673,10 @@ const PricingPage: React.FC = () => {
                 {
                   question: "What happens if I exceed my response limit?",
                   answer: "We'll notify you when you're approaching your limit. You can upgrade your plan or purchase additional responses as needed."
+                },
+                {
+                  question: "Are all automation actions production-complete today?",
+                  answer: "No. Core automation paths are live now. Some advanced actions are marked as partial or coming soon in Automation Studio so teams can plan safely."
                 }
               ].map((faq, index) => (
                 <div key={index} className="bg-card/90 backdrop-blur-sm rounded-xl p-6 border border-border shadow-sm">

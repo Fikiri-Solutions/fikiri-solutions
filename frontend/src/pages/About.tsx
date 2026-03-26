@@ -1,4 +1,5 @@
 import React from 'react'
+import { Mail, Users, Brain } from 'lucide-react'
 import { RadiantLayout, Container, Gradient, AnimatedBackground } from '../components/radiant'
 import { PublicChatbotWidget } from '../components/PublicChatbotWidget'
 
@@ -24,15 +25,107 @@ export const About: React.FC = () => {
           </Container>
         </section>
 
-        {/* Business Information */}
+        {/* Main Content */}
         <section className="py-16 relative z-10">
           <Container>
-            <div className="bg-card/90 backdrop-blur-sm rounded-2xl border border-border shadow-sm p-8 mb-12">
-              <h2 className="text-2xl font-semibold text-foreground mb-6">
-                Business Information
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Services */}
+            <h2 className="text-2xl font-semibold text-foreground mb-6">
+              Our Services
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+              <div className="group text-center bg-card/90 backdrop-blur-sm rounded-2xl border border-border/80 shadow-sm p-8 relative overflow-hidden">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-500/5 via-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="relative bg-gradient-to-r from-orange-500 to-red-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Mail className="w-7 h-7 text-white" />
+                </div>
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  Email Automation
+                </h3>
+                <p className="text-muted-foreground text-sm">
+                  AI-powered email processing and response automation
+                </p>
+              </div>
+              <div className="group text-center bg-card/90 backdrop-blur-sm rounded-2xl border border-border/80 shadow-sm p-8 relative overflow-hidden">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-500/5 via-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="relative bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Users className="w-7 h-7 text-white" />
+                </div>
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  CRM Management
+                </h3>
+                <p className="text-muted-foreground text-sm">
+                  Customer relationship management and lead tracking
+                </p>
+              </div>
+              <div className="group text-center bg-card/90 backdrop-blur-sm rounded-2xl border border-border/80 shadow-sm p-8 relative overflow-hidden">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-sky-500/5 via-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="relative bg-gradient-to-r from-sky-500 to-indigo-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Brain className="w-7 h-7 text-white" />
+                </div>
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  AI Assistant
+                </h3>
+                <p className="text-muted-foreground text-sm">
+                  Intelligent business automation and analytics
+                </p>
+              </div>
+            </div>
+
+            {/* Specializations / social proof by example */}
+            <h2 className="text-2xl font-semibold text-foreground mb-2">
+              Industry Examples
+            </h2>
+            <p className="text-sm text-muted-foreground mb-6 max-w-2xl">
+              We partner with service-driven businesses of all sizes. Here are a few places where teams are already using Fikiri to save time every week:
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="text-center p-6 bg-card/90 backdrop-blur-sm border border-border rounded-2xl shadow-sm relative overflow-hidden">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-green-500/5 via-emerald-500/5 to-transparent opacity-60" />
+                <div className="relative">
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  Landscaping
+                </h3>
+                <p className="text-muted-foreground text-sm">
+                  Owner-operators use Fikiri to keep clients updated, follow up on quotes, and stay ahead of seasonal work.
+                </p>
+                </div>
+              </div>
+              <div className="text-center p-6 bg-card/90 backdrop-blur-sm border border-border rounded-2xl shadow-sm relative overflow-hidden">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-500/5 via-red-500/5 to-transparent opacity-60" />
+                <div className="relative">
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  Restaurants
+                </h3>
+                <p className="text-muted-foreground text-sm">
+                  Multi-location teams streamline guest messaging, reservations, and feedback without adding staff.
+                </p>
+                </div>
+              </div>
+              <div className="text-center p-6 bg-card/90 backdrop-blur-sm border border-border rounded-2xl shadow-sm relative overflow-hidden">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-sky-500/5 via-indigo-500/5 to-transparent opacity-60" />
+                <div className="relative">
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  Medical Practices
+                </h3>
+                <p className="text-muted-foreground text-sm">
+                  Clinics use Fikiri to reduce no-shows and keep patients informed before and after visits.
+                </p>
+                </div>
+              </div>
+            </div>
+
+            <p className="mt-4 text-sm text-muted-foreground">
+              Not in one of these industries? If you talk to customers, book work, or manage follow-ups, Fikiri can likely help your business too.
+            </p>
+
+            {/* Business Information – moved to bottom with subtle gradient */}
+            <div className="mt-16 bg-card/95 backdrop-blur-sm rounded-2xl border border-border/80 shadow-sm p-8 relative overflow-hidden">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-orange-500/10 via-red-500/10 to-transparent opacity-80" />
+              <div className="relative grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
+                  <h2 className="text-2xl font-semibold text-foreground mb-4">
+                    Business Information
+                  </h2>
                   <h3 className="text-lg font-medium text-foreground mb-4">
                     Company Details
                   </h3>
@@ -64,77 +157,6 @@ export const About: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Services */}
-            <h2 className="text-2xl font-semibold text-foreground mb-6">
-              Our Services
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-              <div className="text-center bg-card/90 backdrop-blur-sm rounded-2xl border border-border shadow-sm p-8">
-                <div className="bg-brand-primary/15 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl">📧</span>
-                </div>
-                <h3 className="text-lg font-medium text-foreground mb-2">
-                  Email Automation
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                  AI-powered email processing and response automation
-                </p>
-              </div>
-              <div className="text-center bg-card/90 backdrop-blur-sm rounded-2xl border border-border shadow-sm p-8">
-                <div className="bg-brand-primary/15 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl">👥</span>
-                </div>
-                <h3 className="text-lg font-medium text-foreground mb-2">
-                  CRM Management
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                  Customer relationship management and lead tracking
-                </p>
-              </div>
-              <div className="text-center bg-card/90 backdrop-blur-sm rounded-2xl border border-border shadow-sm p-8">
-                <div className="bg-brand-primary/15 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl">🤖</span>
-                </div>
-                <h3 className="text-lg font-medium text-foreground mb-2">
-                  AI Assistant
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                  Intelligent business automation and analytics
-                </p>
-              </div>
-            </div>
-
-            {/* Specializations */}
-            <h2 className="text-2xl font-semibold text-foreground mb-6">
-              Industry Specializations
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center p-6 bg-card/90 backdrop-blur-sm border border-border rounded-2xl shadow-sm">
-                <h3 className="text-lg font-medium text-foreground mb-2">
-                  Landscaping
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                  Automated client communication and project management
-                </p>
-              </div>
-              <div className="text-center p-6 bg-card/90 backdrop-blur-sm border border-border rounded-2xl shadow-sm">
-                <h3 className="text-lg font-medium text-foreground mb-2">
-                  Restaurants
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                  Order management and customer service automation
-                </p>
-              </div>
-              <div className="text-center p-6 bg-card/90 backdrop-blur-sm border border-border rounded-2xl shadow-sm">
-                <h3 className="text-lg font-medium text-foreground mb-2">
-                  Medical Practices
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                  Patient communication and appointment scheduling
-                </p>
               </div>
             </div>
           </Container>

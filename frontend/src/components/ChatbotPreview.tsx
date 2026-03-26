@@ -50,8 +50,8 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
   }, [theme, position, title, primaryColor, apiKey]);
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-8">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-gray-700">
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
         Customize Your Chatbot
       </h2>
 
@@ -59,7 +59,7 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
         {/* Customization Options */}
         <div className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Theme
             </label>
             <div className="flex gap-4">
@@ -67,8 +67,8 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
                 onClick={() => setTheme('light')}
                 className={`px-4 py-2 rounded-lg border-2 transition-all ${
                   theme === 'light'
-                    ? 'border-teal-600 bg-teal-50'
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-teal-600 dark:border-teal-500 bg-teal-50 dark:bg-teal-900/30 text-teal-900 dark:text-teal-100'
+                    : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 text-gray-700 dark:text-gray-300'
                 }`}
               >
                 Light
@@ -77,8 +77,8 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
                 onClick={() => setTheme('dark')}
                 className={`px-4 py-2 rounded-lg border-2 transition-all ${
                   theme === 'dark'
-                    ? 'border-teal-600 bg-teal-50'
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-teal-600 dark:border-teal-500 bg-teal-50 dark:bg-teal-900/30 text-teal-900 dark:text-teal-100'
+                    : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 text-gray-700 dark:text-gray-300'
                 }`}
               >
                 Dark
@@ -87,7 +87,7 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Position
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -97,8 +97,8 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
                   onClick={() => setPosition(pos)}
                   className={`px-4 py-2 rounded-lg border-2 transition-all text-sm ${
                     position === pos
-                      ? 'border-teal-600 bg-teal-50'
-                      : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-teal-600 dark:border-teal-500 bg-teal-50 dark:bg-teal-900/30 text-teal-900 dark:text-teal-100'
+                      : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 text-gray-700 dark:text-gray-300'
                   }`}
                 >
                   {pos.replace('-', ' ')}
@@ -108,20 +108,20 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Title
             </label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
               placeholder="Need Help?"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Primary Color
             </label>
             <div className="flex gap-4 items-center">
@@ -129,13 +129,13 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
                 type="color"
                 value={primaryColor}
                 onChange={(e) => setPrimaryColor(e.target.value)}
-                className="w-16 h-10 border border-gray-300 rounded cursor-pointer"
+                className="w-16 h-10 border border-gray-300 dark:border-gray-600 rounded cursor-pointer bg-transparent"
               />
               <input
                 type="text"
                 value={primaryColor}
                 onChange={(e) => setPrimaryColor(e.target.value)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                 placeholder="#0f766e"
               />
             </div>
@@ -144,13 +144,13 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
 
         {/* Live Preview */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Live Preview
           </label>
-          <div className="border-2 border-gray-200 rounded-lg p-6 bg-gray-50 relative" style={{ minHeight: '400px' }}>
+          <div className="border-2 border-gray-200 dark:border-gray-600 rounded-lg p-6 bg-gray-50 dark:bg-gray-900/50 relative" style={{ minHeight: '400px' }}>
             {/* Simulated Chatbot */}
             <div
-              className={`absolute ${position === 'bottom-right' ? 'bottom-4 right-4' : ''} ${position === 'bottom-left' ? 'bottom-4 left-4' : ''} ${position === 'top-right' ? 'top-4 right-4' : ''} ${position === 'top-left' ? 'top-4 left-4' : ''} w-80 bg-white rounded-lg shadow-xl border border-gray-200`}
+              className={`absolute ${position === 'bottom-right' ? 'bottom-4 right-4' : ''} ${position === 'bottom-left' ? 'bottom-4 left-4' : ''} ${position === 'top-right' ? 'top-4 right-4' : ''} ${position === 'top-left' ? 'top-4 left-4' : ''} w-80 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600`}
               style={{ backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff' }}
             >
               {/* Chatbot Header */}
@@ -179,11 +179,11 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
               </div>
               
               {/* Chatbot Input */}
-              <div className="px-4 py-3 border-t border-gray-200">
+              <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-600">
                 <input
                   type="text"
                   placeholder="Type your message..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                   style={{ backgroundColor: theme === 'dark' ? '#374151' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}
                 />
               </div>
@@ -195,7 +195,7 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
       {/* Generated Code */}
       <div className="mt-8">
         <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Generated Code
           </label>
           <button

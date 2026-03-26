@@ -133,7 +133,7 @@ describe('Login Component', () => {
     const emailInput = screen.getByLabelText(/email address/i)
     const passwordInput = screen.getByLabelText(/password/i)
     
-    expect(emailInput).toHaveAttribute('autocomplete', 'email')
+    expect(emailInput).toHaveAttribute('autocomplete', 'username')
     expect(passwordInput).toHaveAttribute('autocomplete', 'current-password')
   })
 

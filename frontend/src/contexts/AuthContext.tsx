@@ -555,7 +555,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
     setAuthState(prev => ({
       ...prev,
-      user
+      user,
+      // If we have a user object, treat the client as authenticated.
+      // Some flows (e.g. email verification callback) update user before AuthContext
+      // has flipped `isAuthenticated`, which can block redirects via RouteGuard.
+      isAuthenticated: !!user,
     }))
   }
 

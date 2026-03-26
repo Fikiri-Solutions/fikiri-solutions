@@ -9,7 +9,18 @@ import globals from 'globals'
 export default [
   // Global ignores
   {
-    ignores: ['dist', 'dev-dist', 'node_modules', 'build', '.vite', 'coverage', 'cypress/**', '**/*.d.ts']
+    ignores: [
+      'dist',
+      'dev-dist',
+      'node_modules',
+      'build',
+      '.vite',
+      'coverage',
+      'playwright-report',
+      'test-results',
+      'cypress/**',
+      '**/*.d.ts'
+    ]
   },
   
   // Node.js JavaScript config files (.js files)

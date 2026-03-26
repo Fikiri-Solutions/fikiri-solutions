@@ -59,10 +59,10 @@ export const VerticalLanding: React.FC<VerticalLandingProps> = ({
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
               <Link
-                to="/industry"
+                to="/analytics"
                 className="border-2 border-white text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-white hover:text-blue-600 hover:scale-105 transition-all duration-200 inline-flex items-center justify-center"
               >
-                Try AI Assistant
+                View Usage Analytics
               </Link>
             </div>
           </div>

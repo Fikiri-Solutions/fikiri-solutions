@@ -6,17 +6,17 @@
  */
 
 export const SMS_CONSENT = {
-  /** Upfront disclosure shown above the phone field and consent checkbox. */
+  /** Upfront disclosure shown above the phone field and consent checkbox. Describes what we request consent for (SMS/text). */
   upfrontDisclosure:
-    'By providing your mobile number and checking the box below, you expressly consent to receive automated text messages (SMS) from Fikiri Solutions LLC at the number you provide. Messages are limited to: (1) account verification codes, (2) login and security alerts, and (3) account status notifications. We do not send marketing or promotional text messages. Message frequency varies as needed. You can reply STOP at any time to opt out or HELP for help. Message and data rates may apply. Consent is not required to use our services or make a purchase.',
+    'By entering your mobile number and checking the box below, you consent to receive SMS text messages from Fikiri Solutions LLC. You will receive: verification codes, login and security alerts, and account notifications only. No marketing. Reply STOP to unsubscribe, HELP for help. Message and data rates may apply. Consent is not required to use our services.',
 
   /** Shorter disclosure for tight UI (e.g. Account Settings). */
   upfrontDisclosureShort:
-    'Fikiri Solutions LLC may send you text messages (SMS) for verification codes, login and security alerts, and account notifications only. No marketing. Reply STOP to opt out, HELP for help. Msg & data rates may apply. Consent is not required for purchase.',
+    'I agree to receive SMS text messages from Fikiri Solutions LLC for verification codes, security alerts, and account notifications. Reply STOP to unsubscribe, HELP for help. Msg & data rates may apply. Consent not required for purchase.',
 
-  /** Exact checkbox label — must explicitly request consent for SMS/text messages (Error 30513). */
+  /** Exact checkbox label — explicit consent for SMS/text (Error 30513). Lead with "I agree to receive text messages from [Business Name]". */
   checkboxLabel:
-    'I agree to receive text messages (SMS) from Fikiri Solutions LLC for account verification codes, login and security alerts, and account notifications. Reply STOP to opt out. Reply HELP for help. Msg & data rates may apply. Consent is not a condition of purchase.',
+    'I agree to receive SMS text messages from Fikiri Solutions LLC for verification codes, login and security alerts, and account notifications. Message and data rates may apply. Reply STOP to unsubscribe, HELP for help. Consent is not required to use our services.',
 
   /** Section heading for optional SMS block. */
   sectionTitle: 'SMS notifications (optional)',

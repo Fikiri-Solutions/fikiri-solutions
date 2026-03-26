@@ -41,23 +41,23 @@ const LandingPage: React.FC = () => {
   const valueProps = [
     {
       icon: Mail,
-      title: "Email Assistant",
-      description: "Respond to leads instantly with AI-powered email automation"
+      title: "Never miss a hot lead",
+      description: "Reply to new inquiries instantly and follow up automatically, even when you’re on a job or in a meeting."
     },
     {
       icon: Users,
-      title: "CRM Automations",
-      description: "Track and manage clients with intelligent workflow automation"
+      title: "Keep every contact organized",
+      description: "See every conversation and deal in one place so your team stops double‑emailing or dropping the ball."
     },
     {
       icon: Brain,
-      title: "AI Insights",
-      description: "Predict opportunities and optimize your business processes"
+      title: "Know where to focus",
+      description: "Spot your best leads and repeatable work so you invest time where it actually drives revenue."
     },
     {
       icon: BarChart3,
-      title: "Seamless Integrations",
-      description: "Connect with Gmail, Shopify, Outlook, and 50+ other tools"
+      title: "Scales with your team",
+      description: "From solo operators to multi‑location teams, connect the tools you already use and grow without extra headcount."
     }
   ]
 
@@ -95,7 +95,7 @@ const LandingPage: React.FC = () => {
     {
       name: "Dr. Emily Rodriguez",
       company: "Rodriguez Medical Practice",
-      quote: "Patient communication has never been smoother. Fikiri handles appointment reminders and follow-ups perfectly.",
+      quote: "Patient communication has never been smoother. Fikiri handles appointment reminders and follow-ups reliably for our current workflow.",
       rating: 5
     }
   ]
@@ -310,14 +310,14 @@ const LandingPage: React.FC = () => {
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent'
             }}>
-              The platform for
+              Stop losing time
               <br />
-              reliable automation
+              and high‑value leads
             </h1>
             <p className="text-xl sm:text-2xl text-white mb-8 max-w-3xl mx-auto">
-              Save time, close more leads, and automate your workflows with Fikiri Solutions.
+              Fikiri handles the follow‑up, reminders, and busywork—so whether it’s just you or a team of 50+, no lead or customer slips through the cracks.
               <br />
-              <span className="text-orange-300 font-medium">Transform your business with intelligent automation.</span>
+              <span className="text-orange-300 font-medium">Built for owner‑operators, lean teams, and growing multi‑location businesses.</span>
             </p>
           </motion.div>
 
@@ -379,10 +379,10 @@ const LandingPage: React.FC = () => {
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent'
             }}>
-              Everything You Need to Automate Your Business
+              Automation that works for solo and scaling teams
             </h2>
             <p className="text-xl text-gray-100 max-w-2xl mx-auto">
-              Powerful AI tools designed specifically for small businesses
+              Powerful AI that feels light enough for one person to run, but strong enough to support a growing team.
             </p>
           </motion.div>
 
@@ -420,10 +420,10 @@ const LandingPage: React.FC = () => {
             className="text-center mb-16"
           >
             <h2 className="text-3xl sm:text-4xl font-bold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-blue-500 bg-clip-text text-transparent">
-              How It Works
+              How it fits into your day
             </h2>
             <p className="text-xl text-white max-w-2xl mx-auto">
-              Get started in minutes, see results immediately
+              Set it up once, then let it quietly handle the busywork—whether you’re answering emails yourself or managing a team.
             </p>
           </motion.div>
 
@@ -457,10 +457,10 @@ const LandingPage: React.FC = () => {
             className="text-center mb-16"
           >
             <h2 className="text-3xl sm:text-4xl font-bold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-blue-500 bg-clip-text text-transparent">
-              Trusted by Growing Businesses
+              Trusted by growing service businesses
             </h2>
             <p className="text-xl text-white max-w-2xl mx-auto">
-              Join thousands of businesses already automating with Fikiri
+              From solo practices to multi‑location teams, Fikiri helps owners reclaim hours every week without hiring more staff.
             </p>
           </motion.div>
 
@@ -513,10 +513,10 @@ const LandingPage: React.FC = () => {
             transition={{ duration: 0.8 }}
           >
             <h2 className="text-3xl sm:text-4xl font-bold mb-6 bg-gradient-to-r from-orange-400 via-orange-500 to-blue-500 bg-clip-text text-transparent">
-              Start Automating Today
+              Start automating without adding headcount
             </h2>
             <p className="text-xl text-white mb-8">
-              7-day free trial, no credit card required. Join thousands of businesses already saving time with AI.
+              7-day free trial, no credit card required. Works whether you’re on your own or running a team across locations.
             </p>
             <motion.div
               initial={{ opacity: 0, y: 30 }}
@@ -544,6 +544,12 @@ const LandingPage: React.FC = () => {
             </motion.div>
             <p className="text-sm text-white mt-4">
               No setup fees • Cancel anytime • 24/7 support
+            </p>
+            <p className="text-xs text-white/70 mt-2 max-w-xl mx-auto">
+              Most teams save <span className="font-semibold">5–10 hours per week</span> on email follow-up and admin after adopting automation,* freeing owners and managers to focus on higher‑value work.
+            </p>
+            <p className="text-[11px] text-white/50 mt-1 max-w-xl mx-auto">
+              *Based on independent studies of AI and marketing automation tools for small and midsize businesses.
             </p>
           </motion.div>
         </div>

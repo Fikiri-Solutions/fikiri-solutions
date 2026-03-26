@@ -6,6 +6,7 @@ import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
 import { ForgotPassword } from './pages/ForgotPassword'
 import { ResetPassword } from './pages/ResetPassword'
+import { VerifyEmail } from './pages/VerifyEmail'
 import { TermsOfService } from './pages/TermsOfService'
 import { PrivacyPolicy } from './pages/PrivacyPolicy'
 import SmsOptIn from './pages/SmsOptIn'
@@ -14,6 +15,7 @@ import { Services } from './pages/Services'
 import { CRM } from './pages/CRM'
 import { AIAssistant } from './pages/AIAssistant'
 import { Automations } from './pages/Automations'
+import { CorrelationDebugPage } from './pages/CorrelationDebugPage'
 import { ChatbotBuilder } from './pages/ChatbotBuilder'
 import { GmailConnect } from './pages/GmailConnect'
 import { OutlookConnect } from './pages/OutlookConnect'
@@ -83,9 +85,9 @@ function App() {
           >
           <ThemeProvider>
             <LandingThemeGuard />
-            <CustomizationProvider>
-              <ActivityProvider>
-                <AuthProvider>
+            <AuthProvider>
+              <CustomizationProvider>
+                <ActivityProvider>
                   <QueryProvider>
                     <ToastProvider>
                       <ScrollToTop />
@@ -133,6 +135,12 @@ function App() {
                           <Route path="/reset-password" element={
                             <AuthRoute>
                               <ResetPassword />
+                            </AuthRoute>
+                          } />
+
+                          <Route path="/verify-email" element={
+                            <AuthRoute>
+                              <VerifyEmail />
                             </AuthRoute>
                           } />
                           
@@ -198,6 +206,11 @@ function App() {
                               <Layout><Automations /></Layout>
                             </ProtectedRoute>
                           } />
+                          <Route path="/debug/correlation" element={
+                            <ProtectedRoute>
+                              <Layout><CorrelationDebugPage /></Layout>
+                            </ProtectedRoute>
+                          } />
                           <Route path="/ai/chatbot-builder" element={
                             <ProtectedRoute>
                               <Layout><ChatbotBuilder /></Layout>
@@ -246,9 +259,9 @@ function App() {
                     )}
                     </ToastProvider>
                   </QueryProvider>
-                </AuthProvider>
-              </ActivityProvider>
-            </CustomizationProvider>
+                </ActivityProvider>
+              </CustomizationProvider>
+            </AuthProvider>
           </ThemeProvider>
         </Router>
         </AccessibilityProvider>

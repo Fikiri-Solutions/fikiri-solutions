@@ -5,6 +5,7 @@ import { toast } from 'react-hot-toast';
 import { apiClient } from '../services/apiClient';
 import { config } from '../config';
 import { CheckCircle, Mail, Building, User, ArrowRight, Sparkles, Zap } from 'lucide-react';
+import { EmailVerificationBanner } from '../components/EmailVerificationBanner';
 
 export const Onboarding: React.FC = () => {
   const navigate = useNavigate();
@@ -228,6 +229,7 @@ export const Onboarding: React.FC = () => {
         return (
     <div className="min-h-screen bg-gradient-to-br from-brand-background via-brand-tan/20 to-brand-background flex items-center justify-center px-4 py-12">
       <div className="max-w-2xl w-full">
+        <EmailVerificationBanner user={user} />
         {/* Progress indicator */}
         <div className="mb-8">
           <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">

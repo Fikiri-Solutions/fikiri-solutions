@@ -39,7 +39,7 @@ const getFallbackResponse = (message: string): string => {
   }
   
   if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('pricing')) {
-    return 'Our pricing varies based on your specific needs:\n\n• **Starter Plan**: $39/month - Basic email automation\n• **Growth Plan**: $79/month - Advanced CRM + automation\n• **Business Plan**: $199/month - White-label options\n• **Enterprise Plan**: $399/month - Custom solutions\n\nContact us for a personalized quote based on your industry and requirements.'
+    return 'Our pricing varies based on your specific needs:\n\n• **Starter Plan**: $49/month - Basic email automation\n• **Growth Plan**: $99/month - Advanced CRM + automation\n• **Business Plan**: $199/month - White-label options\n• **Enterprise Plan**: $499/month - Custom solutions\n\nContact us for a personalized quote based on your industry and requirements.'
   }
   
   if (lowerMessage.includes('service') || lowerMessage.includes('what do you do')) {
@@ -306,8 +306,8 @@ Response should include a next step and keep tone professional but warm.`
 
       {/* Error Display */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-sm text-red-600">
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <p className="text-sm text-red-600 dark:text-red-200">
             <strong>Error:</strong> {error}
           </p>
         </div>

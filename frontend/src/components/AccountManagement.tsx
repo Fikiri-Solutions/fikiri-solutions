@@ -118,17 +118,42 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
     }
   }, [user])
 
-  // Load profile (phone, sms_consent) when modal opens
+  // Load profile (phone, sms_consent, timezone, notification_preferences) when modal opens
   React.useEffect(() => {
     if (isOpen && user?.id) {
       import('../services/apiClient').then(({ apiClient }) => {
         apiClient.getProfile().then(({ user: profile }) => {
-          setAccountData(prev => ({ ...prev, phone: profile?.phone || '' }))
+          setAccountData(prev => ({
+            ...prev,
+            phone: profile?.phone || '',
+            timezone: profile?.timezone || prev.timezone || 'America/New_York'
+          }))
           setSmsConsent(!!profile?.sms_consent)
+          if (profile?.notification_preferences && typeof profile.notification_preferences === 'object') {
+            const np = profile.notification_preferences as Record<string, unknown>
+            setNotificationSettings(prev => ({
+              ...prev,
+              email: { ...prev.email, ...(np.email as Record<string, boolean> || {}) },
+              sms: { ...prev.sms, ...(np.sms as Record<string, boolean> || {}) },
+              push: { ...prev.push, ...(np.push as Record<string, boolean> || {}) }
+            }))
+          }
         }).catch(() => {})
       })
     }
   }, [isOpen, user?.id])
+
+  // Lock body scroll while modal is open
+  React.useEffect(() => {
+    if (isOpen) {
+      const prev = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.body.style.overflow = prev
+      }
+    }
+    return undefined
+  }, [isOpen])
 
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
     currentPassword: '',
@@ -205,6 +230,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
         team_size: accountData.teamSize,
         phone: accountData.phone?.trim() || undefined,
         sms_consent: smsConsent,
+        timezone: accountData.timezone || undefined,
       }
       const { user: updated } = await apiClient.updateProfile(payload)
       if (user && updated) {
@@ -215,6 +241,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
           business_email: updated.business_email ?? user.business_email,
           industry: updated.industry ?? user.industry,
           team_size: updated.team_size ?? user.team_size,
+          timezone: updated.timezone ?? (user as { timezone?: string }).timezone,
           metadata: { ...(user.metadata || {}), phone: updated.phone, sms_consent: updated.sms_consent, sms_consent_at: updated.sms_consent_at },
         }
         updateUser(updatedUser)
@@ -241,19 +268,33 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
 
     setIsLoading(true)
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
+      const { apiClient } = await import('../services/apiClient')
+      await apiClient.changePassword(securitySettings.currentPassword, securitySettings.newPassword)
       setSecuritySettings(prev => ({
         ...prev,
         currentPassword: '',
         newPassword: '',
         confirmPassword: ''
       }))
-      
-      addToast({ type: 'success', title: 'Password changed successfully!' })
-    } catch (_error) {
-      addToast({ type: 'error', title: 'Failed to change password. Please try again.' })
+      addToast({ type: 'success', title: 'Password changed. Please sign in again.' })
+      onClose?.()
+      logout()
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+      addToast({ type: 'error', title: msg || 'Failed to change password. Please try again.' })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSaveNotifications = async () => {
+    setIsLoading(true)
+    try {
+      const { apiClient } = await import('../services/apiClient')
+      await apiClient.updateProfile({ notification_preferences: notificationSettings })
+      addToast({ type: 'success', title: 'Notification preferences saved!' })
+    } catch (_err) {
+      addToast({ type: 'error', title: 'Failed to save notification preferences.' })
     } finally {
       setIsLoading(false)
     }
@@ -285,19 +326,18 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
   }
 
   const handleDeleteAccount = async () => {
-    if (window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
-      setIsLoading(true)
-      try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        
-        logout()
-        addToast({ type: 'success', title: 'Account deleted successfully' })
-      } catch (_error) {
-        addToast({ type: 'error', title: 'Failed to delete account. Please try again.' })
-      } finally {
-        setIsLoading(false)
-      }
+    if (!window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) return
+    setIsLoading(true)
+    try {
+      const { apiClient } = await import('../services/apiClient')
+      await apiClient.deleteAccount()
+      onClose?.()
+      logout()
+      addToast({ type: 'success', title: 'Account deactivated successfully' })
+    } catch (_err) {
+      addToast({ type: 'error', title: 'Failed to delete account. Please try again.' })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -345,10 +385,11 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             <input
               type="email"
               value={accountData.email}
-              onChange={(e) => setAccountData(prev => ({ ...prev, email: e.target.value }))}
-              disabled={!isEditing}
-              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-800"
+              readOnly
+              disabled
+              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-800 cursor-not-allowed"
             />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Email cannot be changed here.</p>
           </div>
 
           <div>
@@ -669,7 +710,17 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Notification Preferences</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Notification Preferences</h3>
+        <button
+          onClick={handleSaveNotifications}
+          disabled={isLoading}
+          className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+        >
+          {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          <span>Save</span>
+        </button>
+      </div>
 
       <div className="space-y-6">
         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6">

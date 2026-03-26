@@ -22,10 +22,11 @@ export default defineConfig({
   // You can also set these via command line: BACKEND_PORT=8081 npm run test:e2e
 
   projects: [
-    // Setup project for authentication
+    // Setup project for authentication (longer timeout for signup/navigation)
     {
       name: 'setup',
       testMatch: /auth\.setup\.ts/,
+      timeout: 60000,
     },
     
     // Main E2E tests with authentication
@@ -91,7 +92,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:5174',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
     timeout: 120 * 1000,
   },
 });

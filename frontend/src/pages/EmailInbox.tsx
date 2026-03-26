@@ -75,9 +75,12 @@ const EmailBodyRenderer: React.FC<{ content: string; emailId?: string }> = ({ co
     
     images.forEach(img => {
       img.addEventListener('error', handleImageError)
-      // Add loading="lazy" for performance
+      // Add loading="lazy" + async decode so layout/paint isn't blocked on many images
       if (!img.hasAttribute('loading')) {
         img.setAttribute('loading', 'lazy')
+      }
+      if (!img.hasAttribute('decoding')) {
+        img.setAttribute('decoding', 'async')
       }
       // Only add crossorigin for external images (not our proxy)
       const isExternalImage = img.src.startsWith('http://') || img.src.startsWith('https://')
@@ -332,6 +335,25 @@ export const EmailInbox: React.FC = () => {
 
   const gmailConnected = gmailStatus?.connected ?? null
 
+  const {
+    data: emailDetail,
+    isFetching: detailFetching
+  } = useQuery({
+    queryKey: ['email-detail', user?.id, selectedEmail?.id],
+    queryFn: () => apiClient.getEmailMessage(selectedEmail!.id),
+    enabled: Boolean(user && selectedEmail?.id && gmailConnected === true),
+    staleTime: 2 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false
+  })
+
+  const displayBody =
+    (emailDetail?.body && String(emailDetail.body).trim() !== '')
+      ? emailDetail.body
+      : (selectedEmail?.body && String(selectedEmail.body).trim() !== '')
+        ? selectedEmail.body
+        : ''
+
   // Load emails with React Query caching - prefer synced emails for speed
   const { 
     data: emailsData, 
@@ -344,7 +366,12 @@ export const EmailInbox: React.FC = () => {
       // Try synced emails first (faster), fallback to Gmail API
       try {
         // First try synced emails
-        const syncedData = await apiClient.getEmails({ filter, limit: emailLimit, use_synced: true })
+        const syncedData = await apiClient.getEmails({
+          filter,
+          limit: emailLimit,
+          use_synced: true,
+          include_body: false
+        })
         if (syncedData?.emails && syncedData.emails.length > 0) {
           return { ...syncedData, source: 'synced' }
         }
@@ -353,7 +380,7 @@ export const EmailInbox: React.FC = () => {
       }
       
       // Fallback to Gmail API
-      const data = await apiClient.getEmails({ filter, limit: emailLimit })
+      const data = await apiClient.getEmails({ filter, limit: emailLimit, include_body: false })
       return { ...data, source: 'gmail_api' }
     },
     enabled: !!user && gmailConnected === true,
@@ -390,11 +417,13 @@ export const EmailInbox: React.FC = () => {
   // Manual refresh function
   const handleRefresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['emails', user?.id] })
+    queryClient.invalidateQueries({ queryKey: ['email-detail', user?.id] })
     refetchEmails()
   }, [queryClient, user?.id, refetchEmails])
 
   const analyzeEmail = async (email: Email) => {
-    if (!email.body && !email.snippet) {
+    const content = displayBody || email.body || email.snippet
+    if (!content?.trim()) {
       addToast({ type: 'error', title: 'No email content to analyze' })
       return
     }
@@ -406,7 +435,7 @@ export const EmailInbox: React.FC = () => {
       const data = await apiClient.analyzeEmail(
         email.id,
         email.subject,
-        email.body || email.snippet,
+        content,
         email.from
       )
       setAiAnalysis(data)
@@ -419,7 +448,8 @@ export const EmailInbox: React.FC = () => {
   }
 
   const generateReply = async (email: Email) => {
-    if (!email.body && !email.snippet) {
+    const content = displayBody || email.body || email.snippet
+    if (!content?.trim()) {
       addToast({ type: 'error', title: 'No email content to reply to' })
       return
     }
@@ -430,7 +460,7 @@ export const EmailInbox: React.FC = () => {
       const data = await apiClient.generateReply(
         email.id,
         email.subject,
-        email.body || email.snippet,
+        content,
         email.from
       )
       const reply = data?.reply || data?.data?.reply || data?.suggested_reply
@@ -850,8 +880,13 @@ export const EmailInbox: React.FC = () => {
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto p-6 min-h-0" style={{ maxHeight: 'calc(100vh - 250px)' }}>
-                {selectedEmail.body ? (
-                  <EmailBodyRenderer content={selectedEmail.body} emailId={selectedEmail.id} />
+                {detailFetching && !displayBody ? (
+                  <div className="flex items-center gap-2 text-brand-text/70 dark:text-gray-400 py-8">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>Loading message…</span>
+                  </div>
+                ) : displayBody ? (
+                  <EmailBodyRenderer content={displayBody} emailId={selectedEmail.id} />
                 ) : (
                   <div className="text-brand-text/70 dark:text-gray-400">
                     {selectedEmail.snippet}

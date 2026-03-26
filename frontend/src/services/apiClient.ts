@@ -55,6 +55,7 @@ export interface ServiceData {
   name: string
   status: 'active' | 'inactive' | 'error' | string
   description: string
+  settings?: Record<string, any>
 }
 
 export interface ActivityItem {
@@ -74,6 +75,19 @@ export interface LeadData {
   score: number
   lastContact: string
   source: string
+}
+
+/** Row from GET /crm/leads/:id/events (append-only CRM timeline). */
+export interface LeadCrmEvent {
+  id: number
+  created_at: string
+  event_type: string
+  entity_type: string
+  entity_id: number
+  correlation_id?: string | null
+  status?: string | null
+  source?: string | null
+  [key: string]: unknown
 }
 
 export interface AIResponse {
@@ -280,6 +294,13 @@ class ApiClient {
       (error) => {
         // Handle 401 Unauthorized errors
         if (error.response?.status === 401) {
+          const method = String(error.config?.method || 'get').toLowerCase()
+          const reqUrl = String(error.config?.url || '')
+          // Optional reads that are expected to 401 when logged out — do not nuke session / redirect
+          if (method === 'get' && reqUrl.includes('/user/customization/logo')) {
+            return Promise.reject(error)
+          }
+
           // Don't clear localStorage if we're on login page (might be during login flow)
           // or if the request was to /auth/login (login endpoint itself)
           const isLoginRequest = error.config?.url?.includes('/auth/login')
@@ -337,8 +358,34 @@ class ApiClient {
     return response.data
   }
 
+  async verifyEmail(token: string): Promise<any> {
+    const response = await this.client.get('/auth/verify-email', {
+      params: { token }
+    })
+    return response.data
+  }
+
+  async whoami(): Promise<any> {
+    const response = await this.client.get('/auth/whoami')
+    return response.data
+  }
+
+  async resendEmailVerification(): Promise<any> {
+    const response = await this.client.post('/auth/resend-email-verification')
+    return response.data
+  }
+
   async logout(): Promise<void> {
     await this.client.post('/auth/logout')
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ message?: string; error?: string }> {
+    const response = await this.client.post('/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword
+    })
+    const data = response.data?.data ?? response.data
+    return data
   }
 
   // Gmail OAuth (accept userId for components that pass it)
@@ -423,7 +470,21 @@ class ApiClient {
           id: s.service_id,
           name: s.service_name,
           status: s.status || (s.enabled ? 'active' : 'inactive'),
-          description: this.getServiceDescription(s.service_id)
+          description: this.getServiceDescription(s.service_id),
+          // Preserve saved settings so the UI can't clobber them silently.
+          settings: (() => {
+            const raw = s.settings
+            if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw
+            if (typeof raw === 'string') {
+              try {
+                const parsed = JSON.parse(raw)
+                if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed
+              } catch {
+                // ignore parse errors; fall back to empty object
+              }
+            }
+            return {}
+          })(),
         }))
       }
     } catch (error) {
@@ -438,7 +499,8 @@ class ApiClient {
           id,
           name: this.formatServiceName(id),
           status: status?.status === 'healthy' ? 'active' : 'inactive',
-          description: this.getServiceDescription(id)
+          description: this.getServiceDescription(id),
+          settings: {},
         }))
       }
     } catch (healthError) {
@@ -631,7 +693,8 @@ class ApiClient {
     const response = await this.client.get('/crm/leads', {
       params: { user_id: this.getUserId() ?? 1 }
     })
-    const backendLeads = response.data.leads || []
+    const payload = response.data?.data ?? response.data
+    const backendLeads = payload?.leads ?? []
     
     // Map backend data to frontend interface
     return backendLeads.map((lead: any) => this.mapLead(lead))
@@ -642,7 +705,8 @@ class ApiClient {
       params: { user_id: this.getUserId() ?? 1 }
     })
 
-    const pipeline = response.data.pipeline || {}
+    const payload = response.data?.data ?? response.data
+    const pipeline = payload?.pipeline || {}
     const mapped: Record<string, LeadData[]> = {}
 
     Object.keys(pipeline).forEach(stage => {
@@ -650,6 +714,25 @@ class ApiClient {
     })
 
     return mapped
+  }
+
+  /** CRM event timeline for a lead; includes correlation_id when present. */
+  async getLeadCrmEvents(
+    leadId: string | number,
+    params?: { limit?: number; offset?: number }
+  ): Promise<{ events: LeadCrmEvent[]; limit: number; offset: number }> {
+    const response = await this.client.get(`/crm/leads/${leadId}/events`, {
+      params: {
+        limit: params?.limit ?? 50,
+        offset: params?.offset ?? 0
+      }
+    })
+    const data = response.data?.data ?? response.data
+    return {
+      events: (data?.events as LeadCrmEvent[]) ?? [],
+      limit: data?.limit ?? 50,
+      offset: data?.offset ?? 0
+    }
   }
 
   async updateLeadStage(leadId: string | number, stage: string): Promise<void> {
@@ -689,10 +772,50 @@ class ApiClient {
     return { user: data?.user ?? {} }
   }
 
-  async updateProfile(payload: { name?: string; business_name?: string; business_email?: string; industry?: string; team_size?: string; phone?: string; sms_consent?: boolean }): Promise<{ user: Record<string, any> }> {
+  async updateProfile(payload: {
+    name?: string
+    business_name?: string
+    business_email?: string
+    industry?: string
+    team_size?: string
+    phone?: string
+    sms_consent?: boolean
+    timezone?: string
+    notification_preferences?: Record<string, any>
+  }): Promise<{ user: Record<string, any> }> {
     const response = await this.client.put('/user/profile', payload)
     const data = response.data?.data ?? response.data
     return { user: data?.user ?? {} }
+  }
+
+  async deleteAccount(): Promise<{ message?: string }> {
+    const response = await this.client.post('/user/delete-account')
+    const data = response.data?.data ?? response.data
+    return data ?? {}
+  }
+
+  async getUserCustomizationLogo(): Promise<{ logoUrl?: string }> {
+    const response = await this.client.get('/user/customization/logo')
+    const customization = response.data?.data?.customization ?? {}
+    return { logoUrl: customization?.logoUrl || undefined }
+  }
+
+  async uploadUserCustomizationLogo(file: File): Promise<{ logoUrl?: string }> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await this.client.post('/user/customization/logo', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+
+    const customization = response.data?.data?.customization ?? {}
+    return { logoUrl: customization?.logoUrl || undefined }
+  }
+
+  async deleteUserCustomizationLogo(): Promise<void> {
+    await this.client.delete('/user/customization/logo')
   }
 
   async saveOnboarding(payload: { name: string; company: string; industry?: string }): Promise<any> {
@@ -795,10 +918,25 @@ class ApiClient {
     started_at?: string
     completed_at?: string
     error_message?: string
+    correlation_id?: string | null
     result?: any
   } | null> {
     const response = await this.client.get(`/automation/jobs/${encodeURIComponent(jobId)}`)
     return response.data?.data || response.data || null
+  }
+
+  /** Debug: stitched domain rows for one correlation_id (auth required; see docs/CORRELATION_AND_EVENTS.md). */
+  async getCorrelationTrace(correlationId: string): Promise<{
+    correlation_id: string
+    user_id: number
+    limits: { per_section: number }
+    sections: Record<string, unknown[]>
+    notes?: string[]
+  } | null> {
+    const response = await this.client.get(
+      `/debug/correlation/${encodeURIComponent(correlationId)}`
+    )
+    return response.data?.data ?? null
   }
 
   async getAutomationLogs(params?: { ruleId?: number; slug?: string; limit?: number }): Promise<AutomationLog[]> {
@@ -815,9 +953,15 @@ class ApiClient {
   }
 
   async runAutomationPreset(presetId: string): Promise<any> {
-    const response = await this.client.post('/automation/test/preset', {
-      preset_id: presetId
-    })
+    const correlationId =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
+    const response = await this.client.post(
+      '/automation/test/preset',
+      { preset_id: presetId, correlation_id: correlationId },
+      { headers: { 'X-Correlation-ID': correlationId } }
+    )
     return response.data
   }
 
@@ -866,15 +1010,33 @@ class ApiClient {
     return status
   }
 
-  async getEmails(params?: { filter?: string; limit?: number; query?: string; use_synced?: boolean }): Promise<any> {
+  async getEmails(params?: {
+    filter?: string
+    limit?: number
+    query?: string
+    use_synced?: boolean
+    /** false = list only (snippets); full body via getEmailMessage(id) */
+    include_body?: boolean
+  }): Promise<any> {
     const response = await this.client.get('/email/messages', {
       params: {
+        ...params,
         user_id: this.getUserId() ?? 1,
-        use_synced: params?.use_synced ?? true, // Default to using synced emails for speed
-        ...params
+        use_synced: params?.use_synced ?? true,
+        include_body: params?.include_body ?? false
       }
     })
     return response.data.data || response.data
+  }
+
+  /** Full email body (synced row or Gmail). Use after list fetch with include_body=false. */
+  async getEmailMessage(emailId: string): Promise<any | null> {
+    const enc = encodeURIComponent(emailId)
+    const response = await this.client.get(`/email/messages/${enc}`, {
+      params: { user_id: this.getUserId() ?? 1 }
+    })
+    const data = response.data?.data ?? response.data
+    return data?.email ?? null
   }
 
   async analyzeEmail(emailId: string, subject: string, content: string, from: string): Promise<any> {
@@ -1019,6 +1181,36 @@ class ApiClient {
   async addLead(leadData: LeadData): Promise<LeadData> {
     const response = await this.client.post('/crm/leads', leadData)
     return response.data
+  }
+
+  /** Export all leads as CSV file download. */
+  async exportLeadsCsv(): Promise<void> {
+    const response = await this.client.get('/crm/leads/export', { responseType: 'blob' })
+    const blob = response.data as Blob
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'leads.csv'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  /** Import leads from a CSV file. Returns summary: imported, created, updated, skipped, skipped_details. */
+  async importLeadsCsv(file: File): Promise<{
+    imported: number
+    created: number
+    updated: number
+    skipped: number
+    skipped_details: Array<{ row: number; reason: string; email?: string }>
+    total_rows: number
+  }> {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await this.client.post('/crm/leads/import/csv', formData)
+    const data = response.data?.data ?? response.data
+    return data
   }
 
   private mapLead(lead: any): LeadData {

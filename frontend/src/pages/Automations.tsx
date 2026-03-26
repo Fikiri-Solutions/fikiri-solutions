@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import {
   Mail,
@@ -21,6 +22,7 @@ import { useToast } from '../components/Toast'
 import { AutomationWizard } from '../components/AutomationWizard'
 import { WebhookPayloadBuilder } from '../components/WebhookPayloadBuilder'
 import { useAuth } from '../contexts/AuthContext'
+import { FIKIRI_LAST_AUTOMATION_CORRELATION_KEY } from '../constants/correlationDebug'
 
 type ConfigField = {
   key: string
@@ -198,6 +200,9 @@ export const Automations: React.FC = () => {
     return defaults
   }, [])
   const [configState, setConfigState] = useState<Record<string, Record<string, any>>>(baseConfig)
+  const [lastCorrelationId, setLastCorrelationId] = useState<string | null>(null)
+  const [tracePreview, setTracePreview] = useState<string | null>(null)
+  const [traceLoading, setTraceLoading] = useState(false)
 
   const { data: rules = [], refetch: refetchRules, isLoading } = useQuery({
     queryKey: ['automation-rules'],
@@ -286,8 +291,27 @@ export const Automations: React.FC = () => {
 
   const testPresetMutation = useMutation({
     mutationFn: (presetId: string) => apiClient.runAutomationPreset(presetId),
-    onSuccess: (_, presetId) => {
-      addToast({ type: 'success', title: `Preset ${presetId} ran successfully` })
+    onSuccess: (payload: { correlation_id?: string } | undefined, presetId) => {
+      const cid =
+        typeof payload?.correlation_id === 'string' && payload.correlation_id
+          ? payload.correlation_id
+          : null
+      if (cid) {
+        setLastCorrelationId(cid)
+        setTracePreview(null)
+        try {
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.setItem(FIKIRI_LAST_AUTOMATION_CORRELATION_KEY, cid)
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      addToast({
+        type: 'success',
+        title: `Preset ${presetId} ran successfully`,
+        message: cid ? `Correlation: ${cid}` : undefined,
+      })
       refetchLogs()
     },
     onError: (error: any) => {
@@ -451,52 +475,50 @@ export const Automations: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
           <p className="text-sm uppercase tracking-wide text-brand-text/60 dark:text-gray-400">Automation Studio</p>
-          <h1 className="text-3xl font-bold text-brand-text dark:text-white">Workflow Automations</h1>
-          <p className="mt-2 text-brand-text/70 dark:text-gray-300">
+          <h1 className="text-2xl font-bold text-brand-text dark:text-white mt-0.5">Workflow Automations</h1>
+          <p className="mt-1.5 text-sm text-brand-text/70 dark:text-gray-300 max-w-xl">
             Toggle always-on workflows without writing code. Each automation runs using your connected Gmail and CRM.
           </p>
         </div>
-        <div className="flex items-center gap-4 flex-wrap">
-        <div className="rounded-2xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 px-5 py-3 shadow-sm">
-          <div className="flex items-center gap-3">
-            <Shield className="h-5 w-5 text-brand-primary" />
-            <div>
-              <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400">Safety</p>
-              <p className="text-sm font-semibold text-brand-text dark:text-white">
-                {safetyStatus?.automation_enabled ? 'Enabled' : 'Disabled'} · {safetyStatus?.safety_level ?? 'normal'}
-              </p>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="rounded-xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <Shield className="h-4 w-4 text-brand-primary" />
+              <div>
+                <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400">Safety</p>
+                <p className="text-sm font-semibold text-brand-text dark:text-white">
+                  {safetyStatus?.automation_enabled ? 'Enabled' : 'Disabled'} · {safetyStatus?.safety_level ?? 'normal'}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="rounded-2xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 px-5 py-3 shadow-sm min-w-[200px]">
-          <div className="flex items-center gap-3">
-            <BarChart3 className="h-5 w-5 text-brand-primary" />
-            <div className="flex-1">
-              <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400">Queue health</p>
-              {metricsLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin text-brand-text/50 mt-0.5" />
-              ) : automationMetrics ? (
-                <div className="text-sm font-semibold text-brand-text dark:text-white space-y-0.5">
-                  <span className="block">Queued: {automationMetrics.queued ?? 0} · Running: {automationMetrics.running ?? 0}</span>
-                  <span className="block text-emerald-500 dark:text-emerald-400">Success: {automationMetrics.success ?? 0}</span>
-                  <span className="block text-rose-500 dark:text-rose-400">Failed: {automationMetrics.failed ?? 0} · Dead: {automationMetrics.dead ?? 0}</span>
-                  {automationMetrics.success_rate_24h != null && (
-                    <span className="block text-brand-text/70 dark:text-gray-300">
-                      Success rate (24h): {Math.round(automationMetrics.success_rate_24h * 100)}%
-                      {automationMetrics.p95_duration_seconds != null && ` · p95: ${automationMetrics.p95_duration_seconds}s`}
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-brand-text/60 dark:text-gray-400">No metrics yet</p>
-              )}
+          <div className="rounded-xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 shadow-sm min-w-[180px]">
+            <div className="flex items-center gap-2.5">
+              <BarChart3 className="h-4 w-4 text-brand-primary flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400">Queue health</p>
+                {metricsLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-brand-text/50 mt-0.5" />
+                ) : automationMetrics ? (
+                  <p className="text-xs font-semibold text-brand-text dark:text-white leading-tight mt-0.5">
+                    Q: {automationMetrics.queued ?? 0} · R: {automationMetrics.running ?? 0} · ✓ {automationMetrics.success ?? 0} · ✗ {automationMetrics.failed ?? 0}
+                    {automationMetrics.success_rate_24h != null && (
+                      <span className="block text-brand-text/70 dark:text-gray-300 font-normal mt-0.5">
+                        {Math.round(automationMetrics.success_rate_24h * 100)}% success
+                        {automationMetrics.p95_duration_seconds != null && ` · p95 ${automationMetrics.p95_duration_seconds}s`}
+                      </span>
+                    )}
+                  </p>
+                ) : (
+                  <p className="text-xs text-brand-text/60 dark:text-gray-400 mt-0.5">No metrics yet</p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
         </div>
       </div>
 
@@ -517,7 +539,7 @@ export const Automations: React.FC = () => {
           Loading automations…
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {automationPresets.map((preset) => {
             const Icon = preset.icon
             const rule = findRuleForPreset(rules, preset.id)
@@ -532,22 +554,22 @@ export const Automations: React.FC = () => {
             const lastMessage = lastLog?.action_result?.message || lastLog?.error_message
             const isTesting = testPresetMutation.isPending && testPresetMutation.variables === preset.id
             return (
-              <div key={preset.id} className="rounded-2xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-brand-accent/20">
-                      <Icon className="h-5 w-5 text-brand-primary" />
+              <div key={preset.id} className="rounded-xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="p-1.5 rounded-lg bg-brand-accent/20 flex-shrink-0">
+                      <Icon className="h-4 w-4 text-brand-primary" />
                     </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-brand-text dark:text-white">{preset.name}</h3>
-                      <p className="text-sm text-brand-text/70 dark:text-gray-400">{preset.description}</p>
+                    <div className="min-w-0">
+                      <h3 className="text-base font-semibold text-brand-text dark:text-white">{preset.name}</h3>
+                      <p className="text-xs text-brand-text/70 dark:text-gray-400 line-clamp-2">{preset.description}</p>
                       {isStub && (
-                        <span className="inline-block mt-1.5 px-2 py-0.5 rounded text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                        <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400">
                           Not implemented yet
                         </span>
                       )}
                       {isPartial && !isStub && (
-                        <span className="inline-block mt-1.5 px-2 py-0.5 rounded text-xs font-medium bg-blue-500/15 text-blue-600 dark:text-blue-400">
+                        <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-500/15 text-blue-600 dark:text-blue-400">
                           Partial (depends on configuration)
                         </span>
                       )}
@@ -562,7 +584,7 @@ export const Automations: React.FC = () => {
                 </div>
 
                 {preset.actionType === 'trigger_webhook' && (
-                  <div className="space-y-4 mt-4">
+                  <div className="space-y-3 mt-1">
                     <WebhookPayloadBuilder
                       webhookUrl={configState[preset.id]?.webhook_url || configState[preset.id]?.sheet_url || ''}
                       payload={configState[preset.id]?.payload || {}}
@@ -574,32 +596,32 @@ export const Automations: React.FC = () => {
                 )}
 
                 {preset.actionType !== 'trigger_webhook' && preset.configFields.length > 0 && (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {preset.configFields.map(field => (
                       <div key={field.key}>
-                        <label className="text-sm font-medium text-brand-text dark:text-gray-200">{field.label}</label>
+                        <label className="text-xs font-medium text-brand-text dark:text-gray-200">{field.label}</label>
                         {renderField(preset.id, field)}
-                        {field.helper && <p className="text-xs text-brand-text/60 dark:text-gray-400 mt-1">{field.helper}</p>}
+                        {field.helper && <p className="text-xs text-brand-text/60 dark:text-gray-400 mt-0.5">{field.helper}</p>}
                       </div>
                     ))}
                   </div>
                 )}
 
-                <div className="rounded-xl border border-brand-text/10 dark:border-gray-700 bg-brand-accent/5 dark:bg-gray-900 p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
+                <div className="rounded-lg border border-brand-text/10 dark:border-gray-700 bg-brand-accent/5 dark:bg-gray-900 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
                       <p className="text-xs uppercase tracking-wide text-brand-text/50 dark:text-gray-400">Last run</p>
-                      <p className="text-sm font-medium text-brand-text dark:text-white">{formatAbsoluteTimestamp(lastLog?.executed_at)}</p>
-                      <p className="text-xs text-brand-text/60 dark:text-gray-400">
-                        {lastMessage ? lastMessage : lastLog ? 'Preset executed via backend' : 'No executions have been recorded yet'}
+                      <p className="text-xs font-medium text-brand-text dark:text-white truncate">{formatAbsoluteTimestamp(lastLog?.executed_at)}</p>
+                      <p className="text-xs text-brand-text/60 dark:text-gray-400 truncate" title={lastMessage || undefined}>
+                        {lastMessage ? lastMessage : lastLog ? 'Preset executed via backend' : 'No executions yet'}
                       </p>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusClass}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${statusClass}`}>
                       {lastLog ? (lastLog.status === 'success' ? 'Healthy' : 'Needs attention') : 'Idle'}
                     </span>
                   </div>
                   {presetLogs.length > 0 && (
-                    <div className="mt-3 space-y-1 max-h-24 overflow-y-auto pr-1 text-xs text-brand-text/70 dark:text-gray-300">
+                    <div className="mt-2 space-y-0.5 max-h-16 overflow-y-auto pr-1 text-xs text-brand-text/70 dark:text-gray-300">
                       {presetLogs.slice(0, 3).map(log => (
                         <div key={log.execution_id} className="flex items-center justify-between">
                           <span className="truncate">{log.action_result?.summary || log.action_result?.message || log.status}</span>
@@ -610,24 +632,24 @@ export const Automations: React.FC = () => {
                   )}
                 </div>
 
-                <div className="flex items-center justify-between border-t border-brand-text/10 dark:border-gray-700 pt-4">
-                  <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between border-t border-brand-text/10 dark:border-gray-700 pt-3 gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <button
                       onClick={() => handleTestPreset(preset.id)}
                       disabled={isTesting}
-                      className={`text-sm font-medium inline-flex items-center gap-2 ${
+                      className={`text-xs font-medium inline-flex items-center gap-1.5 ${
                         isTesting ? 'text-brand-text/50 dark:text-gray-500 cursor-not-allowed' : 'text-brand-primary hover:text-brand-secondary'
                       } ${isStub ? 'opacity-75' : ''}`}
                       title={isStub ? 'Run Test will return "Not implemented" until this action is built' : undefined}
                     >
-                      <PlayCircle className="h-4 w-4" />
+                      <PlayCircle className="h-3.5 w-3.5" />
                       {isTesting ? 'Testing…' : 'Run Test'}
                     </button>
                     <button
                       onClick={() => handleToggle(preset, true)}
-                      className="text-sm font-medium text-brand-primary hover:text-brand-secondary inline-flex items-center gap-2"
+                      className="text-xs font-medium text-brand-primary hover:text-brand-secondary inline-flex items-center gap-1.5"
                     >
-                      <Zap className="h-4 w-4" />
+                      <Zap className="h-3.5 w-3.5" />
                       Save & Activate
                     </button>
                   </div>
@@ -638,18 +660,18 @@ export const Automations: React.FC = () => {
         </div>
       )}
 
-      <div className="rounded-2xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <History className="h-5 w-5 text-brand-primary" />
+      <div className="rounded-xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-3 gap-3">
+          <div className="flex items-center gap-2.5">
+            <History className="h-4 w-4 text-brand-primary" />
             <div>
               <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400">Automation activity</p>
-              <h2 className="text-xl font-semibold text-brand-text dark:text-white">Recent executions</h2>
+              <h2 className="text-lg font-semibold text-brand-text dark:text-white">Recent executions</h2>
             </div>
           </div>
           {logsLoading && (
             <div className="flex items-center text-xs text-brand-text/60 dark:text-gray-400">
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
               Updating…
             </div>
           )}
@@ -657,25 +679,24 @@ export const Automations: React.FC = () => {
         {automationLogs.length === 0 ? (
           <div className="text-sm text-brand-text/60 dark:text-gray-400">No automation activity recorded yet.</div>
         ) : (
-          <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
             {automationLogs.slice(0, 12).map(log => {
               const isSuccess = log.status === 'success'
               const StatusIcon = isSuccess ? CheckCircle2 : AlertTriangle
               return (
-                <div key={log.execution_id} className="flex items-start justify-between gap-4 rounded-xl border border-brand-text/10 dark:border-gray-700 p-4">
-                  <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-full ${isSuccess ? 'bg-emerald-500/10 text-emerald-500 dark:text-emerald-300' : 'bg-rose-500/10 text-rose-500 dark:text-rose-300'}`}>
-                      <StatusIcon className="h-4 w-4" />
+                <div key={log.execution_id} className="flex items-start justify-between gap-3 rounded-lg border border-brand-text/10 dark:border-gray-700 p-3">
+                  <div className="flex items-start gap-2 min-w-0">
+                    <div className={`p-1.5 rounded-full flex-shrink-0 ${isSuccess ? 'bg-emerald-500/10 text-emerald-500 dark:text-emerald-300' : 'bg-rose-500/10 text-rose-500 dark:text-rose-300'}`}>
+                      <StatusIcon className="h-3.5 w-3.5" />
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-brand-text dark:text-white">{log.rule_name}</p>
-                      <p className="text-sm text-brand-text/70 dark:text-gray-300 mt-1">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-brand-text dark:text-white">{log.rule_name}</p>
+                      <p className="text-xs text-brand-text/70 dark:text-gray-300 mt-0.5 line-clamp-2">
                         {log.action_result?.message || log.action_result?.summary || log.error_message || 'Automation completed successfully'}
                       </p>
                     </div>
                   </div>
-                  <div className="text-right text-xs text-brand-text/60 dark:text-gray-400 min-w-[120px]">
-                    <p>{formatAbsoluteTimestamp(log.executed_at)}</p>
+                  <div className="text-right text-xs text-brand-text/60 dark:text-gray-400 flex-shrink-0">
                     <p>{formatRelativeTimestamp(log.executed_at)}</p>
                   </div>
                 </div>
@@ -686,24 +707,96 @@ export const Automations: React.FC = () => {
       </div>
 
       {suggestions && suggestions.length > 0 && (
-        <div className="rounded-2xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm">
-          <div className="flex items-center gap-3 mb-4">
-            <GitBranch className="h-5 w-5 text-brand-primary" />
+        <div className="rounded-xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
+          <div className="flex items-center gap-2.5 mb-3">
+            <GitBranch className="h-4 w-4 text-brand-primary" />
             <div>
               <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400">AI recommendations</p>
-              <h2 className="text-xl font-semibold text-brand-text dark:text-white">Suggested automations</h2>
+              <h2 className="text-lg font-semibold text-brand-text dark:text-white">Suggested automations</h2>
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             {suggestions.map((suggestion: any, idx: number) => (
-              <div key={idx} className="rounded-xl border border-brand-text/10 dark:border-gray-700 p-4 text-sm text-brand-text/80 dark:text-gray-300">
-                <p className="font-semibold text-brand-text dark:text-white">{suggestion.title || suggestion.name || 'Automation suggestion'}</p>
-                <p className="mt-1">{suggestion.description || suggestion.reason || 'Optimize this workflow for better response times.'}</p>
+              <div key={idx} className="rounded-lg border border-brand-text/10 dark:border-gray-700 p-3 text-sm text-brand-text/80 dark:text-gray-300">
+                <p className="font-semibold text-brand-text dark:text-white text-sm">{suggestion.title || suggestion.name || 'Automation suggestion'}</p>
+                <p className="mt-0.5 text-xs">{suggestion.description || suggestion.reason || 'Optimize this workflow for better response times.'}</p>
               </div>
             ))}
           </div>
         </div>
       )}
+
+      <details className="rounded-xl border border-dashed border-brand-text/20 dark:border-gray-600 bg-white/50 dark:bg-gray-900/40 p-4 text-xs text-brand-text/70 dark:text-gray-400">
+        <summary className="cursor-pointer font-medium text-brand-text dark:text-gray-200 select-none">
+          Debug: correlation ID &amp; trace
+        </summary>
+        <p className="mt-2 text-[11px] leading-relaxed">
+          Top-level <code className="px-1 rounded bg-brand-text/10">correlation_id</code> is canonical on API
+          responses. Use{' '}
+          <code className="px-1 rounded bg-brand-text/10">GET /api/debug/correlation/&lt;id&gt;</code> for a
+          stitched view (see <code className="px-1 rounded bg-brand-text/10">docs/CORRELATION_AND_EVENTS.md</code>
+          ).
+        </p>
+        <p className="mt-2 text-[11px]">
+          <Link
+            to={
+              lastCorrelationId
+                ? `/debug/correlation?id=${encodeURIComponent(lastCorrelationId)}`
+                : '/debug/correlation'
+            }
+            className="font-medium text-brand-primary hover:underline dark:text-brand-accent"
+          >
+            Open full correlation debug page →
+          </Link>
+        </p>
+        {lastCorrelationId ? (
+          <div className="mt-3 space-y-2">
+            <p className="break-all font-mono text-[11px] text-brand-text dark:text-gray-200">{lastCorrelationId}</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded-md border border-brand-text/20 px-2 py-1 text-xs font-medium text-brand-text dark:text-gray-200 hover:bg-brand-text/5"
+                onClick={() => {
+                  void navigator.clipboard.writeText(lastCorrelationId)
+                  addToast({ type: 'success', title: 'Copied correlation ID' })
+                }}
+              >
+                Copy ID
+              </button>
+              <button
+                type="button"
+                disabled={traceLoading}
+                className="rounded-md border border-brand-primary/40 bg-brand-primary/10 px-2 py-1 text-xs font-medium text-brand-primary disabled:opacity-50"
+                onClick={async () => {
+                  setTraceLoading(true)
+                  setTracePreview(null)
+                  try {
+                    const t = await apiClient.getCorrelationTrace(lastCorrelationId)
+                    setTracePreview(JSON.stringify(t, null, 2))
+                  } catch (e: unknown) {
+                    const msg =
+                      e && typeof e === 'object' && 'response' in e
+                        ? String((e as { response?: { data?: { error?: string } } }).response?.data?.error)
+                        : 'Trace request failed'
+                    addToast({ type: 'error', title: 'Trace failed', message: msg })
+                  } finally {
+                    setTraceLoading(false)
+                  }
+                }}
+              >
+                {traceLoading ? 'Loading…' : 'Load stitched trace'}
+              </button>
+            </div>
+            {tracePreview ? (
+              <pre className="mt-2 max-h-56 overflow-auto rounded-md border border-brand-text/10 bg-black/5 dark:bg-black/30 p-2 text-[10px] leading-snug text-brand-text dark:text-gray-200">
+                {tracePreview}
+              </pre>
+            ) : null}
+          </div>
+        ) : (
+          <p className="mt-2 text-[11px]">Run a preset test above to capture the last correlation ID.</p>
+        )}
+      </details>
     </div>
   )
 }

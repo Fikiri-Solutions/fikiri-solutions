@@ -17,7 +17,7 @@ export function useDashboardMetrics() {
 export function useDashboardTimeseries(period: 'week' | 'month' | 'quarter' = 'week') {
   return useQuery({
     queryKey: ['dashboard', 'timeseries', period],
-    queryFn: () => apiClient.getDashboardTimeseries(1, period),
+    queryFn: () => apiClient.getDashboardTimeseries(undefined, period),
     staleTime: 60000, // 1 minute
     refetchInterval: 300000, // Refetch every 5 minutes
     retry: 3,
@@ -113,7 +113,7 @@ export function usePrefetchDashboardData() {
     
     queryClient.prefetchQuery({
       queryKey: ['dashboard', 'timeseries', 'week'],
-      queryFn: () => apiClient.getDashboardTimeseries(1, 'week'),
+      queryFn: () => apiClient.getDashboardTimeseries(undefined, 'week'),
       staleTime: 60000,
     });
     

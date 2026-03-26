@@ -279,25 +279,25 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
     return (
       <div className="space-y-6">
         <div className="text-center">
-          <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-            <CheckCircle className="h-8 w-8 text-green-600" />
+          <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/40 rounded-full flex items-center justify-center mb-4">
+            <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Gmail Connected!</h2>
-          <p className="text-gray-600">We're ready to sync your emails</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Gmail Connected!</h2>
+          <p className="text-gray-600 dark:text-gray-300">We're ready to sync your emails</p>
         </div>
 
-        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-6">
           <div className="flex items-center mb-4">
-            <Mail className="h-5 w-5 text-green-600 mr-3" />
+            <Mail className="h-5 w-5 text-green-600 dark:text-green-400 mr-3 shrink-0" />
             <div>
-              <h3 className="font-semibold text-green-900">Connected Account</h3>
-              <p className="text-sm text-green-800">{gmailStatus.email}</p>
+              <h3 className="font-semibold text-green-900 dark:text-green-100">Connected Account</h3>
+              <p className="text-sm text-green-800 dark:text-green-200">{gmailStatus.email}</p>
             </div>
           </div>
           
           {gmailStatus.last_sync && (
-            <div className="flex items-center text-sm text-green-700">
-              <Clock className="h-4 w-4 mr-2" />
+            <div className="flex items-center text-sm text-green-700 dark:text-green-300">
+              <Clock className="h-4 w-4 mr-2 shrink-0" />
               Last sync: {new Date(gmailStatus.last_sync).toLocaleString()}
             </div>
           )}
@@ -306,30 +306,30 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
         <div className="text-center">
           <button
             onClick={() => setShowDetails(!showDetails)}
-            className="text-sm text-blue-600 hover:text-blue-700"
+            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
           >
             {showDetails ? 'Hide' : 'Show'} permission details
           </button>
         </div>
 
         {showDetails && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <h4 className="font-medium text-gray-900 mb-3">What we can do:</h4>
-            <ul className="space-y-2 text-sm text-gray-700">
+          <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+            <h4 className="font-medium text-gray-900 dark:text-white mb-3">What we can do:</h4>
+            <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
               {gmailStatus.scopes?.map((scope) => (
                 <li key={scope} className="flex items-center">
-                  <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                  <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 mr-2 shrink-0" />
                   {getScopeDescription(scope)}
                 </li>
               ))}
             </ul>
             
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded">
               <div className="flex items-start">
-                <Shield className="h-5 w-5 text-blue-600 mr-3 mt-0.5" />
+                <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-3 mt-0.5 shrink-0" />
                 <div>
-                  <h5 className="font-medium text-blue-900">Your privacy is protected</h5>
-                  <p className="text-sm text-blue-800 mt-1">
+                  <h5 className="font-medium text-blue-900 dark:text-blue-100">Your privacy is protected</h5>
+                  <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">
                     We only access emails you've received and never read your personal messages. 
                     You can revoke access anytime in your settings.
                   </p>
@@ -342,13 +342,13 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
         <div className="flex justify-center space-x-4">
           <button
             onClick={disconnectGmail}
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
           >
             Disconnect
           </button>
           <button
             onClick={onConnected}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="px-6 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800"
           >
             Continue
           </button>
@@ -360,69 +360,69 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-          <Mail className="h-8 w-8 text-blue-600" />
+        <div className="mx-auto w-16 h-16 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center mb-4">
+          <Mail className="h-8 w-8 text-blue-600 dark:text-blue-400" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Connect your Gmail</h2>
-        <p className="text-gray-600">We'll sync your emails to find leads and automate responses</p>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Connect your Gmail</h2>
+        <p className="text-gray-600 dark:text-gray-300">We'll sync your emails to find leads and automate responses</p>
       </div>
 
       {/* Trust Indicators */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="text-center p-4 bg-white border border-gray-200 rounded-lg">
-          <Shield className="h-8 w-8 text-green-600 mx-auto mb-2" />
-          <h3 className="font-medium text-gray-900">Secure</h3>
-          <p className="text-sm text-gray-600">OAuth 2.0 encryption</p>
+        <div className="text-center p-4 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+          <Shield className="h-8 w-8 text-green-600 dark:text-green-400 mx-auto mb-2" />
+          <h3 className="font-medium text-gray-900 dark:text-white">Secure</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">OAuth 2.0 encryption</p>
         </div>
         
-        <div className="text-center p-4 bg-white border border-gray-200 rounded-lg">
-          <Eye className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-          <h3 className="font-medium text-gray-900">Transparent</h3>
-          <p className="text-sm text-gray-600">See exactly what we access</p>
+        <div className="text-center p-4 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+          <Eye className="h-8 w-8 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
+          <h3 className="font-medium text-gray-900 dark:text-white">Transparent</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">See exactly what we access</p>
         </div>
         
-        <div className="text-center p-4 bg-white border border-gray-200 rounded-lg">
-          <Clock className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-          <h3 className="font-medium text-gray-900">Reversible</h3>
-          <p className="text-sm text-gray-600">Disconnect anytime</p>
+        <div className="text-center p-4 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+          <Clock className="h-8 w-8 text-purple-600 dark:text-purple-400 mx-auto mb-2" />
+          <h3 className="font-medium text-gray-900 dark:text-white">Reversible</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Disconnect anytime</p>
         </div>
       </div>
 
       {/* Permission Details */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">What we'll access:</h3>
+      <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+        <h3 className="font-semibold text-gray-900 dark:text-white mb-4">What we'll access:</h3>
         <ul className="space-y-3">
           <li className="flex items-start">
-            <CheckCircle className="h-5 w-5 text-green-500 mr-3 mt-0.5" />
+            <CheckCircle className="h-5 w-5 text-green-500 dark:text-green-400 mr-3 mt-0.5 shrink-0" />
             <div>
-              <span className="font-medium text-gray-900">Read emails</span>
-              <p className="text-sm text-gray-600">To identify leads and extract contact information</p>
+              <span className="font-medium text-gray-900 dark:text-white">Read emails</span>
+              <p className="text-sm text-gray-600 dark:text-gray-400">To identify leads and extract contact information</p>
             </div>
           </li>
           <li className="flex items-start">
-            <CheckCircle className="h-5 w-5 text-green-500 mr-3 mt-0.5" />
+            <CheckCircle className="h-5 w-5 text-green-500 dark:text-green-400 mr-3 mt-0.5 shrink-0" />
             <div>
-              <span className="font-medium text-gray-900">Send emails</span>
-              <p className="text-sm text-gray-600">To respond to leads automatically (with your approval)</p>
+              <span className="font-medium text-gray-900 dark:text-white">Send emails</span>
+              <p className="text-sm text-gray-600 dark:text-gray-400">To respond to leads automatically (with your approval)</p>
             </div>
           </li>
           <li className="flex items-start">
-            <CheckCircle className="h-5 w-5 text-green-500 mr-3 mt-0.5" />
+            <CheckCircle className="h-5 w-5 text-green-500 dark:text-green-400 mr-3 mt-0.5 shrink-0" />
             <div>
-              <span className="font-medium text-gray-900">Organize emails</span>
-              <p className="text-sm text-gray-600">To label and categorize your business emails</p>
+              <span className="font-medium text-gray-900 dark:text-white">Organize emails</span>
+              <p className="text-sm text-gray-600 dark:text-gray-400">To label and categorize your business emails</p>
             </div>
           </li>
         </ul>
       </div>
 
       {/* Privacy Notice */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
         <div className="flex items-start">
-          <Shield className="h-5 w-5 text-blue-600 mr-3 mt-0.5" />
+          <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-3 mt-0.5 shrink-0" />
           <div>
-            <h4 className="font-medium text-blue-900">Your privacy is our priority</h4>
-            <p className="text-sm text-blue-800 mt-1">
+            <h4 className="font-medium text-blue-900 dark:text-blue-100">Your privacy is our priority</h4>
+            <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">
               We only process business-related emails and never access your personal messages. 
               All data is encrypted and you can delete it anytime.
             </p>
@@ -432,10 +432,10 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
           <div className="flex items-center">
-            <AlertCircle className="h-5 w-5 text-red-400 mr-3" />
-            <p className="text-sm text-red-800">{error}</p>
+            <AlertCircle className="h-5 w-5 text-red-400 dark:text-red-300 mr-3 shrink-0" />
+            <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
           </div>
         </div>
       )}
@@ -445,7 +445,7 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
         <button
           onClick={connectGmail}
           disabled={isConnecting}
-          className="bg-blue-600 text-white px-8 py-4 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center mx-auto"
+          className="bg-blue-600 dark:bg-blue-500 text-white px-8 py-4 rounded-lg font-medium hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center mx-auto"
         >
           {isConnecting ? (
             <>
@@ -460,7 +460,7 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
           )}
         </button>
         
-        <p className="text-xs text-gray-500 mt-3">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
           By connecting, you agree to our Terms of Service and Privacy Policy
         </p>
       </div>

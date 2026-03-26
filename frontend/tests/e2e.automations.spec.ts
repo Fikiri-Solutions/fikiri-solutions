@@ -160,8 +160,9 @@ test.describe('Automations Launch Flows', () => {
     await expect(page.getByRole('heading', { name: 'Gmail → CRM' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Send Leads to Your Tools' })).toBeVisible()
     await expect(page.getByText('Partial (depends on configuration)')).toBeVisible()
-    await expect(page.getByText('Queued: 2 · Running: 1')).toBeVisible()
-    await expect(page.getByText('Success rate (24h): 92%')).toBeVisible()
+    // UI shows "Q: 2 · R: 1 · ✓ 12 · ✗ 1" and "92% success" (not "Queued: 2" or "Success rate (24h): 92%")
+    await expect(page.getByText(/Q: 2 · R: 1/)).toBeVisible()
+    await expect(page.getByText(/92% success/)).toBeVisible()
   })
 
   test('can run preset tests and activate a preset from UI', async ({ page }) => {
@@ -183,7 +184,7 @@ test.describe('Automations Launch Flows', () => {
       req => req.url().includes('/api/automation/rules') && ['POST', 'PUT'].includes(req.method()),
       { timeout: 5000 }
     )
-    const gmailCard = page.locator('div.rounded-2xl', { has: page.getByRole('heading', { name: 'Gmail → CRM' }) }).first()
+    const gmailCard = page.locator('div.rounded-xl', { has: page.getByRole('heading', { name: 'Gmail → CRM' }) }).first()
     await gmailCard.getByRole('button', { name: 'Save & Activate' }).click()
     await activationRequest
   })

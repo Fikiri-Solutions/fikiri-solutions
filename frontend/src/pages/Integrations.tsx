@@ -116,9 +116,9 @@ export const Integrations: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             {connectedCount === totalIntegrations ? (
-              <CheckCircle className="h-8 w-8 text-green-600" />
+              <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
             ) : (
-              <XCircle className="h-8 w-8 text-gray-400" />
+              <XCircle className="h-8 w-8 text-gray-400 dark:text-gray-500" />
             )}
           </div>
         </div>
@@ -178,7 +178,7 @@ export const Integrations: React.FC = () => {
           Install on Your Website
         </h2>
         {apiKeyStatus === 'error' && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
+          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4 text-sm text-red-700 dark:text-red-200">
             Sign in to generate your API key and unlock install instructions.
           </div>
         )}
@@ -200,7 +200,7 @@ export const Integrations: React.FC = () => {
           Customize Your Chatbot
         </h2>
         {apiKeyStatus === 'error' && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
+          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4 text-sm text-red-700 dark:text-red-200">
             Sign in to generate your API key and unlock the preview generator.
           </div>
         )}

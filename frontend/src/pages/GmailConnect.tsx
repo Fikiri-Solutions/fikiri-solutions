@@ -110,7 +110,7 @@ export const GmailConnect: React.FC = () => {
     return (
       <div className="flex items-center justify-center h-full text-center text-brand-text/70 dark:text-gray-300">
         <div>
-          <h2 className="text-2xl font-semibold mb-2">Sign in required</h2>
+          <h2 className="text-2xl font-semibold mb-2 text-gray-900 dark:text-white">Sign in required</h2>
           <p>Please log in to connect your Gmail inbox.</p>
         </div>
       </div>
@@ -122,7 +122,7 @@ export const GmailConnect: React.FC = () => {
       label: 'Connection status',
       value: gmailStatus?.connected ? 'Connected' : 'Not connected',
       icon: gmailStatus?.connected ? Mail : AlertCircle,
-      tone: gmailStatus?.connected ? 'text-green-700' : 'text-red-600',
+      tone: gmailStatus?.connected ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400',
       showProgress: false
     },
     {
@@ -152,12 +152,12 @@ export const GmailConnect: React.FC = () => {
             : 'N/A',
       icon: Clock,
       tone: syncStatus?.last_sync 
-        ? 'text-green-600' 
+        ? 'text-green-600 dark:text-green-400' 
         : syncStatus?.syncing
-          ? 'text-blue-600 animate-pulse'
+          ? 'text-blue-600 dark:text-blue-400 animate-pulse'
           : gmailStatus?.connected 
-            ? 'text-gray-500' 
-            : 'text-gray-400',
+            ? 'text-gray-500 dark:text-gray-400' 
+            : 'text-gray-400 dark:text-gray-500',
       showProgress: false
     },
     {
@@ -181,18 +181,18 @@ export const GmailConnect: React.FC = () => {
       })(),
       icon: Activity,
       tone: syncStatus?.syncing || syncStatus?.sync_status === 'in_progress' || syncStatus?.sync_status === 'processing'
-        ? 'text-blue-600 animate-pulse' 
+        ? 'text-blue-600 dark:text-blue-400 animate-pulse' 
         : syncStatus?.sync_status === 'pending'
-          ? 'text-blue-600 animate-pulse'
+          ? 'text-blue-600 dark:text-blue-400 animate-pulse'
         : syncStatus?.sync_status === 'completed'
-          ? 'text-green-600'
+          ? 'text-green-600 dark:text-green-400'
           : syncStatus?.sync_status === 'failed'
-            ? 'text-red-600'
+            ? 'text-red-600 dark:text-red-400'
             : syncStatus?.sync_status === 'connected_pending_sync'
-              ? 'text-yellow-600'
+              ? 'text-yellow-600 dark:text-yellow-400'
               : gmailStatus?.connected 
-                ? 'text-yellow-600' 
-                : 'text-red-600',
+                ? 'text-yellow-600 dark:text-yellow-400' 
+                : 'text-red-600 dark:text-red-400',
       showProgress: syncStatus?.syncing || syncStatus?.sync_status === 'in_progress' || syncStatus?.sync_status === 'processing' || syncStatus?.sync_status === 'pending',
       progress: syncStatus?.progress !== undefined ? syncStatus.progress : (syncStatus?.syncing || syncStatus?.sync_status === 'in_progress' || syncStatus?.sync_status === 'processing' || syncStatus?.sync_status === 'pending' ? 1 : 0)
     }
@@ -215,7 +215,7 @@ export const GmailConnect: React.FC = () => {
               refetchSyncStatus()
               addToast({ type: 'info', title: 'Status refreshed' })
             }}
-            className="inline-flex items-center gap-2 rounded-lg border border-brand-text/20 px-4 py-2 text-sm font-medium text-brand-text hover:bg-brand-accent/10 dark:text-gray-200"
+            className="inline-flex items-center gap-2 rounded-lg border border-brand-text/20 dark:border-gray-600 px-4 py-2 text-sm font-medium text-brand-text hover:bg-brand-accent/10 dark:text-gray-200 dark:hover:bg-gray-700"
           >
             <RefreshCw className="h-4 w-4" />
             Refresh
@@ -290,7 +290,7 @@ export const GmailConnect: React.FC = () => {
                     <div className="w-full mt-2">
                       <div className="flex items-center justify-between text-xs text-brand-text/60 dark:text-gray-400 mb-1.5">
                         <span className="font-medium">Progress</span>
-                        <span className="font-semibold text-blue-600">
+                        <span className="font-semibold text-blue-600 dark:text-blue-400">
                           {item.progress !== undefined && item.progress > 0 
                             ? `${item.progress}%` 
                             : 'Syncing...'}
@@ -323,8 +323,8 @@ export const GmailConnect: React.FC = () => {
             )}
 
             {syncStatus?.error && (
-              <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-                <AlertCircle className="h-5 w-5" />
+              <div className="flex items-start gap-3 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 p-4 text-sm text-red-800 dark:text-red-200">
+                <AlertCircle className="h-5 w-5 shrink-0" />
                 <div>
                   <p className="font-semibold">Sync issues detected</p>
                   <p>{syncStatus.error}</p>

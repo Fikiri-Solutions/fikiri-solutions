@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Mail, Users, Brain, Settings, Menu, X, Palette, LogOut, BarChart3, Shield, Zap, User, PlugZap, BookOpen, CreditCard } from 'lucide-react'
+import { LayoutDashboard, Mail, Users, Brain, Settings, Menu, X, Palette, LogOut, BarChart3, Shield, Zap, User, PlugZap, BookOpen, CreditCard } from 'lucide-react'
 import { MobileBottomNav } from './MobileBottomNav'
 import { ThemeToggle } from './ThemeToggle'
 import { CustomizationPanel } from './CustomizationPanel'
@@ -10,6 +10,7 @@ import { useCustomization } from '../contexts/CustomizationContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { FikiriLogo } from './FikiriLogo'
+import { EmailVerificationBanner } from './EmailVerificationBanner'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -49,7 +50,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   }
 
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: Mail },
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Inbox', href: '/inbox', icon: Mail },
     { name: 'Integrations', href: '/integrations/gmail', icon: PlugZap },
     { name: 'Services', href: '/services', icon: Settings },
@@ -57,7 +58,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'CRM', href: '/crm', icon: Users },
     { name: 'AI Assistant', href: '/ai', icon: Brain },
     { name: 'Chatbot Builder', href: '/ai/chatbot-builder', icon: BookOpen },
-    { name: 'Usage Analytics', href: '/industry', icon: BarChart3 },
+    { name: 'Usage Analytics', href: '/analytics', icon: BarChart3 },
     { name: 'Billing', href: '/billing', icon: CreditCard },
     { name: 'Privacy', href: '/privacy', icon: Shield },
   ]
@@ -181,6 +182,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         {/* Page content */}
         <main id="main-content" className="py-6 pb-20 lg:pb-6">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <EmailVerificationBanner user={user} />
             {children}
           </div>
         </main>

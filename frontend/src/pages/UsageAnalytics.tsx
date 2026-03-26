@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { apiClient } from '../services/apiClient'
+import { apiClient, GmailConnectionStatus } from '../services/apiClient'
 import { useAuth } from '../contexts/AuthContext'
 import { 
   BarChart3, 
@@ -80,6 +80,22 @@ export const UsageAnalytics: React.FC = () => {
     staleTime: 2 * 60 * 1000,
   })
 
+  // Fetch Gmail connection status (authoritative "connected or not")
+  const { data: gmailConnection } = useQuery<GmailConnectionStatus>({
+    queryKey: ['gmail-connection', user?.id],
+    queryFn: () => apiClient.getGmailConnectionStatus(),
+    enabled: !!user,
+    staleTime: 2 * 60 * 1000,
+  })
+
+  // Fetch latest email sync status so analytics can reflect that Gmail has actually synced
+  const { data: syncStatus } = useQuery({
+    queryKey: ['gmail-sync-status', user?.id],
+    queryFn: () => apiClient.getEmailSyncStatus(),
+    enabled: !!user,
+    staleTime: 2 * 60 * 1000,
+  })
+
   const isLoading = loadingMetrics || loadingEmail || loadingAI
 
   const metrics = dashboardMetrics?.data || dashboardMetrics || {}
@@ -92,6 +108,21 @@ export const UsageAnalytics: React.FC = () => {
   const aiResponses = aiData.total_responses || aiData.responses || 0
   const totalLeads = metrics.leads?.total || 0
   const activeAutomations = metrics.automation?.active_automations || 0
+
+  const syncedEmailCount = syncStatus?.total_emails || 0
+
+  const gmailConnected =
+    metrics.integrations?.gmail_connected ||
+    gmailConnection?.connected ||
+    syncedEmailCount > 0
+
+  const hasAnyUsage =
+    totalEmails > 0 ||
+    unreadEmails > 0 ||
+    aiResponses > 0 ||
+    totalLeads > 0 ||
+    activeAutomations > 0 ||
+    syncedEmailCount > 0
 
   if (!user) {
     return (
@@ -108,12 +139,14 @@ export const UsageAnalytics: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-brand-text dark:text-white mb-2">Usage Analytics</h1>
-          <p className="text-brand-text/70 dark:text-gray-400">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-brand-text dark:text-white">
+            Usage Analytics
+          </h1>
+          <p className="mt-1 text-sm text-brand-text/70 dark:text-gray-400">
             Track your platform usage and performance metrics
           </p>
         </div>
@@ -133,6 +166,23 @@ export const UsageAnalytics: React.FC = () => {
       {isLoading ? (
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-brand-primary" />
+        </div>
+      ) : !hasAnyUsage ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="max-w-md text-center space-y-3">
+            <AlertCircle className="h-10 w-10 text-brand-primary mx-auto" />
+            <h2 className="text-lg font-semibold text-brand-text dark:text-white">
+              Waiting for usage data
+            </h2>
+            <p className="text-sm text-brand-text/70 dark:text-gray-400">
+              Once your email and automations start running, this page will show real-time analytics for emails,
+              AI responses, leads, and workflows.
+            </p>
+            <p className="text-xs text-brand-text/60 dark:text-gray-500">
+              If you&apos;ve just connected an integration on the Integrations page, give it a little time to sync
+              and process data.
+            </p>
+          </div>
         </div>
       ) : (
         <>
@@ -285,7 +335,7 @@ export const UsageAnalytics: React.FC = () => {
                     </div>
                   </div>
                 )}
-                {metrics.integrations?.gmail_connected && (
+                {gmailConnected && (
                   <div className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                     <Mail className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5" />
                     <div className="flex-1">
@@ -298,7 +348,7 @@ export const UsageAnalytics: React.FC = () => {
                     </div>
                   </div>
                 )}
-                {aiResponses === 0 && activeAutomations === 0 && totalLeads === 0 && !metrics.integrations?.gmail_connected && (
+                {aiResponses === 0 && activeAutomations === 0 && totalLeads === 0 && !gmailConnected && (
                   <p className="text-sm text-brand-text/60 dark:text-gray-400 italic">
                     Start using features to see what's working well
                   </p>
@@ -313,7 +363,7 @@ export const UsageAnalytics: React.FC = () => {
                 <h2 className="text-xl font-semibold text-brand-text dark:text-white">Areas Needing Attention</h2>
               </div>
               <div className="space-y-3">
-                {!metrics.integrations?.gmail_connected && (
+                {!gmailConnected && (
                   <div className="flex items-start gap-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                     <Mail className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5" />
                     <div className="flex-1">
@@ -351,7 +401,7 @@ export const UsageAnalytics: React.FC = () => {
                     </div>
                   </div>
                 )}
-                {activeAutomations === 0 && metrics.integrations?.gmail_connected && (
+                {activeAutomations === 0 && gmailConnected && (
                   <div className="flex items-start gap-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                     <Zap className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5" />
                     <div className="flex-1">
@@ -370,7 +420,7 @@ export const UsageAnalytics: React.FC = () => {
                     </div>
                   </div>
                 )}
-                {aiResponses === 0 && metrics.integrations?.gmail_connected && (
+                {aiResponses === 0 && gmailConnected && (
                   <div className="flex items-start gap-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                     <Brain className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5" />
                     <div className="flex-1">
@@ -389,7 +439,7 @@ export const UsageAnalytics: React.FC = () => {
                     </div>
                   </div>
                 )}
-                {totalLeads === 0 && metrics.integrations?.gmail_connected && (
+                {totalLeads === 0 && gmailConnected && (
                   <div className="flex items-start gap-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                     <Users className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5" />
                     <div className="flex-1">
@@ -408,7 +458,7 @@ export const UsageAnalytics: React.FC = () => {
                     </div>
                   </div>
                 )}
-                {metrics.integrations?.gmail_connected && unreadEmails <= 10 && activeAutomations > 0 && aiResponses > 0 && totalLeads > 0 && (
+                {gmailConnected && unreadEmails <= 10 && activeAutomations > 0 && aiResponses > 0 && totalLeads > 0 && (
                   <div className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                     <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5" />
                     <div className="flex-1">
@@ -471,13 +521,13 @@ export const UsageAnalytics: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                <div className={`p-2 rounded-lg ${metrics.integrations?.gmail_connected ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-100 dark:bg-gray-600'}`}>
-                  <Mail className={`h-4 w-4 ${metrics.integrations?.gmail_connected ? 'text-green-600 dark:text-green-400' : 'text-gray-400'}`} />
+                <div className={`p-2 rounded-lg ${gmailConnected ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-100 dark:bg-gray-600'}`}>
+                  <Mail className={`h-4 w-4 ${gmailConnected ? 'text-green-600 dark:text-green-400' : 'text-gray-400'}`} />
                 </div>
                 <div>
                   <p className="text-xs text-brand-text/60 dark:text-gray-400">Gmail</p>
                   <p className="text-sm font-semibold text-brand-text dark:text-white">
-                    {metrics.integrations?.gmail_connected ? 'Connected' : 'Not Connected'}
+                    {gmailConnected ? 'Connected' : 'Not Connected'}
                   </p>
                 </div>
               </div>

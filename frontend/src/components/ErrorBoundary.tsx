@@ -41,8 +41,11 @@ export class ErrorBoundary extends Component<Props, State> {
       // Log to console for debugging
       console.error('Error details:', errorData)
       
-      // In production, send to error tracking service
-      if (window.location.hostname !== 'localhost') {
+      // In production, send to error tracking service (treat 127.0.0.1 as local dev)
+      const host = window.location.hostname
+      const isLocalDev =
+        host === 'localhost' || host === '127.0.0.1' || host === '[::1]'
+      if (!isLocalDev) {
         // Send to Vercel Analytics or custom error tracking
         try {
           // You can integrate with Sentry, LogRocket, or custom error tracking here

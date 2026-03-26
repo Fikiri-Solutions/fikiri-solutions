@@ -12,14 +12,15 @@ const DEFAULT_SDK_URL = '/integrations/universal/fikiri-sdk.js'
 
 export const PublicChatbotWidget: React.FC = () => {
   useEffect(() => {
-    const apiKey = import.meta.env.VITE_CHATBOT_API_KEY
-    if (!apiKey) return
+    const apiKey = (import.meta.env.VITE_CHATBOT_API_KEY || '').trim()
+    // Backend only accepts keys prefixed with fik_; skip placeholder/empty to avoid 401 spam
+    if (!apiKey || !apiKey.startsWith('fik_')) return
 
     if (window.__fikiriWidgetLoaded) return
     window.__fikiriWidgetLoaded = true
 
     const scriptUrl = import.meta.env.VITE_CHATBOT_SDK_URL || DEFAULT_SDK_URL
-    const initWidget = () => {
+    const initWidget = async () => {
       if (!window.Fikiri) return
       try {
         window.Fikiri.init({
@@ -28,29 +29,39 @@ export const PublicChatbotWidget: React.FC = () => {
           features: ['chatbot', 'leadCapture'],
           debug: false
         })
+        if (typeof window.Fikiri.validatePublicApiKey === 'function') {
+          const status = await window.Fikiri.validatePublicApiKey()
+          if (status && status.valid === false) {
+            if (import.meta.env.DEV) {
+              // eslint-disable-next-line no-console
+              console.warn('[Fikiri] Chatbot API key invalid:', status.error_code, status.message)
+            }
+            return
+          }
+        }
         window.Fikiri.Chatbot.show({
           position: 'bottom-right'
         })
-      } catch (err) {
+      } catch {
         // No-op: public widget should not break landing pages
       }
     }
 
     if (window.Fikiri) {
-      initWidget()
+      void initWidget()
       return
     }
 
     const existing = document.querySelector(`script[src="${scriptUrl}"]`)
     if (existing) {
-      existing.addEventListener('load', initWidget)
+      existing.addEventListener('load', () => void initWidget())
       return
     }
 
     const script = document.createElement('script')
     script.src = scriptUrl
     script.async = true
-    script.onload = initWidget
+    script.onload = () => void initWidget()
     document.body.appendChild(script)
   }, [])
 

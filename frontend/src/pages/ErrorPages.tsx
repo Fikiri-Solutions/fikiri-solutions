@@ -4,12 +4,12 @@ import { Home, RefreshCw, AlertTriangle, Search } from 'lucide-react'
 
 export const NotFoundPage: React.FC = () => {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center">
-          <Search className="mx-auto h-24 w-24 text-gray-400" />
-          <h1 className="mt-6 text-3xl font-bold text-gray-900">Page Not Found</h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <Search className="mx-auto h-24 w-24 text-gray-400 dark:text-gray-500" />
+          <h1 className="mt-6 text-3xl font-bold text-gray-900 dark:text-white">Page Not Found</h1>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Sorry, we couldn't find the page you're looking for.
           </p>
           <div className="mt-6">
@@ -29,12 +29,12 @@ export const NotFoundPage: React.FC = () => {
 
 export const ErrorPage: React.FC = () => {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center">
-          <AlertTriangle className="mx-auto h-24 w-24 text-red-400" />
-          <h1 className="mt-6 text-3xl font-bold text-gray-900">Something went wrong</h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <AlertTriangle className="mx-auto h-24 w-24 text-red-400 dark:text-red-500" />
+          <h1 className="mt-6 text-3xl font-bold text-gray-900 dark:text-white">Something went wrong</h1>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             We're experiencing some technical difficulties. Please try again.
           </p>
           <div className="mt-6 space-y-3">

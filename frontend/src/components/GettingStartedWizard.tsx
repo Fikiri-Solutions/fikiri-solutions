@@ -512,6 +512,48 @@ export const GettingStartedWizard: React.FC<{ onComplete?: () => void }> = ({ on
                               <li key={i}>{rec}</li>
                             ))}
                           </ul>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {result.category === 'Email Integration' && (
+                              <Button
+                                size="sm"
+                                onClick={() => navigate('/integrations/gmail')}
+                                variant="outline"
+                              >
+                                <Mail className="mr-2 h-4 w-4" />
+                                Connect Email
+                              </Button>
+                            )}
+                            {result.category === 'Lead Management' && (
+                              <Button
+                                size="sm"
+                                onClick={() => navigate('/crm')}
+                                variant="outline"
+                              >
+                                <Users className="mr-2 h-4 w-4" />
+                                Open CRM
+                              </Button>
+                            )}
+                            {result.category === 'Email Automation' && (
+                              <Button
+                                size="sm"
+                                onClick={() => navigate('/automations')}
+                                variant="outline"
+                              >
+                                <Zap className="mr-2 h-4 w-4" />
+                                View Automations
+                              </Button>
+                            )}
+                            {result.category === 'Workflow Automation' && (
+                              <Button
+                                size="sm"
+                                onClick={() => navigate('/automations')}
+                                variant="outline"
+                              >
+                                <Zap className="mr-2 h-4 w-4" />
+                                Configure Workflows
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}

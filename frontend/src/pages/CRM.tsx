@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import { Users, Mail, Phone, Building, Calendar, Star, Filter, Search, Plus, Activity, Zap } from 'lucide-react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
+import { Users, Mail, Phone, Building, Calendar, Star, Filter, Search, Plus, Activity, Zap, Download, Upload, GitBranch } from 'lucide-react'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { apiClient, LeadData } from '../services/apiClient'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorMessage, getUserFriendlyError } from '../components/ErrorMessage'
 import { FeatureStatus, getFeatureStatus } from '../components/FeatureStatus'
 import { useToast } from '../components/Toast'
+import { LeadTraceModal } from '../components/LeadTraceModal'
 
 const pipelineStages = [
   { id: 'new', title: 'New Leads', accent: 'border-blue-200 bg-blue-50 dark:bg-blue-900/30', helper: 'Synced from Gmail & forms' },
@@ -33,6 +34,17 @@ export const CRM: React.FC = () => {
     lastContact: new Date().toISOString(),
     source: 'web'
   })
+  const [isExporting, setIsExporting] = useState(false)
+  const [traceLead, setTraceLead] = useState<LeadData | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const [importResult, setImportResult] = useState<{
+    imported: number
+    created: number
+    updated: number
+    skipped: number
+    skipped_details: Array<{ row: number; reason: string; email?: string }>
+  } | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { addToast } = useToast()
 
   const handleAddLead = async () => {
@@ -90,6 +102,62 @@ export const CRM: React.FC = () => {
       setError(getUserFriendlyError(error))
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleExportCsv = async () => {
+    setIsExporting(true)
+    setError(null)
+    try {
+      await apiClient.exportLeadsCsv()
+      addToast({ type: 'success', title: 'Export complete', message: 'leads.csv downloaded.' })
+    } catch (err) {
+      setError(getUserFriendlyError(err))
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const handleDownloadTemplate = () => {
+    const template = 'email,name,phone,source\njohn@example.com,John Doe,1234567890,website\njane@example.com,Jane Smith,9876543210,facebook'
+    const blob = new Blob([template], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'leads-template.csv'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    addToast({ type: 'success', title: 'Template downloaded', message: 'Fill in your leads and import the CSV.' })
+  }
+
+  const handleImportCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setIsImporting(true)
+    setError(null)
+    setImportResult(null)
+    try {
+      const result = await apiClient.importLeadsCsv(file)
+      setImportResult({
+        imported: result.imported,
+        created: result.created,
+        updated: result.updated,
+        skipped: result.skipped,
+        skipped_details: result.skipped_details || []
+      })
+      addToast({
+        type: 'success',
+        title: 'Import complete',
+        message: `${result.imported} leads imported${result.skipped ? `, ${result.skipped} skipped` : ''}.`
+      })
+      fetchLeads()
+    } catch (err) {
+      setError(getUserFriendlyError(err))
+    } finally {
+      setIsImporting(false)
     }
   }
 
@@ -203,14 +271,62 @@ export const CRM: React.FC = () => {
               Track and manage your customer leads and relationships.
             </p>
           </div>
-          <button 
-            onClick={() => setShowAddLeadModal(true)}
-            className="bg-brand-primary hover:bg-brand-secondary text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center space-x-2"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Lead</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleExportCsv}
+              disabled={isExporting || leads.length === 0}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium border border-brand-text/20 dark:border-gray-600 text-brand-text dark:text-gray-200 hover:bg-brand-background/50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Download className="h-4 w-4" />
+              <span>{isExporting ? 'Exporting…' : 'Export CSV'}</span>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={handleImportCsv}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isImporting}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium border border-brand-text/20 dark:border-gray-600 text-brand-text dark:text-gray-200 hover:bg-brand-background/50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Upload className="h-4 w-4" />
+              <span>{isImporting ? 'Importing…' : 'Import CSV'}</span>
+            </button>
+            <button
+              onClick={handleDownloadTemplate}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-brand-primary dark:text-brand-accent hover:underline"
+            >
+              <Download className="h-4 w-4" />
+              <span>Download template</span>
+            </button>
+            <button 
+              onClick={() => setShowAddLeadModal(true)}
+              className="bg-brand-primary hover:bg-brand-secondary text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center space-x-2"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Lead</span>
+            </button>
+          </div>
         </div>
+
+        {importResult !== null && (
+          <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 p-4 text-sm">
+            <p className="font-medium text-green-800 dark:text-green-200">
+              ✔ {importResult.imported} leads imported
+              {importResult.created !== undefined && importResult.updated !== undefined && (
+                <span className="text-green-700 dark:text-green-300"> ({importResult.created} new, {importResult.updated} updated)</span>
+              )}
+            </p>
+            {importResult.skipped > 0 && (
+              <p className="mt-1 text-amber-700 dark:text-amber-200">
+                ⚠ {importResult.skipped} skipped (invalid or missing email)
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Error Display */}
         {error && (
@@ -359,6 +475,19 @@ export const CRM: React.FC = () => {
                                   {new Date(lead.lastContact).toLocaleDateString()}
                                 </div>
                               </div>
+                              <button
+                                type="button"
+                                className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-lg border border-brand-text/15 py-1.5 text-[11px] font-medium text-brand-primary hover:bg-brand-primary/5 dark:border-gray-600 dark:text-brand-accent"
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setTraceLead(lead)
+                                }}
+                              >
+                                <GitBranch className="h-3 w-3" />
+                                View trace
+                              </button>
                             </div>
                           )}
                         </Draggable>
@@ -388,7 +517,7 @@ export const CRM: React.FC = () => {
               </div>
               <input
                 type="text"
-                className="bg-white text-brand-text placeholder-brand-text/60 border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 pl-10 w-full"
+                className="bg-white dark:bg-gray-800 text-brand-text dark:text-white placeholder-brand-text/60 dark:placeholder-gray-400 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 pl-10 w-full"
                 placeholder="Search leads by name, email, or company..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -400,7 +529,7 @@ export const CRM: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Filter className="h-4 w-4 text-brand-text/60" />
               <select
-                className="bg-white text-brand-text border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2"
+                className="bg-white dark:bg-gray-800 text-brand-text dark:text-white border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2"
                 value={filterStage}
                 onChange={(e) => setFilterStage(e.target.value)}
               >
@@ -448,6 +577,9 @@ export const CRM: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider">
                     Source
                   </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-900 divide-y divide-brand-text/10 dark:divide-gray-700">
@@ -487,6 +619,16 @@ export const CRM: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-brand-text/70 dark:text-gray-400">
                       {lead.source}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 rounded-md border border-brand-text/15 px-2 py-1 text-xs font-medium text-brand-primary hover:bg-brand-primary/5 dark:border-gray-600 dark:text-brand-accent"
+                        onClick={() => setTraceLead(lead)}
+                      >
+                        <GitBranch className="h-3.5 w-3.5" />
+                        View trace
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -504,6 +646,12 @@ export const CRM: React.FC = () => {
         )}
       </div>
 
+      <LeadTraceModal
+        lead={traceLead}
+        open={traceLead !== null}
+        onClose={() => setTraceLead(null)}
+      />
+
       {/* Add Lead Modal */}
       {showAddLeadModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
@@ -518,7 +666,7 @@ export const CRM: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    className="bg-white text-brand-text placeholder-brand-text/60 border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
+                    className="bg-white dark:bg-gray-800 text-brand-text dark:text-white placeholder-brand-text/60 dark:placeholder-gray-400 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                     value={newLead.name}
                     onChange={(e) => setNewLead({...newLead, name: e.target.value})}
                     placeholder="Enter lead name"
@@ -531,7 +679,7 @@ export const CRM: React.FC = () => {
                   </label>
                   <input
                     type="email"
-                    className="bg-white text-brand-text placeholder-brand-text/60 border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
+                    className="bg-white dark:bg-gray-800 text-brand-text dark:text-white placeholder-brand-text/60 dark:placeholder-gray-400 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                     value={newLead.email}
                     onChange={(e) => setNewLead({...newLead, email: e.target.value})}
                     placeholder="Enter email address"
@@ -544,7 +692,7 @@ export const CRM: React.FC = () => {
                   </label>
                   <input
                     type="tel"
-                    className="bg-white text-brand-text placeholder-brand-text/60 border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
+                    className="bg-white dark:bg-gray-800 text-brand-text dark:text-white placeholder-brand-text/60 dark:placeholder-gray-400 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                     value={newLead.phone}
                     onChange={(e) => setNewLead({...newLead, phone: e.target.value})}
                     placeholder="Enter phone number"
@@ -557,7 +705,7 @@ export const CRM: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    className="bg-white text-brand-text placeholder-brand-text/60 border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
+                    className="bg-white dark:bg-gray-800 text-brand-text dark:text-white placeholder-brand-text/60 dark:placeholder-gray-400 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                     value={newLead.company}
                     onChange={(e) => setNewLead({...newLead, company: e.target.value})}
                     placeholder="Enter company name"

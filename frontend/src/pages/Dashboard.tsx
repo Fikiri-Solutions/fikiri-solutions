@@ -1,7 +1,7 @@
 import React, { Suspense } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Mail, Users, Brain, UserPlus, Zap, AlertTriangle, AlertCircle, TrendingUp, CreditCard } from 'lucide-react'
+import { Mail, Users, Brain, UserPlus, Zap, AlertTriangle, AlertCircle, TrendingUp, CreditCard, CheckCircle2, History } from 'lucide-react'
 import { ServiceCard } from '../components/ServiceCard'
 import { EnhancedMetricCard } from '../components/EnhancedMetricCard'
 import { MiniTrend } from '../components/MiniTrend'
@@ -77,6 +77,15 @@ export const Dashboard: React.FC = () => {
     refetchInterval: 60 * 1000, // Auto-refresh every minute
     enabled: true,
   })
+
+  const { data: automationRuns = [], isLoading: automationRunsLoading } = useQuery({
+    queryKey: ['automation-runs-dashboard'],
+    queryFn: () => apiClient.getAutomationLogs({ limit: 8 }),
+    staleTime: 45 * 1000,
+    refetchInterval: 90 * 1000,
+    enabled: !features.useMockData,
+  })
+  const failedRuns = automationRuns.filter((r: { status?: string }) => r.status !== 'success')
 
   // Combine API data with real-time WebSocket updates
   const services = data.services?.services || servicesData
@@ -158,14 +167,14 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="bg-white dark:bg-gray-900">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-6 space-y-6">
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-brand-text dark:text-white mb-2">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-brand-text dark:text-white">
               Dashboard
             </h1>
-            <p className="text-brand-text/70 dark:text-gray-400">
+            <p className="mt-1 text-sm text-brand-text/70 dark:text-gray-400">
               Welcome back! Here's what's happening with your business.
             </p>
           </div>
@@ -179,12 +188,10 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Getting Started Wizard / Health Check */}
-        <div className="mb-8">
-          <GettingStartedWizard />
-        </div>
+        <GettingStartedWizard />
 
         {/* Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {metricsLoading ? (
             <>
               <MetricCardSkeleton />
@@ -261,7 +268,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Email Trends Chart */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-brand-text dark:text-white mb-4 flex items-center">
@@ -298,7 +305,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Service Distribution Chart */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8 border border-gray-200 dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-brand-text dark:text-white mb-4 flex items-center">
             <div className="w-3 h-3 bg-brand-accent rounded-full mr-2"></div>
             Service Distribution
@@ -360,6 +367,60 @@ export const Dashboard: React.FC = () => {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Recent automation runs - visibility for failures */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700 mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-brand-text dark:text-white flex items-center gap-2">
+              <History className="h-5 w-5 text-brand-primary" />
+              Recent automation runs
+            </h3>
+            <Link
+              to="/automations"
+              className="text-sm font-medium text-brand-primary hover:underline"
+            >
+              View all
+            </Link>
+          </div>
+          {failedRuns.length > 0 && (
+            <div className="mb-3 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/20">
+              <p className="text-sm font-medium text-rose-700 dark:text-rose-300">
+                {failedRuns.length} failed run{failedRuns.length !== 1 ? 's' : ''} — check details below or on Automations.
+              </p>
+            </div>
+          )}
+          {automationRunsLoading ? (
+            <ActivitySkeleton />
+          ) : automationRuns.length === 0 ? (
+            <div className="text-sm text-brand-text/60 dark:text-gray-400">
+              No automation runs yet. Enable a workflow on Automations to see activity here.
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {automationRuns.slice(0, 8).map((run: { execution_id: number; rule_name?: string; status?: string; error_message?: string; executed_at?: string; action_result?: { message?: string } }) => {
+                const isSuccess = run.status === 'success'
+                const msg = run.error_message || run.action_result?.message || (isSuccess ? 'Completed' : 'Failed')
+                return (
+                  <div
+                    key={run.execution_id}
+                    className={`flex items-start gap-2 rounded-lg border p-2.5 ${isSuccess ? 'border-brand-text/10 dark:border-gray-700' : 'border-rose-500/30 bg-rose-500/5 dark:bg-rose-500/10'}`}
+                  >
+                    <div className={`flex-shrink-0 mt-0.5 ${isSuccess ? 'text-emerald-500 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'}`}>
+                      {isSuccess ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-brand-text dark:text-white truncate">{run.rule_name || 'Automation'}</p>
+                      <p className={`text-xs truncate ${isSuccess ? 'text-brand-text/60 dark:text-gray-400' : 'text-rose-600 dark:text-rose-300'}`} title={msg}>
+                        {msg}
+                      </p>
+                    </div>
+                    <p className="text-xs text-brand-text/50 dark:text-gray-500 flex-shrink-0">{run.executed_at ? new Date(run.executed_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</p>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Sentry Test Section removed - component deleted */}

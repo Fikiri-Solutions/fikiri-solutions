@@ -147,8 +147,8 @@ const InstallFlow: React.FC<InstallFlowProps> = ({ apiKey, onComplete }) => {
 
   if (!selectedPlatform) {
     return (
-      <div className="bg-white rounded-lg shadow-lg p-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-gray-700">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
           Where is your website built?
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -156,10 +156,10 @@ const InstallFlow: React.FC<InstallFlowProps> = ({ apiKey, onComplete }) => {
             <button
               key={platform}
               onClick={() => setSelectedPlatform(platform)}
-              className="p-6 border-2 border-gray-200 rounded-lg hover:border-teal-500 hover:bg-teal-50 transition-all text-left"
+              className="p-6 border-2 border-gray-200 dark:border-gray-600 rounded-lg hover:border-teal-500 dark:hover:border-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/30 transition-all text-left"
             >
               <div className="text-3xl mb-2">{platformConfigs[platform].icon}</div>
-              <div className="font-semibold text-gray-900">{platformConfigs[platform].name}</div>
+              <div className="font-semibold text-gray-900 dark:text-white">{platformConfigs[platform].name}</div>
             </button>
           ))}
         </div>
@@ -170,16 +170,16 @@ const InstallFlow: React.FC<InstallFlowProps> = ({ apiKey, onComplete }) => {
   const config = platformConfigs[selectedPlatform];
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-8">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 border border-gray-200 dark:border-gray-700">
       <div className="flex items-center justify-between mb-6">
         <div>
           <button
             onClick={() => setSelectedPlatform(null)}
-            className="text-gray-600 hover:text-gray-900 mb-2"
+            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-2"
           >
             ← Back
           </button>
-          <h2 className="text-2xl font-bold text-gray-900">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
             Installing on {config.name}
           </h2>
         </div>
@@ -188,7 +188,7 @@ const InstallFlow: React.FC<InstallFlowProps> = ({ apiKey, onComplete }) => {
 
       <div className="space-y-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Step 1: Copy this code
           </label>
           <div className="bg-gray-900 rounded-lg p-4 relative">
@@ -207,25 +207,25 @@ const InstallFlow: React.FC<InstallFlowProps> = ({ apiKey, onComplete }) => {
             </button>
           </div>
           {copied && (
-            <p className="mt-2 text-sm text-green-600">✓ Copied to clipboard!</p>
+            <p className="mt-2 text-sm text-green-600 dark:text-green-400">✓ Copied to clipboard!</p>
           )}
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Step 2: Paste it
           </label>
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <p className="text-gray-700">{config.instruction}</p>
+          <div className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+            <p className="text-gray-700 dark:text-gray-300">{config.instruction}</p>
           </div>
         </div>
 
-        <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+        <div className="bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800 rounded-lg p-4">
           <div className="flex items-center gap-2">
-            <Check className="w-5 h-5 text-teal-600" />
-            <span className="font-semibold text-teal-900">Step 3: Done! ✅</span>
+            <Check className="w-5 h-5 text-teal-600 dark:text-teal-400 shrink-0" />
+            <span className="font-semibold text-teal-900 dark:text-teal-100">Step 3: Done! ✅</span>
           </div>
-          <p className="mt-2 text-sm text-teal-700">
+          <p className="mt-2 text-sm text-teal-700 dark:text-teal-200">
             Save and preview your site. The chatbot will appear automatically.
           </p>
         </div>
@@ -233,7 +233,7 @@ const InstallFlow: React.FC<InstallFlowProps> = ({ apiKey, onComplete }) => {
         {onComplete && (
           <button
             onClick={onComplete}
-            className="w-full bg-teal-600 text-white py-3 rounded-lg hover:bg-teal-700 transition-colors font-semibold flex items-center justify-center gap-2"
+            className="w-full bg-teal-600 dark:bg-teal-500 text-white py-3 rounded-lg hover:bg-teal-700 dark:hover:bg-teal-600 transition-colors font-semibold flex items-center justify-center gap-2"
           >
             I've Installed It
             <ChevronRight className="w-5 h-5" />

@@ -9,10 +9,12 @@ vi.mock('react-hot-toast', () => {
   const mockToast = vi.fn()
   const mockToastSuccess = vi.fn()
   const mockToastError = vi.fn()
+  const mockToastDismiss = vi.fn()
   
   const defaultExport = Object.assign(mockToast, {
     success: mockToastSuccess,
     error: mockToastError,
+    dismiss: mockToastDismiss,
   })
   
   return {
@@ -68,7 +70,7 @@ describe('Toast Component', () => {
       expect.anything(),
       expect.objectContaining({
         duration: 4000,
-        position: 'top-right',
+        position: 'top-center',
       })
     )
   })
@@ -88,7 +90,7 @@ describe('Toast Component', () => {
       expect.anything(),
       expect.objectContaining({
         duration: 4000,
-        position: 'top-right',
+        position: 'top-center',
       })
     )
   })
@@ -108,7 +110,7 @@ describe('Toast Component', () => {
       expect.anything(),
       expect.objectContaining({
         duration: 4000,
-        position: 'top-right',
+        position: 'top-center',
       })
     )
   })
@@ -128,7 +130,7 @@ describe('Toast Component', () => {
       expect.anything(),
       expect.objectContaining({
         duration: 4000,
-        position: 'top-right',
+        position: 'top-center',
       })
     )
   })

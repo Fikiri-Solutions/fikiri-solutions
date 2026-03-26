@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { RadiantLink } from './RadiantLink'
 import { FikiriLogo } from '@/components/FikiriLogo'
 import { PlusGrid, PlusGridItem, PlusGridRow } from './PlusGrid'
+import { useAuth } from '@/contexts/AuthContext'
 
 const links = [
   { to: '/pricing', label: 'Pricing' },
@@ -71,13 +72,15 @@ function MobileNav() {
 
 export function Navbar({ banner }: { banner?: React.ReactNode }) {
   const { pathname } = useLocation()
+  const { isAuthenticated, user } = useAuth()
+  const homeTo = isAuthenticated && user?.onboarding_completed ? '/dashboard' : '/'
   return (
     <Disclosure as="header" className="pt-12 sm:pt-16" key={pathname}>
       <PlusGrid>
         <PlusGridRow className="grid grid-cols-3 items-center gap-4">
           <div className="flex items-center gap-6">
             <PlusGridItem className="py-3">
-              <RadiantLink to="/" title="Home" className="inline-flex">
+              <RadiantLink to={homeTo} title="Home" className="inline-flex">
                 <FikiriLogo size="md" variant="full" className="h-12 w-auto sm:h-14" />
               </RadiantLink>
             </PlusGridItem>

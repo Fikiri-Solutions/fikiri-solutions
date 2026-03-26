@@ -16,7 +16,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ className = ''
     { name: 'Integrations', href: '/integrations/gmail', icon: PlugZap },
     { name: 'CRM', href: '/crm', icon: Users },
     { name: 'AI Assistant', href: '/ai', icon: Brain },
-    { name: 'Analytics', href: '/industry', icon: BarChart3 },
+    { name: 'Usage Analytics', href: '/analytics', icon: BarChart3 },
   ]
 
   return (

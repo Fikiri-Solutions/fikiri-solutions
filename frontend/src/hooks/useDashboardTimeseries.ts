@@ -45,7 +45,7 @@ export function useDashboardTimeseries() {
         setLoading(true);
         setError(null);
         
-        const response = await apiClient.getDashboardTimeseries(1);
+        const response = await apiClient.getDashboardTimeseries(undefined);
         
         if (response.success) {
           setData(response.data.timeseries);

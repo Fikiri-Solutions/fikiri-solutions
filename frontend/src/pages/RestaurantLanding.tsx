@@ -35,8 +35,8 @@ export const RestaurantLanding: React.FC = () => {
         "Slow period detected → Promotional offers sent → Tables filled"
       ]}
       pricing={{
-        tier: "Premium",
-        price: 249,
+        tier: "Business",
+        price: 199,
         features: [
           "Unlimited reservations",
           "Customer preference tracking",

@@ -52,86 +52,47 @@ const getToastStyles = (type: ToastType) => {
     maxWidth: '420px',
     minWidth: '320px',
     boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    backdropFilter: 'blur(10px)',
+    border: '1px solid rgba(0, 0, 0, 0.08)',
   }
 
   switch (type) {
     case 'success':
       return {
         ...baseStyles,
-        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.1) 100%)',
-        color: '#f0fdf4',
+        background: '#059669',
+        color: '#ffffff',
       }
     case 'error':
       return {
         ...baseStyles,
-        background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.1) 100%)',
-        color: '#fef2f2',
+        background: '#dc2626',
+        color: '#ffffff',
       }
     case 'warning':
       return {
         ...baseStyles,
-        background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(234, 88, 12, 0.1) 100%)',
-        color: '#fff7ed',
+        background: '#ea580c',
+        color: '#ffffff',
       }
     case 'info':
       return {
         ...baseStyles,
-        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.1) 100%)',
-        color: '#eff6ff',
+        background: '#2563eb',
+        color: '#ffffff',
       }
   }
 }
 
-const getToastPosition = (pathname: string): { position: 'top-right' | 'top-left' | 'top-center', containerStyle: React.CSSProperties } => {
-  // Pages with forms/centered content - use top-right to avoid overlap
-  if (pathname === '/login' || pathname === '/signup' || pathname.startsWith('/onboarding')) {
-    return {
-      position: 'top-right',
-      containerStyle: {
-        top: '80px',
-        right: '24px',
-        left: 'auto',
-      }
-    }
-  }
-  
-  // Dashboard and app pages - top-right, below header
-  if (pathname.startsWith('/dashboard') || pathname.startsWith('/inbox') || 
-      pathname.startsWith('/crm') || pathname.startsWith('/services') ||
-      pathname.startsWith('/integrations') || pathname.startsWith('/automations') ||
-      pathname.startsWith('/ai')) {
-    return {
-      position: 'top-right',
-      containerStyle: {
-        top: '80px',
-        right: '24px',
-        left: 'auto',
-      }
-    }
-  }
-  
-  // Landing and pricing pages - top-right, avoid hero section
-  if (pathname === '/' || pathname === '/pricing' || pathname.startsWith('/industries')) {
-    return {
-      position: 'top-right',
-      containerStyle: {
-        top: '100px',
-        right: '24px',
-        left: 'auto',
-      }
-    }
-  }
-  
-  // Default: top-right for all other pages
+const getToastPosition = (_pathname: string): { position: 'top-right' | 'top-left' | 'top-center', containerStyle: React.CSSProperties } => {
+  // Center-ish placement so short toasts are visible and not missed.
   return {
-    position: 'top-right',
+    position: 'top-center',
     containerStyle: {
-      top: '80px',
-      right: '24px',
-      left: 'auto',
-    }
+      top: '90px',
+      left: '50%',
+      right: 'auto',
+      transform: 'translateX(-50%)',
+    },
   }
 }
 
@@ -165,14 +126,11 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
       </div>
     )
 
+    // Keep one visible toast at a time for signal over noise.
+    toast.dismiss()
     toast(customToast, {
       duration,
       position,
-      style: {
-        background: 'transparent',
-        boxShadow: 'none',
-        padding: 0,
-      },
     })
   }, [position])
 
@@ -184,14 +142,8 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
         containerStyle={containerStyle}
         toastOptions={{
           className: '',
-          style: {
-            background: 'transparent',
-            boxShadow: 'none',
-            padding: 0,
-          },
         }}
       />
     </ToastContext.Provider>
   )
 }
-
