@@ -58,9 +58,11 @@ class TestAutomationEngine(unittest.TestCase):
         self.assertIsInstance(result["data"]["rules"], list)
 
     def test_send_notification_without_webhook_returns_not_implemented(self):
-        result = self.engine._execute_send_notification(
-            {"message": "Hi", "type": "info"}, {}, 1
-        )
+        # Ensure no global Slack URL leaks success when env has SLACK_WEBHOOK_URL set (CI/local).
+        with patch.dict(os.environ, {"SLACK_WEBHOOK_URL": ""}, clear=False):
+            result = self.engine._execute_send_notification(
+                {"message": "Hi", "type": "info"}, {}, 1
+            )
         self.assertFalse(result.get("success"))
         self.assertEqual(result.get("error_code"), "NOT_IMPLEMENTED")
 

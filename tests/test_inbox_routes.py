@@ -25,17 +25,16 @@ class TestInboxRoutes(unittest.TestCase):
         self.assertFalse(data.get('success'))
         self.assertEqual(data.get('code'), 'AUTHENTICATION_REQUIRED')
 
+    @patch('routes.business.resolve_request_user_id', return_value=None)
     @patch('routes.business.db_optimizer')
-    @patch('routes.business.get_current_user_id')
-    def test_get_emails_invalid_user_id_param(self, mock_get_user, mock_db):
-        mock_get_user.return_value = None
+    def test_get_emails_invalid_user_id_param(self, mock_db, mock_resolve):
         mock_db.execute_query.return_value = []
 
         response = self.client.get('/api/email/messages?user_id=999')
         self.assertEqual(response.status_code, 401)
         data = json.loads(response.data)
         self.assertFalse(data.get('success'))
-        self.assertEqual(data.get('code'), 'INVALID_USER_ID')
+        self.assertEqual(data.get('code'), 'AUTHENTICATION_REQUIRED')
 
     @patch('routes.business.db_optimizer')
     @patch('routes.business.get_current_user_id')

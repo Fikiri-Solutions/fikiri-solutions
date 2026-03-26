@@ -43,10 +43,10 @@ class TestMonitoringRoutes(unittest.TestCase):
         data = json.loads(response.data)
         self.assertTrue(data.get('data', {}).get('connected'))
 
-    @patch("routes.monitoring.get_current_user_id", return_value=None)
+    @patch("routes.monitoring.resolve_request_user_id", return_value=1)
     @patch("routes.monitoring.db_optimizer")
     @patch("core.oauth_token_manager.oauth_token_manager")
-    def test_email_sync_status_not_connected(self, mock_oauth, mock_db, mock_user_id):
+    def test_email_sync_status_not_connected(self, mock_oauth, mock_db, mock_resolve):
         mock_db.execute_query.return_value = []
         mock_oauth.get_token_status.return_value = {"success": False, "has_token": False}
         response = self.client.get('/api/email/sync/status?user_id=1')
