@@ -2,6 +2,14 @@
 
 To pass Twilio use case 30446, Fikiri collects **express SMS consent** with the required disclosure and optional checkbox.
 
+## Production configuration
+
+- **Toll-free number (verified):** +1 855 389 4992  
+- **Env vars** (set in production; never commit secrets):  
+  `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_MESSAGING_SERVICE_SID`  
+- Outbound SMS use the **Messaging Service** (SID in env); add the toll-free number to that service in Twilio Console.  
+- Inbound: configure webhooks in Twilio to `https://your-api-domain.com/api/webhooks/twilio/sms` and `/voice` (see [TWILIO_WEBHOOKS.md](TWILIO_WEBHOOKS.md)).
+
 ## Where consent is collected
 
 1. **Signup** (`frontend/src/pages/Signup.tsx`)  

@@ -192,8 +192,8 @@ Use Method 1 or Method 2 above - works on any HTML page!
 
 ## 🆘 Need Help?
 
-- **Documentation:** [docs/UNIVERSAL_INTEGRATION_STRATEGY.md](./UNIVERSAL_INTEGRATION_STRATEGY.md)
-- **API Reference:** [docs/PUBLIC_API_DOCUMENTATION.md](./PUBLIC_API_DOCUMENTATION.md)
+- **Documentation:** [docs/INTEGRATION_COMPLETE.md](INTEGRATION_COMPLETE.md) (API contracts and status)
+- **API Reference:** [docs/PUBLIC_API_DOCUMENTATION.md](PUBLIC_API_DOCUMENTATION.md)
 - **Support:** support@fikirisolutions.com
 
 ---

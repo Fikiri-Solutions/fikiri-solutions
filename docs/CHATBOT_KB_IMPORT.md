@@ -12,7 +12,7 @@ Use these endpoints to ingest landing and FAQ content into the public chatbot.
 
 **Body (one of):**
 
-- **Content only:** `{ "title": "Pricing", "content": "Starter $39/mo...", "category": "pricing", "document_type": "article", "tags": ["pricing"], "keywords": ["plan", "trial"] }`
+- **Content only:** `{ "title": "Pricing", "content": "Starter $49/mo...", "category": "pricing", "document_type": "article", "tags": ["pricing"], "keywords": ["plan", "trial"] }`
 - **FAQ style:** `{ "question": "What is Fikiri?", "answer": "Fikiri Solutions is...", "title": "What is Fikiri?", "category": "general" }`
 
 **Fields:**
@@ -56,7 +56,7 @@ curl -X POST https://your-api/api/chatbot/knowledge/import/bulk \
   -d '{
     "documents": [
       {"title":"Home","content":"Fikiri automates outreach. One place for email, CRM, scheduling.","category":"landing"},
-      {"question":"How much does it cost?","answer":"Starter $39/mo, Growth $79/mo, Business $199/mo, Enterprise $399/mo. Free trial available.","category":"pricing"}
+      {"question":"How much does it cost?","answer":"Starter $49/mo, Growth $99/mo, Business $199/mo, Enterprise $499/mo. Free trial available.","category":"pricing"}
     ]
   }'
 ```

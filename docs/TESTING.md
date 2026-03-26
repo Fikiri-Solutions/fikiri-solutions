@@ -129,6 +129,10 @@ INTEGRATION_LOGIN_EMAIL=test@example.com INTEGRATION_LOGIN_PASSWORD=TestPassword
 
 **E2E (Playwright) note:** In specs that mock API routes (e.g. `frontend/tests/e2e.automations.spec.ts`), prefer asserting on **real outbound requests** (e.g. `page.waitForRequest(...)`) rather than counting mock-handler invocations. When multiple handlers can fulfill the same URL, handler counters may stay 0 and cause flaky failures; waiting for the actual request the browser sends is more reliable.
 
+**CI/CD:** The main gate runs backend unit tests with `pytest tests/ -m "not contract and not integration"` and frontend lint + unit + build. Smoke test runs on `main` only. See [docs/CI_CD_STRATEGY.md](CI_CD_STRATEGY.md) for pipeline structure and how to keep local and CI in sync.
+
+**Launch-safe 100%:** Remaining work is external dependency validation (Gmail/Outlook contract tests with real OAuth, E2E onboarding, full readiness suite against staging with real Stripe + mail). See [docs/LAUNCH_SAFE_REMAINING.md](LAUNCH_SAFE_REMAINING.md) for commands and env.
+
 ---
 
 ## 4. What’s left (high-value test gaps)

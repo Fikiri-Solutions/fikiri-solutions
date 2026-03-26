@@ -311,20 +311,27 @@ Set up automatic lead scoring based on:
 
 ## Pricing & Plans
 
-### Starter Plan - $29/month
+### Starter Plan - $49/month
 - Up to 500 emails/month
 - Basic AI responses
 - Standard CRM features
 - Email support
 
-### Professional Plan - $79/month
+### Professional Plan - $99/month
 - Up to 2,000 emails/month
 - Advanced AI responses
 - Full CRM features
 - Priority support
 - Custom integrations
 
-### Enterprise Plan - $199/month
+### Business Plan - $199/month
+- Up to 10,000 emails/month
+- Advanced AI and white-label options
+- Full CRM and analytics
+- Phone support
+- Multi-user access
+
+### Enterprise Plan - $499/month
 - Unlimited emails
 - Custom AI training
 - Advanced analytics

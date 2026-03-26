@@ -2,6 +2,13 @@
 
 This doc tracks the reliability pass for Automation Studio: truth-first behavior, real connectors, queue isolation, and observability.
 
+## Engine ownership (anti-drift)
+
+- **Source of truth for runtime automation execution:** `services/automation_engine.py`
+- **Queue/worker execution path:** `services/automation_queue.py` -> `services/automation_engine.py`
+- **Scheduler time-based execution path:** `core/cleanup_scheduler.py` -> `services.automation_engine.run_due_time_based_automations()`
+- `core/automation_engine.py` is now a **compatibility shim** that re-exports `services/automation_engine.py` so legacy imports cannot diverge behavior.
+
 ## Done (Week 1 – Truth first + real webhook)
 
 ### 1. Action capability registry

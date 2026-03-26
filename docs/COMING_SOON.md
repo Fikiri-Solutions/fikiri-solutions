@@ -22,6 +22,8 @@ Single reference for features that are not fully implemented or cannot be guaran
 
 - **Analytics dashboard:** Partial; not all metrics guaranteed.
 - **Integrations:** Gmail and Outlook OAuth are implemented; other providers (e.g. Notion) may be stubs or not implemented.
+- **Automation actions currently stubbed:** `send_email`, `apply_label`, `archive_email`, `create_task`.
+- **Automation actions currently partial:** `send_notification`, `generate_document`, `send_sms` (provider/config dependent).
 - **Multi-channel / channel handlers:** Abstract base raises `NotImplementedError`; concrete handlers must implement.
 - **Integration framework:** Providers must implement `get_auth_url`, `exchange_code_for_tokens`, `refresh_access_token`, `revoke_token`.
 
