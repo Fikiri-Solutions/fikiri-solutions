@@ -181,23 +181,32 @@ class JWTAuthManager:
                 device_id
             ), fetch=False)
             
-            # Store session in Redis with device-specific key
+            # Store session in Redis with device-specific key (optional; DB is source of truth)
             if self.redis_client:
                 session_data = {
                     'user_id': user_id,
                     'user_data': user_data,
-                    'access_token': access_token,
+                    'access_token': (
+                        access_token.decode('utf-8')
+                        if isinstance(access_token, (bytes, bytearray))
+                        else access_token
+                    ),
                     'device_id': device_id,
                     'created_at': current_time.isoformat(),
                     'last_accessed': current_time.isoformat()
                 }
-                
                 session_key = f"{self.session_prefix}{user_id}:{device_id}"
-                self.redis_client.setex(
-                    session_key, 
-                    self.access_token_expiry, 
-                    json.dumps(session_data)
-                )
+                try:
+                    self.redis_client.setex(
+                        session_key,
+                        self.access_token_expiry,
+                        json.dumps(session_data),
+                    )
+                except Exception as redis_err:
+                    logger.warning(
+                        "JWT Redis session cache skipped (tokens still issued): %s",
+                        redis_err,
+                    )
             
             logger.info(f"✅ Generated tokens for user {user_id} (device: {device_id})")
             
@@ -285,7 +294,7 @@ class JWTAuthManager:
                 SELECT rt.*, u.* FROM refresh_tokens rt
                 JOIN users u ON rt.user_id = u.id
                 WHERE rt.token_hash = ? AND rt.is_revoked = FALSE 
-                AND rt.expires_at > datetime('now') AND u.is_active = 1
+                AND datetime(rt.expires_at) > datetime('now') AND u.is_active = 1
             """, (token_hash,))
             
             if not token_data:
@@ -459,7 +468,7 @@ class JWTAuthManager:
         try:
             db_optimizer.execute_query("""
                 DELETE FROM refresh_tokens 
-                WHERE expires_at < datetime('now') OR is_revoked = TRUE
+                WHERE datetime(expires_at) < datetime('now') OR is_revoked = TRUE
             """, fetch=False)
             
             logger.info("✅ Expired tokens cleaned up")

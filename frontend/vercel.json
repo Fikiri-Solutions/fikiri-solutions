@@ -4,7 +4,7 @@
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/((?!assets/).*)",
+      "source": "/((?!assets/|fonts/|icons/|img/|optimized/|manifest\\.json|manifest\\.webmanifest|sw\\.js|workbox-|registerSW\\.js|robots\\.txt|sitemap\\.xml|clear-cache\\.html|og-image\\.png|privacy\\.md|terms\\.md).*)",
       "destination": "/index.html"
     }
   ],
@@ -26,7 +26,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://fikirisolutions.onrender.com https://va.vercel-scripts.com wss://fikirisolutions.onrender.com; frame-ancestors 'none';"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://fikirisolutions.onrender.com https://va.vercel-scripts.com wss://fikirisolutions.onrender.com https://fonts.googleapis.com https://fonts.gstatic.com; frame-ancestors 'none';"
         },
         {
           "key": "Referrer-Policy",

@@ -156,14 +156,20 @@ class SecureSessionManager:
                 'is_active': True
             }
             
-            # Store in Redis if available
+            # Store in Redis if available (optional; SQLite row is authoritative)
             if self.redis_client:
                 session_key = f"{self.session_prefix}{session_id}"
-                self.redis_client.setex(
-                    session_key, 
-                    self.session_ttl, 
-                    json.dumps(session_data)
-                )
+                try:
+                    self.redis_client.setex(
+                        session_key,
+                        self.session_ttl,
+                        json.dumps(session_data),
+                    )
+                except Exception as redis_err:
+                    logger.warning(
+                        "Secure session Redis cache skipped (DB session still created): %s",
+                        redis_err,
+                    )
             
             # Store in database for tracking
             db_optimizer.execute_query("""
@@ -223,7 +229,7 @@ class SecureSessionManager:
                 SELECT id, session_id, user_id, ip_address, user_agent, created_at, last_accessed, expires_at, is_active, metadata 
                 FROM secure_sessions 
                 WHERE session_id = ? AND is_active = TRUE 
-                AND expires_at > datetime('now')
+                AND datetime(expires_at) > datetime('now')
             """, (session_id,))
             
             if db_data:
@@ -382,7 +388,7 @@ class SecureSessionManager:
             db_optimizer.execute_query("""
                 UPDATE secure_sessions 
                 SET is_active = FALSE 
-                WHERE expires_at < datetime('now')
+                WHERE datetime(expires_at) < datetime('now')
             """, fetch=False)
             
             logger.info("✅ Expired sessions cleaned up")
@@ -397,7 +403,7 @@ class SecureSessionManager:
                 SELECT 
                     COUNT(*) as total_sessions,
                     COUNT(CASE WHEN is_active = TRUE THEN 1 END) as active_sessions,
-                    COUNT(CASE WHEN expires_at > datetime('now') THEN 1 END) as valid_sessions
+                    COUNT(CASE WHEN datetime(expires_at) > datetime('now') THEN 1 END) as valid_sessions
                 FROM secure_sessions
             """)
             
@@ -419,23 +425,16 @@ def init_secure_sessions(app):
     
     @app.before_request
     def load_secure_session():
-        """Load session from secure cookie before each request"""
+        """Load identity from secure cookie, or from Bearer JWT when no valid session."""
         if not FLASK_AVAILABLE:
             return
-        
-        session_id = None
-        
-        # Get session ID from cookie
-        if request.cookies.get(secure_session_manager.cookie_name):
-            session_id = request.cookies.get(secure_session_manager.cookie_name)
-        
-        # Get session ID from Authorization header (for API calls)
-        elif request.headers.get('Authorization'):
-            auth_header = request.headers.get('Authorization')
-            if auth_header.startswith('Bearer '):
-                # This is for JWT tokens, not session tokens
-                logger.debug("Authorization header contains JWT, skipping session token parsing")
-        
+
+        g.session_id = None
+        g.user_id = None
+        g.user_data = {}
+        g.session_data = {}
+
+        session_id = request.cookies.get(secure_session_manager.cookie_name)
         if session_id:
             session_data = secure_session_manager.get_session(session_id)
             if session_data:
@@ -443,17 +442,26 @@ def init_secure_sessions(app):
                 g.user_id = session_data.get('user_id')
                 g.user_data = session_data.get('user_data', {})
                 g.session_data = session_data
-            else:
-                # Session expired or invalid
-                g.session_id = None
-                g.user_id = None
-                g.user_data = {}
-                g.session_data = {}
-        else:
-            g.session_id = None
-            g.user_id = None
-            g.user_data = {}
-            g.session_data = {}
+                return
+
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            parts = auth_header.split(' ', 1)
+            token = parts[1].strip() if len(parts) > 1 else ''
+            if token:
+                from core.jwt_auth import get_jwt_manager
+
+                payload = get_jwt_manager().verify_access_token(token)
+                if payload and isinstance(payload, dict) and 'error' not in payload:
+                    uid = payload.get('user_id')
+                    if uid is not None:
+                        try:
+                            g.user_id = int(uid)
+                        except (TypeError, ValueError):
+                            g.user_id = None
+                        if g.user_id is not None:
+                            g.user_data = {'user_id': g.user_id}
+                            g.session_data = {}
     
     @app.after_request
     def save_secure_session(response):
