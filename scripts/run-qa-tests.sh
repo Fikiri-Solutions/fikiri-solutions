@@ -154,11 +154,11 @@ run_api_tests() {
     # Test health endpoint
     run_test "Health Endpoint Test" "curl -s -o /dev/null -w '%{http_code}' https://fikirisolutions.onrender.com/api/health | grep -q '200'"
     
-    # Test industry prompts endpoint
-    run_test "Industry Prompts Endpoint Test" "curl -s -o /dev/null -w '%{http_code}' https://fikirisolutions.onrender.com/api/industry/prompts | grep -q '200'"
+    # Test industry prompts (canonical path: /api/dashboard/industry/*)
+    run_test "Industry Prompts Endpoint Test" "curl -s -o /dev/null -w '%{http_code}' https://fikirisolutions.onrender.com/api/dashboard/industry/prompts | grep -q '200'"
     
-    # Test industry chat endpoint
-    run_test "Industry Chat Endpoint Test" "curl -s -X POST -H 'Content-Type: application/json' -d '{\"industry\":\"landscaping\",\"client_id\":\"test\",\"message\":\"test\"}' https://fikirisolutions.onrender.com/api/industry/chat | grep -q 'success'"
+    # Test industry pricing (replaces removed /api/industry/chat)
+    run_test "Industry Pricing Endpoint Test" "curl -s -o /dev/null -w '%{http_code}' https://fikirisolutions.onrender.com/api/dashboard/industry/pricing | grep -q '200'"
 }
 
 # Function to run deployment tests

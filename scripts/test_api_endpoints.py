@@ -148,14 +148,11 @@ class APITester:
         print("\n💾 Testing cache operations...")
         self.test_endpoint('POST', '/api/cache/clear')
         
-        # Industry-specific endpoints
+        # Industry-specific endpoints (dashboard blueprint)
         print("\n🏭 Testing industry-specific endpoints...")
-        self.test_endpoint('GET', '/api/industry/prompts')
-        self.test_endpoint('POST', '/api/industry/chat', {
-            'industry': 'landscaping',
-            'client_id': 'test_client',
-            'message': 'Help with lead management'
-        })
+        self.test_endpoint('GET', '/api/dashboard/industry/prompts')
+        self.test_endpoint('GET', '/api/dashboard/industry/pricing')
+        self.test_endpoint('GET', '/api/dashboard/industry/usage?user_id=1')
         
         # Test endpoints
         print("\n🧪 Testing test endpoints...")

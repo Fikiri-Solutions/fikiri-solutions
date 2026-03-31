@@ -150,7 +150,8 @@ jobs:
     - name: Run performance tests
       run: |
         if [ -n "$API_BASE_URL" ]; then
+          mkdir -p k6-results
           k6 run scripts/k6-performance-test.js
         else
-          echo "Skipping k6 (PERF_API_BASE_URL not set)"
+          echo "Skipping k6 (PERF_API_BASE_URL secret / API_BASE_URL not set)"
         fi

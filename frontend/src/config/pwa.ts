@@ -7,6 +7,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export const pwaConfig = VitePWA({
   registerType: 'autoUpdate',
+  // Emit /manifest.json so the browser finds a single canonical web app manifest (no Rollup conflict).
+  manifestFilename: 'manifest.json',
   includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.png'],
   // Disable automatic prefetch/preload generation to prevent wildcard issues
   injectRegister: 'script',
@@ -60,28 +62,9 @@ export const pwaConfig = VitePWA({
           }
         }
       },
-      {
-        urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-        handler: 'CacheFirst',
-        options: {
-          cacheName: 'google-fonts-cache',
-          expiration: {
-            maxEntries: 10,
-            maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
-          }
-        }
-      },
-      {
-        urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-        handler: 'CacheFirst',
-        options: {
-          cacheName: 'gstatic-fonts-cache',
-          expiration: {
-            maxEntries: 10,
-            maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
-          }
-        }
-      }
+      // Fonts are loaded via <link> in the document; do not intercept in the SW.
+      // Intercepting with Workbox fetch() requires connect-src to allow fonts.googleapis.com/gstatic
+      // for the service worker scope, which is brittle across CSP updates.
     ]
   },
   // PWA is only enabled in production builds (see vite.config.mts)

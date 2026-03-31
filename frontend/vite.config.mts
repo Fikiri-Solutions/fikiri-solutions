@@ -55,7 +55,8 @@ export default defineConfig(({ mode }) => ({
     // Bundle optimization
     outDir: 'dist',
     assetsDir: 'assets', // ensure chunk files live in /assets
-    manifest: true,
+    // Do not emit dist/manifest.json (Rollup asset map) — it conflicts with PWA web app manifest.
+    manifest: false,
     rollupOptions: {
       output: {
         manualChunks: {

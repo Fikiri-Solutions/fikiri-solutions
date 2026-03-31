@@ -98,7 +98,8 @@
   "cypress:run": "cypress run",
   "e2e": "cypress run --headless",
   "k6:stress": "cd .. && mkdir -p k6-results && API_BASE_URL=http://localhost:5000 k6 run scripts/k6-stress-test.js",
-  "k6:steady": "cd .. && mkdir -p k6-results && API_BASE_URL=http://localhost:5000 k6 run scripts/k6-steady-automations.js"
+  "k6:steady": "cd .. && mkdir -p k6-results && API_BASE_URL=http://localhost:5000 k6 run scripts/k6-steady-automations.js",
+  "k6:perf": "cd .. && mkdir -p k6-results && API_BASE_URL=http://localhost:5000 k6 run scripts/k6-performance-test.js"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
