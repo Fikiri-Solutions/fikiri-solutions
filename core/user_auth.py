@@ -33,6 +33,29 @@ class UserProfile:
     onboarding_step: int
     metadata: Dict[str, Any]
 
+def _parse_user_created_at(value: Any) -> datetime:
+    """Parse users.created_at from SQLite (often 'YYYY-MM-DD HH:MM:SS.fff') for all Python versions."""
+    if isinstance(value, datetime):
+        return value
+    if value is None:
+        return datetime.utcnow()
+    s = str(value).strip()
+    if not s:
+        return datetime.utcnow()
+    if "T" not in s and " " in s:
+        s = s.replace(" ", "T", 1)
+    try:
+        return datetime.fromisoformat(s)
+    except ValueError:
+        try:
+            from dateutil.parser import parse as dateutil_parse
+
+            return dateutil_parse(value)
+        except Exception:
+            logger.warning("Could not parse created_at=%r; using utcnow()", value)
+            return datetime.utcnow()
+
+
 class UserAuthManager:
     """Enhanced user authentication and management"""
     
@@ -476,7 +499,10 @@ class UserAuthManager:
                 }
 
             user_row = user_rows[0]
-            raw_metadata = user_row.get('metadata') if hasattr(user_row, 'get') else user_row[0]
+            if hasattr(user_row, 'keys'):
+                raw_metadata = dict(user_row).get('metadata')
+            else:
+                raw_metadata = user_row[1] if len(user_row) > 1 else None
 
             metadata: Dict[str, Any] = {}
             if isinstance(raw_metadata, str):
@@ -752,7 +778,7 @@ class UserAuthManager:
             team_size=user_dict.get('team_size'),
             is_active=bool(user_dict.get('is_active', True)),
             email_verified=bool(user_dict.get('email_verified', False)),
-            created_at=datetime.fromisoformat(user_dict['created_at']),
+            created_at=_parse_user_created_at(user_dict.get('created_at')),
             onboarding_completed=bool(user_dict.get('onboarding_completed', False)),
             onboarding_step=user_dict.get('onboarding_step', 1),
             metadata=metadata

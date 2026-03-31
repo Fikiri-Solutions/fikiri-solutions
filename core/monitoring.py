@@ -7,6 +7,7 @@ import os
 import logging
 import requests
 import json
+import tempfile
 import uuid
 import time
 import threading
@@ -699,12 +700,29 @@ class PerformanceMonitor:
                 if len(all_metrics) > 1000:
                     all_metrics = all_metrics[-1000:]
 
-                tmp_path = metrics_file.with_suffix('.json.tmp')
-                with open(tmp_path, 'w') as f:
-                    json.dump(all_metrics, f, indent=2)
-                    f.flush()
-                    os.fsync(f.fileno())
-                os.replace(tmp_path, metrics_file)
+                # Unique temp path per write: a shared ".json.tmp" races under
+                # multi-worker (one worker's os.replace removes the file before another's).
+                tmp_path: Optional[str] = None
+                try:
+                    with tempfile.NamedTemporaryFile(
+                        mode="w",
+                        encoding="utf-8",
+                        dir=str(metrics_file.parent),
+                        prefix="performance_metrics_",
+                        suffix=".tmp",
+                        delete=False,
+                    ) as f:
+                        tmp_path = f.name
+                        json.dump(all_metrics, f, indent=2)
+                        f.flush()
+                        os.fsync(f.fileno())
+                    os.replace(tmp_path, metrics_file)
+                finally:
+                    if tmp_path and os.path.exists(tmp_path):
+                        try:
+                            os.unlink(tmp_path)
+                        except OSError:
+                            pass
 
         except Exception as e:
             logger.warning(f"Failed to persist performance metrics: {e}")

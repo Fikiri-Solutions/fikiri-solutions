@@ -209,7 +209,13 @@ class JWTAuthManager:
                     )
             
             logger.info(f"✅ Generated tokens for user {user_id} (device: {device_id})")
-            
+
+            # Flask jsonify cannot encode bytes; PyJWT 2.x returns str, but normalize defensively.
+            if isinstance(access_token, (bytes, bytearray, memoryview)):
+                access_token = bytes(access_token).decode("utf-8", errors="replace")
+            else:
+                access_token = str(access_token)
+
             return {
                 'access_token': access_token,
                 'refresh_token': refresh_token,

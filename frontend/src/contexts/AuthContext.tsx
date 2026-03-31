@@ -526,11 +526,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           error: data.error || 'Signup failed' 
         }
       }
-    } catch (error) {
-      return { 
-        success: false, 
-        error: 'Network error. Please try again.' 
+    } catch (error: any) {
+      // Axios rejects on 4xx/5xx; backend messages live on error.response.data (same as login()).
+      if (import.meta.env.DEV) {
+        console.error('❌ [AuthContext] signup() error:', error?.response?.data ?? error?.message)
       }
+      if (error?.response?.status === 429) {
+        const retryAfter = error.response?.data?.retry_after
+        const minutes = retryAfter ? Math.ceil(retryAfter / 60) : 60
+        return {
+          success: false,
+          error: `Too many signup attempts from this network. Please wait ${minutes} minute${minutes !== 1 ? 's' : ''} and try again.`,
+        }
+      }
+      const errorMessage =
+        error?.response?.data?.error ||
+        error?.message ||
+        'Network error. Please try again.'
+      return { success: false, error: errorMessage }
     }
   }
 
