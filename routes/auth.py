@@ -39,12 +39,16 @@ auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
 def _parse_auth_json_body():
     """
-    Parse JSON POST body; return 400 for bad JSON instead of letting BadRequest become 500.
+    Parse JSON POST body; return 400 for bad JSON instead of letting Werkzeug errors become 500.
     Do not call request.get_data() before get_json — that consumes the body under WSGI.
     """
     try:
         data = request.get_json(force=True, silent=False)
     except BadRequest:
+        return None, create_error_response("Invalid JSON body", 400, "INVALID_JSON")
+    except Exception as e:
+        # UnsupportedMediaType, proxy quirks, or parser edge cases — never bubble to handle_api_errors as 500.
+        logger.warning("Auth JSON parse failed: %s: %s", type(e).__name__, e)
         return None, create_error_response("Invalid JSON body", 400, "INVALID_JSON")
 
     if data is None:
@@ -144,54 +148,53 @@ def api_signup():
     if err:
         return err
 
-    logger.info("Signup attempt: %s", data.get("email", ""))
-    required_fields = ['email', 'password', 'name']
-    for field in required_fields:
-        if field not in data or not data[field]:
-            return create_error_response(f"{field} is required", 400, 'MISSING_FIELD')
+    try:
+        logger.info("Signup attempt: %s", data.get("email", ""))
+        required_fields = ['email', 'password', 'name']
+        for field in required_fields:
+            if field not in data or not data[field]:
+                return create_error_response(f"{field} is required", 400, 'MISSING_FIELD')
 
-    # Soft validation by default: we run helper validators, but do not block signup.
-    # Turn on strict mode to enforce these validations by setting:
-    #   FIKIRI_SIGNUP_STRICT_VALIDATION=1
-    signup_strict = os.getenv("FIKIRI_SIGNUP_STRICT_VALIDATION") == "1"
-    # When enabled, invalid email domains that do not publish MX records will block signup.
-    signup_strict_email_provider = os.getenv("FIKIRI_SIGNUP_STRICT_EMAIL_PROVIDER") == "1"
-    validation_warnings = []
+        # Soft validation by default: we run helper validators, but do not block signup.
+        # Turn on strict mode to enforce these validations by setting:
+        #   FIKIRI_SIGNUP_STRICT_VALIDATION=1
+        signup_strict = os.getenv("FIKIRI_SIGNUP_STRICT_VALIDATION") == "1"
+        # When enabled, invalid email domains that do not publish MX records will block signup.
+        signup_strict_email_provider = os.getenv("FIKIRI_SIGNUP_STRICT_EMAIL_PROVIDER") == "1"
+        validation_warnings = []
 
-    # Email validation (format only)
-    email_raw = str(data.get("email", "")).strip()
-    # Typical SaaS onboarding criteria: enforce max length to avoid pathological inputs.
-    email_is_valid = len(email_raw) <= 255 and validate_email(email_raw)
-    if not email_is_valid:
-        validation_warnings.append({
-            "code": "INVALID_EMAIL",
-            "field": "email",
-            "message": "Invalid email format"
-        })
-
-    # Email provider legitimacy heuristic (DNS MX lookup).
-    # Soft by default: warning only. Strict mode can block signups.
-    if email_is_valid and "@" in email_raw:
-        domain = email_raw.split("@", 1)[1].strip()
-        mx_result = check_email_domain_has_mx(domain)
-        if mx_result.get("has_mx") is False:
+        # Email validation (format only)
+        email_raw = str(data.get("email", "")).strip()
+        # Typical SaaS onboarding criteria: enforce max length to avoid pathological inputs.
+        email_is_valid = len(email_raw) <= 255 and validate_email(email_raw)
+        if not email_is_valid:
             validation_warnings.append({
-                "code": "SUSPICIOUS_EMAIL_DOMAIN",
+                "code": "INVALID_EMAIL",
                 "field": "email",
-                "message": "Email domain does not appear to receive email (no MX records).",
+                "message": "Invalid email format"
             })
 
-    if (signup_strict or signup_strict_email_provider) and validation_warnings:
-        # Return the first failing validation (deterministic ordering).
-        first = validation_warnings[0]
-        return create_error_response(
-            first["message"],
-            400,
-            first["code"],
-            field=first.get("field"),
-        )
+        # Email provider legitimacy heuristic (DNS MX lookup).
+        # Soft by default: warning only. Strict mode can block signups.
+        if email_is_valid and "@" in email_raw:
+            domain = email_raw.split("@", 1)[1].strip()
+            mx_result = check_email_domain_has_mx(domain)
+            if mx_result.get("has_mx") is False:
+                validation_warnings.append({
+                    "code": "SUSPICIOUS_EMAIL_DOMAIN",
+                    "field": "email",
+                    "message": "Email domain does not appear to receive email (no MX records).",
+                })
 
-    try:
+        if (signup_strict or signup_strict_email_provider) and validation_warnings:
+            first = validation_warnings[0]
+            return create_error_response(
+                first.get("message", "Validation failed"),
+                400,
+                first.get("code", "VALIDATION_ERROR"),
+                field=first.get("field"),
+            )
+
         user_result = user_auth_manager.create_user(
             email=data['email'],
             password=data['password'],
@@ -306,7 +309,7 @@ def api_signup():
         
         logger.info(f"✅ User registration successful: {user_data['email']}")
         return response, status_code
-        
+
     except Exception as e:
         logger.error(f"Signup error: {e}")
         logger.error(f"Signup error details: {type(e).__name__}: {str(e)}")
