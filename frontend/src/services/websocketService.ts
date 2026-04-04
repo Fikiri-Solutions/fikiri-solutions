@@ -1,27 +1,45 @@
 /**
  * WebSocket Service for Real-Time Updates
  * Connects to Flask-SocketIO backend for live data updates
+ *
+ * Connections are disabled unless the production build sets
+ * VITE_ENABLE_WEBSOCKET=true (and realTimeUpdates is true in config).
+ * This avoids console noise when the CDN serves an older bundle or Socket.IO is not ready.
  */
 
-import { io, Socket } from 'socket.io-client'
+import type { Socket } from 'socket.io-client'
 import { config, isFeatureEnabled } from '../config'
+
+function websocketBuildEnabled(): boolean {
+  return import.meta.env.VITE_ENABLE_WEBSOCKET === 'true'
+}
 
 class WebSocketService {
   private socket: Socket | null = null
   private isConnected = false
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
+  private connectStarted = false
 
   constructor() {
-    if (isFeatureEnabled('realTimeUpdates')) {
-      this.connect()
+    if (websocketBuildEnabled() && isFeatureEnabled('realTimeUpdates')) {
+      void this.connect()
     }
   }
 
-  private connect() {
+  private async connect() {
+    if (this.connectStarted) {
+      return
+    }
+    if (!websocketBuildEnabled() || !isFeatureEnabled('realTimeUpdates')) {
+      return
+    }
+    this.connectStarted = true
+
     try {
+      const { io } = await import('socket.io-client')
       const wsUrl = config.apiUrl.replace('/api', '')
-      
+
       this.socket = io(wsUrl, {
         transports: ['websocket', 'polling'],
         timeout: 5000,
@@ -40,38 +58,28 @@ class WebSocketService {
         this.isConnected = false
       })
 
-      this.socket.on('connect_error', (error) => {
-        // Silently handle connection errors (WebSocket is optional)
+      this.socket.on('connect_error', () => {
         this.reconnectAttempts++
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-          // Stop trying after max attempts
           this.socket?.disconnect()
         }
       })
 
-      // Dashboard update handlers
       this.socket.on('metrics_update', (data) => {
-        // Metrics updated
-        // Emit custom event for React components to listen to
         window.dispatchEvent(new CustomEvent('metricsUpdate', { detail: data }))
       })
 
       this.socket.on('services_update', (data) => {
-        // Services updated
         window.dispatchEvent(new CustomEvent('servicesUpdate', { detail: data }))
       })
 
       this.socket.on('activity_update', (data) => {
-        // Activity updated
         window.dispatchEvent(new CustomEvent('activityUpdate', { detail: data }))
       })
 
-      this.socket.on('error', () => {
-        // WebSocket error
-      })
-
-    } catch (error) {
-      // Failed to initialize WebSocket
+      this.socket.on('error', () => {})
+    } catch {
+      this.connectStarted = false
     }
   }
 
@@ -99,7 +107,6 @@ class WebSocketService {
     }
   }
 
-  // React hook for subscribing to updates
   public subscribeToUpdates(callback: (event: string, data: any) => void) {
     const handleMetricsUpdate = (event: CustomEvent) => callback('metrics', event.detail)
     const handleServicesUpdate = (event: CustomEvent) => callback('services', event.detail)
@@ -109,7 +116,6 @@ class WebSocketService {
     window.addEventListener('servicesUpdate', handleServicesUpdate as EventListener)
     window.addEventListener('activityUpdate', handleActivityUpdate as EventListener)
 
-    // Return cleanup function
     return () => {
       window.removeEventListener('metricsUpdate', handleMetricsUpdate as EventListener)
       window.removeEventListener('servicesUpdate', handleServicesUpdate as EventListener)
@@ -118,6 +124,5 @@ class WebSocketService {
   }
 }
 
-// Export singleton instance
 export const websocketService = new WebSocketService()
 export default websocketService

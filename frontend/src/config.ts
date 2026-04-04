@@ -16,7 +16,7 @@ export const features = {
   darkMode: false,       // Dark mode toggle
   analytics: false,     // Advanced analytics dashboard
   
-  // Experimental features
+  // Experimental features (needs VITE_ENABLE_WEBSOCKET=true at build time to open sockets)
   realTimeUpdates: false, // WebSocket real-time updates
   advancedSettings: false, // Advanced service configuration
   
@@ -60,9 +60,9 @@ export const config = {
   
   // App Configuration
   appName: 'Fikiri Solutions',
-  version: '1.0.19', // Force deployment refresh - fixed critical import syntax error
-  buildTimestamp: '2025-09-25T19:40:00Z', // Force cache refresh
-  cacheVersion: 'v1.0.19-20250925', // Force cache refresh
+  version: '1.0.20', // WebSocket gated by VITE_ENABLE_WEBSOCKET
+  buildTimestamp: '2026-04-04T00:00:00Z',
+  cacheVersion: 'v1.0.20-20260404',
   
   // Development flags
   isDevelopment: typeof window !== 'undefined' && window.location.hostname === 'localhost',
