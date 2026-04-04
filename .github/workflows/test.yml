@@ -9,51 +9,55 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+# Optional smoke checks against a live URL (staging recommended).
+# Set repository secrets SMOKE_API_BASE_URL and SMOKE_SITE_URL to enable; leave unset to skip
+# (avoids coupling every PR to production uptime and accidental load).
+
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     strategy:
       matrix:
         node-version: ['20.18.2']  # Latest patched LTS version
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Setup Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
         cache-dependency-path: frontend/package-lock.json
-        
+
     - name: Install dependencies
       run: |
         cd frontend
         npm ci
-        
+
     - name: TypeScript type check
       run: |
         cd frontend
         npm run type-check
       continue-on-error: true
-        
+
     - name: ESLint code quality check
       run: |
         cd frontend
         npm run lint
-        
+
     - name: Run unit tests
       run: |
         cd frontend
         npm test -- --run --coverage
-        
+
     - name: Build test
       run: |
         cd frontend
         npm run build
-        
+
     - name: Upload coverage reports
       uses: codecov/codecov-action@v3
       continue-on-error: true
@@ -61,74 +65,82 @@ jobs:
         file: frontend/coverage/lcov.info
         flags: frontend
         name: frontend-coverage
-        
+
   backend-health:
     runs-on: ubuntu-latest
-    
+    env:
+      SMOKE_API_BASE_URL: ${{ secrets.SMOKE_API_BASE_URL || '' }}
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
-    - name: Backend health check
+
+    - name: Backend smoke (optional)
       run: |
+        if [ -z "$SMOKE_API_BASE_URL" ]; then
+          echo "Skipping backend smoke — set GitHub secret SMOKE_API_BASE_URL (e.g. staging API origin, no trailing slash)"
+          exit 0
+        fi
         echo "Testing backend health..."
-        curl -f https://fikirisolutions.onrender.com/api/health || true
-        
-    - name: CRM API test
-      run: |
+        curl -fsS "$SMOKE_API_BASE_URL/api/health"
         echo "Testing CRM API endpoint..."
-        curl -f https://fikirisolutions.onrender.com/api/crm/leads || true
-        
+        curl -fsS "$SMOKE_API_BASE_URL/api/crm/leads"
+
   frontend-deployment:
     runs-on: ubuntu-latest
-    
+    env:
+      SMOKE_SITE_URL: ${{ secrets.SMOKE_SITE_URL || '' }}
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
-    - name: Frontend deployment check
+
+    - name: Frontend smoke (optional)
       run: |
+        if [ -z "$SMOKE_SITE_URL" ]; then
+          echo "Skipping frontend smoke — set GitHub secret SMOKE_SITE_URL (e.g. https://your-preview.vercel.app)"
+          exit 0
+        fi
         echo "Testing frontend deployment..."
-        curl -f https://fikirisolutions.com || true
-        
-    - name: Check for latest build
-      run: |
-        echo "Checking for latest frontend build..."
-        BUILD_HASH=$(curl -s https://fikirisolutions.com | grep -o 'index-[a-f0-9]*\.js' | head -1)
+        curl -fsS "$SMOKE_SITE_URL"
+        echo "Checking for latest build..."
+        BUILD_HASH=$(curl -fsS "$SMOKE_SITE_URL" | grep -o 'index-[a-f0-9]*\.js' | head -1)
         echo "Current build hash: $BUILD_HASH"
         if [ -z "$BUILD_HASH" ]; then
           echo "No build hash found - deployment may be stale"
-          exit 0
         fi
-        
+
   integration-test:
     runs-on: ubuntu-latest
     needs: [test, backend-health, frontend-deployment]
-    
+    env:
+      SMOKE_API_BASE_URL: ${{ secrets.SMOKE_API_BASE_URL || '' }}
+      SMOKE_SITE_URL: ${{ secrets.SMOKE_SITE_URL || '' }}
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
-    - name: Run integration tests
+
+    - name: Integration smoke (optional)
       run: |
-        echo "Running integration tests..."
-        # Test CRM page loads
-        curl -s https://fikirisolutions.com/crm | grep -q "CRM" || true
-        
-        # Test AI Assistant endpoint
-        curl -s https://fikirisolutions.onrender.com/api/ai/chat \
+        if [ -z "$SMOKE_API_BASE_URL" ] || [ -z "$SMOKE_SITE_URL" ]; then
+          echo "Skipping integration smoke — set both SMOKE_API_BASE_URL and SMOKE_SITE_URL"
+          exit 0
+        fi
+        echo "Running integration smoke..."
+        curl -sS "$SMOKE_SITE_URL/crm" | grep -q "CRM" || true
+        curl -sS "$SMOKE_API_BASE_URL/api/ai/chat" \
           -H "Content-Type: application/json" \
           -d '{"message":"test"}' | grep -q "response" || true
-        
-        echo "✅ All integration tests passed!"
-        
+        echo "✅ Integration smoke finished (best-effort checks)"
+
   security-scan:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Run security audit
       run: |
         cd frontend

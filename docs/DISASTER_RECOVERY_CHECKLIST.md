@@ -3,11 +3,13 @@
 ## 🚨 Emergency Recovery Procedures
 
 ### 1. Environment Variables Backup
+Store real values only in Doppler, Render dashboard, or an offline vault — **never** commit them to git.
+
 ```bash
-# Critical environment variables to backup
-JWT_SECRET_KEY=xbppiUtMLEy-edconosX09sfeaeGwMhmhCxFabteQtw
-FERNET_KEY=2HJ-fbPvowR0BFd7MR2nXO4REdtRtBoz4Bb-HFTl4aU=
-REDIS_URL=redis://default:fz0wvU6lk68C67y2bMwSrjGC38g3Dh6H@redis-19575.c17.us-east-1-4.ec2.redns.redis-cloud.com:19575
+# Example names (replace with values from your secret manager)
+JWT_SECRET_KEY=<paste from production env>
+FERNET_KEY=<paste from production env>
+REDIS_URL=<paste from production env>
 ```
 
 ### 2. Database Recovery
@@ -21,11 +23,8 @@ sqlite3 data/fikiri.db < backup/fikiri_backup_YYYYMMDD_HHMMSS.sql
 
 ### 3. Redis Recovery
 ```bash
-# Redis Cloud connection string (backup)
-redis://default:fz0wvU6lk68C67y2bMwSrjGC38g3Dh6H@redis-19575.c17.us-east-1-4.ec2.redns.redis-cloud.com:19575
-
-# Test connection
-redis-cli -u redis://default:fz0wvU6lk68C67y2bMwSrjGC38g3Dh6H@redis-19575.c17.us-east-1-4.ec2.redns.redis-cloud.com:19575 ping
+# Export REDIS_URL from your vault first, then:
+redis-cli -u "$REDIS_URL" ping
 ```
 
 ### 4. Application Recovery
