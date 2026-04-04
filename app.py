@@ -44,6 +44,7 @@ if os.getenv("FLASK_ENV") not in ["production", "development", "staging"]:
 logger.info("Starting Fikiri API environment: %s", os.getenv("FLASK_ENV", "production"))
 
 # Core imports
+from core.flask_secret import resolve_flask_secret_key
 from core.minimal_config import get_config
 from email_automation.parser import MinimalEmailParser
 from integrations.gmail.utils import MinimalGmailService
@@ -119,10 +120,10 @@ def create_app():
     """Flask Application Factory Pattern with Enhanced Monitoring"""
     app = Flask(__name__)
     env = os.getenv('FLASK_ENV', 'production')
-    secret = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key' if env == 'development' else None)
+    secret = resolve_flask_secret_key()
     if env in ('production', 'staging') and not secret:
-        raise RuntimeError('FLASK_SECRET_KEY is required in production and staging')
-    app.secret_key = secret or 'dev-secret-key'
+        raise RuntimeError('FLASK_SECRET_KEY or SECRET_KEY is required in production and staging')
+    app.secret_key = secret
     app.socketio = None  # Will be initialized in create_app() if available
     
     # 🔧 Database sanity check and initialization
