@@ -459,7 +459,13 @@ def setup_routes(app):
 
     @app.route('/api/health')
     def api_health_check():
-        """Readiness-style check: database + Redis. For monitoring; not suitable as sole Render probe."""
+        """
+        Full readiness when called by browsers/monitors; fast liveness when probed by Render.
+        Render often keeps Health Check Path on /api/health — UA is Render/1.0 (no DB/Redis).
+        """
+        ua = request.headers.get('User-Agent') or ''
+        if 'Render/' in ua:
+            return api_health_live()
         db_status = 'unknown'
         redis_status = 'unknown'
         try:

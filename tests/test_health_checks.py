@@ -33,6 +33,14 @@ class TestHealthChecks(unittest.TestCase):
         self.assertEqual(data.get('status'), 'ok')
         self.assertIn('timestamp', data)
 
+    def test_health_main_uses_fast_path_for_render_user_agent(self):
+        """Render keeps /api/health as probe path; UA Render/1.0 must skip DB/Redis."""
+        response = self.client.get('/api/health', headers={'User-Agent': 'Render/1.0'})
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertEqual(data.get('status'), 'ok')
+        self.assertNotIn('database', data)
+
     def test_health_endpoint_exists(self):
         """Test that /api/health endpoint exists and returns 200."""
         response = self.client.get('/api/health')
