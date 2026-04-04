@@ -5,6 +5,7 @@ Extracted from app.py for better maintainability
 """
 
 from flask import Blueprint, request, jsonify, redirect, session
+from werkzeug.exceptions import BadRequest
 from functools import wraps
 import time
 import logging
@@ -35,14 +36,33 @@ logger = logging.getLogger(__name__)
 # Create auth blueprint
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
+
+def _parse_auth_json_body():
+    """
+    Parse JSON POST body; return 400 for bad JSON instead of letting BadRequest become 500.
+    Do not call request.get_data() before get_json — that consumes the body under WSGI.
+    """
+    try:
+        data = request.get_json(force=True, silent=False)
+    except BadRequest:
+        return None, create_error_response("Invalid JSON body", 400, "INVALID_JSON")
+
+    if data is None:
+        return None, create_error_response("Request body cannot be empty", 400, "EMPTY_REQUEST_BODY")
+    if not isinstance(data, dict):
+        return None, create_error_response("JSON body must be an object", 400, "INVALID_BODY")
+    if not data:
+        return None, create_error_response("Request body cannot be empty", 400, "EMPTY_REQUEST_BODY")
+    return data, None
+
 @auth_bp.route('/login', methods=['POST'])
 @handle_api_errors
 @rate_limit('login_attempts', lambda *args, **kwargs: request.remote_addr)
 def api_login():
     """Enhanced login endpoint with security features"""
-    data = request.get_json()
-    if not data:
-        return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
+    data, err = _parse_auth_json_body()
+    if err:
+        return err
 
     if 'email' not in data or 'password' not in data:
         return create_error_response("Email and password are required", 400, 'MISSING_FIELDS')
@@ -120,11 +140,11 @@ def api_login():
 @rate_limit('signup_attempts', lambda *args, **kwargs: request.remote_addr)
 def api_signup():
     """Simplified signup endpoint without tenant complexity"""
-    data = request.get_json()
-    logger.info("Signup attempt: %s", (data.get('email') if data else 'no body'))
-    if not data:
-        return create_error_response("Request body cannot be empty", 400, 'EMPTY_REQUEST_BODY')
+    data, err = _parse_auth_json_body()
+    if err:
+        return err
 
+    logger.info("Signup attempt: %s", data.get("email", ""))
     required_fields = ['email', 'password', 'name']
     for field in required_fields:
         if field not in data or not data[field]:
