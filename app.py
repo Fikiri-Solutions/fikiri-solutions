@@ -599,6 +599,7 @@ def setup_routes(app):
         try:
             _app_limiter.init_app(app)
             _app_limiter.exempt(health_summary)
+            _app_limiter.exempt(api_health_live)
             _app_limiter.exempt(api_health_check)
             _app_limiter.exempt(ingest_client_error)
         except Exception as e:
