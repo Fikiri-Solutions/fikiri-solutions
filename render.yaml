@@ -3,13 +3,15 @@ services:
     name: fikiri-backend
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --worker-class gthread --workers ${WEB_CONCURRENCY:-4} --threads ${GUNICORN_THREADS:-4} --timeout ${GUNICORN_TIMEOUT:-120} --bind 0.0.0.0:$PORT app:app
+    startCommand: gunicorn --worker-class eventlet --workers 1 --timeout ${GUNICORN_TIMEOUT:-120} --bind 0.0.0.0:$PORT app:wsgi_app
     plan: starter
     disk:
       name: fikiri-data
       mountPath: /opt/render/project/data
       sizeGB: 1
     envVars:
+      - key: SOCKETIO_ASYNC_MODE
+        value: eventlet
       - key: FLASK_ENV
         value: production
       - key: SECRET_KEY
@@ -56,9 +58,11 @@ services:
     name: fikiri-backend-staging
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --worker-class gthread --workers ${WEB_CONCURRENCY:-2} --threads ${GUNICORN_THREADS:-2} --timeout ${GUNICORN_TIMEOUT:-120} --bind 0.0.0.0:$PORT app:app
+    startCommand: gunicorn --worker-class eventlet --workers 1 --timeout ${GUNICORN_TIMEOUT:-120} --bind 0.0.0.0:$PORT app:wsgi_app
     plan: starter
     envVars:
+      - key: SOCKETIO_ASYNC_MODE
+        value: eventlet
       - key: FLASK_ENV
         value: staging
       - key: SECRET_KEY

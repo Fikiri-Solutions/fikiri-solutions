@@ -217,9 +217,27 @@ def create_app():
     setup_routes(app)
     
     # Initialize SocketIO for real-time updates (optional, non-blocking)
+    # Gunicorn + threading does not support WebSocket upgrade; use eventlet worker + async_mode
+    # eventlet on Render (set SOCKETIO_ASYNC_MODE=eventlet in the dashboard or render.yaml).
     app.socketio = None
     try:
         from flask_socketio import SocketIO
+
+        def _socketio_async_mode() -> str:
+            if os.getenv('FLASK_ENV') == 'test':
+                return 'threading'
+            override = (os.getenv('SOCKETIO_ASYNC_MODE') or '').strip().lower()
+            if override in ('threading', 'eventlet', 'gevent'):
+                return override
+            return 'threading'
+
+        socketio_async_mode = _socketio_async_mode()
+        if socketio_async_mode == 'eventlet':
+            try:
+                import eventlet  # noqa: F401
+            except ImportError:
+                logger.warning("eventlet not installed; SocketIO using threading (WebSockets may fail behind Gunicorn)")
+                socketio_async_mode = 'threading'
         
         # SocketIO origin validation function
         def validate_socketio_origin(origin):
@@ -243,7 +261,7 @@ def create_app():
         socketio = SocketIO(
             app, 
             cors_allowed_origins=validate_socketio_origin,
-            async_mode='threading', 
+            async_mode=socketio_async_mode,
             logger=False, 
             engineio_logger=False
         )
@@ -666,6 +684,10 @@ def register_blueprints(app):
 
 # Create Flask app instance
 app = create_app()
+
+# Gunicorn WSGI target: must be the SocketIO wrapper when SocketIO is enabled (see Flask-SocketIO deployment docs).
+# Use: gunicorn --worker-class eventlet -w 1 ... app:wsgi_app
+wsgi_app = app.socketio if app.socketio is not None else app
 
 # Dev-only routes (bypass auth/plan gating; not registered in production/staging)
 if os.getenv('FLASK_ENV') == 'development':

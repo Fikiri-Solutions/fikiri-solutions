@@ -4,7 +4,7 @@
  */
 
 import { io, Socket } from 'socket.io-client'
-import { config } from '../config'
+import { config, isFeatureEnabled } from '../config'
 
 class WebSocketService {
   private socket: Socket | null = null
@@ -13,8 +13,9 @@ class WebSocketService {
   private maxReconnectAttempts = 5
 
   constructor() {
-    // Enable WebSocket connection (will fail gracefully if backend doesn't support it)
-    this.connect()
+    if (isFeatureEnabled('realTimeUpdates')) {
+      this.connect()
+    }
   }
 
   private connect() {

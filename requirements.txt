@@ -37,6 +37,7 @@ flask-cors>=4.0.0
 flask-limiter>=3.5.0
 flask-restx>=1.2.0
 gunicorn>=20.0.0
+eventlet>=0.35.0  # Flask-SocketIO WebSockets behind Gunicorn (threading mode does not upgrade WS)
 marshmallow>=3.20.0  # Schema validation for API endpoints
 dnspython>=2.0.0
 
