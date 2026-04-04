@@ -146,32 +146,34 @@ jobs:
 
   performance-tests:
     runs-on: ubuntu-latest
-    
+    # Never default to production. Set GitHub Actions secret PERF_API_BASE_URL to a staging
+    # or dedicated load-test backend (e.g. https://fikiri-backend-staging.onrender.com) to enable k6 in CI.
+    env:
+      API_BASE_URL: ${{ secrets.PERF_API_BASE_URL || '' }}
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '20.18.2'  # Latest LTS with security patches
-    
+
     - name: Install k6
       uses: grafana/setup-k6-action@v1
-    
-    - name: Run load tests
+
+    - name: Run k6 load/stress tests (optional)
       run: |
+        if [ -z "$API_BASE_URL" ]; then
+          echo "Skipping k6: PERF_API_BASE_URL secret not set (avoids hammering production)."
+          mkdir -p k6-results
+          echo '{"skipped":true,"reason":"PERF_API_BASE_URL not configured"}' > k6-results/skipped.json
+          exit 0
+        fi
         mkdir -p k6-results
-        k6 run scripts/k6-performance-test.js || true
-      env:
-        API_BASE_URL: https://fikirisolutions.onrender.com
-    
-    - name: Run stress tests
-      run: |
-        mkdir -p k6-results
-        k6 run scripts/k6-stress-test.js || true
-      env:
-        API_BASE_URL: https://fikirisolutions.onrender.com
-    
+        k6 run scripts/k6-performance-test.js
+        k6 run scripts/k6-stress-test.js
+
     - name: Upload performance results
       uses: actions/upload-artifact@v4
       if: always()
@@ -242,8 +244,7 @@ jobs:
         echo "- Security tests: ✅ Passed" >> test-summary.md
         echo "" >> test-summary.md
         echo "## Performance Tests" >> test-summary.md
-        echo "- Load tests: ✅ Passed" >> test-summary.md
-        echo "- Stress tests: ✅ Passed" >> test-summary.md
+        echo "- k6: runs only when PERF_API_BASE_URL is set (never production by default)" >> test-summary.md
         echo "" >> test-summary.md
         echo "## Security Scan" >> test-summary.md
         echo "- Vulnerability scan: ✅ Passed" >> test-summary.md

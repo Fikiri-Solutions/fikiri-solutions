@@ -6,7 +6,7 @@ import { Rate } from 'k6/metrics';
  * Load profile against the live Fikiri API contract.
  *
  * Env (optional):
- *   API_BASE_URL / PERF_API_BASE_URL — backend root, e.g. https://fikirisolutions.onrender.com
+ *   API_BASE_URL / PERF_API_BASE_URL — backend root (required; no default — avoids accidental prod load)
  *   FRONTEND_URL — marketing site, e.g. https://www.fikirisolutions.com
  *
  * Dashboard industry routes live under /api/dashboard/industry/* (not /api/industry/*).
@@ -30,7 +30,12 @@ export const options = {
   },
 };
 
-const BASE_URL = __ENV.API_BASE_URL || __ENV.PERF_API_BASE_URL || 'https://fikirisolutions.onrender.com';
+const BASE_URL = __ENV.API_BASE_URL || __ENV.PERF_API_BASE_URL;
+if (!BASE_URL) {
+  throw new Error(
+    'Set API_BASE_URL or PERF_API_BASE_URL (e.g. http://localhost:5000 for local npm run k6:perf)',
+  );
+}
 const FRONTEND_URL = __ENV.FRONTEND_URL || 'https://www.fikirisolutions.com';
 
 function parseJson(r) {

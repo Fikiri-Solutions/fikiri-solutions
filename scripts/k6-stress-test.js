@@ -4,7 +4,7 @@ import { Rate } from 'k6/metrics';
 
 export let errorRate = new Rate('errors');
 
-const BASE_URL = __ENV.API_BASE_URL || 'https://fikirisolutions.com';
+const BASE_URL = __ENV.API_BASE_URL || __ENV.PERF_API_BASE_URL || 'http://localhost:5000';
 const AUTOMATION_USER_ID = __ENV.AUTOMATION_USER_ID || '1';
 const AUTOMATION_PRESET_ID = __ENV.AUTOMATION_PRESET_ID || 'gmail_crm';
 const BEARER_TOKEN = __ENV.K6_BEARER_TOKEN || '';
