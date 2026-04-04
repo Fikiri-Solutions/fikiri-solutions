@@ -116,6 +116,26 @@ from routes.appointments import appointments_bp
 # Global services dictionary
 services = {}
 
+
+def _merge_cors_origins_from_env(base_origins):
+    """
+    Append origins from CORS_ORIGINS (comma-separated).
+
+    app.py previously ignored this env var; core/security.py only reads it when CORS
+    is not already configured. Render and local .env often list Vercel / preview URLs
+    here — those must be merged or production browsers see missing Access-Control-Allow-Origin.
+    """
+    raw = os.getenv("CORS_ORIGINS", "")
+    if not raw.strip():
+        return list(base_origins)
+    merged = list(base_origins)
+    for part in raw.split(","):
+        origin = part.strip()
+        if origin and origin not in merged:
+            merged.append(origin)
+    return merged
+
+
 def create_app():
     """Flask Application Factory Pattern with Enhanced Monitoring"""
     app = Flask(__name__)
@@ -156,26 +176,37 @@ def create_app():
     
     # Enhanced CORS configuration for cookie-based auth
     # Allow both local development ports (3000 for Next.js, 5173/5174 for Vite)
-    cors_origins = [
-        "https://fikirisolutions.com",
-        "https://www.fikirisolutions.com",
-        "https://fikirisolutions.onrender.com",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
+    # Vercel default hostnames (hyphen vs no-hyphen) — also merge CORS_ORIGINS from env
+    cors_origins = _merge_cors_origins_from_env(
+        [
+            "https://fikirisolutions.com",
+            "https://www.fikirisolutions.com",
+            "https://fikirisolutions.onrender.com",
+            "https://fikirisolutions.vercel.app",
+            "https://fikiri-solutions.vercel.app",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5174",
+        ]
+    )
+
+    # Private LAN origins when Vite uses --host 0.0.0.0 (e.g. http://10.0.0.148:5174).
+    # Flask-CORS matches these regexes; OPTIONS preflight is handled separately in handle_preflight.
+    _dev_private_lan_origin_patterns = [
+        r"^http://10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$",
+        r"^http://192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$",
+        r"^http://172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}(:\d+)?$",
     ]
-    
-    # In development, dynamically allow the requesting origin
-    # Note: Cannot use '*' with supports_credentials=True
+
     def get_cors_origins():
-        if os.getenv('FLASK_ENV') == 'development':
-            # In development, allow any localhost or local network origin
-            return cors_origins  # Will be validated dynamically
+        # Cannot use '*' with supports_credentials=True; extend allowlist in dev only.
+        if os.getenv("FLASK_ENV") == "development":
+            return list(cors_origins) + _dev_private_lan_origin_patterns
         return cors_origins
-    
+
     CORS(app, 
          resources={r"/api/*": {"origins": get_cors_origins()}},
          methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
