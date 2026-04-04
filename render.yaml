@@ -48,7 +48,7 @@ services:
         sync: false
       - key: SMTP_PASSWORD
         sync: false
-    healthCheckPath: /api/health
+    healthCheckPath: /api/health/live
     autoDeploy: true
     branch: main
     
@@ -73,6 +73,6 @@ services:
         value: "2"
       - key: GUNICORN_TIMEOUT
         value: "120"
-    healthCheckPath: /api/health
+    healthCheckPath: /api/health/live
     autoDeploy: true
     branch: develop

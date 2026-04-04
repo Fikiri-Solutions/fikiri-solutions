@@ -444,9 +444,22 @@ def setup_routes(app):
             "frontend": "https://fikirisolutions.com"
         })
 
+    @app.route('/api/health/live')
+    def api_health_live():
+        """
+        Liveness probe only: no database or Redis.
+        Point Render healthCheckPath here — Render times out after 5s; /api/health can exceed
+        that when SQLite is locked or Redis is slow to connect.
+        """
+        return jsonify({
+            'status': 'ok',
+            'service': 'fikiri-backend',
+            'timestamp': datetime.now().isoformat(),
+        }), 200
+
     @app.route('/api/health')
     def api_health_check():
-        """API health check for Render / uptime checks. Includes database and Redis status."""
+        """Readiness-style check: database + Redis. For monitoring; not suitable as sole Render probe."""
         db_status = 'unknown'
         redis_status = 'unknown'
         try:

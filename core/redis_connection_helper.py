@@ -7,10 +7,16 @@ Supports REDIS_URL or Upstash env vars: UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_R
 
 import os
 import logging
-from typing import Optional
+import threading
+from typing import Dict, Optional, Tuple
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
+
+_cache_lock = threading.Lock()
+# Reuse clients per (decode_responses, db) — avoids new TCP + INFO spam on every /api/health poll.
+_redis_client_cache: Dict[Tuple[bool, int], "redis.Redis"] = {}
+_connection_info_logged: set = set()
 
 # Optional Redis integration
 try:
@@ -44,9 +50,23 @@ def _is_test_mode() -> bool:
     )
 
 
+def reset_redis_connection_helper_cache() -> None:
+    """Close and drop cached clients (tests / process reload)."""
+    global _redis_client_cache, _connection_info_logged
+    with _cache_lock:
+        for _key, client in list(_redis_client_cache.items()):
+            try:
+                client.close()
+            except Exception:
+                pass
+        _redis_client_cache.clear()
+        _connection_info_logged.clear()
+
+
 def get_redis_client(decode_responses: bool = True, db: int = 0) -> Optional[redis.Redis]:
     """
-    Get a Redis client with proper SSL handling for Upstash Redis
+    Get a Redis client with proper SSL handling for Upstash Redis.
+    Returns a cached client per (decode_responses, db) for the process lifetime.
     
     Args:
         decode_responses: Whether to decode responses as strings
@@ -60,7 +80,21 @@ def get_redis_client(decode_responses: bool = True, db: int = 0) -> Optional[red
 
     if _is_test_mode():
         return None
-    
+
+    cache_key = (decode_responses, db)
+    with _cache_lock:
+        cached = _redis_client_cache.get(cache_key)
+        if cached is not None:
+            try:
+                cached.ping()
+                return cached
+            except Exception:
+                try:
+                    cached.close()
+                except Exception:
+                    pass
+                del _redis_client_cache[cache_key]
+
     try:
         redis_url = _resolve_redis_url()
 
@@ -79,12 +113,15 @@ def get_redis_client(decode_responses: bool = True, db: int = 0) -> Optional[red
             
             # Test connection
             client.ping()
-            
-            # Log success
-            if redis_url.startswith('rediss://'):
-                logger.info("✅ Redis connection established (Upstash TLS via from_url)")
-            else:
-                logger.info("✅ Redis connection established (standard via from_url)")
+
+            with _cache_lock:
+                _redis_client_cache[cache_key] = client
+                if cache_key not in _connection_info_logged:
+                    _connection_info_logged.add(cache_key)
+                    if redis_url.startswith('rediss://'):
+                        logger.info("✅ Redis connection established (Upstash TLS via from_url)")
+                    else:
+                        logger.info("✅ Redis connection established (standard via from_url)")
             
             return client
         else:
@@ -103,7 +140,11 @@ def get_redis_client(decode_responses: bool = True, db: int = 0) -> Optional[red
                 socket_timeout=5,
             )
             client.ping()
-            logger.info(f"✅ Redis connection established (local): {redis_host}:{redis_port}")
+            with _cache_lock:
+                _redis_client_cache[cache_key] = client
+                if cache_key not in _connection_info_logged:
+                    _connection_info_logged.add(cache_key)
+                    logger.info(f"✅ Redis connection established (local): {redis_host}:{redis_port}")
             return client
             
     except redis.AuthenticationError as e:

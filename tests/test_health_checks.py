@@ -25,6 +25,14 @@ class TestHealthChecks(unittest.TestCase):
         self.client = app.test_client()
         self.app.config['TESTING'] = True
     
+    def test_health_live_endpoint(self):
+        """Liveness route for Render: no DB/Redis, must stay under platform probe timeouts."""
+        response = self.client.get('/api/health/live')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertEqual(data.get('status'), 'ok')
+        self.assertIn('timestamp', data)
+
     def test_health_endpoint_exists(self):
         """Test that /api/health endpoint exists and returns 200."""
         response = self.client.get('/api/health')
