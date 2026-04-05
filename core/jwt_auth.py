@@ -33,6 +33,7 @@ except ImportError:
     redis = None
 
 from core.database_optimization import db_optimizer
+from core.json_serialization import json_dumps_user_payload
 
 logger = logging.getLogger(__name__)
 
@@ -200,7 +201,7 @@ class JWTAuthManager:
                     self.redis_client.setex(
                         session_key,
                         self.access_token_expiry,
-                        json.dumps(session_data),
+                        json_dumps_user_payload(session_data),
                     )
                 except Exception as redis_err:
                     logger.warning(

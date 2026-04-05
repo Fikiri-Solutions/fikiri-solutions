@@ -33,6 +33,7 @@ except ImportError:
     jsonify = None
 
 from core.database_optimization import db_optimizer
+from core.json_serialization import json_dumps_user_payload
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,7 @@ def _is_test_mode() -> bool:
 
 def _utcnow_naive() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
 
 class SecureSessionManager:
     """Secure session management with Redis persistence and cookie security"""
@@ -163,7 +165,7 @@ class SecureSessionManager:
                     self.redis_client.setex(
                         session_key,
                         self.session_ttl,
-                        json.dumps(session_data),
+                        json_dumps_user_payload(session_data),
                     )
                 except Exception as redis_err:
                     logger.warning(
@@ -182,7 +184,7 @@ class SecureSessionManager:
                 session_data['ip_address'],
                 session_data['user_agent'],
                 expires_at.isoformat(),
-                json.dumps({'user_data': user_data})
+                json_dumps_user_payload({'user_data': user_data}),
             ), fetch=False)
             
             # Create secure cookie
@@ -215,7 +217,7 @@ class SecureSessionManager:
                     self.redis_client.setex(
                         session_key, 
                         self.session_ttl, 
-                        json.dumps(data)
+                        json_dumps_user_payload(data)
                     )
                     
                     # Update database
@@ -275,7 +277,7 @@ class SecureSessionManager:
                     self.redis_client.setex(
                         session_key, 
                         self.session_ttl, 
-                        json.dumps(data)
+                        json_dumps_user_payload(data)
                     )
             
             # Update database metadata
@@ -285,7 +287,7 @@ class SecureSessionManager:
                     SET metadata = ?, last_accessed = datetime('now')
                     WHERE session_id = ?
                 """, (
-                    json.dumps({'user_data': updates['user_data']}),
+                    json_dumps_user_payload({'user_data': updates['user_data']}),
                     session_id
                 ), fetch=False)
             
