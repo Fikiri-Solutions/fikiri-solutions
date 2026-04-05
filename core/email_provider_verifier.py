@@ -18,11 +18,10 @@ try:
     import dns.resolver  # type: ignore
 except Exception:  # pragma: no cover
     dns = None
-    dns_resolver = None
 
-    # We keep this module importable even when dnspython isn't available.
-    # Verification will degrade to "unknown".
-    dns_resolver = None
+# When import succeeds, `dns` is bound by `import dns.resolver`. Do not reference
+# undefined names here — a prior bug checked `dns_resolver is None` even though
+# that variable only existed in the except branch, causing NameError on signup.
 
 
 _in_memory_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
@@ -122,7 +121,7 @@ def check_email_domain_has_mx(
         return cached
 
     # Degrade gracefully if dnspython isn't available.
-    if "dns" not in globals() or dns is None or dns_resolver is None:  # type: ignore[name-defined]
+    if dns is None:
         result = {
             "domain": normalized,
             "has_mx": None,
