@@ -1,12 +1,18 @@
 name: CI/CD Pipeline
 
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+#
+# Single deploy pipeline: develop → staging (GitHub Environment "staging"), main → production ("production").
+# Create repo: Settings → Environments → New → names "staging" and "production" (can be empty; repo secrets
+# still apply). Add environment-specific secrets or protection rules as needed. Staging Vercel should use a
+# dedicated project: set VERCEL_PROJECT_ID in the staging environment to that project; production environment
+# has the production VERCEL_PROJECT_ID.
 
 on:
   push:
     branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
   workflow_dispatch:
     inputs:
       deploy_id:
@@ -201,6 +207,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [frontend, backend, security]
     if: github.ref == 'refs/heads/main'
+    environment: production
     env:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME || '' }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD || '' }}
@@ -235,6 +242,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [frontend, backend, security, performance]
     if: github.ref == 'refs/heads/develop'
+    environment: staging
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN || '' }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID || '' }}
@@ -257,6 +265,8 @@ jobs:
             -d '{"clearCache": "do_not_clear"}' || true
         fi
     
+    # Vercel: VERCEL_PROJECT_ID in the staging environment should point at a dedicated staging project.
+    # --prod deploys that project's production URL (not the same as app production).
     - name: Deploy to Vercel (Staging)
       if: github.ref == 'refs/heads/develop'
       uses: amondnet/vercel-action@v25
@@ -266,12 +276,23 @@ jobs:
         vercel-project-id: ${{ env.VERCEL_PROJECT_ID }}
         working-directory: ./frontend
         vercel-args: '--prod'
+    
+    - name: Health check (staging API)
+      if: github.ref == 'refs/heads/develop'
+      env:
+        RENDER_STAGING_URL: ${{ secrets.RENDER_STAGING_URL || '' }}
+      run: |
+        if [ -n "$RENDER_STAGING_URL" ]; then
+          sleep 60
+          curl -fsS "$RENDER_STAGING_URL/api/health" || exit 1
+        fi
 
   # Deployment to Production
   deploy-production:
     runs-on: ubuntu-latest
     needs: [frontend, backend, security, performance, docker]
     if: github.ref == 'refs/heads/main'
+    environment: production
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN || '' }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID || '' }}
@@ -304,7 +325,23 @@ jobs:
         working-directory: ./frontend
         vercel-args: '--prod'
     
-    - name: Run smoke tests
+    - name: API health, migrations, cache (production)
+      if: github.ref == 'refs/heads/main'
+      env:
+        PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL || '' }}
+        BACKEND_URL: ${{ secrets.BACKEND_URL || '' }}
+      run: |
+        BASE="${PRODUCTION_BASE_URL:-$BACKEND_URL}"
+        if [ -z "$BASE" ]; then
+          echo "Skipping API post-deploy checks (set PRODUCTION_BASE_URL or BACKEND_URL)"
+          exit 0
+        fi
+        sleep 60
+        curl -fsS "$BASE/api/health" || exit 1
+        curl -sS -X POST "$BASE/api/database/migrations/run" || true
+        curl -sS -X POST "$BASE/api/cache/clear" || true
+    
+    - name: Smoke tests (frontend + backend URLs)
       if: github.ref == 'refs/heads/main'
       env:
         BACKEND_URL: ${{ secrets.BACKEND_URL || '' }}
@@ -312,8 +349,8 @@ jobs:
       run: |
         if [ -n "$BACKEND_URL" ] && [ -n "$FRONTEND_URL" ]; then
           sleep 30
-          curl -f "$BACKEND_URL/health" || exit 1
-          curl -f "$FRONTEND_URL" || exit 1
+          curl -fsS "$BACKEND_URL/api/health" || exit 1
+          curl -fsS "$FRONTEND_URL" || exit 1
         fi
     
     - name: Notify deployment success
@@ -327,10 +364,39 @@ jobs:
             "$SLACK_WEBHOOK_URL" || true
         fi
 
+  # Post-production load test (optional; set repo variable K6_CI_ENABLED and secret PERF_API_BASE_URL)
+  k6-load-test:
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    if: github.ref == 'refs/heads/main' && vars.K6_CI_ENABLED == 'true'
+    env:
+      API_BASE_URL: ${{ secrets.PERF_API_BASE_URL || '' }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+    
+    - name: Install k6
+      uses: grafana/setup-k6-action@v1
+    
+    - name: Run performance tests
+      run: |
+        if [ -n "$API_BASE_URL" ]; then
+          mkdir -p k6-results
+          k6 run scripts/k6-performance-test.js
+        else
+          echo "Skipping k6 (PERF_API_BASE_URL not set)"
+        fi
+
   # Rollback Job (Manual trigger)
   rollback:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
+    environment: production
     
     steps:
     - name: Checkout code

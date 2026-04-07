@@ -11,7 +11,7 @@ from email_automation.followup_system import get_follow_up_system
 from core.reminders_alerts_system import get_reminders_alerts_system
 from core.database_optimization import db_optimizer
 from core.secure_sessions import get_current_user_id
-from crm.service import enhanced_crm_service, lead_dataclass_to_public_dict
+from crm.service import enhanced_crm_service, lead_dataclass_to_public_dict, _crm_meta_dict
 
 logger = logging.getLogger(__name__)
 
@@ -330,7 +330,7 @@ def get_pipeline_leads(user_id):
             if stage not in pipeline_data:
                 pipeline_data[stage] = []
             
-            metadata = json.loads(lead.get('metadata', '{}'))
+            metadata = _crm_meta_dict(lead.get('metadata'))
             lead_quality = metadata.get('lead_quality')
             pipeline_data[stage].append({
                 'id': lead['id'],

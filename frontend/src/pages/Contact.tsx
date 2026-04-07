@@ -3,6 +3,7 @@ import { RadiantLayout, Container, Gradient, AnimatedBackground } from '../compo
 import { Button } from '../components/radiant/Button'
 import { apiClient } from '../services/apiClient'
 import { PublicChatbotWidget } from '../components/PublicChatbotWidget'
+import { AUTOCOMPLETE } from '../constants/autocomplete'
 
 const LIMITS = { name: 200, email: 254, phone: 50, company: 200, subject: 200, message: 3000 }
 
@@ -81,14 +82,16 @@ export const Contact: React.FC = () => {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-5">
+              <form onSubmit={handleSubmit} className="space-y-5" autoComplete="on">
                 <div>
                   <label htmlFor="contact-name" className="block text-sm font-medium text-foreground mb-1">
                     Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     id="contact-name"
+                    name="name"
                     type="text"
+                    autoComplete={AUTOCOMPLETE.contact.name}
                     required
                     maxLength={LIMITS.name}
                     value={name}
@@ -104,7 +107,9 @@ export const Contact: React.FC = () => {
                   </label>
                   <input
                     id="contact-email"
+                    name="email"
                     type="email"
+                    autoComplete={AUTOCOMPLETE.contact.email}
                     required
                     maxLength={LIMITS.email}
                     value={email}
@@ -119,7 +124,9 @@ export const Contact: React.FC = () => {
                   </label>
                   <input
                     id="contact-phone"
+                    name="phone"
                     type="tel"
+                    autoComplete={AUTOCOMPLETE.contact.tel}
                     maxLength={LIMITS.phone}
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
@@ -133,7 +140,9 @@ export const Contact: React.FC = () => {
                   </label>
                   <input
                     id="contact-company"
+                    name="company"
                     type="text"
+                    autoComplete={AUTOCOMPLETE.contact.organization}
                     maxLength={LIMITS.company}
                     value={company}
                     onChange={(e) => setCompany(e.target.value)}
@@ -147,7 +156,9 @@ export const Contact: React.FC = () => {
                   </label>
                   <input
                     id="contact-subject"
+                    name="subject"
                     type="text"
+                    autoComplete={AUTOCOMPLETE.contact.subject}
                     maxLength={LIMITS.subject}
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
@@ -161,6 +172,8 @@ export const Contact: React.FC = () => {
                   </label>
                   <textarea
                     id="contact-message"
+                    name="message"
+                    autoComplete={AUTOCOMPLETE.contact.message}
                     required
                     rows={6}
                     maxLength={LIMITS.message}

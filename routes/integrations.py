@@ -17,6 +17,7 @@ from core.integrations.integration_framework import integration_manager
 from core.integrations.calendar.google_calendar_provider import GoogleCalendarProvider
 from core.integrations.calendar.calendar_manager import CalendarManager
 from core.database_optimization import db_optimizer
+from config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -93,15 +94,15 @@ def google_calendar_callback():
         
         if error:
             logger.error(f"OAuth error: {error}")
-            return redirect(f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/integrations?error={error}")
+            return redirect(f"{Config.FRONTEND_URL.rstrip('/')}/integrations?error={error}")
         
         if not code or not state:
-            return redirect(f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/integrations?error=missing_params")
+            return redirect(f"{Config.FRONTEND_URL.rstrip('/')}/integrations?error=missing_params")
         
         # Verify state
         state_data = verify_oauth_state(state)
         if not state_data:
-            return redirect(f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/integrations?error=invalid_state")
+            return redirect(f"{Config.FRONTEND_URL.rstrip('/')}/integrations?error=invalid_state")
         
         user_id = state_data['user_id']
         
@@ -128,11 +129,11 @@ def google_calendar_callback():
         )
         
         redirect_url = state_data.get('redirect_url') or '/dashboard'
-        return redirect(f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}{redirect_url}?calendar_connected=true")
+        return redirect(f"{Config.FRONTEND_URL.rstrip('/')}{redirect_url}?calendar_connected=true")
         
     except Exception as e:
         logger.error(f"Failed to handle Google Calendar callback: {e}")
-        return redirect(f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/integrations?error={str(e)}")
+        return redirect(f"{Config.FRONTEND_URL.rstrip('/')}/integrations?error={str(e)}")
 
 
 @integrations_bp.route("/google-calendar/status", methods=["GET"])

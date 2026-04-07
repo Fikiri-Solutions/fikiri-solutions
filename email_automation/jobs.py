@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass
 from config import config as app_config
+from core.email_branding import wrap_html_email_body
 
 # Optional Redis integration
 try:
@@ -581,16 +582,13 @@ class EmailJobManager:
     
     def _generate_welcome_email(self, data: Dict[str, Any]) -> str:
         """Generate welcome email content"""
-        return f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h1 style="color: #2563eb;">Welcome to Fikiri Solutions, {data.get('name', 'there')}!</h1>
-                
+        inner = f"""
+                <h1 style="color: #2563eb; font-size: 22px; margin-top: 0;">Welcome to Fikiri Solutions, {data.get('name', 'there')}!</h1>
+
                 <p>Thank you for joining Fikiri Solutions! We're excited to help you streamline your business operations with our AI-powered tools.</p>
-                
+
                 <p>Your account has been successfully created for <strong>{data.get('company_name', 'Your Company')}</strong>.</p>
-                
+
                 <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
                     <h3 style="margin-top: 0;">What's next?</h3>
                     <ul>
@@ -599,88 +597,73 @@ class EmailJobManager:
                         <li>Start syncing your contacts and leads</li>
                     </ul>
                 </div>
-                
+
                 <div style="text-align: center; margin: 30px 0;">
-                    <a href="{data.get('dashboard_url', 'https://fikirisolutions.com/dashboard')}" 
+                    <a href="{data.get('dashboard_url', 'https://fikirisolutions.com/dashboard')}"
                        style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
                         Get Started
                     </a>
                 </div>
-                
+
                 <p>If you have any questions, feel free to reach out to our support team at <a href="mailto:{data.get('support_email', 'support@fikirisolutions.com')}">{data.get('support_email', 'support@fikirisolutions.com')}</a>.</p>
-                
+
                 <p>Best regards,<br>The Fikiri Solutions Team</p>
-            </div>
-        </body>
-        </html>
         """
+        return wrap_html_email_body(inner)
     
     def _generate_onboarding_email(self, data: Dict[str, Any]) -> str:
         """Generate onboarding email content"""
-        return f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h1 style="color: #2563eb;">Onboarding Progress - Step {data.get('step', 1)}</h1>
-                
+        inner = f"""
+                <h1 style="color: #2563eb; font-size: 22px; margin-top: 0;">Onboarding Progress - Step {data.get('step', 1)}</h1>
+
                 <p>Hi {data.get('name', 'there')},</p>
-                
+
                 <p>Great progress on your Fikiri Solutions setup! You've completed step {data.get('step', 1)} of your onboarding.</p>
-                
+
                 <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
                     <h3 style="margin-top: 0;">Next Steps:</h3>
                     <p>Continue your onboarding to unlock the full power of Fikiri Solutions.</p>
                 </div>
-                
+
                 <div style="text-align: center; margin: 30px 0;">
-                    <a href="{data.get('next_step_url', 'https://fikirisolutions.com/onboarding')}" 
+                    <a href="{data.get('next_step_url', 'https://fikirisolutions.com/onboarding')}"
                        style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
                         Continue Onboarding
                     </a>
                 </div>
-                
+
                 <p>Best regards,<br>The Fikiri Solutions Team</p>
-            </div>
-        </body>
-        </html>
         """
+        return wrap_html_email_body(inner)
     
     def _generate_password_reset_email(self, data: Dict[str, Any]) -> str:
         """Generate password reset email content"""
-        return f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h1 style="color: #2563eb;">Reset Your Password</h1>
-                
+        inner = f"""
+                <h1 style="color: #2563eb; font-size: 22px; margin-top: 0;">Reset Your Password</h1>
+
                 <p>Hi {data.get('name', 'there')},</p>
-                
+
                 <p>We received a request to reset your password for your Fikiri Solutions account.</p>
-                
+
                 <div style="text-align: center; margin: 30px 0;">
-                    <a href="{data.get('reset_url', '#')}" 
+                    <a href="{data.get('reset_url', '#')}"
                        style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
                         Reset Password
                     </a>
                 </div>
-                
+
                 <p><strong>This link will expire in {data.get('expires_in', '1 hour')}.</strong></p>
-                
+
                 <p>If you didn't request this password reset, please ignore this email. Your password will remain unchanged.</p>
-                
+
                 <p>Best regards,<br>The Fikiri Solutions Team</p>
-            </div>
-        </body>
-        </html>
         """
+        return wrap_html_email_body(inner)
 
     def _generate_email_verification_email(self, data: Dict[str, Any]) -> str:
         """Generate email verification email content"""
-        return f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h1 style="color: #2563eb;">Verify Your Email</h1>
+        inner = f"""
+                <h1 style="color: #2563eb; font-size: 22px; margin-top: 0;">Verify Your Email</h1>
 
                 <p>Hi {data.get('name', 'there')},</p>
 
@@ -698,52 +681,40 @@ class EmailJobManager:
                 <p>If you didn't create this account, you can safely ignore this email.</p>
 
                 <p>Best regards,<br>The Fikiri Solutions Team</p>
-            </div>
-        </body>
-        </html>
         """
+        return wrap_html_email_body(inner)
     
     def _generate_notification_email(self, data: Dict[str, Any]) -> str:
         """Generate notification email content"""
-        return f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h1 style="color: #2563eb;">{data.get('subject', 'Notification')}</h1>
-                
+        inner = f"""
+                <h1 style="color: #2563eb; font-size: 22px; margin-top: 0;">{data.get('subject', 'Notification')}</h1>
+
                 <p>Hi {data.get('name', 'there')},</p>
-                
+
                 <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
                     {data.get('message', 'You have a new notification.')}
                 </div>
-                
+
                 <div style="text-align: center; margin: 30px 0;">
-                    <a href="{data.get('dashboard_url', 'https://fikirisolutions.com/dashboard')}" 
+                    <a href="{data.get('dashboard_url', 'https://fikirisolutions.com/dashboard')}"
                        style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
                         View Dashboard
                     </a>
                 </div>
-                
+
                 <p>Best regards,<br>The Fikiri Solutions Team</p>
-            </div>
-        </body>
-        </html>
         """
+        return wrap_html_email_body(inner)
     
     def _generate_default_email(self, data: Dict[str, Any]) -> str:
         """Generate default email content"""
-        return f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h1 style="color: #2563eb;">Fikiri Solutions</h1>
+        inner = """
+                <h1 style="color: #2563eb; font-size: 22px; margin-top: 0;">Fikiri Solutions</h1>
                 <p>Hello,</p>
                 <p>You have a new message from Fikiri Solutions.</p>
                 <p>Best regards,<br>The Fikiri Solutions Team</p>
-            </div>
-        </body>
-        </html>
         """
+        return wrap_html_email_body(inner)
     
     def _send_email(self, to_email: str, subject: str, content: str) -> Tuple[bool, bool, Optional[str]]:
         """

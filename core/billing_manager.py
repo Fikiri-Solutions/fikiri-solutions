@@ -6,6 +6,8 @@ Handles subscription management, usage tracking, and billing operations
 import os
 import logging
 from typing import Dict, List, Optional, Any
+
+from config import Config
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from enum import Enum
@@ -310,8 +312,8 @@ class FikiriBillingManager:
                     'quantity': 1,
                 }],
                 'mode': 'subscription',
-                'success_url': success_url or f"{os.getenv('FRONTEND_URL')}/dashboard?success=true",
-                'cancel_url': cancel_url or f"{os.getenv('FRONTEND_URL')}/pricing?canceled=true",
+                'success_url': success_url or f"{Config.FRONTEND_URL.rstrip('/')}/dashboard?success=true",
+                'cancel_url': cancel_url or f"{Config.FRONTEND_URL.rstrip('/')}/pricing?canceled=true",
                 'trial_period_days': 14,
                 'allow_promotion_codes': True,
                 'billing_address_collection': 'required',

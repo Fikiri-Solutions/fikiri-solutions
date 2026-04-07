@@ -6,6 +6,8 @@ Implements Stripe's Products, Features, and Entitlements system for proper featu
 import os
 import logging
 from typing import Dict, List, Optional, Any
+
+from config import Config
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from enum import Enum
@@ -571,7 +573,7 @@ class FikiriStripeManager:
             return {}
         
         try:
-            frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5174')
+            frontend_url = Config.FRONTEND_URL.rstrip('/')
             session_params = {
                 'payment_method_types': ['card'],
                 'line_items': [{'price': price_id, 'quantity': 1}],

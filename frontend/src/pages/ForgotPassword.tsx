@@ -5,6 +5,7 @@ import { RadiantLayout } from '../components/radiant'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../services/apiClient'
+import { AUTOCOMPLETE } from '../constants/autocomplete'
 
 export const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('')
@@ -109,7 +110,7 @@ export const ForgotPassword: React.FC = () => {
           <p className="text-gray-300">Enter your email address and we'll send you a link to reset your password.</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6" autoComplete="on">
           {error && (
             <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4 backdrop-blur-sm">
               <p className="text-sm text-red-200">{error}</p>
@@ -124,7 +125,9 @@ export const ForgotPassword: React.FC = () => {
               <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 id="email"
+                name="email"
                 type="email"
+                autoComplete={AUTOCOMPLETE.forgotPassword.email}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"

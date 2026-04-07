@@ -20,6 +20,8 @@ try:
 except ImportError:
     pass  # python-dotenv not available - using system environment variables
 
+from config import IS_PRODUCTION
+
 # Ensure logging directories exist
 os.makedirs("logs", exist_ok=True)
 os.makedirs("data", exist_ok=True)
@@ -117,6 +119,26 @@ from routes.appointments import appointments_bp
 services = {}
 
 
+def _cors_default_base_origins():
+    """Align with core/security.py: prod deploys only need public origins; dev adds localhost."""
+    prod = [
+        "https://fikirisolutions.com",
+        "https://www.fikirisolutions.com",
+        "https://fikirisolutions.onrender.com",
+        "https://fikirisolutions.vercel.app",
+        "https://fikiri-solutions.vercel.app",
+    ]
+    dev = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+    ]
+    return prod + dev if not IS_PRODUCTION else prod
+
+
 def _merge_cors_origins_from_env(base_origins):
     """
     Append origins from CORS_ORIGINS (comma-separated).
@@ -177,21 +199,7 @@ def create_app():
     # Enhanced CORS configuration for cookie-based auth
     # Allow both local development ports (3000 for Next.js, 5173/5174 for Vite)
     # Vercel default hostnames (hyphen vs no-hyphen) — also merge CORS_ORIGINS from env
-    cors_origins = _merge_cors_origins_from_env(
-        [
-            "https://fikirisolutions.com",
-            "https://www.fikirisolutions.com",
-            "https://fikirisolutions.onrender.com",
-            "https://fikirisolutions.vercel.app",
-            "https://fikiri-solutions.vercel.app",
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "http://localhost:5174",
-            "http://127.0.0.1:5174",
-        ]
-    )
+    cors_origins = _merge_cors_origins_from_env(_cors_default_base_origins())
 
     # Private LAN origins when Vite uses --host 0.0.0.0 (e.g. http://10.0.0.148:5174).
     # Flask-CORS matches these regexes; OPTIONS preflight is handled separately in handle_preflight.
@@ -718,9 +726,11 @@ def register_blueprints(app):
 # Create Flask app instance
 app = create_app()
 
-# Gunicorn WSGI target: must be the SocketIO wrapper when SocketIO is enabled (see Flask-SocketIO deployment docs).
-# Use: gunicorn --worker-class eventlet -w 1 ... app:wsgi_app
-wsgi_app = app.socketio if app.socketio is not None else app
+# Gunicorn WSGI target: must be the Flask application object.
+# Flask-SocketIO 5.x: the SocketIO instance is NOT WSGI-callable (callable(socketio) is False), so gunicorn app:wsgi_app
+# would raise "Application object must be callable". SocketIO attaches middleware via app.wsgi_app instead.
+# Use: gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT app:wsgi_app
+wsgi_app = app
 
 # Dev-only routes (bypass auth/plan gating; not registered in production/staging)
 if os.getenv('FLASK_ENV') == 'development':

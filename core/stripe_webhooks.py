@@ -24,6 +24,8 @@ except ImportError:
     FikiriBillingManager = None
     SubscriptionStatus = None
 
+from core.email_branding import wrap_html_email_body
+
 logger = logging.getLogger(__name__)
 
 class StripeWebhookHandler:
@@ -713,16 +715,16 @@ class StripeWebhookHandler:
         if not email:
             logger.info(f"Skipping welcome email: no email for customer {customer_id}")
             return
-        body = f"<p>Welcome to Fikiri Solutions! Your subscription is active.</p><p>Subscription ID: {subscription_id}</p>"
-        self._send_billing_email(email, "Welcome to Fikiri Solutions", body)
+        inner = f"<p>Welcome to Fikiri Solutions! Your subscription is active.</p><p>Subscription ID: {subscription_id}</p>"
+        self._send_billing_email(email, "Welcome to Fikiri Solutions", wrap_html_email_body(inner))
     
     def _send_cancellation_email(self, customer_id: str, subscription_id: str):
         """Send cancellation email"""
         email = self._get_customer_email(customer_id)
         if not email:
             return
-        body = f"<p>Your Fikiri subscription has been canceled. We're sorry to see you go.</p><p>Subscription ID: {subscription_id}</p>"
-        self._send_billing_email(email, "Your Fikiri subscription has been canceled", body)
+        inner = f"<p>Your Fikiri subscription has been canceled. We're sorry to see you go.</p><p>Subscription ID: {subscription_id}</p>"
+        self._send_billing_email(email, "Your Fikiri subscription has been canceled", wrap_html_email_body(inner))
     
     def _send_trial_ending_email(self, customer_id: str, subscription_id: str, trial_end: int):
         """Send trial ending email"""
@@ -730,8 +732,8 @@ class StripeWebhookHandler:
         if not email:
             return
         end_str = datetime.utcfromtimestamp(trial_end).strftime('%Y-%m-%d') if trial_end else 'soon'
-        body = f"<p>Your Fikiri trial ends on {end_str}. Add a payment method to continue using the service.</p>"
-        self._send_billing_email(email, "Your Fikiri trial is ending soon", body)
+        inner = f"<p>Your Fikiri trial ends on {end_str}. Add a payment method to continue using the service.</p>"
+        self._send_billing_email(email, "Your Fikiri trial is ending soon", wrap_html_email_body(inner))
     
     def _send_payment_confirmation_email(self, customer_id: str, invoice_id: str, amount_paid: int):
         """Send payment confirmation email"""
@@ -739,8 +741,8 @@ class StripeWebhookHandler:
         if not email:
             return
         amount_str = f"${amount_paid / 100:.2f}" if amount_paid is not None else "—"
-        body = f"<p>Thank you for your payment. We've received {amount_str} for invoice {invoice_id}.</p>"
-        self._send_billing_email(email, "Payment received – Fikiri Solutions", body)
+        inner = f"<p>Thank you for your payment. We've received {amount_str} for invoice {invoice_id}.</p>"
+        self._send_billing_email(email, "Payment received – Fikiri Solutions", wrap_html_email_body(inner))
     
     def _send_payment_failure_email(self, customer_id: str, invoice_id: str, amount_due: int):
         """Send payment failure email"""
@@ -748,8 +750,8 @@ class StripeWebhookHandler:
         if not email:
             return
         amount_str = f"${amount_due / 100:.2f}" if amount_due is not None else "—"
-        body = f"<p>We couldn't process your payment for invoice {invoice_id}. Amount due: {amount_str}. Please update your payment method.</p>"
-        self._send_billing_email(email, "Payment failed – action needed", body)
+        inner = f"<p>We couldn't process your payment for invoice {invoice_id}. Amount due: {amount_str}. Please update your payment method.</p>"
+        self._send_billing_email(email, "Payment failed – action needed", wrap_html_email_body(inner))
     
     def _handle_subscription_activated(self, subscription_id: str, customer_id: str):
         """Handle subscription activation (status already persisted by caller)."""

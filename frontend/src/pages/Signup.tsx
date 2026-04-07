@@ -20,6 +20,7 @@ import { RadiantLayout } from '../components/radiant';
 import { useAuth } from '../contexts/AuthContext';
 import { useUserActivityTracking } from '../contexts/ActivityContext';
 import { SMS_CONSENT } from '../constants/smsConsent';
+import { AUTOCOMPLETE } from '../constants/autocomplete';
 
 const Signup: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -356,7 +357,7 @@ const Signup: React.FC = () => {
               </p>
             </div>
             
-            <form className="space-y-6" onSubmit={handleSubmit}>
+            <form className="space-y-6" onSubmit={handleSubmit} autoComplete="on">
               {errors.submit && (
                 <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4 backdrop-blur-sm">
                   <div className="flex items-center">
@@ -380,6 +381,7 @@ const Signup: React.FC = () => {
                       id="firstName"
                       name="firstName"
                       type="text"
+                      autoComplete={AUTOCOMPLETE.signup.givenName}
                       required
                       className={`w-full pl-12 pr-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 ${errors.firstName ? 'border-red-500 focus:ring-red-500' : ''}`}
                       placeholder="John"
@@ -404,6 +406,7 @@ const Signup: React.FC = () => {
                       id="lastName"
                       name="lastName"
                       type="text"
+                      autoComplete={AUTOCOMPLETE.signup.familyName}
                       required
                       className={`w-full pl-12 pr-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 ${errors.lastName ? 'border-red-500 focus:ring-red-500' : ''}`}
                       placeholder="Doe"
@@ -430,7 +433,7 @@ const Signup: React.FC = () => {
                     id="email"
                     name="email"
                     type="email"
-                    autoComplete="email"
+                    autoComplete={AUTOCOMPLETE.signup.email}
                     required
                     className={`w-full pl-12 pr-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 ${errors.email ? 'border-red-500 focus:ring-red-500' : ''}`}
                     placeholder="john@company.com"
@@ -456,6 +459,7 @@ const Signup: React.FC = () => {
                     id="company"
                     name="company"
                     type="text"
+                    autoComplete={AUTOCOMPLETE.signup.organization}
                     required
                     className={`w-full pl-12 pr-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 ${errors.company ? 'border-red-500 focus:ring-red-500' : ''}`}
                     placeholder="Your Company"
@@ -482,7 +486,7 @@ const Signup: React.FC = () => {
                     id="phone"
                     name="phone"
                     type="tel"
-                    autoComplete="tel"
+                    autoComplete={AUTOCOMPLETE.signup.tel}
                     className="w-full pl-4 pr-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200"
                     placeholder="+1 (555) 123-4567"
                     value={formData.phone}
@@ -495,6 +499,7 @@ const Signup: React.FC = () => {
                       id="smsConsent"
                       name="smsConsent"
                       type="checkbox"
+                      autoComplete={AUTOCOMPLETE.off}
                       checked={formData.smsConsent}
                       onChange={handleInputChange}
                       className="w-4 h-4 text-brand-accent bg-white/10 border-white/20 rounded focus:ring-brand-accent focus:ring-2"
@@ -520,7 +525,7 @@ const Signup: React.FC = () => {
                       id="password"
                       name="password"
                       type={showPassword ? "text" : "password"}
-                      autoComplete="new-password"
+                      autoComplete={AUTOCOMPLETE.signup.newPassword}
                       required
                       className={`w-full pl-12 pr-12 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 ${errors.password ? 'border-red-500 focus:ring-red-500' : ''}`}
                       placeholder="••••••••"
@@ -557,7 +562,7 @@ const Signup: React.FC = () => {
                       id="confirmPassword"
                       name="confirmPassword"
                       type={showConfirmPassword ? "text" : "password"}
-                      autoComplete="new-password"
+                      autoComplete={AUTOCOMPLETE.signup.newPasswordConfirm}
                       required
                       className={`w-full pl-12 pr-12 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 ${errors.confirmPassword ? 'border-red-500 focus:ring-red-500' : ''}`}
                       placeholder="••••••••"
@@ -591,6 +596,7 @@ const Signup: React.FC = () => {
                       id="agreeToTerms"
                       name="agreeToTerms"
                       type="checkbox"
+                      autoComplete={AUTOCOMPLETE.off}
                       className="w-4 h-4 text-brand-accent bg-white/10 border-white/20 rounded focus:ring-brand-accent focus:ring-2"
                       checked={formData.agreeToTerms}
                       onChange={handleInputChange}
@@ -619,6 +625,7 @@ const Signup: React.FC = () => {
                       id="subscribeNewsletter"
                       name="subscribeNewsletter"
                       type="checkbox"
+                      autoComplete={AUTOCOMPLETE.off}
                       className="w-4 h-4 text-brand-accent bg-white/10 border-white/20 rounded focus:ring-brand-accent focus:ring-2"
                       checked={formData.subscribeNewsletter}
                       onChange={handleInputChange}

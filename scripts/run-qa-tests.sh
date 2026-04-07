@@ -113,6 +113,10 @@ run_cypress_tests() {
 
 # Function to run K6 performance tests
 run_k6_tests() {
+    if [ "${K6_RUN_LOCAL:-}" != "true" ]; then
+        echo -e "\n${YELLOW}⏭ Skipping K6 load tests (set K6_RUN_LOCAL=true to run).${NC}"
+        return 0
+    fi
     echo -e "\n${BLUE}🧪 Running K6 Performance Tests${NC}"
     
     # Run performance tests

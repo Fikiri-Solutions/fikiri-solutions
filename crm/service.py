@@ -435,7 +435,7 @@ class EnhancedCRMService:
             updated_lead_dict = dict(updated_lead)
             activity_count, last_activity = self._get_lead_activity_metrics(lead_id)
             score_result = self._score_lead_data(updated_lead_dict, activity_count, last_activity)
-            metadata = json.loads(updated_lead_dict.get('metadata', '{}'))
+            metadata = dict(_crm_meta_dict(updated_lead_dict.get('metadata')))
             metadata['lead_quality'] = score_result['quality']
             metadata['score_breakdown'] = score_result['breakdown']
             db_optimizer.execute_query(
@@ -843,8 +843,8 @@ class EnhancedCRMService:
             updated_at=datetime.fromisoformat(lead_data['updated_at']),
             last_contact=datetime.fromisoformat(lead_data['last_contact']) if lead_data.get('last_contact') else None,
             notes=lead_data.get('notes'),
-            tags=json.loads(lead_data.get('tags', '[]')),
-            metadata=json.loads(lead_data.get('metadata', '{}'))
+            tags=_crm_tags_list(lead_data.get('tags')),
+            metadata=_crm_meta_dict(lead_data.get('metadata')),
         )
     
     def _format_activity(self, activity_data: Dict[str, Any]) -> LeadActivity:
@@ -855,7 +855,7 @@ class EnhancedCRMService:
             activity_type=activity_data['activity_type'],
             description=activity_data['description'],
             timestamp=datetime.fromisoformat(activity_data['timestamp']),
-            metadata=json.loads(activity_data.get('metadata', '{}'))
+            metadata=_crm_meta_dict(activity_data.get('metadata')),
         )
     
     def _add_lead_activity(self, lead_id: int, activity_type: str, 
@@ -900,7 +900,7 @@ class EnhancedCRMService:
         old_score = int(lead.get('score') or 0)
         activity_count, last_activity = self._get_lead_activity_metrics(lead_id)
         score_result = self._score_lead_data(lead, activity_count, last_activity)
-        metadata = json.loads(lead.get('metadata', '{}'))
+        metadata = dict(_crm_meta_dict(lead.get('metadata')))
         metadata['lead_quality'] = score_result['quality']
         metadata['score_breakdown'] = score_result['breakdown']
         db_optimizer.execute_query(

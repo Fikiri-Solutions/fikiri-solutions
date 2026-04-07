@@ -31,6 +31,7 @@ def get_jwt_identity():
         return None
     except Exception:
         return None
+from config import Config
 from core.fikiri_stripe_manager import FikiriStripeManager
 from core.stripe_webhooks import StripeWebhookHandler
 
@@ -292,7 +293,7 @@ def create_checkout_session():
         if not price_id:
             return jsonify({'success': False, 'error': 'Either price_id or tier_name is required'}), 400
         
-        frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5174')
+        frontend_url = (current_app.config.get('FRONTEND_URL') or Config.FRONTEND_URL).rstrip('/')
         session = stripe_manager.create_checkout_session(
             price_id=price_id,
             success_url=f"{frontend_url}/dashboard?success=true",
@@ -513,7 +514,7 @@ def create_portal_session():
         if not customer_id:
             return jsonify({'success': False, 'error': 'No customer found. Please create a subscription first.'}), 400
         
-        frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5174')
+        frontend_url = (current_app.config.get('FRONTEND_URL') or Config.FRONTEND_URL).rstrip('/')
         session = stripe_manager.create_customer_portal_session(customer_id, f"{frontend_url}/billing")
         return jsonify({'success': True, 'url': session['url']})
     except Exception as e:

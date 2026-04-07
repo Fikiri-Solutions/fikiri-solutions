@@ -938,8 +938,11 @@ def api_logout():
         if origin:
             response.headers.add('Access-Control-Allow-Origin', origin)
         else:
-            # Allow localhost origins for development
-            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5174')
+            # Preflight without Origin (unusual); use configured SPA URL, not localhost-only
+            response.headers.add(
+                'Access-Control-Allow-Origin',
+                (os.getenv('FRONTEND_URL') or 'https://fikirisolutions.com').rstrip('/'),
+            )
         response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
         response.headers.add('Access-Control-Allow-Credentials', 'true')

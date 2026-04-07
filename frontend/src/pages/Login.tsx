@@ -8,6 +8,7 @@ import { RadiantLayout } from '../components/radiant'
 import { motion } from 'framer-motion'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { apiClient } from '../services/apiClient'
+import { AUTOCOMPLETE } from '../constants/autocomplete'
 
 export const Login: React.FC = () => {
   const [rememberMe, setRememberMe] = useState(() => {
@@ -505,7 +506,7 @@ export const Login: React.FC = () => {
                       id="email"
                       name="email"
                       type="email"
-                      autoComplete="username"
+                      autoComplete={AUTOCOMPLETE.login.identifier}
                       required
                       className={`w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-all duration-200 ${emailError ? 'border-red-500 focus:ring-red-500' : ''}`}
                       placeholder="Enter your email"
@@ -530,7 +531,7 @@ export const Login: React.FC = () => {
                       id="password"
                       name="password"
                       type={showPassword ? "text" : "password"}
-                      autoComplete="current-password"
+                      autoComplete={AUTOCOMPLETE.login.password}
                       required
                       className={`w-full pl-12 pr-12 py-3 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-all duration-200 ${passwordError ? 'border-red-500 focus:ring-red-500' : ''}`}
                       placeholder="Enter your password"
@@ -562,7 +563,7 @@ export const Login: React.FC = () => {
                     id="remember-me"
                     name="remember-me"
                     type="checkbox"
-                    autoComplete="off"
+                    autoComplete={AUTOCOMPLETE.off}
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
                     className="h-4 w-4 text-brand-primary focus:ring-brand-primary border-gray-300 rounded"

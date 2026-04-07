@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 // import * as Sentry from '@sentry/react'
 import App from './App'
 import './index.css'
+import { registerSupabaseSessionRefresh } from './utils/supabase/middleware'
 // import { initializeCacheInvalidation } from './utils/cacheInvalidation'
 
 // Initialize Sentry before anything else
@@ -76,6 +77,11 @@ if (import.meta.env.DEV || window.location.hostname === 'localhost' || window.lo
       })
     })
   }
+}
+
+const stopSupabaseRefresh = registerSupabaseSessionRefresh()
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => stopSupabaseRefresh())
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root')!)

@@ -270,9 +270,9 @@ class JWTAuthManager:
                     data = json.loads(session_data)
                     data['last_accessed'] = datetime.now().isoformat()
                     self.redis_client.setex(
-                        session_key, 
-                        self.access_token_expiry, 
-                        json.dumps(data)
+                        session_key,
+                        self.access_token_expiry,
+                        json_dumps_user_payload(data),
                     )
             
             return payload

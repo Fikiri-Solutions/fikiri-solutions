@@ -6,6 +6,8 @@ Production-ready security headers, rate limiting, and CORS
 import os
 import time
 import logging
+
+from config import IS_PRODUCTION
 from functools import wraps
 from typing import Dict, Any, Optional
 
@@ -148,7 +150,12 @@ def init_security(app: Flask):
     # Configure CORS (only if not already configured in app.py)
     # Check if CORS is already configured by checking if app has _cors attribute
     if not hasattr(app, '_cors_configured'):
-        cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173,http://localhost:5174').split(',')
+        _cors_default = (
+            "https://fikirisolutions.com,https://www.fikirisolutions.com"
+            if IS_PRODUCTION
+            else "http://localhost:3000,http://localhost:5173,http://localhost:5174"
+        )
+        cors_origins = os.getenv("CORS_ORIGINS", _cors_default).split(",")
         # Strip whitespace from origins
         cors_origins = [origin.strip() for origin in cors_origins if origin.strip()]
         CORS(app, 

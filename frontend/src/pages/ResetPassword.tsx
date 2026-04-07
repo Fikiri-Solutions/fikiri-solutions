@@ -5,6 +5,7 @@ import { RadiantLayout } from '../components/radiant'
 import { motion } from 'framer-motion'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { apiClient } from '../services/apiClient'
+import { AUTOCOMPLETE } from '../constants/autocomplete'
 
 export const ResetPassword: React.FC = () => {
   const [password, setPassword] = useState('')
@@ -143,7 +144,7 @@ export const ResetPassword: React.FC = () => {
           <p className="text-gray-300">Enter your new password below.</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6" autoComplete="on">
           {error && (
             <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4 backdrop-blur-sm">
               <p className="text-sm text-red-200">{error}</p>
@@ -158,7 +159,9 @@ export const ResetPassword: React.FC = () => {
               <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 id="password"
+                name="password"
                 type={showPassword ? 'text' : 'password'}
+                autoComplete={AUTOCOMPLETE.resetPassword.newPassword}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full pl-10 pr-12 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
@@ -183,7 +186,9 @@ export const ResetPassword: React.FC = () => {
               <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 id="confirmPassword"
+                name="confirmPassword"
                 type={showConfirmPassword ? 'text' : 'password'}
+                autoComplete={AUTOCOMPLETE.resetPassword.newPasswordConfirm}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full pl-10 pr-12 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"

@@ -1,13 +1,16 @@
-name: Backend CI/CD Pipeline
+name: Backend CI
 
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+#
+# Tests and coverage only. Deploys (staging → develop, production → main) live in ci-cd.yml to avoid
+# duplicate Render/Vercel triggers.
 
 on:
   push:
     branches: [ main, develop ]
     paths: [ 'core/**', 'routes/**', 'app.py', 'requirements.txt', 'services/**', 'crm/**', 'analytics/**', 'email_automation/**' ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
     paths: [ 'core/**', 'routes/**', 'app.py', 'requirements.txt', 'services/**', 'crm/**', 'analytics/**', 'email_automation/**' ]
 
 jobs:
@@ -50,108 +53,3 @@ jobs:
         file: ./coverage.xml
         flags: backend
         name: backend-coverage
-
-  deploy-staging:
-    if: github.ref == 'refs/heads/develop'
-    runs-on: ubuntu-latest
-    needs: test
-    env:
-      RENDER_STAGING_SERVICE_ID: ${{ secrets.RENDER_STAGING_SERVICE_ID || '' }}
-      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY || '' }}
-      RENDER_STAGING_URL: ${{ secrets.RENDER_STAGING_URL || '' }}
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Deploy to Render Staging
-      run: |
-        if [ -n "$RENDER_API_KEY" ] && [ -n "$RENDER_STAGING_SERVICE_ID" ]; then
-          curl -sS -X POST "https://api.render.com/v1/services/$RENDER_STAGING_SERVICE_ID/deploys" \
-            -H "Authorization: Bearer $RENDER_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d '{"clearCache": "do_not_clear"}' || true
-        fi
-    
-    - name: Run health check
-      run: |
-        if [ -n "$RENDER_STAGING_URL" ]; then
-          sleep 60
-          curl -f "$RENDER_STAGING_URL/api/health" || exit 1
-        fi
-
-  deploy-production:
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    needs: test
-    env:
-      RENDER_PRODUCTION_SERVICE_ID: ${{ secrets.RENDER_PRODUCTION_SERVICE_ID || '' }}
-      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY || '' }}
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}
-      PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL || '' }}
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Deploy to Render Production
-      run: |
-        if [ -n "$RENDER_API_KEY" ] && [ -n "$RENDER_PRODUCTION_SERVICE_ID" ]; then
-          curl -sS -X POST "https://api.render.com/v1/services/$RENDER_PRODUCTION_SERVICE_ID/deploys" \
-            -H "Authorization: Bearer $RENDER_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d '{"clearCache": "do_not_clear"}' || true
-        fi
-    
-    - name: Run health check
-      run: |
-        if [ -n "$PRODUCTION_BASE_URL" ]; then
-          sleep 60
-          curl -f "$PRODUCTION_BASE_URL/api/health" || exit 1
-        fi
-    
-    - name: Run database migrations
-      run: |
-        if [ -n "$PRODUCTION_BASE_URL" ]; then
-          curl -sS -X POST "$PRODUCTION_BASE_URL/api/database/migrations/run" || true
-        fi
-    
-    - name: Clear cache
-      run: |
-        if [ -n "$PRODUCTION_BASE_URL" ]; then
-          curl -sS -X POST "$PRODUCTION_BASE_URL/api/cache/clear" || true
-        fi
-    
-    - name: Notify deployment success
-      if: always()
-      run: |
-        if [ -n "$SLACK_WEBHOOK_URL" ]; then
-          curl -sS -X POST -H 'Content-type: application/json' \
-            --data '{"text":"✅ Backend deployed successfully to production!"}' \
-            "$SLACK_WEBHOOK_URL" || true
-        fi
-
-  performance-test:
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    needs: deploy-production
-    env:
-      API_BASE_URL: ${{ secrets.PERF_API_BASE_URL || '' }}
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.18.2'  # Latest LTS with security patches
-    
-    - name: Install k6
-      uses: grafana/setup-k6-action@v1
-    
-    - name: Run performance tests
-      run: |
-        if [ -n "$API_BASE_URL" ]; then
-          mkdir -p k6-results
-          k6 run scripts/k6-performance-test.js
-        else
-          echo "Skipping k6 (PERF_API_BASE_URL secret / API_BASE_URL not set)"
-        fi

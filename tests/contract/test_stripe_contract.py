@@ -17,7 +17,11 @@ from core.stripe_webhooks import StripeWebhookHandler
 
 
 def _skip_if_missing_env():
-    if not os.getenv("STRIPE_SECRET_KEY"):
+    k = os.getenv("STRIPE_SECRET_KEY") or ""
+    if not k.strip():
+        return True
+    # Restricted keys (rk_*) and some dashboard key prefixes cannot run Customer.create / Checkout in tests.
+    if not (k.startswith("sk_test_") or k.startswith("sk_live_")):
         return True
     return False
 

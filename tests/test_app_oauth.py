@@ -71,6 +71,18 @@ class TestAppOAuth(unittest.TestCase):
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(resp.get_json().get("error"), "state_mismatch")
 
+    def test_gmail_callback_missing_state_in_db_returns_400_not_500(self):
+        """When session has no oauth_state and DB has no row, must not IndexError (regression)."""
+        app = _create_app()
+
+        with patch("core.database_optimization.db_optimizer") as mock_db:
+            mock_db.execute_query.return_value = []
+            client = app.test_client()
+            resp = client.get("/api/oauth/gmail/callback?state=some_state_from_google&code=unused")
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.get_json().get("error"), "state_mismatch")
+
     def test_gmail_callback_missing_code(self):
         app = _create_app()
 

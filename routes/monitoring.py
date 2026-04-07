@@ -229,32 +229,10 @@ def email_sync_status():
             # Assume table doesn't exist and try to create it
         
         if not table_exists:
-            # Create the table if it doesn't exist
-            try:
-                logger.info("Creating user_sync_status table...")
-                db_optimizer.execute_query("""
-                    CREATE TABLE IF NOT EXISTS user_sync_status (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id INTEGER NOT NULL UNIQUE,
-                        last_sync DATETIME,
-                        sync_status TEXT DEFAULT 'connected_pending_sync',
-                        syncing INTEGER DEFAULT 0,
-                        total_emails INTEGER DEFAULT 0,
-                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-                    )
-                """, fetch=False)
-                db_optimizer.execute_query("""
-                    CREATE INDEX IF NOT EXISTS idx_user_sync_status_user_id 
-                    ON user_sync_status (user_id)
-                """, fetch=False)
-                table_exists = True
-                logger.info("✅ user_sync_status table created")
-            except Exception as create_error:
-                logger.warning(f"Could not create user_sync_status table: {create_error}")
-        
-        if not table_exists:
-            # Table doesn't exist yet, but Gmail is connected - return "sync pending"
+            # Schema bootstrap lives in core/database_optimization.py (init_database); no inline DDL here.
+            logger.warning(
+                "user_sync_status table missing — ensure init_database() ran on this DB path"
+            )
             return create_success_response({
                 'sync_status': 'pending',
                 'last_sync': None,

@@ -516,17 +516,18 @@ class DatabaseOptimizer:
             )
         """)
         
-        # OAuth states table for CSRF protection
+        # OAuth states table for CSRF protection (single definition; was duplicated below)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS oauth_states (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 state TEXT UNIQUE NOT NULL,
                 user_id INTEGER,
-                provider TEXT NOT NULL,
+                provider TEXT NOT NULL DEFAULT 'gmail',
                 redirect_url TEXT,
                 expires_at INTEGER,
                 metadata TEXT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
             )
         """)
         
@@ -546,6 +547,83 @@ class DatabaseOptimizer:
                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
             )
         """)
+
+        # Synced emails (Gmail/Outlook inbox copy) — required by dashboard timeseries & inbox routes.
+        # Also created by email_automation/gmail_sync_jobs.py; must exist on fresh prod DB before any sync job runs.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS synced_emails (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                gmail_id TEXT,
+                external_id TEXT,
+                provider TEXT DEFAULT 'gmail',
+                thread_id TEXT,
+                subject TEXT,
+                sender TEXT,
+                recipient TEXT,
+                date DATETIME,
+                body TEXT,
+                labels TEXT DEFAULT '[]',
+                attachments TEXT DEFAULT '[]',
+                processed BOOLEAN DEFAULT FALSE,
+                is_read BOOLEAN DEFAULT FALSE,
+                lead_score INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                metadata TEXT DEFAULT '{}',
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                UNIQUE(user_id, external_id, provider)
+            )
+        """)
+
+        # Gmail sync job queue + contacts + sync status (also created in email_automation/gmail_sync_jobs.py).
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS gmail_sync_jobs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                job_id TEXT NOT NULL UNIQUE,
+                status TEXT DEFAULT 'pending',
+                progress INTEGER DEFAULT 0,
+                emails_synced INTEGER DEFAULT 0,
+                contacts_found INTEGER DEFAULT 0,
+                leads_identified INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                started_at DATETIME,
+                completed_at DATETIME,
+                error_message TEXT,
+                metadata TEXT DEFAULT '{}',
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS contacts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                email TEXT NOT NULL,
+                name TEXT,
+                company TEXT,
+                last_contact DATETIME,
+                contact_count INTEGER DEFAULT 1,
+                lead_score INTEGER DEFAULT 0,
+                source TEXT DEFAULT 'gmail',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                metadata TEXT DEFAULT '{}',
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                UNIQUE(user_id, email)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_sync_status (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL UNIQUE,
+                last_sync DATETIME,
+                sync_status TEXT DEFAULT 'connected_pending_sync',
+                syncing INTEGER DEFAULT 0,
+                total_emails INTEGER DEFAULT 0,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
         
         # Onboarding info table
         cursor.execute("""
@@ -559,21 +637,6 @@ class DatabaseOptimizer:
                 goals TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-            )
-        """)
-        
-        # OAuth states table for CSRF protection
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS oauth_states (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                state TEXT UNIQUE NOT NULL,
-                user_id INTEGER,
-                provider TEXT DEFAULT 'gmail',
-                redirect_url TEXT,
-                expires_at INTEGER,
-                metadata TEXT,  -- JSON object for additional state data
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
             )
         """)
@@ -1685,6 +1748,10 @@ class DatabaseOptimizer:
             ("idx_email_sync_status", "email_sync", ["status"]),
             ("idx_email_sync_type", "email_sync", ["sync_type"]),
             ("idx_email_sync_started", "email_sync", ["started_at"]),
+            ("idx_synced_emails_user_id", "synced_emails", ["user_id"]),
+            ("idx_gmail_sync_jobs_user_id", "gmail_sync_jobs", ["user_id"]),
+            ("idx_contacts_user_id", "contacts", ["user_id"]),
+            ("idx_user_sync_status_user_id", "user_sync_status", ["user_id"]),
             
             # User sessions indexes
             ("idx_sessions_user_id", "user_sessions", ["user_id"]),

@@ -6,7 +6,7 @@ on:
   push:
     branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
   schedule:
     - cron: '0 2 * * *'  # Daily at 2 AM
 
@@ -164,6 +164,12 @@ jobs:
 
     - name: Run k6 load/stress tests (optional)
       run: |
+        if [ "${{ vars.K6_CI_ENABLED }}" != "true" ]; then
+          echo "k6 skipped: set GitHub Actions repository variable K6_CI_ENABLED=true to run load tests in CI."
+          mkdir -p k6-results
+          echo '{"skipped":true,"reason":"K6_CI_ENABLED not true"}' > k6-results/skipped.json
+          exit 0
+        fi
         if [ -z "$API_BASE_URL" ]; then
           echo "Skipping k6: PERF_API_BASE_URL secret not set (avoids hammering production)."
           mkdir -p k6-results
@@ -244,7 +250,7 @@ jobs:
         echo "- Security tests: ✅ Passed" >> test-summary.md
         echo "" >> test-summary.md
         echo "## Performance Tests" >> test-summary.md
-        echo "- k6: runs only when PERF_API_BASE_URL is set (never production by default)" >> test-summary.md
+        echo "- k6: requires repo variable K6_CI_ENABLED=true and secret PERF_API_BASE_URL" >> test-summary.md
         echo "" >> test-summary.md
         echo "## Security Scan" >> test-summary.md
         echo "- Vulnerability scan: ✅ Passed" >> test-summary.md

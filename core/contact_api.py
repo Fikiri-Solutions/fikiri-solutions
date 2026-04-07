@@ -9,6 +9,7 @@ import os
 import json
 from flask import Blueprint, request, jsonify
 from core.database_optimization import db_optimizer
+from core.email_branding import wrap_html_email_body
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +141,7 @@ def submit_contact():
         lines.append(f"<p><strong>Subject:</strong> {subject}</p>")
     lines.append("<p><strong>Message:</strong></p>")
     lines.append(f"<p>{message.replace(chr(10), '<br>')}</p>")
-    body = "\n".join(lines)
+    body = wrap_html_email_body("\n".join(lines))
 
     sent = _send_contact_email(CONTACT_TO_EMAIL, email_subject, body)
 

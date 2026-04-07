@@ -15,6 +15,8 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 
+from config import Config
+
 logger = logging.getLogger(__name__)
 
 # Try to import cryptography for token encryption
@@ -190,9 +192,19 @@ def gmail_callback():
             """, (state, int(time.time())))
             
             if state_data:
-                expected_state = state_data[0]['state']
-                redirect_url = state_data[0]['redirect_url']
-                stored_user_id = state_data[0].get('user_id')
+                row = state_data[0]
+                expected_state = row["state"]
+                redirect_url = row.get("redirect_url") or redirect_url
+                stored_user_id = row.get("user_id")
+                metadata_str = row.get("metadata", "{}")
+                try:
+                    metadata = json.loads(metadata_str) if isinstance(metadata_str, str) else metadata_str
+                    if metadata and (stored_user_id is None or stored_user_id == 0):
+                        uid = metadata.get("user_id")
+                        if uid:
+                            stored_user_id = uid
+                except Exception as parse_error:
+                    logger.debug("Failed to parse oauth state metadata: %s", parse_error)
                 logger.info(
                     "🧪 OAuth state loaded (gmail) state=%s user_id=%s redirect=%s",
                     expected_state,
@@ -201,15 +213,6 @@ def gmail_callback():
                 )
             else:
                 logger.warning("🧪 OAuth state not found in DB (gmail) state=%s", state)
-                # Also try to get user_id from metadata if stored there
-                if not stored_user_id or stored_user_id == 0:
-                    metadata_str = state_data[0].get('metadata', '{}')
-                    try:
-                        metadata = json.loads(metadata_str) if isinstance(metadata_str, str) else metadata_str
-                        if metadata and 'user_id' in metadata:
-                            stored_user_id = metadata.get('user_id')
-                    except Exception as parse_error:
-                        logger.debug("Failed to parse oauth state metadata: %s", parse_error)
         
         if not state or state != expected_state:
             logger.error(f"❌ State mismatch: {state} != {expected_state}")
@@ -250,8 +253,15 @@ def gmail_callback():
         
         # Log the redirect URI being used for debugging
         logger.info(f"🔍 Using redirect_uri: {GOOGLE_REDIRECT_URI}")
-        logger.info(f"🔍 Client ID: {GOOGLE_CLIENT_ID[:20]}...")
-        
+        if GOOGLE_CLIENT_ID:
+            logger.info("🔍 Client ID: %s...", GOOGLE_CLIENT_ID[:20])
+        else:
+            logger.error("❌ GOOGLE_CLIENT_ID missing during Gmail callback")
+            return jsonify({"error": "oauth_not_configured", "message": "Google OAuth is not configured."}), 500
+        if not GOOGLE_CLIENT_SECRET:
+            logger.error("❌ GOOGLE_CLIENT_SECRET missing during Gmail callback")
+            return jsonify({"error": "oauth_not_configured", "message": "Google OAuth is not configured."}), 500
+
         token_data = {
             'client_id': GOOGLE_CLIENT_ID,
             'client_secret': GOOGLE_CLIENT_SECRET,
@@ -394,8 +404,8 @@ def gmail_callback():
             })
         else:
             # For browser redirects, redirect to the frontend
-            # Get frontend URL from environment or default to localhost
-            frontend_base = os.getenv('FRONTEND_URL', 'http://localhost:5174')
+            # Match config.py defaults (prod → fikirisolutions.com, dev → Vite)
+            frontend_base = Config.FRONTEND_URL.rstrip('/')
             
             # Ensure redirect_url is a valid frontend route
             if redirect_url.startswith('http'):
@@ -421,7 +431,7 @@ def gmail_callback():
         logger.error(f"❌ OAuth callback failed: {e}")
         # If this is a browser redirect, redirect to frontend with error
         if request.headers.get('Accept', '').startswith('text/html'):
-            frontend_base = os.getenv('FRONTEND_URL', 'http://localhost:5174')
+            frontend_base = Config.FRONTEND_URL.rstrip('/')
             error_url = f"{frontend_base}/integrations/gmail?oauth_error={urlencode({'error': str(e)})}"
             return redirect(error_url)
         return jsonify({"error": f"OAuth callback failed: {str(e)}"}), 500
@@ -645,7 +655,7 @@ def outlook_callback():
         logger.info(f"✅ Outlook OAuth completed for user {user_id}")
         
         # 4) Redirect to frontend
-        frontend_base = os.getenv('FRONTEND_URL', 'http://localhost:5174')
+        frontend_base = Config.FRONTEND_URL.rstrip('/')
         if redirect_url.startswith('/'):
             frontend_url = f"{frontend_base}{redirect_url}"
         else:
@@ -659,7 +669,7 @@ def outlook_callback():
 
     except Exception as e:
         logger.error(f"❌ Outlook OAuth callback failed: {e}")
-        frontend_base = os.getenv('FRONTEND_URL', 'http://localhost:5174')
+        frontend_base = Config.FRONTEND_URL.rstrip('/')
         error_url = f"{frontend_base}/integrations/outlook?oauth_error={urlencode({'error': str(e)})}"
         return redirect(error_url)
 

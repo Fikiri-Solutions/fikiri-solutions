@@ -6,7 +6,7 @@ on:
   push:
     branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
   workflow_dispatch:
 
 # Optional smoke checks against a live URL (staging recommended).

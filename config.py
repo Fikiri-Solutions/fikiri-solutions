@@ -6,8 +6,12 @@ Environment-aware settings for OAuth and other integrations
 import os
 from typing import Optional
 
-# Environment detection
-ENV = os.getenv("ENVIRONMENT", "development")
+# Environment detection (Render often sets FLASK_ENV=production but not ENVIRONMENT)
+_raw_env = os.getenv("ENVIRONMENT", "").strip().lower()
+if _raw_env:
+    ENV = _raw_env
+else:
+    ENV = os.getenv("FLASK_ENV", "development").strip().lower() or "development"
 IS_PRODUCTION = ENV == "production"
 
 class Config:

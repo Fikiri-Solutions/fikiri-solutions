@@ -6,6 +6,7 @@ import { apiClient } from '../services/apiClient';
 import { config } from '../config';
 import { CheckCircle, Mail, Building, User, ArrowRight, Sparkles, Zap } from 'lucide-react';
 import { EmailVerificationBanner } from '../components/EmailVerificationBanner';
+import { AUTOCOMPLETE } from '../constants/autocomplete';
 
 export const Onboarding: React.FC = () => {
   const navigate = useNavigate();
@@ -269,6 +270,7 @@ export const Onboarding: React.FC = () => {
                 <input
                   type="text"
                   name="name"
+                  autoComplete={AUTOCOMPLETE.onboarding.name}
                   value={formData.name}
                   onChange={handleChange}
                     placeholder="John Doe"
@@ -285,6 +287,7 @@ export const Onboarding: React.FC = () => {
                 <input
                   type="text"
                   name="company"
+                  autoComplete={AUTOCOMPLETE.onboarding.organization}
                   value={formData.company}
                   onChange={handleChange}
                     placeholder="Acme Inc."
@@ -300,6 +303,7 @@ export const Onboarding: React.FC = () => {
                 <input
                   type="text"
                   name="industry"
+                  autoComplete={AUTOCOMPLETE.onboarding.industry}
                   value={formData.industry}
                   onChange={handleChange}
                     placeholder="e.g., Real Estate, Property Management, Construction"

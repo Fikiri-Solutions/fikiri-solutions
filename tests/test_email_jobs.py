@@ -106,6 +106,8 @@ class TestEmailJobManager:
         assert "TestCo" in content
         assert "Welcome" in content
         assert "html" in content.lower()
+        assert "fikiri-email-logo" in content
+        assert "Stop losing time" in content
 
     @patch("email_automation.jobs.db_optimizer")
     def test_generate_email_content_routes_to_welcome(self, mock_db):
