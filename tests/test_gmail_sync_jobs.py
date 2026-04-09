@@ -9,13 +9,36 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from email_automation.gmail_sync_jobs import GmailSyncJobManager
+from email_automation.gmail_sync_jobs import GmailSyncJobManager, should_process_gmail_sync_inline
+
+
+class TestGmailSyncInlinePolicy(unittest.TestCase):
+    def test_inline_true_for_sqlite_url(self):
+        with patch.dict(os.environ, {"DATABASE_URL": "sqlite:///data/fikiri.db"}, clear=False):
+            self.assertTrue(should_process_gmail_sync_inline())
+
+    def test_inline_false_for_postgres(self):
+        with patch.dict(
+            os.environ,
+            {"DATABASE_URL": "postgresql://user:pass@host:5432/db", "GMAIL_SYNC_FORCE_INLINE": ""},
+            clear=False,
+        ):
+            self.assertFalse(should_process_gmail_sync_inline())
+
+    def test_force_inline_env(self):
+        with patch.dict(
+            os.environ,
+            {"DATABASE_URL": "postgresql://user:pass@host:5432/db", "GMAIL_SYNC_FORCE_INLINE": "1"},
+            clear=False,
+        ):
+            self.assertTrue(should_process_gmail_sync_inline())
 
 
 class TestGmailSyncJobs(unittest.TestCase):
+    @patch('email_automation.gmail_sync_jobs.should_process_gmail_sync_inline', return_value=False)
     @patch('email_automation.gmail_sync_jobs.db_optimizer')
     @patch('email_automation.gmail_sync_jobs.time.time')
-    def test_queue_sync_job_writes_db_and_redis(self, mock_time, mock_db):
+    def test_queue_sync_job_writes_db_and_redis(self, mock_time, mock_db, _inline):
         manager = GmailSyncJobManager()
         manager.redis_client = MagicMock()
         mock_time.return_value = 1234567890

@@ -37,6 +37,24 @@ from integrations.gmail.gmail_client import gmail_client
 
 logger = logging.getLogger(__name__)
 
+
+def should_process_gmail_sync_inline() -> bool:
+    """
+    Run Gmail sync in the web process (daemon thread) instead of the Redis job queue.
+
+    On Render, SQLite lives on the web service disk (`DATABASE_URL=sqlite:///...`).
+    A separate background worker cannot mount that disk, so queued jobs are never
+    processed and sync stays at 0–1%. PostgreSQL (or explicit opt-in) can use Redis workers.
+    """
+    db_url = (os.getenv("DATABASE_URL") or "").strip().lower()
+    if "sqlite" in db_url:
+        return True
+    force = (os.getenv("GMAIL_SYNC_FORCE_INLINE") or "").strip().lower()
+    if force in ("1", "true", "yes", "on"):
+        return True
+    return False
+
+
 def _is_test_mode() -> bool:
     return (
         os.getenv("FIKIRI_TEST_MODE") == "1"
@@ -160,14 +178,26 @@ class GmailSyncJobManager:
                 )
             """, fetch=False)
             
-            # Migration: add is_read column if missing (existing DBs created before this column)
+            # Migration: add is_read only when missing (CREATE above already includes it on new DBs;
+            # blind ALTER duplicates the column and logs errors on every init).
             try:
-                db_optimizer.execute_query(
-                    "ALTER TABLE synced_emails ADD COLUMN is_read BOOLEAN DEFAULT 0",
-                    fetch=False,
-                )
-            except Exception:
-                pass  # column already exists
+                db_url = (os.getenv("DATABASE_URL") or "").lower()
+                if "sqlite" in db_url or not db_url:
+                    info = db_optimizer.execute_query("PRAGMA table_info(synced_emails)")
+                    col_names = set()
+                    if info:
+                        for row in info:
+                            if isinstance(row, dict):
+                                col_names.add(row.get("name"))
+                            elif row is not None and len(row) > 1:
+                                col_names.add(row[1])
+                    if info is not None and "is_read" not in col_names:
+                        db_optimizer.execute_query(
+                            "ALTER TABLE synced_emails ADD COLUMN is_read BOOLEAN DEFAULT 0",
+                            fetch=False,
+                        )
+            except Exception as mig_err:
+                logger.debug("synced_emails is_read migration skipped: %s", mig_err)
             try:
                 db_optimizer.execute_query("""
                     UPDATE synced_emails 
@@ -265,8 +295,8 @@ class GmailSyncJobManager:
             except Exception as status_error:
                 logger.warning(f"⚠️ Could not update user_sync_status to pending: {status_error}")
             
-            # Queue in Redis if available
-            if self.redis_client:
+            # Optional: mirror job id on legacy Redis list (only when not using inline web-thread mode)
+            if self.redis_client and not should_process_gmail_sync_inline():
                 job_data = {
                     'job_id': job_id,
                     'user_id': user_id,

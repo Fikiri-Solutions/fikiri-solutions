@@ -698,7 +698,7 @@ def sync_gmail():
         sync_job_queued = False
         job_id = None
         try:
-            from email_automation.gmail_sync_jobs import GmailSyncJobManager
+            from email_automation.gmail_sync_jobs import GmailSyncJobManager, should_process_gmail_sync_inline
             from core.redis_queues import get_email_queue
             
             sync_job_manager = GmailSyncJobManager()
@@ -708,14 +708,15 @@ def sync_gmail():
                 sync_job_queued = True
                 logger.info(f"Queued Gmail sync job {job_id} for user {user_id}")
                 
-                # Enqueue job to RQ for background processing
                 email_queue = get_email_queue()
-                if email_queue.is_connected():
+                use_inline = should_process_gmail_sync_inline()
+                # SQLite on Render: DB file is on the web disk only—no separate worker can run the job.
+                # Redis enqueue would leave jobs pending forever unless GMAIL_SYNC_FORCE_INLINE=0 and a worker shares Postgres.
+                if email_queue.is_connected() and not use_inline:
                     # Register the sync job task if not already registered
                     if 'process_gmail_sync' not in email_queue._registered_tasks:
                         email_queue.register_task('process_gmail_sync', sync_job_manager.process_sync_job)
                     
-                    # Enqueue job to RQ with trace ID
                     try:
                         from core.trace_context import get_trace_id
                         trace_id = get_trace_id()
@@ -727,10 +728,15 @@ def sync_gmail():
                         {'job_id': job_id, 'trace_id': trace_id},
                         max_retries=3
                     )
-                    logger.info(f"✅ Enqueued Gmail sync job {job_id} to RQ (RQ job ID: {rq_job_id})")
+                    logger.info(f"✅ Enqueued Gmail sync job {job_id} to Redis queue (job id: {rq_job_id})")
                 else:
-                    # Fallback: process synchronously if Redis not available (not ideal but works)
-                    logger.warning("⚠️ Redis not available, processing sync synchronously")
+                    if use_inline:
+                        logger.info(
+                            "Gmail sync: processing in web process (SQLite or GMAIL_SYNC_FORCE_INLINE); "
+                            "Redis queue bypassed so the job can access the database"
+                        )
+                    else:
+                        logger.warning("⚠️ Redis not available, processing sync in background thread")
                     import threading
                     def process_in_background():
                         try:
@@ -743,7 +749,7 @@ def sync_gmail():
                             logger.error(f"❌ Sync job {job_id} error: {e}")
                     thread = threading.Thread(target=process_in_background, daemon=True)
                     thread.start()
-                    logger.info(f"✅ Started fallback thread for sync job {job_id}")
+                    logger.info(f"✅ Started background thread for sync job {job_id}")
         except Exception as job_error:
             logger.warning(f"Could not queue sync job (will try direct sync): {job_error}")
             import traceback
