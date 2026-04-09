@@ -40,6 +40,8 @@ gunicorn>=20.0.0
 # Flask-SocketIO + Gunicorn: use gevent + GeventWebSocketWorker (Gunicorn 26 removes eventlet worker)
 gevent>=24.2.1
 gevent-websocket>=0.10.1
+# If Render dashboard Start Command overrides render.yaml with --worker-class eventlet, Gunicorn needs this. Prefer fixing Start Command to GeventWebSocketWorker (see render.yaml).
+eventlet>=0.40.3
 marshmallow>=3.20.0  # Schema validation for API endpoints
 dnspython>=2.0.0
 
