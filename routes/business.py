@@ -2245,3 +2245,91 @@ def test_automation_preset():
     except Exception as e:
         logger.error(f"Automation preset test error: {e}")
         return create_error_response("Failed to run automation preset", 500, 'AUTOMATION_TEST_ERROR')
+
+
+# ---------------------------------------------------------------------------
+# Privacy & Data Management endpoints
+# ---------------------------------------------------------------------------
+
+@business_bp.route('/privacy/settings', methods=['GET'])
+@handle_api_errors
+def get_privacy_settings():
+    """Get user privacy settings."""
+    user_id = get_current_user_id() or request.args.get('user_id', type=int)
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+    try:
+        rows = db_optimizer.execute_query(
+            "SELECT * FROM user_privacy_settings WHERE user_id = ?", (user_id,)
+        )
+        if rows:
+            return create_success_response(dict(rows[0]), 'Privacy settings retrieved')
+        return create_success_response({
+            'user_id': user_id,
+            'data_retention_enabled': True,
+            'email_scanning_enabled': True,
+            'personal_email_exclusion': True,
+            'auto_labeling': True,
+            'lead_detection': True,
+            'analytics_enabled': True,
+        }, 'Default privacy settings')
+    except Exception as e:
+        logger.error("Privacy settings error: %s", e)
+        return create_success_response({
+            'user_id': user_id,
+            'data_retention_enabled': True,
+            'email_scanning_enabled': True,
+            'personal_email_exclusion': True,
+            'auto_labeling': True,
+            'lead_detection': True,
+            'analytics_enabled': True,
+        }, 'Default privacy settings')
+
+
+@business_bp.route('/privacy/data-summary', methods=['GET'])
+@handle_api_errors
+def get_privacy_data_summary():
+    """Get user data summary for privacy dashboard."""
+    user_id = get_current_user_id() or request.args.get('user_id', type=int)
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+    try:
+        leads_count = db_optimizer.execute_query(
+            "SELECT COUNT(*) as cnt FROM leads WHERE user_id = ?", (user_id,)
+        )
+        activities_count = db_optimizer.execute_query(
+            "SELECT COUNT(*) as cnt FROM lead_activities WHERE user_id = ?", (user_id,)
+        )
+        sync_count = db_optimizer.execute_query(
+            "SELECT COUNT(*) as cnt FROM email_sync WHERE user_id = ?", (user_id,)
+        )
+        return create_success_response({
+            'leads': leads_count[0]['cnt'] if leads_count else 0,
+            'activities': activities_count[0]['cnt'] if activities_count else 0,
+            'sync_records': sync_count[0]['cnt'] if sync_count else 0,
+        }, 'Data summary retrieved')
+    except Exception as e:
+        logger.error("Data summary error: %s", e)
+        return create_success_response({'leads': 0, 'activities': 0, 'sync_records': 0}, 'Data summary')
+
+
+@business_bp.route('/privacy/consents', methods=['GET'])
+@handle_api_errors
+def get_privacy_consents():
+    """Get user consent history."""
+    user_id = get_current_user_id() or request.args.get('user_id', type=int)
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+    try:
+        rows = db_optimizer.execute_query(
+            "SELECT * FROM privacy_consents WHERE user_id = ? ORDER BY created_at DESC LIMIT 20",
+            (user_id,)
+        )
+        consents = [dict(r) for r in rows] if rows else []
+        return create_success_response({'consents': consents}, 'Consents retrieved')
+    except Exception as e:
+        logger.error("Consents error: %s", e)
+        return create_success_response({'consents': []}, 'Consents')
