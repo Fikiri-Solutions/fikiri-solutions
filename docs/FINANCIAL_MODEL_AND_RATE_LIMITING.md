@@ -8,6 +8,22 @@ Summary of **pricing vs. cost**, **cost to acquire and serve a customer**, and *
 
 Use this section to see **all** costs you pay so you can price services and product with a target margin in mind.
 
+### Current source DB plan (Free)
+
+Use this as the active baseline for infrastructure assumptions until the plan changes.
+
+| Item | Current Free plan limit |
+|------|--------------------------|
+| Plan cost | **$0.00/month** |
+| API requests | **Unlimited** |
+| Monthly active users | **50,000 MAU** |
+| Database size | **500 MB** |
+| Compute | **Shared CPU, 500 MB RAM** |
+| Egress | **5 GB** |
+| Cached egress | **5 GB** |
+| File storage | **1 GB** |
+| Support | **Community support** |
+
 ### Fixed monthly overhead (you pay regardless of customer count)
 
 | Category | What it is | Typical range (fill in your actuals) |

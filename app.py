@@ -257,8 +257,8 @@ def create_app():
     setup_routes(app)
     
     # Initialize SocketIO for real-time updates (optional, non-blocking)
-    # Gunicorn + threading does not support WebSocket upgrade; use eventlet worker + async_mode
-    # eventlet on Render (set SOCKETIO_ASYNC_MODE=eventlet in the dashboard or render.yaml).
+    # Gunicorn + threading does not support WebSocket upgrade; use gevent worker + async_mode
+    # Render: SOCKETIO_ASYNC_MODE=gevent and gunicorn -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker
     app.socketio = None
     try:
         from flask_socketio import SocketIO
@@ -277,6 +277,16 @@ def create_app():
                 import eventlet  # noqa: F401
             except ImportError:
                 logger.warning("eventlet not installed; SocketIO using threading (WebSockets may fail behind Gunicorn)")
+                socketio_async_mode = 'threading'
+        elif socketio_async_mode == 'gevent':
+            try:
+                import gevent  # noqa: F401
+                import geventwebsocket  # noqa: F401
+            except ImportError:
+                logger.warning(
+                    "gevent/gevent-websocket not installed; SocketIO using threading "
+                    "(WebSockets may fail behind Gunicorn)"
+                )
                 socketio_async_mode = 'threading'
         
         # SocketIO origin validation function
@@ -729,7 +739,7 @@ app = create_app()
 # Gunicorn WSGI target: must be the Flask application object.
 # Flask-SocketIO 5.x: the SocketIO instance is NOT WSGI-callable (callable(socketio) is False), so gunicorn app:wsgi_app
 # would raise "Application object must be callable". SocketIO attaches middleware via app.wsgi_app instead.
-# Use: gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT app:wsgi_app
+# Use: gunicorn -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker -w 1 --bind 0.0.0.0:$PORT app:wsgi_app
 wsgi_app = app
 
 # Dev-only routes (bypass auth/plan gating; not registered in production/staging)

@@ -112,3 +112,6 @@ frontend/public/*.mp4
 # Node dependencies
 frontend/node_modules/
 .vercel
+
+# Cursor / local agent skill trees (optional copies; remove this line to track in git)
+.agents/
