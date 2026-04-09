@@ -3,10 +3,46 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import { apiClient } from '../services/apiClient';
-import { config } from '../config';
 import { CheckCircle, Mail, Building, User, ArrowRight, Sparkles, Zap } from 'lucide-react';
 import { EmailVerificationBanner } from '../components/EmailVerificationBanner';
 import { AUTOCOMPLETE } from '../constants/autocomplete';
+
+/** Survives full-page OAuth redirects (React state is wiped on reload). */
+function onboardingDraftKey(userId: number) {
+  return `fikiri-onboarding-wizard-draft:${userId}`;
+}
+
+function readOnboardingDraft(userId: number | undefined): { name: string; company: string; industry: string } | null {
+  if (!userId || typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(onboardingDraftKey(userId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return {
+      name: typeof parsed.name === 'string' ? parsed.name : '',
+      company: typeof parsed.company === 'string' ? parsed.company : '',
+      industry: typeof parsed.industry === 'string' ? parsed.industry : ''
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeOnboardingDraft(userId: number, data: { name: string; company: string; industry: string }) {
+  try {
+    localStorage.setItem(onboardingDraftKey(userId), JSON.stringify(data));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function clearOnboardingDraft(userId: number) {
+  try {
+    localStorage.removeItem(onboardingDraftKey(userId));
+  } catch {
+    /* ignore */
+  }
+}
 
 export const Onboarding: React.FC = () => {
   const navigate = useNavigate();
@@ -16,12 +52,30 @@ export const Onboarding: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [checkingEmail, setCheckingEmail] = useState(false);
   const [emailConnected, setEmailConnected] = useState(false);
-  const [statusLoaded, setStatusLoaded] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     company: '',
     industry: ''
   });
+
+  // Restore name/company/industry after OAuth redirect (full page reload clears React state),
+  // and fall back to profile fields from signup when draft is empty.
+  useEffect(() => {
+    if (!user?.id) return;
+    const draft = readOnboardingDraft(user.id);
+    setFormData((prev) => ({
+      name: prev.name || draft?.name || user.name || '',
+      company: prev.company || draft?.company || user.business_name || '',
+      industry: prev.industry || draft?.industry || user.industry || ''
+    }));
+  }, [user?.id, user?.name, user?.business_name, user?.industry]);
+
+  // Keep draft in sync while the user edits (covers OAuth and refresh mid-flow).
+  useEffect(() => {
+    if (!user?.id) return;
+    if (!formData.name && !formData.company && !formData.industry) return;
+    writeOnboardingDraft(user.id, formData);
+  }, [user?.id, formData.name, formData.company, formData.industry]);
   
   // Check if user is returning from OAuth redirect
   useEffect(() => {
@@ -81,25 +135,35 @@ export const Onboarding: React.FC = () => {
       const pathMatch = location.pathname.match(/\/onboarding\/(\d+)/);
       const hasExplicitStep = !!stepParam || !!pathMatch;
       try {
-        const status = await apiClient.getOnboardingStatus(user.id);
-        const data = status?.data || status;
-        const payload = data?.data;
-        if (payload?.name || payload?.company || payload?.industry) {
-          setFormData(prev => ({
+        // apiClient returns the inner payload: { completed, data: row | null, step }
+        const apiStatus = await apiClient.getOnboardingStatus(user.id);
+        const row = apiStatus?.data;
+        const onboardingRow =
+          row &&
+          typeof row === 'object' &&
+          ('name' in row || 'company' in row || 'industry' in row)
+            ? (row as { name?: string; company?: string; industry?: string })
+            : null;
+        if (onboardingRow?.name || onboardingRow?.company || onboardingRow?.industry) {
+          setFormData((prev) => ({
             ...prev,
-            name: payload.name || prev.name,
-            company: payload.company || prev.company,
-            industry: payload.industry || prev.industry
+            name: onboardingRow.name || prev.name,
+            company: onboardingRow.company || prev.company,
+            industry: onboardingRow.industry || prev.industry
           }));
         }
-        if (!hasExplicitStep && typeof data?.step === 'number' && data.step >= 1 && data.step <= 4) {
-          setStep(data.step);
-          navigate(`/onboarding/${data.step}`, { replace: true });
+        const stepFromApi = apiStatus?.step;
+        if (
+          !hasExplicitStep &&
+          typeof stepFromApi === 'number' &&
+          stepFromApi >= 1 &&
+          stepFromApi <= 4
+        ) {
+          setStep(stepFromApi);
+          navigate(`/onboarding/${stepFromApi}`, { replace: true });
         }
       } catch (error) {
         // If status fails, keep default step and empty form
-      } finally {
-        setStatusLoaded(true);
       }
     };
     loadStatus();
@@ -145,6 +209,9 @@ export const Onboarding: React.FC = () => {
   };
 
   const handleGoogleAuth = async () => {
+    if (user?.id) {
+      writeOnboardingDraft(user.id, formData);
+    }
     // Preserve redirect parameter through OAuth flow
     const redirectPath = getRedirectPath()
     const redirectParam = redirectPath ? `?redirect=${encodeURIComponent(redirectPath)}` : ''
@@ -164,6 +231,9 @@ export const Onboarding: React.FC = () => {
   };
 
   const handleOutlookAuth = async () => {
+    if (user?.id) {
+      writeOnboardingDraft(user.id, formData);
+    }
     // Preserve redirect parameter through OAuth flow
     const redirectPath = getRedirectPath()
     const redirectParam = redirectPath ? `?redirect=${encodeURIComponent(redirectPath)}` : ''
@@ -208,6 +278,7 @@ export const Onboarding: React.FC = () => {
 
     try {
       await apiClient.saveOnboarding(formData);
+        clearOnboardingDraft(user.id);
         toast.success('Onboarding completed!');
         localStorage.setItem('fikiri-onboarding-just-completed', 'true');
       updateUser({
