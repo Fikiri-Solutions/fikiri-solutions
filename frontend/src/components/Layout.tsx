@@ -7,7 +7,6 @@ import { CustomizationPanel } from './CustomizationPanel'
 import { BackToTop } from './BackToTop'
 import { AccountManagement } from './AccountManagement'
 import { useCustomization } from '../contexts/CustomizationContext'
-import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { FikiriLogo } from './FikiriLogo'
 import { EmailVerificationBanner } from './EmailVerificationBanner'
@@ -22,7 +21,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [accountManagementOpen, setAccountManagementOpen] = useState(false)
   const location = useLocation()
   const { customization } = useCustomization()
-  const { resolvedTheme } = useTheme()
   const { user, logout } = useAuth()
 
   // Persist sidebar state in localStorage
@@ -60,7 +58,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Chatbot Builder', href: '/ai/chatbot-builder', icon: BookOpen },
     { name: 'Usage Analytics', href: '/analytics', icon: BarChart3 },
     { name: 'Billing', href: '/billing', icon: CreditCard },
-    { name: 'Privacy', href: '/privacy', icon: Shield },
+    { name: 'Privacy', href: '/privacy-settings', icon: Shield },
   ]
 
   // Add onboarding link if not completed
@@ -92,7 +90,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <Link
                 key={item.name}
                 to={item.href}
-                className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                className={`flex min-h-[44px] items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
                   location.pathname === item.href
                     ? 'bg-brand-accent/20 dark:bg-brand-accent/20 text-brand-primary dark:text-brand-accent'
                     : 'text-brand-text dark:text-gray-300 hover:bg-brand-accent/10 dark:hover:bg-gray-700'
@@ -145,35 +143,42 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8 transition-colors duration-300">
           <button
             type="button"
-            className="-m-2.5 p-2.5 text-brand-text dark:text-gray-300 hover:text-brand-primary dark:hover:text-white lg:hidden transition-colors"
+            className="lg:hidden flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-brand-text dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-brand-primary dark:hover:text-white transition-colors"
             onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
           >
             <Menu className="h-6 w-6" />
           </button>
-          <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
-            <div className="flex flex-1"></div>
-            <div className="flex items-center gap-x-4 lg:gap-x-6">
+          <div className="flex min-w-0 flex-1 gap-x-2 self-stretch sm:gap-x-4 lg:gap-x-6">
+            <div className="flex min-w-0 flex-1" />
+            <div className="flex min-w-0 max-w-full items-center gap-x-1 overflow-x-auto overflow-y-hidden py-1 sm:gap-x-3 lg:gap-x-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <ThemeToggle />
               <button
+                type="button"
                 onClick={() => setCustomizationOpen(true)}
-                className="p-2 text-brand-text hover:text-brand-primary dark:text-gray-300 dark:hover:text-white transition-colors"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-brand-text hover:bg-gray-100 hover:text-brand-primary dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
                 title="Customize appearance"
+                aria-label="Customize appearance"
               >
                 <Palette className="h-5 w-5" />
               </button>
               <button
+                type="button"
                 onClick={() => setAccountManagementOpen(true)}
-                className="p-2 text-brand-text hover:text-brand-primary dark:text-gray-300 dark:hover:text-white transition-colors"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-brand-text hover:bg-gray-100 hover:text-brand-primary dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
                 title="Account settings"
+                aria-label="Account settings"
               >
                 <User className="h-5 w-5" />
               </button>
               <button 
+                type="button"
                 onClick={handleSignOut}
-                className="flex items-center gap-2 text-sm font-medium text-brand-text hover:text-brand-primary dark:text-gray-300 dark:hover:text-white transition-colors"
+                className="flex h-11 min-w-[44px] shrink-0 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-brand-text hover:bg-gray-100 hover:text-brand-primary dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
+                aria-label="Sign out"
               >
-                <LogOut className="h-4 w-4" />
-                Sign out
+                <LogOut className="h-4 w-4 shrink-0" />
+                <span className="hidden sm:inline">Sign out</span>
               </button>
             </div>
           </div>

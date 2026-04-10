@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Mail, Search, Filter, Sparkles, Send, Reply, Archive, Trash2, Star, MoreVertical, Loader2, AlertCircle, RefreshCw, Paperclip, Download } from 'lucide-react'
+import { Mail, Search, Sparkles, Send, Reply, Archive, MoreVertical, Loader2, RefreshCw, Paperclip, Download, Activity, ChevronLeft } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { apiClient } from '../services/apiClient'
@@ -166,6 +166,11 @@ const EmailBodyRenderer: React.FC<{ content: string; emailId?: string }> = ({ co
             line-height: 1.6;
             font-size: 14px;
           }
+          @media (max-width: 767px) {
+            .email-body-html {
+              font-size: 16px;
+            }
+          }
           .email-body-html img {
             max-width: 100%;
             height: auto;
@@ -198,6 +203,12 @@ const EmailBodyRenderer: React.FC<{ content: string; emailId?: string }> = ({ co
           .email-body-html a:hover {
             color: #2563eb;
           }
+          .dark .email-body-html a {
+            color: #93c5fd;
+          }
+          .dark .email-body-html a:hover {
+            color: #bfdbfe;
+          }
           .email-body-html table {
             width: 100%;
             border-collapse: collapse;
@@ -207,6 +218,10 @@ const EmailBodyRenderer: React.FC<{ content: string; emailId?: string }> = ({ co
           .email-body-html table th {
             padding: 8px;
             border: 1px solid rgba(0, 0, 0, 0.1);
+          }
+          .dark .email-body-html table td,
+          .dark .email-body-html table th {
+            border-color: rgba(255, 255, 255, 0.12);
           }
           .email-body-html blockquote {
             border-left: 4px solid #3b82f6;
@@ -276,7 +291,21 @@ export const EmailInbox: React.FC = () => {
   const [loadingAttachments, setLoadingAttachments] = useState(false)
   const [emailLimit, setEmailLimit] = useState(25) // Start with 25 emails
   const [loadingMore, setLoadingMore] = useState(false)
-  
+  const [syncInboxPending, setSyncInboxPending] = useState(false)
+  const [isNarrowViewport, setIsNarrowViewport] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mq = window.matchMedia('(max-width: 1023px)')
+    const update = () => setIsNarrowViewport(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+
+  const hideListOnMobile = isNarrowViewport && !!selectedEmail
+  const hideDetailOnMobile = isNarrowViewport && !selectedEmail
+
   // Reset email limit when filter changes
   useEffect(() => {
     setEmailLimit(25)
@@ -420,6 +449,36 @@ export const EmailInbox: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['email-detail', user?.id] })
     refetchEmails()
   }, [queryClient, user?.id, refetchEmails])
+
+  const handleSyncInbox = useCallback(async () => {
+    if (!gmailConnected) {
+      addToast({
+        type: 'info',
+        title: 'Gmail not connected',
+        message: 'Connect Gmail under Integrations to sync your inbox.',
+      })
+      return
+    }
+    setSyncInboxPending(true)
+    try {
+      await apiClient.triggerGmailSync()
+      addToast({
+        type: 'success',
+        title: 'Gmail sync started',
+        message: 'New messages will appear after sync completes.',
+      })
+      queryClient.invalidateQueries({ queryKey: ['emails', user?.id] })
+      queryClient.invalidateQueries({ queryKey: ['gmail-sync-status', user?.id] })
+      setTimeout(() => refetchEmails(), 2000)
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } }; message?: string }
+      const message =
+        err?.response?.data?.message || err?.message || 'Could not start Gmail sync.'
+      addToast({ type: 'error', title: 'Sync failed', message })
+    } finally {
+      setSyncInboxPending(false)
+    }
+  }, [gmailConnected, addToast, queryClient, user?.id, refetchEmails])
 
   const analyzeEmail = async (email: Email) => {
     const content = displayBody || email.body || email.snippet
@@ -629,63 +688,91 @@ export const EmailInbox: React.FC = () => {
   }
 
   return (
-    <div className="flex h-full max-h-screen bg-brand-background dark:bg-gray-900 overflow-hidden">
+    <div
+      className="flex w-full min-h-0 flex-col overflow-hidden rounded-lg border border-brand-text/10 bg-brand-background dark:border-gray-700 dark:bg-gray-900 h-[calc(100dvh-11rem)] max-h-[calc(100dvh-11rem)] lg:h-[calc(100dvh-8rem)] lg:max-h-[calc(100dvh-8rem)]"
+      role="main"
+      aria-label="Email inbox"
+    >
       {/* Email List Sidebar */}
-      <div className="w-1/3 border-r border-brand-text/10 dark:border-gray-700 flex flex-col">
+      <div
+        className={`min-h-0 w-full flex flex-col border-brand-text/10 dark:border-gray-700 lg:w-1/3 lg:border-r ${
+          hideListOnMobile ? 'hidden' : 'flex'
+        } lg:flex`}
+      >
         {/* Header */}
-        <div className="p-4 border-b border-brand-text/10 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-brand-text dark:text-white">Inbox</h2>
-            <button
-              onClick={handleRefresh}
-              disabled={loading || isFetching}
-              className="p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              title="Refresh"
-            >
-              <RefreshCw className={`h-5 w-5 text-brand-text/70 dark:text-gray-400 ${loading ? 'animate-spin' : ''}`} />
-            </button>
+        <div className="shrink-0 border-b border-brand-text/10 p-3 sm:p-4 dark:border-gray-700">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:mb-4">
+            <h2 className="text-lg font-bold text-brand-text dark:text-white sm:text-xl">Inbox</h2>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={handleSyncInbox}
+                disabled={syncInboxPending || loading || isFetching || gmailConnected !== true}
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-brand-text/15 px-2.5 py-2 text-xs font-medium text-brand-text hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                title="Pull latest messages from Gmail"
+              >
+                <Activity className={`h-4 w-4 shrink-0 ${syncInboxPending ? 'animate-pulse' : ''}`} />
+                <span className="hidden sm:inline">Sync inbox</span>
+                <span className="sm:hidden">Sync</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleRefresh}
+                disabled={loading || isFetching}
+                className="flex h-11 w-11 items-center justify-center rounded-lg text-brand-text/70 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-800"
+                title="Refresh list"
+                aria-label="Refresh inbox list"
+              >
+                <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
           </div>
 
           {/* Search */}
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-brand-text/50 dark:text-gray-500" />
+          <div className="relative mb-3 sm:mb-4">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-text/50 dark:text-gray-500" />
             <input
-              type="text"
+              type="search"
+              enterKeyHint="search"
               placeholder="Search emails..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-800 border border-brand-text/20 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              autoComplete="off"
+              className="min-h-[44px] w-full rounded-lg border border-brand-text/20 bg-white py-2 pl-10 pr-4 text-base text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-primary dark:border-gray-700 dark:bg-gray-800 dark:text-white sm:text-sm"
             />
           </div>
 
           {/* Filters */}
           <div className="flex gap-2">
             <button
+              type="button"
               onClick={() => setFilter('all')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              className={`min-h-[44px] flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors touch-manipulation sm:flex-none sm:px-3 sm:py-1.5 ${
                 filter === 'all'
                   ? 'bg-brand-primary text-white'
-                  : 'bg-gray-50 dark:bg-gray-800 text-brand-text/70 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  : 'bg-gray-50 text-brand-text/70 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
               }`}
             >
               All
             </button>
             <button
+              type="button"
               onClick={() => setFilter('unread')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              className={`min-h-[44px] flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors touch-manipulation sm:flex-none sm:px-3 sm:py-1.5 ${
                 filter === 'unread'
                   ? 'bg-brand-primary text-white'
-                  : 'bg-gray-50 dark:bg-gray-800 text-brand-text/70 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  : 'bg-gray-50 text-brand-text/70 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
               }`}
             >
               Unread
             </button>
             <button
+              type="button"
               onClick={() => setFilter('read')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              className={`min-h-[44px] flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors touch-manipulation sm:flex-none sm:px-3 sm:py-1.5 ${
                 filter === 'read'
                   ? 'bg-brand-primary text-white'
-                  : 'bg-gray-50 dark:bg-gray-800 text-brand-text/70 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  : 'bg-gray-50 text-brand-text/70 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
               }`}
             >
               Read
@@ -715,12 +802,13 @@ export const EmailInbox: React.FC = () => {
               <div className="divide-y divide-brand-text/10 dark:divide-gray-700">
                 {filteredEmails.map((email: Email) => (
                   <button
+                    type="button"
                     key={email.id}
                     onClick={() => {
                       setSelectedEmail(email)
                       setAiAnalysis(null)
                     }}
-                    className={`w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
+                    className={`w-full touch-manipulation text-left p-4 transition-colors hover:bg-gray-50 active:bg-gray-100 dark:hover:bg-gray-800 dark:active:bg-gray-700/80 ${
                       selectedEmail?.id === email.id ? 'bg-brand-primary/10 dark:bg-brand-primary/20 border-l-4 border-brand-primary' : ''
                     } ${email.unread ? 'font-semibold' : ''}`}
                   >
@@ -751,9 +839,10 @@ export const EmailInbox: React.FC = () => {
               {hasMore && (
                 <div className="p-4 border-t border-brand-text/10 dark:border-gray-700">
                   <button
+                    type="button"
                     onClick={loadMoreEmails}
                     disabled={loadingMore || isFetching}
-                    className="w-full py-2 px-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-brand-text dark:text-white rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg bg-gray-50 px-4 py-3 text-brand-text transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 touch-manipulation"
                   >
                     {loadingMore || isFetching ? (
                       <>
@@ -772,41 +861,66 @@ export const EmailInbox: React.FC = () => {
       </div>
 
       {/* Email View & AI Assistant */}
-      <div className="flex-1 flex flex-col min-h-0 max-h-screen">
+      <div
+        className={`min-h-0 min-w-0 flex flex-1 flex-col overflow-hidden ${
+          hideDetailOnMobile ? 'hidden' : 'flex'
+        } lg:flex`}
+      >
         {selectedEmail ? (
-          <>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {/* Email Header */}
-            <div className="p-6 border-b border-brand-text/10 dark:border-gray-700 flex-shrink-0">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h3 className="text-xl font-bold text-brand-text dark:text-white mb-2">
-                    {selectedEmail.subject || '(No subject)'}
-                  </h3>
-                  <div className="flex items-center gap-4 text-sm text-brand-text/70 dark:text-gray-400">
-                    <div>
-                      <span className="font-medium">From:</span> {selectedEmail.from_name || selectedEmail.from}
-                    </div>
-                    <div>
-                      <span className="font-medium">Date:</span> {new Date(selectedEmail.date).toLocaleString()}
+            <div className="shrink-0 border-b border-brand-text/10 p-4 sm:p-6 dark:border-gray-700">
+              <div className="mb-4 flex items-start justify-between gap-2">
+                <div className="flex min-w-0 flex-1 items-start gap-2 sm:gap-3">
+                  {isNarrowViewport && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedEmail(null)
+                        setAiAnalysis(null)
+                        setShowReplyComposer(false)
+                      }}
+                      className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-brand-text transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 touch-manipulation"
+                      aria-label="Back to inbox"
+                    >
+                      <ChevronLeft className="h-6 w-6" />
+                    </button>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <h3 className="mb-2 break-words text-lg font-bold text-brand-text dark:text-white sm:text-xl">
+                      {selectedEmail.subject || '(No subject)'}
+                    </h3>
+                    <div className="flex flex-col gap-2 text-sm text-brand-text/70 dark:text-gray-400 sm:flex-row sm:flex-wrap sm:gap-x-4 sm:gap-y-1">
+                      <div className="min-w-0 break-words">
+                        <span className="font-medium">From:</span>{' '}
+                        {selectedEmail.from_name || selectedEmail.from}
+                      </div>
+                      <div className="shrink-0">
+                        <span className="font-medium">Date:</span>{' '}
+                        {new Date(selectedEmail.date).toLocaleString()}
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex shrink-0 gap-1 sm:gap-2">
                   <button
+                    type="button"
                     onClick={() => generateReply(selectedEmail)}
                     disabled={aiLoading}
-                    className="p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    className="flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-gray-50 disabled:opacity-50 dark:hover:bg-gray-800 touch-manipulation"
                     title="Generate AI Reply"
+                    aria-label="Generate AI reply"
                   >
                     <Sparkles className={`h-5 w-5 text-brand-primary ${aiLoading ? 'animate-pulse' : ''}`} />
                   </button>
-                  <button 
+                  <button
+                    type="button"
                     onClick={() => {
-                      // More options menu - could show dropdown with Forward, Delete, etc.
                       addToast({ type: 'info', title: 'More options', message: 'Additional options coming soon.' })
                     }}
-                    className="p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors" 
+                    className="flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 touch-manipulation"
                     title="More options"
+                    aria-label="More options"
                   >
                     <MoreVertical className="h-5 w-5 text-brand-text/70 dark:text-gray-400" />
                   </button>
@@ -814,27 +928,30 @@ export const EmailInbox: React.FC = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
+                  type="button"
                   onClick={() => analyzeEmail(selectedEmail)}
                   disabled={aiLoading}
-                  className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 transition-colors disabled:opacity-50"
+                  className="flex min-h-[44px] min-w-[44px] flex-1 items-center justify-center gap-2 rounded-lg bg-brand-primary px-4 py-2.5 text-white transition-colors hover:bg-brand-primary/90 disabled:opacity-50 sm:flex-initial touch-manipulation"
                 >
-                  <Sparkles className="h-4 w-4" />
+                  <Sparkles className="h-4 w-4 shrink-0" />
                   {aiLoading ? 'Analyzing...' : 'AI Analyze'}
                 </button>
-                <button 
+                <button
+                  type="button"
                   onClick={() => handleReply(selectedEmail)}
-                  className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-brand-text dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className="flex min-h-[44px] min-w-[44px] flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-brand-text transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 sm:flex-initial touch-manipulation"
                 >
-                  <Reply className="h-4 w-4" />
+                  <Reply className="h-4 w-4 shrink-0" />
                   Reply
                 </button>
-                <button 
+                <button
+                  type="button"
                   onClick={() => handleArchive(selectedEmail)}
-                  className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-brand-text dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className="flex min-h-[44px] min-w-[44px] flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-brand-text transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 sm:flex-initial touch-manipulation"
                 >
-                  <Archive className="h-4 w-4" />
+                  <Archive className="h-4 w-4 shrink-0" />
                   Archive
                 </button>
               </div>
@@ -842,13 +959,13 @@ export const EmailInbox: React.FC = () => {
 
             {/* Email Body or Reply Composer */}
             {showReplyComposer ? (
-              <div className="flex-1 overflow-y-auto p-6 min-h-0" style={{ maxHeight: 'calc(100vh - 250px)' }}>
-                <div className="bg-white dark:bg-gray-800 border border-brand-text/20 dark:border-gray-700 rounded-lg p-4">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
+                <div className="rounded-lg border border-brand-text/20 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-brand-text dark:text-white mb-2">
+                    <label className="mb-2 block text-sm font-medium text-brand-text dark:text-white">
                       To: {selectedEmail.from_name || selectedEmail.from}
                     </label>
-                    <label className="block text-sm font-medium text-brand-text dark:text-white mb-2">
+                    <label className="mb-2 block text-sm font-medium text-brand-text dark:text-white">
                       Subject: {selectedEmail.subject.startsWith('Re:') ? selectedEmail.subject : `Re: ${selectedEmail.subject}`}
                     </label>
                   </div>
@@ -856,22 +973,24 @@ export const EmailInbox: React.FC = () => {
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
                     placeholder="Type your reply..."
-                    className="w-full h-64 p-3 border border-brand-text/20 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-brand-text dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                    className="min-h-[200px] w-full rounded-lg border border-brand-text/20 bg-white p-3 text-base text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-primary dark:border-gray-700 dark:bg-gray-900 dark:text-white sm:min-h-[16rem] sm:text-sm"
                   />
-                  <div className="flex gap-2 mt-4">
+                  <div className="mt-4 flex flex-wrap gap-2">
                     <button
+                      type="button"
                       onClick={() => handleSendReply(selectedEmail)}
-                      className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 transition-colors"
+                      className="flex min-h-[44px] min-w-[44px] flex-1 items-center justify-center gap-2 rounded-lg bg-brand-primary px-4 py-2.5 text-white transition-colors hover:bg-brand-primary/90 sm:flex-initial touch-manipulation"
                     >
-                      <Send className="h-4 w-4 inline mr-2" />
+                      <Send className="h-4 w-4 shrink-0" />
                       Send
                     </button>
                     <button
+                      type="button"
                       onClick={() => {
                         setShowReplyComposer(false)
                         setReplyText('')
                       }}
-                      className="px-4 py-2 bg-white dark:bg-gray-800 border border-brand-text/20 dark:border-gray-700 text-brand-text dark:text-white rounded-lg hover:bg-brand-background/50 dark:hover:bg-gray-700 transition-colors"
+                      className="flex min-h-[44px] min-w-[44px] flex-1 items-center justify-center rounded-lg border border-brand-text/20 bg-white px-4 py-2.5 text-brand-text transition-colors hover:bg-brand-background/50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 sm:flex-initial touch-manipulation"
                     >
                       Cancel
                     </button>
@@ -879,7 +998,7 @@ export const EmailInbox: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto p-6 min-h-0" style={{ maxHeight: 'calc(100vh - 250px)' }}>
+              <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-4 sm:p-6">
                 {detailFetching && !displayBody ? (
                   <div className="flex items-center gap-2 text-brand-text/70 dark:text-gray-400 py-8">
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -940,7 +1059,7 @@ export const EmailInbox: React.FC = () => {
             )}
 
             {/* AI Assistant Panel */}
-            <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-6">
+            <div className="shrink-0 border-t border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50 sm:p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Sparkles className="h-5 w-5 text-brand-primary" />
                 <h4 className="font-semibold text-brand-text dark:text-white">AI Assistant</h4>
@@ -1024,9 +1143,10 @@ export const EmailInbox: React.FC = () => {
                       <div className="text-sm text-brand-text/80 dark:text-gray-300 whitespace-pre-wrap mb-3">
                         {aiAnalysis.suggested_reply}
                       </div>
-                      <button 
+                      <button
+                        type="button"
                         onClick={handleUseSuggestedReply}
-                        className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 transition-colors text-sm"
+                        className="min-h-[44px] rounded-lg bg-brand-primary px-4 py-2.5 text-sm text-white transition-colors hover:bg-brand-primary/90 touch-manipulation"
                       >
                         Use This Reply
                       </button>
@@ -1039,9 +1159,9 @@ export const EmailInbox: React.FC = () => {
                 </div>
               )}
             </div>
-          </>
+          </div>
         ) : (
-          <div className="flex items-center justify-center h-full">
+          <div className="flex min-h-[12rem] flex-1 items-center justify-center p-4">
             <EmptyState
               icon={Mail}
               title="Select an email"
