@@ -33,7 +33,6 @@ export const PublicChatbotWidget: React.FC = () => {
           const status = await window.Fikiri.validatePublicApiKey()
           if (status && status.valid === false) {
             if (import.meta.env.DEV) {
-              // eslint-disable-next-line no-console
               console.warn('[Fikiri] Chatbot API key invalid:', status.error_code, status.message)
             }
             return

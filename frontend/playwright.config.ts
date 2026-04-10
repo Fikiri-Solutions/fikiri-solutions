@@ -89,10 +89,28 @@ export default defineConfig({
     },
   ],
 
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:5174',
-    reuseExistingServer: true,
-    timeout: 120 * 1000,
-  },
+  // Start API + Vite so E2E has /api/auth/* (login, signup). Without Flask on :5000, setup fails with
+  // "Network Error" / stuck on /login. reuseExistingServer: reuse if you already have servers running.
+  webServer: [
+    {
+      command: 'python3 app.py',
+      cwd: '..',
+      url: 'http://localhost:5000/api/health',
+      reuseExistingServer: !process.env.CI,
+      timeout: 180 * 1000,
+      env: {
+        ...process.env,
+        PORT: process.env.PORT || process.env.BACKEND_PORT || '5000',
+        FLASK_ENV: process.env.FLASK_ENV || 'development',
+      },
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+    {
+      command: 'npm run dev',
+      url: 'http://localhost:5174',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120 * 1000,
+    },
+  ],
 });

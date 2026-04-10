@@ -54,8 +54,46 @@ from core.workflow_followups import schedule_follow_up, execute_due_follow_ups
 from core.workflow_documents import generate_document
 from core.tier_usage_caps import check_tier_usage_cap, record_monthly_usage
 from core.request_user_id import resolve_request_user_id
+from core.privacy_manager import privacy_manager, PrivacySettings, PrivacyConsent
 
 logger = logging.getLogger(__name__)
+
+
+def _serialize_privacy_settings(ps: PrivacySettings | None) -> dict | None:
+    if ps is None:
+        return None
+    return {
+        "id": ps.id,
+        "user_id": ps.user_id,
+        "data_retention_days": ps.data_retention_days,
+        "email_scanning_enabled": ps.email_scanning_enabled,
+        "personal_email_exclusion": ps.personal_email_exclusion,
+        "auto_labeling_enabled": ps.auto_labeling_enabled,
+        "lead_detection_enabled": ps.lead_detection_enabled,
+        "analytics_tracking_enabled": ps.analytics_tracking_enabled,
+        "created_at": ps.created_at.isoformat() if ps.created_at else None,
+        "updated_at": ps.updated_at.isoformat() if ps.updated_at else None,
+    }
+
+
+def _serialize_privacy_consent(c: PrivacyConsent) -> dict:
+    return {
+        "id": c.id,
+        "user_id": c.user_id,
+        "consent_type": c.consent_type,
+        "granted": c.granted,
+        "consent_text": c.consent_text,
+        "granted_at": c.granted_at.isoformat() if c.granted_at else None,
+        "revoked_at": c.revoked_at.isoformat() if c.revoked_at else None,
+    }
+
+
+def _ensure_privacy_settings_row(user_id: int) -> PrivacySettings | None:
+    ps = privacy_manager.get_privacy_settings(user_id)
+    if ps is not None:
+        return ps
+    privacy_manager.create_default_privacy_settings(user_id)
+    return privacy_manager.get_privacy_settings(user_id)
 
 # Create business blueprint
 business_bp = Blueprint("business_routes", __name__, url_prefix="/api")
@@ -1524,6 +1562,151 @@ def send_email():
     except Exception as e:
         logger.error(f"Send email error: {e}")
         return create_error_response("Failed to send email", 500, 'EMAIL_SEND_ERROR')
+
+
+@business_bp.route('/privacy/settings', methods=['GET'])
+@handle_api_errors
+def get_privacy_settings_route():
+    user_id = resolve_request_user_id(request, current_user_id=get_current_user_id(), allow_query=True)
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+    ps = _ensure_privacy_settings_row(user_id)
+    if not ps:
+        return create_error_response("Privacy settings unavailable", 500, 'PRIVACY_SETTINGS_ERROR')
+    return create_success_response(_serialize_privacy_settings(ps), "Privacy settings retrieved")
+
+
+@business_bp.route('/privacy/settings', methods=['PUT'])
+@handle_api_errors
+def update_privacy_settings_route():
+    user_id = get_current_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+    data = request.get_json() or {}
+    allowed = (
+        'data_retention_days',
+        'email_scanning_enabled',
+        'personal_email_exclusion',
+        'auto_labeling_enabled',
+        'lead_detection_enabled',
+        'analytics_tracking_enabled',
+    )
+    updates = {k: data[k] for k in allowed if k in data}
+    if not updates:
+        return create_error_response("No valid fields to update", 400, 'NO_UPDATES')
+    _ensure_privacy_settings_row(user_id)
+    result = privacy_manager.update_privacy_settings(user_id, **updates)
+    if not result.get('success'):
+        return create_error_response(
+            result.get('error', 'Update failed'),
+            400,
+            result.get('error_code', 'UPDATE_ERROR'),
+        )
+    settings = result.get('settings')
+    return create_success_response(
+        {'settings': _serialize_privacy_settings(settings)},
+        'Privacy settings updated',
+    )
+
+
+@business_bp.route('/privacy/data-summary', methods=['GET'])
+@handle_api_errors
+def get_privacy_data_summary_route():
+    user_id = resolve_request_user_id(request, current_user_id=get_current_user_id(), allow_query=True)
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+    _ensure_privacy_settings_row(user_id)
+    summary = privacy_manager.get_data_summary(user_id)
+    if not summary.get('success'):
+        return create_error_response(
+            summary.get('error', 'Failed to load summary'),
+            500,
+            summary.get('error_code', 'SUMMARY_ERROR'),
+        )
+    ds = summary['data_summary']
+    ps = ds.get('privacy_settings')
+    payload = {
+        'leads_count': ds['leads_count'],
+        'activities_count': ds['activities_count'],
+        'sync_records_count': ds['sync_records_count'],
+        'privacy_settings': _serialize_privacy_settings(ps) if isinstance(ps, PrivacySettings) else ps,
+        'consents': ds.get('consents'),
+    }
+    return create_success_response(payload, "Data summary retrieved")
+
+
+@business_bp.route('/privacy/consents', methods=['GET'])
+@handle_api_errors
+def get_privacy_consents_route():
+    user_id = resolve_request_user_id(request, current_user_id=get_current_user_id(), allow_query=True)
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+    rows = privacy_manager.get_privacy_consents(user_id)
+    return create_success_response(
+        {'consents': [_serialize_privacy_consent(c) for c in rows]},
+        "Consents retrieved",
+    )
+
+
+@business_bp.route('/privacy/cleanup', methods=['POST'])
+@handle_api_errors
+def privacy_cleanup_route():
+    user_id = get_current_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+    result = privacy_manager.cleanup_expired_data(user_id)
+    if not result.get('success'):
+        return create_error_response(
+            result.get('error', 'Cleanup failed'),
+            400,
+            result.get('error_code', 'CLEANUP_ERROR'),
+        )
+    return create_success_response(
+        {'total_deleted': result.get('total_deleted', 0), 'cleanup_results': result.get('cleanup_results')},
+        result.get('message', 'Cleanup completed'),
+    )
+
+
+@business_bp.route('/privacy/export', methods=['GET'])
+@handle_api_errors
+def privacy_export_route():
+    user_id = resolve_request_user_id(request, current_user_id=get_current_user_id(), allow_query=True)
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+    result = privacy_manager.export_user_data(user_id)
+    if not result.get('success'):
+        return create_error_response(
+            result.get('error', 'Export failed'),
+            500,
+            result.get('error_code', 'EXPORT_ERROR'),
+        )
+    export_data = result.get('export_data') or {}
+    try:
+        safe = json.loads(json.dumps(export_data, default=str))
+    except (TypeError, ValueError) as e:
+        logger.warning("Privacy export JSON fallback: %s", e)
+        safe = export_data
+    return create_success_response(safe, "Export ready")
+
+
+@business_bp.route('/privacy/delete', methods=['POST'])
+@handle_api_errors
+def privacy_delete_route():
+    user_id = get_current_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+    data = request.get_json() or {}
+    if data.get('confirmation') != 'DELETE_ALL_MY_DATA':
+        return create_error_response("Invalid confirmation phrase", 400, 'INVALID_CONFIRMATION')
+    result = privacy_manager.delete_user_data(user_id)
+    if not result.get('success'):
+        return create_error_response(
+            result.get('error', 'Deletion failed'),
+            500,
+            result.get('error_code', 'DELETION_ERROR'),
+        )
+    return create_success_response(result.get('deleted_records', {}), "User data deleted")
+
 
 @business_bp.route('/email/archive', methods=['POST'])
 @handle_api_errors

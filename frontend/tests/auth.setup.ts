@@ -140,11 +140,18 @@ setup('authenticate', async ({ page, request }) => {
     );
   }
 
-  try {
-    const healthCheck = await page.request.get(`${backendUrl}/api/health`, { timeout: 5000 });
-    if (!healthCheck.ok()) console.warn('⚠️ Backend health check failed. Tests may fail.');
-  } catch {
-    console.warn('⚠️ Backend not reachable. Make sure backend is running on', backendUrl);
+  if (process.env.E2E_ALLOW_NO_BACKEND === '1') {
+    console.warn('⚠️ E2E_ALLOW_NO_BACKEND=1 — skipping /api/health check (login/signup may still fail).');
+  } else {
+    const healthCheck = await page.request.get(`${backendUrl}/api/health`, { timeout: 60000 });
+    if (!healthCheck.ok()) {
+      throw new Error(
+        `Backend not healthy at ${backendUrl} (GET /api/health → ${healthCheck.status()}). ` +
+          'Playwright should start Flask via webServer in playwright.config.ts (python3 app.py from repo root). ' +
+          'Or run manually: PORT=5000 FLASK_ENV=development python3 app.py. ' +
+          'Set E2E_ALLOW_NO_BACKEND=1 only if you intentionally have no API.'
+      );
+    }
   }
 
   // Avoid stale auth state from previous runs.

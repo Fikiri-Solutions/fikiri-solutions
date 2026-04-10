@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import { Login } from '../pages/Login'
+import { AUTOCOMPLETE } from '../constants/autocomplete'
 import { AuthProvider } from '../contexts/AuthContext'
 import { QueryProvider } from '../providers/QueryProvider'
 import { ToastProvider } from '../components/Toast'
@@ -133,8 +134,8 @@ describe('Login Component', () => {
     const emailInput = screen.getByLabelText(/^email address$/i)
     const passwordInput = screen.getByLabelText(/^password$/i)
     
-    expect(emailInput).toHaveAttribute('autocomplete', 'username')
-    expect(passwordInput).toHaveAttribute('autocomplete', 'current-password')
+    expect(emailInput).toHaveAttribute('autocomplete', AUTOCOMPLETE.login.identifier)
+    expect(passwordInput).toHaveAttribute('autocomplete', AUTOCOMPLETE.login.password)
   })
 
   it('should have remember me checkbox', () => {
