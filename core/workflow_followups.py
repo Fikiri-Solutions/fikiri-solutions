@@ -13,7 +13,6 @@ from core.database_optimization import db_optimizer
 from core.automation_run_events import record_automation_cancelled
 from core.idempotency_manager import idempotency_manager
 from core.automation_safety import automation_safety_manager
-from core.oauth_token_manager import oauth_token_manager
 from core.sms_consent import lead_row_allows_sms
 from crm.service import enhanced_crm_service
 
@@ -147,14 +146,14 @@ def _send_sms(user_id: int, lead_id: Optional[int], to_phone: str, message: str)
 
 
 def _send_email(user_id: int, to_email: str, subject: str, body: str) -> Dict[str, Any]:
-    token_status = oauth_token_manager.get_token_status(user_id, "gmail")
-    if not token_status.get('success') or not token_status.get('has_token'):
-        logger.warning("Gmail token missing user_id=%s", user_id)
-        return {"success": False, "error": "Gmail connection required"}
-
     try:
         from integrations.gmail.gmail_client import gmail_client
-        gmail_service = gmail_client.get_gmail_service_for_user(user_id)
+
+        try:
+            gmail_service = gmail_client.get_gmail_service_for_user(user_id)
+        except RuntimeError as e:
+            logger.warning("Gmail token missing user_id=%s: %s", user_id, e)
+            return {"success": False, "error": "Gmail connection required"}
         message = {
             'raw': base64.urlsafe_b64encode(
                 f"To: {to_email}\r\n"

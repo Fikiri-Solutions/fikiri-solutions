@@ -241,6 +241,24 @@ class DatabaseOptimizer:
                 cursor.execute("ALTER TABLE leads ADD COLUMN withdrawn_at TIMESTAMP")
                 logger.info("✅ Added withdrawn_at column to leads table")
 
+            # Email sync: run before heavier migrations — if a later step fails, inbox queries still work.
+            cursor.execute("PRAGMA table_info(synced_emails)")
+            synced_email_columns = [row[1] for row in cursor.fetchall()]
+            if synced_email_columns:
+                if 'external_id' not in synced_email_columns:
+                    cursor.execute("ALTER TABLE synced_emails ADD COLUMN external_id TEXT")
+                    logger.info("✅ Added external_id column to synced_emails table")
+                if 'provider' not in synced_email_columns:
+                    cursor.execute(
+                        "ALTER TABLE synced_emails ADD COLUMN provider TEXT DEFAULT 'gmail'"
+                    )
+                    logger.info("✅ Added provider column to synced_emails table")
+                if 'is_read' not in synced_email_columns:
+                    cursor.execute(
+                        "ALTER TABLE synced_emails ADD COLUMN is_read BOOLEAN DEFAULT 0"
+                    )
+                    logger.info("✅ Added is_read column to synced_emails table")
+
             cursor.execute("PRAGMA table_info(crm_events)")
             crm_event_columns = [row[1] for row in cursor.fetchall()]
             if crm_event_columns:
@@ -304,17 +322,6 @@ class DatabaseOptimizer:
             if cf_columns and 'metadata' not in cf_columns:
                 cursor.execute("ALTER TABLE conversation_feedback ADD COLUMN metadata TEXT")
                 logger.info("✅ Added metadata column to conversation_feedback")
-
-            # Email sync: ensure synced_emails has required columns for inbox and metrics
-            cursor.execute("PRAGMA table_info(synced_emails)")
-            synced_email_columns = [row[1] for row in cursor.fetchall()]
-            if synced_email_columns:
-                if 'external_id' not in synced_email_columns:
-                    cursor.execute("ALTER TABLE synced_emails ADD COLUMN external_id TEXT")
-                    logger.info("✅ Added external_id column to synced_emails table")
-                if 'is_read' not in synced_email_columns:
-                    cursor.execute("ALTER TABLE synced_emails ADD COLUMN is_read BOOLEAN DEFAULT 0")
-                    logger.info("✅ Added is_read column to synced_emails table")
         except Exception as e:
             logger.warning(f"Migration warning: {e}")
 

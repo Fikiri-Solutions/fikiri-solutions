@@ -13,7 +13,6 @@ from core.database_optimization import db_optimizer
 from core.idempotency_manager import idempotency_manager
 from core.automation_safety import automation_safety_manager
 from crm.service import enhanced_crm_service
-from core.oauth_token_manager import oauth_token_manager
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +25,14 @@ REMINDER_2H_WINDOW_END_HOURS = 3
 # Email sending (simple implementation - can be replaced with proper email service)
 def send_appointment_reminder_email(user_id: int, to_email: str, appointment: Dict, hours_before: int) -> Dict[str, Any]:
     """Send appointment reminder email via Gmail integration."""
-    token_status = oauth_token_manager.get_token_status(user_id, "gmail")
-    if not token_status.get('success') or not token_status.get('has_token'):
-        logger.warning("Gmail token missing user_id=%s", user_id)
-        return {"success": False, "error": "Gmail connection required"}
-
     try:
         from integrations.gmail.gmail_client import gmail_client
-        gmail_service = gmail_client.get_gmail_service_for_user(user_id)
+
+        try:
+            gmail_service = gmail_client.get_gmail_service_for_user(user_id)
+        except RuntimeError as e:
+            logger.warning("Gmail token missing user_id=%s: %s", user_id, e)
+            return {"success": False, "error": "Gmail connection required"}
         subject = f"Appointment reminder ({hours_before}h)"
         body = (
             f"Hi there,\n\n"

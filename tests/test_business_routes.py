@@ -322,11 +322,13 @@ class TestBusinessRoutes(unittest.TestCase):
         )
         self.assertEqual(response2.status_code, 400)
 
-    @patch("routes.business.oauth_token_manager")
+    @patch("integrations.gmail.gmail_client.gmail_client")
     @patch("routes.business.get_current_user_id")
-    def test_send_email_requires_gmail_connection(self, mock_get_user, mock_oauth):
+    def test_send_email_requires_gmail_connection(self, mock_get_user, mock_gmail_client):
         mock_get_user.return_value = 1
-        mock_oauth.get_token_status.return_value = {"success": False, "has_token": False}
+        mock_gmail_client.get_gmail_service_for_user.side_effect = RuntimeError(
+            "No valid Gmail credentials for user 1"
+        )
         response = self.client.post(
             "/api/email/send",
             json={"to": "a@b.com", "subject": "Hi", "body": "Test"},
@@ -335,11 +337,9 @@ class TestBusinessRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
 
     @patch("integrations.gmail.gmail_client.gmail_client")
-    @patch("routes.business.oauth_token_manager")
     @patch("routes.business.get_current_user_id")
-    def test_send_email_success(self, mock_get_user, mock_oauth, mock_gmail_client):
+    def test_send_email_success(self, mock_get_user, mock_gmail_client):
         mock_get_user.return_value = 1
-        mock_oauth.get_token_status.return_value = {"success": True, "has_token": True}
         gmail_service = MagicMock()
         gmail_service.users().messages().send().execute.return_value = {"id": "m1", "threadId": "t1"}
         mock_gmail_client.get_gmail_service_for_user.return_value = gmail_service
@@ -400,6 +400,23 @@ class TestBusinessRoutes(unittest.TestCase):
         data = response.get_json()
         self.assertTrue(data.get("success"))
         self.assertEqual(data.get("data", {}).get("email_id"), "m1")
+
+    @patch("integrations.gmail.gmail_client.gmail_client")
+    @patch("routes.business.get_current_user_id")
+    def test_mark_email_read_success(self, mock_get_user, mock_gmail_client):
+        mock_get_user.return_value = 1
+        gmail_service = MagicMock()
+        gmail_service.users().messages().modify().execute.return_value = {}
+        mock_gmail_client.get_gmail_service_for_user.return_value = gmail_service
+        response = self.client.post(
+            "/api/email/mark-read",
+            json={"email_id": "m1"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data.get("success"))
+        self.assertEqual(data.get("data", {}).get("read"), True)
 
     # --- IMAP/SMTP config (GET /api/email/imap-config, POST /api/email/imap-config) ---
     @patch("routes.business.get_current_user_id")

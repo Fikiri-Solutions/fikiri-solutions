@@ -36,6 +36,10 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# One process-wide warning instead of N lines when multiple queues init without Redis.
+_missing_redis_queue_client_logged = False
+
+
 class JobStatus(Enum):
     """Job status enumeration"""
     PENDING = "pending"
@@ -84,8 +88,18 @@ class RedisQueue:
             self.redis_client = get_redis_client(decode_responses=True, db=redis_db)
             if self.redis_client:
                 self.redis_client.ping()
-            logger.info(f"✅ Redis queue '{self.queue_name}' connected")
-            
+                logger.info("✅ Redis queue '%s' connected", self.queue_name)
+            else:
+                global _missing_redis_queue_client_logged
+                if not _missing_redis_queue_client_logged:
+                    _missing_redis_queue_client_logged = True
+                    logger.warning(
+                        "⚠️ Redis job queues have no backing client (Redis unavailable; "
+                        "named queues include %s — ops will fail or use fallbacks)",
+                        self.queue_name,
+                    )
+                else:
+                    logger.debug("Redis queue '%s' has no client", self.queue_name)
         except Exception as e:
             logger.error(f"❌ Redis queue connection failed: {e}")
             self.redis_client = None

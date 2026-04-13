@@ -72,13 +72,38 @@ class SchemaValidator:
     def _validate_type(self, value: Any, field_schema: Dict[str, Any]) -> bool:
         """Validate a single value against field schema."""
         expected_type = field_schema.get('type')
-        
+
+        # LLMs often emit null for optional fields; treat as valid for non-boolean scalars
+        if value is None and expected_type != 'boolean':
+            return True
+
         if expected_type == 'string':
-            return isinstance(value, str)
+            if isinstance(value, str):
+                return True
+            # Models often emit numbers for phone, budget, etc.
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                return True
+            return False
         elif expected_type == 'integer':
-            return isinstance(value, int)
+            if isinstance(value, int) and not isinstance(value, bool):
+                return True
+            if isinstance(value, str) and value.strip():
+                try:
+                    int(value.strip())
+                    return True
+                except ValueError:
+                    return False
+            return False
         elif expected_type == 'number':
-            return isinstance(value, (int, float))
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                return True
+            if isinstance(value, str) and value.strip():
+                try:
+                    float(value.strip())
+                    return True
+                except ValueError:
+                    return False
+            return False
         elif expected_type == 'boolean':
             return isinstance(value, bool)
         elif expected_type == 'array':

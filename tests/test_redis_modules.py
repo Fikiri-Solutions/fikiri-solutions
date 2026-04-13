@@ -37,6 +37,19 @@ class TestRedisConnectionHelper:
         from core.redis_connection_helper import _is_test_mode
         assert _is_test_mode() is True
 
+    def test_normalize_rediss_url_tls_sets_ssl_cert_reqs_none(self):
+        """Duplicate ssl_cert_reqs in URL: redis-py keeps the first; normalize must replace."""
+        from core.redis_connection_helper import _normalize_rediss_url_tls
+        from redis.connection import parse_url
+
+        raw = "rediss://default:pass@host.example:6379?ssl_cert_reqs=required"
+        fixed = _normalize_rediss_url_tls(raw)
+        assert parse_url(fixed)["ssl_cert_reqs"] == "none"
+
+        dup = "rediss://default:pass@host.example:6379?ssl_cert_reqs=required&ssl_cert_reqs=none"
+        assert parse_url(dup)["ssl_cert_reqs"] == "required"
+        assert parse_url(_normalize_rediss_url_tls(dup))["ssl_cert_reqs"] == "none"
+
     @patch("core.redis_connection_helper.get_redis_client")
     def test_is_redis_available_false_when_client_none(self, mock_get_client):
         mock_get_client.return_value = None

@@ -12,7 +12,6 @@ import io
 import csv
 import json
 import re
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 # Import business logic modules
@@ -57,6 +56,17 @@ from core.request_user_id import resolve_request_user_id
 from core.privacy_manager import privacy_manager, PrivacySettings, PrivacyConsent
 
 logger = logging.getLogger(__name__)
+
+
+def _plain_email_snippet(text, max_len: int = 160):
+    """Strip HTML for API list snippets so clients do not show raw <!DOCTYPE in previews."""
+    if not text:
+        return ""
+    t = re.sub(r"<[^>]+>", " ", str(text))
+    t = re.sub(r"\s+", " ", t).strip()
+    if len(t) > max_len:
+        return t[:max_len].rstrip() + "…"
+    return t
 
 
 def _serialize_privacy_settings(ps: PrivacySettings | None) -> dict | None:
@@ -963,29 +973,21 @@ def _gmail_full_message_to_email_dict(msg_detail, gmail_message_id):
     """Full parse for body + embedded-image proxy URLs (Gmail format=full)."""
     import base64
 
+    from core.gmail_inline_images import (
+        extract_embedded_image_map,
+        rewrite_html_cid_to_proxy_urls,
+    )
+
     headers = msg_detail['payload'].get('headers', [])
     subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
     from_header = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown')
     date = next((h['value'] for h in headers if h['name'] == 'Date'), '')
     body_html = ''
     body_text = ''
-    embedded_images = {}
 
     def extract_from_part(part):
-        nonlocal body_html, body_text, embedded_images
+        nonlocal body_html, body_text
         mime_type = part.get('mimeType', '')
-        ph = part.get('headers', [])
-        content_id = None
-        for header in ph:
-            if header.get('name', '').lower() == 'content-id':
-                content_id = header.get('value', '').strip('<>')
-                break
-        if content_id and part.get('body', {}).get('attachmentId'):
-            embedded_images[content_id] = {
-                'attachment_id': part['body']['attachmentId'],
-                'mime_type': mime_type,
-                'filename': part.get('filename', ''),
-            }
         if mime_type == 'text/html':
             data = part.get('body', {}).get('data', '')
             if data and not body_html:
@@ -1010,24 +1012,12 @@ def _gmail_full_message_to_email_dict(msg_detail, gmail_message_id):
             extract_from_part(part)
     else:
         extract_from_part(payload)
+    embedded_images = extract_embedded_image_map(payload)
     body = body_html if body_html else body_text
     if body_html and embedded_images:
-        for cid, img_info in embedded_images.items():
-            proxy_url = f"/api/business/email/{gmail_message_id}/embedded-image/{img_info['attachment_id']}"
-            cid_escaped = re.escape(cid.strip('<>'))
-            body = re.sub(
-                rf'src=["\']cid:{cid_escaped}["\']',
-                f'src="{proxy_url}"',
-                body,
-                flags=re.IGNORECASE,
-            )
-            body = re.sub(rf'cid:{cid_escaped}', proxy_url, body, flags=re.IGNORECASE)
-            body = re.sub(
-                rf'src=["\']{cid_escaped}["\']',
-                f'src="{proxy_url}"',
-                body,
-                flags=re.IGNORECASE,
-            )
+        body = rewrite_html_cid_to_proxy_urls(body_html, gmail_message_id, embedded_images)
+    elif body_html:
+        body = body_html
     return {
         'id': msg_detail.get('id', gmail_message_id),
         'subject': subject,
@@ -1070,51 +1060,77 @@ def get_emails():
         # Try to use synced emails first if requested and available
         if use_synced:
             try:
+                # Apply unread/read in SQL so LIMIT returns that many matching rows (not fewer after Python filter).
+                label_filter_sql = ""
+                label_params = ()
+                if filter_type == 'unread':
+                    label_filter_sql = " AND labels LIKE ?"
+                    label_params = ('%UNREAD%',)
+                elif filter_type == 'read':
+                    label_filter_sql = " AND (labels IS NULL OR labels = '' OR labels NOT LIKE ?)"
+                    label_params = ('%UNREAD%',)
+
                 # List without full body: SUBSTR only (less I/O + smaller payloads). Tests may mock `body` without body_preview.
                 if include_body:
                     synced_sql = """
-                        SELECT COALESCE(external_id, gmail_id) as email_id, provider, subject, sender, recipient, date, body, labels
+                        SELECT COALESCE(external_id, gmail_id) as email_id, provider, subject, sender, recipient, date, body, labels, is_read
                         FROM synced_emails
-                        WHERE user_id = ?
+                        WHERE user_id = ?""" + label_filter_sql + """
                         ORDER BY date DESC
                         LIMIT ? OFFSET ?
                     """
                 else:
                     synced_sql = """
                         SELECT COALESCE(external_id, gmail_id) as email_id, provider, subject, sender, recipient, date,
-                               SUBSTR(COALESCE(body, ''), 1, 500) as body_preview, labels
+                               SUBSTR(COALESCE(body, ''), 1, 500) as body_preview, labels, is_read
                         FROM synced_emails
-                        WHERE user_id = ?
+                        WHERE user_id = ?""" + label_filter_sql + """
                         ORDER BY date DESC
                         LIMIT ? OFFSET ?
                     """
-                synced_emails_data = db_optimizer.execute_query(synced_sql, (user_id, limit, offset))
+                synced_params = (user_id,) + label_params + (limit, offset)
+                synced_emails_data = db_optimizer.execute_query(synced_sql, synced_params)
 
                 if synced_emails_data and len(synced_emails_data) > 0:
                     emails = []
-                    for email_row in synced_emails_data:
-                        labels = json.loads(email_row.get('labels', '[]')) if email_row.get('labels') else []
-                        is_unread = 'UNREAD' not in labels  # Inverted: if UNREAD is not in labels, it's read
+                    count_sql = (
+                        "SELECT COUNT(*) as total FROM synced_emails WHERE user_id = ?" + label_filter_sql
+                    )
+                    total_count_result = db_optimizer.execute_query(
+                        count_sql, (user_id,) + label_params
+                    )
+                    total_count = total_count_result[0]['total'] if total_count_result else 0
 
-                        # Apply filter
-                        if filter_type == 'unread' and is_unread:
-                            continue
-                        if filter_type == 'read' and not is_unread:
-                            continue
+                    for email_row in synced_emails_data:
+                        labels: list = []
+                        raw_labels = email_row.get('labels')
+                        if raw_labels:
+                            try:
+                                labels = json.loads(raw_labels) if isinstance(raw_labels, str) else list(raw_labels)
+                            except (json.JSONDecodeError, TypeError):
+                                labels = []
+                        if not isinstance(labels, list):
+                            labels = []
+                        # Prefer Gmail label list; if missing/empty, fall back to is_read (sync / mark-read)
+                        if labels:
+                            unread = 'UNREAD' in labels
+                        else:
+                            ir = email_row.get('is_read')
+                            unread = not bool(ir) if ir is not None else False
 
                         email_id = email_row.get('email_id') or email_row.get('gmail_id')
                         provider = email_row.get('provider', 'gmail')
 
                         if include_body:
                             raw_body = email_row.get('body') or ''
-                            snippet = (raw_body or '')[:100]
+                            snippet = _plain_email_snippet(raw_body, 160)
                             out_body = raw_body
                         else:
                             preview = email_row.get('body_preview')
                             if preview is None:
                                 preview = (email_row.get('body') or '')[:500]
                             preview = preview or ''
-                            snippet = preview[:100]
+                            snippet = _plain_email_snippet(preview, 160)
                             out_body = ''
 
                         emails.append({
@@ -1126,19 +1142,12 @@ def get_emails():
                             'date': email_row.get('date', ''),
                             'snippet': snippet,
                             'body': out_body,
-                            'unread': not is_unread,  # Inverted logic
+                            'unread': unread,
                             'has_attachments': False,  # Not stored in synced_emails
                             'thread_id': None  # Not stored in synced_emails
                         })
                     
                     if emails:
-                        # Get total count for pagination metadata
-                        total_count_result = db_optimizer.execute_query(
-                            "SELECT COUNT(*) as total FROM synced_emails WHERE user_id = ?",
-                            (user_id,)
-                        )
-                        total_count = total_count_result[0]['total'] if total_count_result else 0
-                        
                         return create_success_response({
                             'emails': emails, 
                             'source': 'synced',
@@ -1165,12 +1174,13 @@ def get_emails():
                 logger.info(f"Gmail not connected for user {user_id}: {e}")
                 return create_success_response({'emails': [], 'message': 'Gmail not connected. Please connect your Gmail account first.'}, 'No emails available')
             
-            # Build query based on filter
-            query = ''
+            # Match Gmail's Inbox tab: scope to in:inbox, then read/unread (same as Gmail UI)
             if filter_type == 'unread':
-                query = 'is:unread'
+                query = 'in:inbox is:unread'
             elif filter_type == 'read':
-                query = 'is:read'
+                query = 'in:inbox is:read'
+            else:
+                query = 'in:inbox'
             
             # Get messages with pagination (rulepack compliance: Gmail API uses pageToken for pagination)
             # Note: Gmail API doesn't support offset directly, but we can use pageToken
@@ -1202,15 +1212,14 @@ def get_emails():
                         logger.warning("Gmail metadata fetch failed for %s: %s", mid, e)
                         return None
 
+                # Sequential fetches: google-api-python-client / httplib2 are not reliably thread-safe;
+                # parallel calls caused SSL errors and process crashes on some environments.
                 by_id = {}
                 if messages:
-                    max_workers = min(8, max(1, len(messages)))
-                    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-                        future_map = {pool.submit(_fetch_metadata, m['id']): m['id'] for m in messages}
-                        for fut in as_completed(future_map):
-                            md = fut.result()
-                            if md and md.get('id'):
-                                by_id[md['id']] = _gmail_metadata_message_to_email_dict(md)
+                    for m in messages:
+                        md = _fetch_metadata(m["id"])
+                        if md and md.get("id"):
+                            by_id[md["id"]] = _gmail_metadata_message_to_email_dict(md)
                 for m in messages:
                     row = by_id.get(m['id'])
                     if row:
@@ -1267,7 +1276,7 @@ def get_email_message_detail(email_id):
 
         rows = db_optimizer.execute_query(
             """
-            SELECT COALESCE(external_id, gmail_id) as email_id, provider, subject, sender, recipient, date, body, labels
+            SELECT COALESCE(external_id, gmail_id) as email_id, provider, subject, sender, recipient, date, body, labels, is_read
             FROM synced_emails
             WHERE user_id = ? AND (external_id = ? OR gmail_id = ?)
             LIMIT 1
@@ -1275,11 +1284,24 @@ def get_email_message_detail(email_id):
             (user_id, email_id, email_id),
         )
         if rows:
+            from core.gmail_inline_images import fix_legacy_embedded_image_api_paths
+
             email_row = rows[0]
-            labels = json.loads(email_row.get('labels', '[]')) if email_row.get('labels') else []
-            is_unread = 'UNREAD' not in labels
+            labels: list = []
+            if email_row.get('labels'):
+                try:
+                    labels = json.loads(email_row['labels']) if isinstance(email_row['labels'], str) else list(email_row['labels'])
+                except (json.JSONDecodeError, TypeError):
+                    labels = []
+            if not isinstance(labels, list):
+                labels = []
+            if labels:
+                detail_unread = 'UNREAD' in labels
+            else:
+                ir = email_row.get('is_read')
+                detail_unread = not bool(ir) if ir is not None else False
             eid = email_row.get('email_id')
-            raw_body = email_row.get('body') or ''
+            raw_body = fix_legacy_embedded_image_api_paths(email_row.get('body') or '')
             email = {
                 'id': eid,
                 'provider': email_row.get('provider', 'gmail'),
@@ -1289,9 +1311,9 @@ def get_email_message_detail(email_id):
                 if '<' in email_row.get('sender', '')
                 else email_row.get('sender', 'Unknown'),
                 'date': email_row.get('date', ''),
-                'snippet': raw_body[:200] if raw_body else '',
+                'snippet': _plain_email_snippet(raw_body, 200),
                 'body': raw_body,
-                'unread': not is_unread,
+                'unread': detail_unread,
                 'has_attachments': False,
                 'thread_id': None,
             }
@@ -1506,58 +1528,73 @@ def send_email():
         if tier_limit_error:
             return tier_limit_error
 
-        # Check Gmail connection
-        token_status = oauth_token_manager.get_token_status(user_id, "gmail")
-        if not token_status.get('success') or not token_status.get('has_token'):
-            return create_error_response("Gmail connection required. Please connect your Gmail account first.", 403, 'GMAIL_NOT_CONNECTED')
+        # Gmail OAuth tokens live in gmail_tokens (gmail_client). Do not gate on oauth_tokens alone.
+        from integrations.gmail.gmail_client import gmail_client
+        import base64
 
-        # Get Gmail service for user
         try:
-            from integrations.gmail.gmail_client import gmail_client
-            import base64
-            
             gmail_service = gmail_client.get_gmail_service_for_user(user_id)
-            
-            # Create email message
+        except RuntimeError as e:
+            logger.error(
+                "Send email: cannot build Gmail service for user %s: %s",
+                user_id,
+                e,
+                exc_info=True,
+            )
+            return create_error_response(
+                "Gmail connection required. Please connect your Gmail account first.",
+                403,
+                "GMAIL_NOT_CONNECTED",
+            )
+
+        try:
             message = {
-                'raw': base64.urlsafe_b64encode(
+                "raw": base64.urlsafe_b64encode(
                     f"To: {to_email}\r\n"
                     f"Subject: {subject}\r\n"
                     f"Content-Type: text/plain; charset=UTF-8\r\n"
                     f"\r\n"
-                    f"{body}".encode('utf-8')
-                ).decode('utf-8')
+                    f"{body}".encode("utf-8")
+                ).decode("utf-8")
             }
-            
-            # Send message
-            sent_message = gmail_service.users().messages().send(
-                userId='me', body=message
-            ).execute()
+
+            sent_message = (
+                gmail_service.users().messages().send(userId="me", body=message).execute()
+            )
             record_monthly_usage(user_id, "email_processing", 1, db=db_optimizer)
-            
+
             return create_success_response(
                 {
-                    'message_id': sent_message.get('id'),
-                    'thread_id': sent_message.get('threadId'),
-                    'to': to_email,
-                    'subject': subject
+                    "message_id": sent_message.get("id"),
+                    "thread_id": sent_message.get("threadId"),
+                    "to": to_email,
+                    "subject": subject,
                 },
-                'Email sent successfully'
+                "Email sent successfully",
             )
-            
-        except ImportError as e:
-            logger.error(f"Gmail client not available: {e}")
-            return create_error_response("Gmail service not available. Please ensure Google API libraries are installed.", 500, 'GMAIL_SERVICE_UNAVAILABLE')
-        except RuntimeError as e:
-            logger.error(f"Gmail service creation failed: {e}")
-            return create_error_response(f"Gmail connection error: {str(e)}. Please reconnect your Gmail account.", 500, 'GMAIL_CONNECTION_ERROR')
+
         except Exception as e:
-            logger.error(f"Failed to send email: {e}", exc_info=True)
-            # Provide user-friendly error message
+            logger.error("Failed to send email (user_id=%s): %s", user_id, e, exc_info=True)
             error_msg = str(e)
             if "invalid_grant" in error_msg.lower() or "token" in error_msg.lower():
-                return create_error_response("Gmail authentication expired. Please reconnect your Gmail account.", 401, 'GMAIL_AUTH_EXPIRED')
-            return create_error_response(f"Failed to send email: {error_msg}", 500, 'EMAIL_SEND_ERROR')
+                return create_error_response(
+                    "Gmail authentication expired. Please reconnect your Gmail account.",
+                    401,
+                    "GMAIL_AUTH_EXPIRED",
+                )
+            # Google API often returns HttpError with .status / .reason
+            status = getattr(e, "status_code", None) or getattr(
+                getattr(e, "resp", None), "status", None
+            )
+            if status == 403:
+                return create_error_response(
+                    "Gmail refused to send (403). Check account permissions or reconnect Gmail.",
+                    403,
+                    "GMAIL_SEND_FORBIDDEN",
+                )
+            return create_error_response(
+                f"Failed to send email: {error_msg}", 500, "EMAIL_SEND_ERROR"
+            )
             
     except Exception as e:
         logger.error(f"Send email error: {e}")
@@ -1771,6 +1808,92 @@ def archive_email():
     except Exception as e:
         logger.error(f"Archive email error: {e}")
         return create_error_response("Failed to archive email", 500, 'EMAIL_ARCHIVE_ERROR')
+
+
+@business_bp.route('/email/mark-read', methods=['POST'])
+@handle_api_errors
+def mark_email_read():
+    """Mark a message as read in Gmail (remove UNREAD label) and update local synced_emails if present."""
+    try:
+        user_id = get_current_user_id()
+        if not user_id:
+            data = request.get_json() or {}
+            user_id_raw = data.get('user_id')
+            if user_id_raw:
+                try:
+                    user_id = int(user_id_raw)
+                except (ValueError, TypeError):
+                    user_id = None
+            if user_id:
+                user_check = db_optimizer.execute_query(
+                    "SELECT id FROM users WHERE id = ? AND is_active = 1 LIMIT 1",
+                    (user_id,),
+                )
+                if not user_check:
+                    return create_error_response("Invalid user ID", 401, 'INVALID_USER_ID')
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+        data = request.get_json() or {}
+        email_id = data.get('email_id')
+        if not email_id:
+            return create_error_response("Email ID is required", 400, 'MISSING_EMAIL_ID')
+
+        try:
+            from integrations.gmail.gmail_client import gmail_client
+
+            gmail_service = gmail_client.get_gmail_service_for_user(user_id)
+            gmail_service.users().messages().modify(
+                userId='me',
+                id=email_id,
+                body={'removeLabelIds': ['UNREAD']},
+            ).execute()
+        except ImportError as e:
+            logger.error(f"Gmail client not available: {e}")
+            return create_error_response("Gmail service not available", 500, 'GMAIL_SERVICE_UNAVAILABLE')
+        except RuntimeError as e:
+            logger.error(f"Gmail service creation failed: {e}")
+            return create_error_response(f"Gmail connection error: {str(e)}", 500, 'GMAIL_CONNECTION_ERROR')
+        except Exception as e:
+            logger.error(f"Failed to mark email read: {e}")
+            return create_error_response(f"Failed to mark email read: {str(e)}", 500, 'EMAIL_MARK_READ_ERROR')
+
+        rows = db_optimizer.execute_query(
+            """
+            SELECT labels FROM synced_emails
+            WHERE user_id = ? AND (external_id = ? OR gmail_id = ?) AND COALESCE(provider, 'gmail') = 'gmail'
+            LIMIT 1
+            """,
+            (user_id, email_id, email_id),
+        )
+        if rows:
+            raw = rows[0].get('labels') or '[]'
+            try:
+                labels = json.loads(raw) if isinstance(raw, str) else list(raw)
+            except (json.JSONDecodeError, TypeError):
+                labels = []
+            if not isinstance(labels, list):
+                labels = []
+            labels = [x for x in labels if x != 'UNREAD']
+            db_optimizer.execute_query(
+                """
+                UPDATE synced_emails
+                SET labels = ?, is_read = 1
+                WHERE user_id = ? AND (external_id = ? OR gmail_id = ?)
+                """,
+                (json.dumps(labels), user_id, email_id, email_id),
+                fetch=False,
+            )
+
+        logger.info("Marked email %s as read for user %s", email_id, user_id)
+        return create_success_response(
+            {'email_id': email_id, 'read': True},
+            'Email marked as read',
+        )
+    except Exception as e:
+        logger.error(f"Mark read error: {e}")
+        return create_error_response("Failed to mark email read", 500, 'EMAIL_MARK_READ_ERROR')
+
 
 # Automation Routes
 @business_bp.route('/automation/rules', methods=['GET'])

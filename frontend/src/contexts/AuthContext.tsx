@@ -188,6 +188,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('fikiri-user')
       localStorage.removeItem('fikiri-user-id')
+      localStorage.removeItem('fikiri-token')
+      localStorage.removeItem('fikiri-refresh-token')
       localStorage.removeItem('fikiri-onboarding-data')
       localStorage.removeItem('fikiri-onboarding-completed')
       localStorage.removeItem('fikiri-remember-email')
@@ -396,6 +398,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             if (accessToken) {
               localStorage.setItem('fikiri-token', accessToken)
             }
+            const refreshTok = (data.data as { refresh_token?: string })?.refresh_token
+            if (refreshTok) {
+              localStorage.setItem('fikiri-refresh-token', refreshTok)
+            }
             
             console.log('✅ Saved to localStorage:', {
               userId: user.id,
@@ -498,14 +504,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (data.success) {
         const user = data.data?.user
-        const tokens = data.data?.tokens
-        
+        const tokens = data.data?.tokens as
+          | { access_token?: string; refresh_token?: string }
+          | undefined
+
         // Store user data and tokens (only in browser)
         if (typeof window !== 'undefined') {
           localStorage.setItem('fikiri-user', JSON.stringify(user))
           localStorage.setItem('fikiri-user-id', user.id.toString())
           if (tokens && tokens.access_token) {
             localStorage.setItem('fikiri-token', tokens.access_token)
+          }
+          if (tokens?.refresh_token) {
+            localStorage.setItem('fikiri-refresh-token', tokens.refresh_token)
           }
         }
         

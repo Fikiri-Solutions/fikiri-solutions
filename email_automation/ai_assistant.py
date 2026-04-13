@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 # Contact extraction: keep local until Phase 2 (ExtractedContact in core/domain/schemas.py)
 CONTACT_SCHEMA = {
     "type": "object",
-    "required": ["phone", "company", "website", "location", "budget", "timeline"],
+    # LLMs often omit or null fields; normalize_extracted_contact handles downstream
+    "required": [],
     "properties": {
         "phone": {"type": "string"},
         "company": {"type": "string"},

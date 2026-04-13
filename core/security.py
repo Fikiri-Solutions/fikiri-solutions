@@ -45,8 +45,21 @@ def resolve_flask_limiter_storage_uri() -> str:
     """
     Storage URI for Flask-Limiter (shared with limits library).
     Prefer Redis when REDIS_URL resolves and a client can connect; else memory://.
-    No logging — safe to call at app module import time.
+
+    In development/test, default to memory:// so a bad or unreachable REDIS_URL (DNS/auth)
+    cannot 500 every request via Flask-Limiter's before_request. Opt into Redis in dev with
+    FLASK_LIMITER_USE_REDIS=1. Force memory in any environment with FIKIRI_LIMITER_MEMORY=1.
     """
+    if os.getenv("FIKIRI_LIMITER_MEMORY", "").strip().lower() in ("1", "true", "yes"):
+        return "memory://"
+    env = os.getenv("FLASK_ENV", "").lower()
+    use_redis_explicit = os.getenv("FLASK_LIMITER_USE_REDIS", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if env in ("development", "test") and not use_redis_explicit:
+        return "memory://"
     try:
         try:
             from core.redis_connection_helper import _resolve_redis_url
@@ -60,7 +73,12 @@ def resolve_flask_limiter_storage_uri() -> str:
             try:
                 from core.redis_connection_helper import get_redis_client
 
-                if get_redis_client(decode_responses=True, db=0):
+                client = get_redis_client(decode_responses=True, db=0)
+                if client:
+                    try:
+                        client.ping()
+                    except Exception:
+                        return "memory://"
                     return redis_url
             except Exception:
                 pass

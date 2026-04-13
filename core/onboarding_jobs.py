@@ -386,48 +386,44 @@ def extract_name_from_address(address: str) -> Optional[str]:
         return None
 
 def upsert_lead(user_id: int, lead_data: Dict[str, Any]) -> bool:
-    """Create or update lead in CRM"""
+    """Create or update lead in CRM. Merges on (user_id, email); email is unique per user."""
     try:
         from core.database_optimization import db_optimizer
-        
-        # Check if lead already exists
-        existing = db_optimizer.execute_query(
-            "SELECT id FROM leads WHERE user_id = ? AND external_id = ?",
-            (user_id, lead_data.get("external_id"))
-        )
-        
-        if existing:
-            # Update existing lead
-            db_optimizer.execute_query("""
-                UPDATE leads 
-                SET email = ?, name = ?, subject = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE user_id = ? AND external_id = ?
-            """, (
-                lead_data["email"],
-                lead_data.get("name", ""),
-                lead_data.get("subject", ""),
+
+        raw_email = lead_data.get("email") or ""
+        email_norm = raw_email.strip().lower()
+        if not email_norm:
+            return False
+
+        # Single-statement upsert avoids TOCTOU when many messages share the same sender.
+        db_optimizer.execute_query(
+            """
+            INSERT INTO leads
+            (user_id, email, name, subject, source, external_id, stage,
+             created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id, email) DO UPDATE SET
+                name = excluded.name,
+                subject = excluded.subject,
+                external_id = excluded.external_id,
+                source = excluded.source,
+                stage = excluded.stage,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
                 user_id,
-                lead_data.get("external_id")
-            ), fetch=False)
-        else:
-            # Create new lead
-            db_optimizer.execute_query("""
-                INSERT INTO leads 
-                (user_id, email, name, subject, source, external_id, stage, 
-                 created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            """, (
-                user_id,
-                lead_data["email"],
+                email_norm,
                 lead_data.get("name", ""),
                 lead_data.get("subject", ""),
                 lead_data.get("source", "gmail"),
                 lead_data.get("external_id"),
-                lead_data.get("stage", "new")
-            ), fetch=False)
-        
+                lead_data.get("stage", "new"),
+            ),
+            fetch=False,
+        )
+
         return True
-        
+
     except Exception as e:
         logger.error(f"❌ Failed to upsert lead: {e}")
         return False

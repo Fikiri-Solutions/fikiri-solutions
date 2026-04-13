@@ -9,7 +9,7 @@ import os
 import logging
 import threading
 from typing import Dict, Optional, Tuple
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +17,8 @@ _cache_lock = threading.Lock()
 # Reuse clients per (decode_responses, db) — avoids new TCP + INFO spam on every /api/health poll.
 _redis_client_cache: Dict[Tuple[bool, int], "redis.Redis"] = {}
 _connection_info_logged: set = set()
+# After the first failed connect/auth for a given target, skip retries and duplicate ERROR logs (import-time fan-out).
+_redis_failed_for_identity: Optional[str] = None
 
 # Optional Redis integration
 try:
@@ -25,6 +27,25 @@ try:
 except ImportError:
     REDIS_AVAILABLE = False
     redis = None
+
+
+def _normalize_rediss_url_tls(redis_url: str) -> str:
+    """
+    Build a rediss:// URL whose query sets ssl_cert_reqs=none exactly once.
+
+    Upstash (and some clients) ship URLs like ...?ssl_cert_reqs=required.
+    redis-py's parse_url uses urllib.parse.parse_qs and only reads the *first*
+    value for duplicate keys — so appending &ssl_cert_reqs=none does not override
+    required. That leaves TLS verification on and breaks on macOS/Python installs
+    with an incomplete CA store (CERTIFICATE_VERIFY_FAILED).
+    """
+    if not redis_url.startswith("rediss://"):
+        return redis_url
+    parsed = urlparse(redis_url)
+    pairs = [(k, v) for k, v in parse_qsl(parsed.query, keep_blank_values=True) if k != "ssl_cert_reqs"]
+    pairs.append(("ssl_cert_reqs", "none"))
+    new_query = urlencode(pairs)
+    return urlunparse(parsed._replace(query=new_query))
 
 
 def _resolve_redis_url() -> Optional[str]:
@@ -50,9 +71,19 @@ def _is_test_mode() -> bool:
     )
 
 
+def _connection_identity() -> str:
+    """Stable id for the configured Redis target (not per-db). Used to dedupe failed connects."""
+    u = _resolve_redis_url()
+    if u:
+        return u.strip()
+    host = os.getenv("REDIS_HOST", "localhost")
+    port = os.getenv("REDIS_PORT", "6379")
+    return f"local:{host}:{port}"
+
+
 def reset_redis_connection_helper_cache() -> None:
     """Close and drop cached clients (tests / process reload)."""
-    global _redis_client_cache, _connection_info_logged
+    global _redis_client_cache, _connection_info_logged, _redis_failed_for_identity
     with _cache_lock:
         for _key, client in list(_redis_client_cache.items()):
             try:
@@ -61,6 +92,7 @@ def reset_redis_connection_helper_cache() -> None:
                 pass
         _redis_client_cache.clear()
         _connection_info_logged.clear()
+    _redis_failed_for_identity = None
 
 
 def get_redis_client(decode_responses: bool = True, db: int = 0) -> Optional[redis.Redis]:
@@ -81,6 +113,11 @@ def get_redis_client(decode_responses: bool = True, db: int = 0) -> Optional[red
     if _is_test_mode():
         return None
 
+    global _redis_failed_for_identity
+    ident = _connection_identity()
+    if _redis_failed_for_identity == ident:
+        return None
+
     cache_key = (decode_responses, db)
     with _cache_lock:
         cached = _redis_client_cache.get(cache_key)
@@ -99,10 +136,9 @@ def get_redis_client(decode_responses: bool = True, db: int = 0) -> Optional[red
         redis_url = _resolve_redis_url()
 
         if redis_url:
-            # redis-py 5.x: SSL options must be in the URL query string, not kwargs
+            # redis-py: TLS SSL options must be in the URL query string for from_url
             if redis_url.startswith("rediss://"):
-                sep = "&" if "?" in redis_url else "?"
-                redis_url = f"{redis_url}{sep}ssl_cert_reqs=none"
+                redis_url = _normalize_rediss_url_tls(redis_url)
             client = redis.from_url(
                 redis_url,
                 decode_responses=decode_responses,
@@ -116,6 +152,7 @@ def get_redis_client(decode_responses: bool = True, db: int = 0) -> Optional[red
 
             with _cache_lock:
                 _redis_client_cache[cache_key] = client
+                _redis_failed_for_identity = None
                 if cache_key not in _connection_info_logged:
                     _connection_info_logged.add(cache_key)
                     if redis_url.startswith('rediss://'):
@@ -142,14 +179,19 @@ def get_redis_client(decode_responses: bool = True, db: int = 0) -> Optional[red
             client.ping()
             with _cache_lock:
                 _redis_client_cache[cache_key] = client
+                _redis_failed_for_identity = None
                 if cache_key not in _connection_info_logged:
                     _connection_info_logged.add(cache_key)
                     logger.info(f"✅ Redis connection established (local): {redis_host}:{redis_port}")
             return client
             
     except redis.AuthenticationError as e:
+        _redis_failed_for_identity = ident
         logger.error(f"❌ Redis authentication failed: {e}")
-        logger.warning("⚠️ Check REDIS_URL or UPSTASH_REDIS_REST_* in .env")
+        logger.warning(
+            "⚠️ Check REDIS_URL or UPSTASH_REDIS_REST_* in .env "
+            "(comment out REDIS_URL for local dev if unused; further attempts suppressed for this process)"
+        )
         redis_url = _resolve_redis_url()
         if redis_url:
             parsed = urlparse(redis_url)
@@ -159,9 +201,15 @@ def get_redis_client(decode_responses: bool = True, db: int = 0) -> Optional[red
             logger.debug(f"   URL format: {'rediss:// (TLS)' if redis_url.startswith('rediss://') else 'redis:// (standard)'}")
         return None
     except redis.ConnectionError as e:
+        _redis_failed_for_identity = ident
         logger.error(f"❌ Redis connection failed: {e}")
+        logger.warning(
+            "⚠️ Redis unreachable; using fallbacks. Further connect attempts suppressed for this process "
+            "unless reset_redis_connection_helper_cache() is called."
+        )
         return None
     except Exception as e:
+        _redis_failed_for_identity = ident
         logger.error(f"❌ Redis connection error: {e}")
         return None
 

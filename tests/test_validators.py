@@ -37,16 +37,31 @@ class TestSchemaValidator:
         schema = {"required": ["age"], "properties": {"age": {"type": "integer"}}}
         assert v.validate_schema({"age": "not a number"}, schema) is False
 
+    def test_validate_schema_accepts_numeric_strings_for_llm_outputs(self):
+        v = SchemaValidator()
+        schema = {
+            "type": "object",
+            "required": ["confidence", "urgency"],
+            "properties": {
+                "confidence": {"type": "number"},
+                "urgency": {"type": "string"},
+            },
+        }
+        assert v.validate_schema({"confidence": "0.92", "urgency": "low"}, schema) is True
+
     def test_validate_type_string(self):
         v = SchemaValidator()
         assert v._validate_type("hello", {"type": "string"}) is True
-        assert v._validate_type(123, {"type": "string"}) is False
+        # LLMs often return numbers for text fields (phone, budget)
+        assert v._validate_type(123, {"type": "string"}) is True
+        assert v._validate_type(True, {"type": "string"}) is False
 
     def test_validate_type_number(self):
         v = SchemaValidator()
         assert v._validate_type(1.5, {"type": "number"}) is True
         assert v._validate_type(1, {"type": "number"}) is True
-        assert v._validate_type("1", {"type": "number"}) is False
+        assert v._validate_type("1", {"type": "number"}) is True
+        assert v._validate_type("0.85", {"type": "number"}) is True
 
     def test_validate_type_array(self):
         v = SchemaValidator()

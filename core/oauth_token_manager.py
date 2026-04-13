@@ -527,13 +527,79 @@ class OAuthTokenManager:
                 'error_code': 'REVOKE_FAILED'
             }
     
+    def _gmail_token_status_from_gmail_tokens_table(self, user_id: int) -> Dict[str, Any]:
+        """
+        Gmail OAuth flow stores tokens in gmail_tokens (see core.app_oauth / gmail_client).
+        oauth_tokens may have no row; callers must still treat Gmail as connected.
+        """
+        try:
+            rows = self.db_optimizer.execute_query(
+                """
+                SELECT expiry_timestamp, updated_at, scopes_json, access_token_enc, access_token
+                FROM gmail_tokens
+                WHERE user_id = ? AND is_active = TRUE
+                ORDER BY updated_at DESC
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            if not rows:
+                return {"success": False, "error": "No active tokens found", "error_code": "NO_TOKENS_FOUND"}
+            row = rows[0]
+            if isinstance(row, dict):
+                access_enc = row.get("access_token_enc")
+                access_plain = row.get("access_token")
+                exp_ts = row.get("expiry_timestamp")
+                updated = row.get("updated_at")
+                scope_raw = row.get("scopes_json")
+            else:
+                access_enc = row[3] if len(row) > 3 else None
+                access_plain = row[4] if len(row) > 4 else None
+                exp_ts = row[0] if len(row) > 0 else None
+                updated = row[1] if len(row) > 1 else None
+                scope_raw = row[2] if len(row) > 2 else None
+            if not (access_enc or access_plain):
+                return {"success": False, "error": "No active tokens found", "error_code": "NO_TOKENS_FOUND"}
+            expires_at = None
+            if exp_ts is not None:
+                try:
+                    expires_at = datetime.fromtimestamp(int(exp_ts)).isoformat()
+                except (TypeError, ValueError, OSError):
+                    expires_at = None
+            scope = scope_raw
+            if isinstance(scope_raw, str) and scope_raw.startswith("["):
+                try:
+                    scope = json.loads(scope_raw)
+                except json.JSONDecodeError:
+                    scope = scope_raw
+            return {
+                "success": True,
+                "data": {
+                    "access_token": "***",  # not decrypted here; status-only
+                    "refresh_token": None,
+                    "token_type": "Bearer",
+                    "expires_at": expires_at,
+                    "scope": scope,
+                    "is_active": True,
+                    "last_refresh_at": updated,
+                    "refresh_count": 0,
+                },
+            }
+        except Exception as e:
+            logger.debug("gmail_tokens status check failed: %s", e)
+            return {"success": False, "error": str(e), "error_code": "TOKEN_RETRIEVE_FAILED"}
+
     def get_token_status(self, user_id: int, service: str) -> Dict[str, Any]:
         """Get comprehensive token status"""
         try:
             token_result = self.get_tokens(user_id, service)
-            if not token_result['success']:
-                return token_result
-            
+            if not token_result["success"] and service == "gmail":
+                token_result = self._gmail_token_status_from_gmail_tokens_table(user_id)
+            if not token_result["success"]:
+                err = dict(token_result)
+                err["has_token"] = False
+                return err
+
             tokens = token_result['data']
             
             # Check if token is expired
@@ -576,6 +642,7 @@ class OAuthTokenManager:
             
             return {
                 'success': True,
+                'has_token': True,
                 'data': {
                     'status': status,
                     'is_expired': is_expired,
@@ -584,7 +651,7 @@ class OAuthTokenManager:
                     'refresh_count': tokens['refresh_count'],
                     'recent_failures': failure_count,
                     'scope': tokens.get('scope', []),
-                    'token_hash': self._hash_token(tokens.get('access_token', '')) if tokens.get('access_token') else None  # For debugging
+                    'token_hash': self._hash_token(tokens.get('access_token', '')) if tokens.get('access_token') and tokens.get('access_token') != '***' else None  # For debugging
                 }
             }
             
@@ -592,6 +659,7 @@ class OAuthTokenManager:
             logger.error(f"Failed to get token status: {e}")
             return {
                 'success': False,
+                'has_token': False,
                 'error': str(e),
                 'error_code': 'STATUS_CHECK_FAILED'
             }

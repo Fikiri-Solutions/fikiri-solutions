@@ -104,8 +104,11 @@ class GmailSyncJobManager:
         self.redis_client = None
         self.queue_name = "fikiri:gmail:sync"
         self.failed_queue_name = "fikiri:gmail:failed"
-        self.sync_limit = int(os.getenv('GMAIL_SYNC_LIMIT', '50'))  # Max emails per sync (reduced for faster feedback)
-        self.sync_days = int(os.getenv('GMAIL_SYNC_DAYS', '30'))  # Days to sync
+        # Per-request page size (Gmail allows up to 500; we page with nextPageToken).
+        self.sync_page_size = min(500, max(1, int(os.getenv('GMAIL_SYNC_PAGE_SIZE', '100'))))
+        # Max messages to pull per sync job (after pagination). Was a single-page cap of 50 — caused “missing” mail.
+        self.sync_max_messages = max(1, int(os.getenv('GMAIL_SYNC_MAX_MESSAGES', '500')))
+        self.sync_days = int(os.getenv('GMAIL_SYNC_DAYS', '90'))  # Align with onboarding-style window
         self._connect_redis()
         self._initialize_tables()
     
@@ -178,8 +181,7 @@ class GmailSyncJobManager:
                 )
             """, fetch=False)
             
-            # Migration: add is_read only when missing (CREATE above already includes it on new DBs;
-            # blind ALTER duplicates the column and logs errors on every init).
+            # Migration: add columns when missing (idempotent; matches core/database_optimization).
             try:
                 db_url = (os.getenv("DATABASE_URL") or "").lower()
                 if "sqlite" in db_url or not db_url:
@@ -191,13 +193,19 @@ class GmailSyncJobManager:
                                 col_names.add(row.get("name"))
                             elif row is not None and len(row) > 1:
                                 col_names.add(row[1])
+                    if info is not None and "provider" not in col_names:
+                        db_optimizer.execute_query(
+                            "ALTER TABLE synced_emails ADD COLUMN provider TEXT DEFAULT 'gmail'",
+                            fetch=False,
+                        )
+                        logger.info("✅ Added provider column to synced_emails (gmail_sync_jobs migration)")
                     if info is not None and "is_read" not in col_names:
                         db_optimizer.execute_query(
                             "ALTER TABLE synced_emails ADD COLUMN is_read BOOLEAN DEFAULT 0",
                             fetch=False,
                         )
             except Exception as mig_err:
-                logger.debug("synced_emails is_read migration skipped: %s", mig_err)
+                logger.debug("synced_emails column migration skipped: %s", mig_err)
             try:
                 db_optimizer.execute_query("""
                     UPDATE synced_emails 
@@ -205,7 +213,21 @@ class GmailSyncJobManager:
                     WHERE external_id IS NULL AND gmail_id IS NOT NULL
                 """, fetch=False)
             except Exception as e:
-                logger.warning(f"Migration note: {e}")
+                if "no such column: provider" in str(e).lower():
+                    try:
+                        db_optimizer.execute_query(
+                            "ALTER TABLE synced_emails ADD COLUMN provider TEXT DEFAULT 'gmail'",
+                            fetch=False,
+                        )
+                        db_optimizer.execute_query("""
+                            UPDATE synced_emails 
+                            SET external_id = gmail_id, provider = 'gmail'
+                            WHERE external_id IS NULL AND gmail_id IS NOT NULL
+                        """, fetch=False)
+                    except Exception as retry_err:
+                        logger.warning("synced_emails provider backfill failed: %s", retry_err)
+                else:
+                    logger.warning(f"Migration note: {e}")
             
             # Create contacts table
             db_optimizer.execute_query("""
@@ -612,40 +634,48 @@ class GmailSyncJobManager:
             raise
     
     def _get_gmail_messages(self, service) -> List[Dict[str, Any]]:
-        """Get messages from Gmail API"""
+        """Get messages from Gmail API (paginates nextPageToken until cap or no more results)."""
         try:
-            # Calculate date range
             end_date = _utcnow_naive()
             start_date = end_date - timedelta(days=self.sync_days)
-            
-            # Build query
             query = f"after:{start_date.strftime('%Y/%m/%d')} before:{end_date.strftime('%Y/%m/%d')}"
-            
-            # Get message list
-            results = service.users().messages().list(
-                userId='me',
-                q=query,
-                maxResults=self.sync_limit
-            ).execute()
-            
-            messages = results.get('messages', [])
-            
-            # Get full message details
-            full_messages = []
-            for message in messages:
+
+            message_ids: List[str] = []
+            page_token = None
+            while len(message_ids) < self.sync_max_messages:
+                page_size = min(self.sync_page_size, self.sync_max_messages - len(message_ids))
+                list_params = {
+                    'userId': 'me',
+                    'q': query,
+                    'maxResults': page_size,
+                }
+                if page_token:
+                    list_params['pageToken'] = page_token
+                results = service.users().messages().list(**list_params).execute()
+                batch = results.get('messages', []) or []
+                for m in batch:
+                    if len(message_ids) >= self.sync_max_messages:
+                        break
+                    message_ids.append(m['id'])
+                page_token = results.get('nextPageToken')
+                if not page_token or not batch:
+                    break
+
+            full_messages: List[Dict[str, Any]] = []
+            for mid in message_ids:
                 try:
                     msg = service.users().messages().get(
                         userId='me',
-                        id=message['id'],
-                        format='full'
+                        id=mid,
+                        format='full',
                     ).execute()
                     full_messages.append(msg)
                 except Exception as e:
-                    logger.warning(f"Failed to get message {message['id']}: {e}")
+                    logger.warning(f"Failed to get message {mid}: {e}")
                     continue
-            
+
             return full_messages
-            
+
         except Exception as e:
             logger.error(f"❌ Gmail message retrieval failed: {e}")
             return []
@@ -670,17 +700,33 @@ class GmailSyncJobManager:
                 logger.debug("Failed to parse email date '%s': %s", date_str, parse_error)
                 date = _utcnow_naive()
             
-            # Extract body
+            # Extract body and rewrite cid: inline images to /api/email/.../embedded-image/... (same as live Gmail fetch)
             body = self._extract_email_body(message.get('payload', {}))
-            
+            if body and '<' in body:
+                try:
+                    from core.gmail_inline_images import (
+                        extract_embedded_image_map,
+                        fix_legacy_embedded_image_api_paths,
+                        rewrite_html_cid_to_proxy_urls,
+                    )
+
+                    emb = extract_embedded_image_map(message.get('payload', {}))
+                    if emb:
+                        body = rewrite_html_cid_to_proxy_urls(body, message['id'], emb)
+                    body = fix_legacy_embedded_image_api_paths(body)
+                except Exception as exc:
+                    logger.debug("Inline image rewrite skipped: %s", exc)
+
             # Get labels
             labels = message.get('labelIds', [])
-            
+            # Align with Gmail: UNREAD label present => not read yet
+            is_read = 0 if 'UNREAD' in labels else 1
+
             # Store in database
             email_id = db_optimizer.execute_query("""
                 INSERT OR REPLACE INTO synced_emails 
-                (user_id, gmail_id, thread_id, subject, sender, recipient, date, body, labels)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (user_id, gmail_id, thread_id, subject, sender, recipient, date, body, labels, is_read)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 user_id,
                 message['id'],
@@ -690,7 +736,8 @@ class GmailSyncJobManager:
                 recipient,
                 date.isoformat(),
                 body,
-                json.dumps(labels)
+                json.dumps(labels),
+                is_read,
             ), fetch=False)
             
             return email_id

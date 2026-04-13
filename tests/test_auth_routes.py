@@ -278,6 +278,30 @@ class TestAuthRoutes(unittest.TestCase):
         self.assertTrue(data.get('success'))
         self.assertIn('tokens', data.get('data', {}))
 
+    @patch('routes.auth.get_jwt_manager')
+    def test_refresh_token_accepts_refresh_token_body(self, mock_get_jwt_mgr):
+        """Expired access tokens can be renewed via refresh_token in JSON body."""
+        jwt_mgr = MagicMock()
+        jwt_mgr.refresh_access_token.return_value = {
+            'access_token': 'new_access',
+            'refresh_token': 'new_refresh',
+            'expires_in': 1800,
+            'token_type': 'Bearer',
+        }
+        jwt_mgr.verify_access_token.return_value = {'user_id': 42}
+        mock_get_jwt_mgr.return_value = jwt_mgr
+
+        response = self.client.post(
+            '/api/auth/refresh',
+            json={'refresh_token': 'valid_refresh'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data.get('success'))
+        self.assertEqual(data.get('data', {}).get('user_id'), 42)
+        jwt_mgr.refresh_access_token.assert_called_once_with('valid_refresh')
+
     @patch('routes.auth.db_optimizer')
     def test_whoami_fetches_latest_user(self, mock_db):
         mock_db.execute_query.return_value = [{'id': 1, 'email': 'test@example.com', 'name': 'Test', 'role': 'user'}]

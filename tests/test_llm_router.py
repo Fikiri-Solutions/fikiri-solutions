@@ -11,7 +11,33 @@ os.environ.setdefault("FIKIRI_TEST_MODE", "1")
 os.environ.setdefault("FIKIRI_AI_EVENT_LOG", "0")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.ai.llm_router import LLMRouter, _safe_float, _safe_int, _safe_latency_ms
+from core.ai.schemas import EmailClassificationSchema
+
+from core.ai.llm_router import (
+    LLMRouter,
+    _coerce_llm_json_for_schema,
+    _extract_first_json_object,
+    _safe_float,
+    _safe_int,
+    _safe_latency_ms,
+)
+
+
+class TestStructuredJsonHelpers:
+    def test_extract_first_json_object_skips_prose(self):
+        raw = 'Here you go:\n{"intent": "lead_inquiry", "confidence": 0.9, "urgency": "high", "suggested_action": "x"}'
+        out = _extract_first_json_object(raw)
+        assert out.startswith("{")
+        assert '"intent"' in out
+
+    def test_coerce_classification_confidence_bool(self):
+        raw = '{"intent": "spam", "confidence": true, "urgency": "low", "suggested_action": "ignore"}'
+        fixed = _coerce_llm_json_for_schema(raw, EmailClassificationSchema)
+        import json
+
+        data = json.loads(fixed)
+        assert data["confidence"] == 1.0
+        assert isinstance(data["intent"], str)
 
 
 class TestSafeCoercions:
@@ -67,6 +93,13 @@ class TestLLMRouterPipelineMethods:
         router = LLMRouter(api_key=None)
         out = router.postprocess('  "quoted text"  ', "general", None)
         assert out == "quoted text"
+
+    def test_postprocess_strips_markdown_json_fence(self):
+        router = LLMRouter(api_key=None)
+        raw = '```json\n{"intent": "spam", "confidence": 0.9}\n```'
+        out = router.postprocess(raw, "classification", None)
+        assert out.strip().startswith("{")
+        assert '"intent"' in out
 
 
 class TestLLMRouterProcess:

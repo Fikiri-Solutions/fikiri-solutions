@@ -3,12 +3,48 @@
  * All HTTP calls use config.apiUrl. Hardcoded backend URLs are forbidden (Rulepack v4.1).
  */
 
-import axios, { AxiosInstance, AxiosResponse } from 'axios'
+import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { config } from '../config'
 import { CacheInvalidationManager } from '../utils/cacheInvalidation'
 
 // API Configuration
 const API_BASE_URL = config.apiUrl
+
+/** Single-flight refresh so concurrent 401s share one POST /auth/refresh. */
+let refreshInFlight: Promise<string | null> | null = null
+
+function persistTokensFromRefreshPayload(data: unknown): string | null {
+  const body = data as { data?: { tokens?: { access_token?: string; refresh_token?: string } } }
+  const tokens = body?.data?.tokens
+  if (tokens?.access_token && typeof window !== 'undefined') {
+    localStorage.setItem('fikiri-token', tokens.access_token)
+    if (tokens.refresh_token) {
+      localStorage.setItem('fikiri-refresh-token', tokens.refresh_token)
+    }
+    return tokens.access_token
+  }
+  return null
+}
+
+async function refreshSessionAccessToken(): Promise<string | null> {
+  if (typeof window === 'undefined') return null
+  const rt = localStorage.getItem('fikiri-refresh-token')
+  if (!rt) return null
+  try {
+    const res = await axios.post(
+      `${API_BASE_URL}/auth/refresh`,
+      { refresh_token: rt },
+      {
+        headers: { 'Content-Type': 'application/json' },
+        withCredentials: true,
+        timeout: 20000,
+      }
+    )
+    return persistTokensFromRefreshPayload(res.data)
+  } catch {
+    return null
+  }
+}
 
 // Types for API responses
 export interface ServiceStatus {
@@ -291,46 +327,66 @@ class ApiClient {
         // API response logged
         return response
       },
-      (error) => {
-        // Handle 401 Unauthorized errors
-        if (error.response?.status === 401) {
-          const method = String(error.config?.method || 'get').toLowerCase()
-          const reqUrl = String(error.config?.url || '')
-          // Optional reads that are expected to 401 when logged out — do not nuke session / redirect
+      async (error) => {
+        // Handle 401: try refresh-token rotation once, then optional logout redirect
+        if (error.response?.status === 401 && error.config) {
+          const cfg = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
+          const reqUrl = String(cfg.url || '')
+          const isAuthCall =
+            reqUrl.includes('/auth/refresh') ||
+            reqUrl.includes('/auth/login') ||
+            reqUrl.includes('/auth/signup')
+          if (!isAuthCall && !cfg._retry && typeof window !== 'undefined') {
+            const hasRefresh = !!localStorage.getItem('fikiri-refresh-token')
+            if (hasRefresh) {
+              if (!refreshInFlight) {
+                refreshInFlight = refreshSessionAccessToken().finally(() => {
+                  refreshInFlight = null
+                })
+              }
+              const newAccess = await refreshInFlight
+              if (newAccess) {
+                cfg._retry = true
+                cfg.headers = cfg.headers ?? {}
+                cfg.headers.Authorization = `Bearer ${newAccess}`
+                return this.client.request(cfg)
+              }
+            }
+          }
+
+          const method = String(cfg.method || 'get').toLowerCase()
+          // Optional asset when logged out — do not redirect
           if (method === 'get' && reqUrl.includes('/user/customization/logo')) {
             return Promise.reject(error)
           }
 
-          // Don't clear localStorage if we're on login page (might be during login flow)
-          // or if the request was to /auth/login (login endpoint itself)
-          const isLoginRequest = error.config?.url?.includes('/auth/login')
+          const isLoginRequest = reqUrl.includes('/auth/login')
           const isOnLoginPage = window.location.pathname === '/login'
-          
+
           if (!isLoginRequest && !isOnLoginPage) {
-            // Clear any stored auth data
             if (typeof window !== 'undefined') {
               console.log('[apiClient] 401 error - clearing localStorage and redirecting to login')
               localStorage.removeItem('fikiri-user')
               localStorage.removeItem('fikiri-token')
+              localStorage.removeItem('fikiri-refresh-token')
               localStorage.removeItem('fikiri-user-id')
-              
-              // Dispatch event for auth context to handle
+
               window.dispatchEvent(new CustomEvent('auth:unauthorized'))
-              
-              // Redirect to login if not already there
-              // Don't redirect /inbox - it handles its own auth state
-              if (window.location.pathname !== '/login' && 
-                  !window.location.pathname.startsWith('/signup') && 
-                  window.location.pathname !== '/inbox') {
-                window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname)
+
+              if (
+                window.location.pathname !== '/login' &&
+                !window.location.pathname.startsWith('/signup') &&
+                window.location.pathname !== '/inbox'
+              ) {
+                window.location.href =
+                  '/login?redirect=' + encodeURIComponent(window.location.pathname)
               }
             }
-          } else {
+          } else if (import.meta.env.DEV) {
             console.log('[apiClient] 401 error on login endpoint or login page - NOT clearing localStorage')
           }
         }
-        
-        // API response error logged
+
         return Promise.reject(error)
       }
     )
@@ -1125,6 +1181,14 @@ class ApiClient {
 
   async archiveEmail(emailId: string): Promise<{ archived: boolean }> {
     const response = await this.client.post('/email/archive', {
+      email_id: emailId,
+      user_id: this.getUserId() ?? 1
+    })
+    return response.data.data || response.data
+  }
+
+  async markEmailRead(emailId: string): Promise<{ read: boolean }> {
+    const response = await this.client.post('/email/mark-read', {
       email_id: emailId,
       user_id: this.getUserId() ?? 1
     })

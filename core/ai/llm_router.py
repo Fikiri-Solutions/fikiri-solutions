@@ -4,7 +4,9 @@ Fikiri Solutions - LLM Router
 Routes LLM requests through the proper pipeline: preprocess → detect_intent → choose_model → call_llm → postprocess → validate → log → return
 """
 
+import json
 import logging
+import re
 import uuid
 from typing import Any, Dict, List, Optional
 from datetime import datetime
@@ -59,6 +61,94 @@ def _safe_int(value: Any, default: int = 0) -> int:
 def _safe_latency_ms(value: Any) -> float:
     """Coerce LLM client latency to float; missing or invalid values become 0.0."""
     return _safe_float(value, 0.0)
+
+
+def _extract_first_json_object(text: str) -> str:
+    """
+    If the model wraps JSON in prose, take the first balanced {...} substring.
+    Falls back to the original string when no object is found or braces are unbalanced.
+    """
+    if not text or not isinstance(text, str):
+        return text
+    s = text.strip()
+    start = s.find("{")
+    if start == -1:
+        return text
+    depth = 0
+    for i in range(start, len(s)):
+        c = s[i]
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                return s[start : i + 1]
+    return text
+
+
+def _coerce_llm_json_for_schema(text: str, output_schema: Optional[Dict[str, Any]]) -> str:
+    """
+    Normalize common LLM quirks before schema validation:
+    - Fill required classification fields with safe defaults when missing
+    - Coerce confidence (bool / str) to number
+    - Coerce string-typed fields from int/float (e.g. phone numbers)
+    """
+    if not output_schema or not text:
+        return text
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return text
+    if not isinstance(data, dict):
+        return text
+
+    required = list(output_schema.get("required") or [])
+    properties = output_schema.get("properties") or {}
+
+    # Email classification: ensure required keys exist
+    if required and set(required) <= {"intent", "confidence", "urgency", "suggested_action"}:
+        defaults = {
+            "intent": "general_info",
+            "confidence": 0.5,
+            "urgency": "medium",
+            "suggested_action": "Review and respond",
+        }
+        for key in required:
+            val = data.get(key)
+            if key not in data or val is None or val == "":
+                if key in defaults:
+                    data[key] = defaults[key]
+
+    if "confidence" in data:
+        c = data["confidence"]
+        if isinstance(c, bool):
+            data["confidence"] = 1.0 if c else 0.0
+        elif isinstance(c, str):
+            try:
+                data["confidence"] = float(c.strip())
+            except ValueError:
+                data["confidence"] = 0.5
+        elif isinstance(c, int) and not isinstance(c, bool):
+            data["confidence"] = float(c)
+
+    for key in ("intent", "urgency", "suggested_action"):
+        if key in data and data[key] is not None and not isinstance(data[key], str):
+            data[key] = str(data[key])
+
+    for key, spec in properties.items():
+        if spec.get("type") == "string" and key in data:
+            v = data[key]
+            if v is None:
+                continue
+            if isinstance(v, bool):
+                data[key] = "true" if v else "false"
+            elif isinstance(v, (int, float)):
+                data[key] = str(v)
+
+    try:
+        return json.dumps(data)
+    except (TypeError, ValueError):
+        return text
 
 
 class LLMRouter:
@@ -236,6 +326,11 @@ class LLMRouter:
                 resolved_intent,
                 context,
             )
+
+            # Step 5b: Structured JSON cleanup (prose wrappers, LLM type quirks) before validation
+            if output_schema:
+                postprocessed = _extract_first_json_object(postprocessed)
+                postprocessed = _coerce_llm_json_for_schema(postprocessed, output_schema)
 
             # Step 6: Validate schema (if provided)
             validated = False
@@ -488,6 +583,12 @@ class LLMRouter:
         """
         # Basic cleanup
         postprocessed = output.strip()
+
+        # Strip ```json ... ``` wrappers so validate_schema can parse JSON
+        if postprocessed.startswith('```'):
+            postprocessed = re.sub(r'^```(?:json)?\s*', '', postprocessed, flags=re.IGNORECASE)
+            postprocessed = re.sub(r'\s*```$', '', postprocessed)
+            postprocessed = postprocessed.strip()
         
         # Remove common LLM artifacts
         if postprocessed.startswith('"') and postprocessed.endswith('"'):

@@ -508,58 +508,81 @@ def api_change_password():
 @auth_bp.route('/refresh', methods=['POST'])
 @handle_api_errors
 def refresh_token():
-    """Refresh JWT access token"""
+    """Refresh JWT access token.
+
+    Two modes:
+    1) JSON body ``{"refresh_token": "..."}`` — use when the access token is expired (SPA).
+    2) ``Authorization: Bearer <access>`` — legacy; requires a still-valid access token.
+    """
     try:
-        # Get current token from Authorization header
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return create_error_response("Authorization header missing or invalid", 401, 'MISSING_AUTH_HEADER')
-        
-        # Extract token
-        token = auth_header.split(' ')[1]
-        
-        # Verify current token
         jwt_manager = get_jwt_manager()
+
+        data = request.get_json(silent=True) or {}
+        body_refresh = data.get("refresh_token") if isinstance(data, dict) else None
+        if isinstance(body_refresh, str) and body_refresh.strip():
+            new_tokens = jwt_manager.refresh_access_token(body_refresh.strip())
+            if not new_tokens:
+                return create_error_response(
+                    "Invalid or expired refresh token", 401, "INVALID_REFRESH_TOKEN"
+                )
+            payload = jwt_manager.verify_access_token(new_tokens["access_token"])
+            if not payload or payload.get("error"):
+                logger.error("Fresh access token failed verification after refresh_access_token")
+                return create_error_response(
+                    "Token generation error", 500, "TOKEN_VERIFICATION_ERROR"
+                )
+            user_id = payload["user_id"]
+            return create_success_response(
+                {"tokens": new_tokens, "user_id": user_id},
+                "Token refreshed successfully",
+            )
+
+        # Legacy: current (still-valid) access token in Authorization header
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return create_error_response(
+                "Authorization header missing or invalid", 401, "MISSING_AUTH_HEADER"
+            )
+
+        token = auth_header.split(" ")[1]
         payload = jwt_manager.verify_access_token(token)
-        
-        if not payload or payload.get('error'):
-            return create_error_response("Invalid or expired token", 401, 'INVALID_TOKEN')
-        
-        # Generate new tokens
-        user_id = payload['user_id']
+
+        if not payload or payload.get("error"):
+            return create_error_response("Invalid or expired token", 401, "INVALID_TOKEN")
+
+        user_id = payload["user_id"]
         user_data = None
         try:
             user_rows = db_optimizer.execute_query(
                 "SELECT id, email, name, role FROM users WHERE id = ? AND is_active = 1",
-                (user_id,)
+                (user_id,),
             )
             if user_rows:
                 user_row = user_rows[0]
-                user_data = dict(user_row) if hasattr(user_row, 'keys') else user_row
+                user_data = dict(user_row) if hasattr(user_row, "keys") else user_row
         except Exception as user_error:
             logger.warning("Failed to load user for token refresh: %s", user_error)
-        
+
         if not user_data:
-            return create_error_response("User not found", 404, 'USER_NOT_FOUND')
-        
+            return create_error_response("User not found", 404, "USER_NOT_FOUND")
+
         new_tokens = jwt_manager.generate_tokens(
             user_id=user_id,
             user_data=user_data,
-            device_info=request.headers.get('User-Agent'),
-            ip_address=request.remote_addr
+            device_info=request.headers.get("User-Agent"),
+            ip_address=request.remote_addr,
         )
-        
+
         if new_tokens:
-            return create_success_response({
-                'tokens': new_tokens,
-                'user_id': user_id
-            }, "Token refreshed successfully")
-        else:
-            return create_error_response("Failed to generate new token", 500, 'TOKEN_GENERATION_ERROR')
-            
+            return create_success_response(
+                {"tokens": new_tokens, "user_id": user_id},
+                "Token refreshed successfully",
+            )
+        return create_error_response("Failed to generate new token", 500, "TOKEN_GENERATION_ERROR")
+
     except Exception as e:
         logger.error(f"Token refresh error: {e}")
-        return create_error_response("Failed to refresh token", 500, 'REFRESH_ERROR')
+        return create_error_response("Failed to refresh token", 500, "REFRESH_ERROR")
 
 @auth_bp.route('/reset-rate-limit', methods=['POST'])
 def reset_rate_limit():
