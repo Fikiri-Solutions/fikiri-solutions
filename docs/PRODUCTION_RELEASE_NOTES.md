@@ -58,11 +58,9 @@ This document categorizes **current local changes** on `main` (not yet pushed) a
 
 ## 5. Optional / not in this commit
 
-The following are **untracked** locally; include only if you intend to ship them:
+The following are **optional** follow-ups (not required for main app deploy):
 
 - `core/gmail_inline_images.py`, `tests/test_gmail_inline_images.py`
-- `frontend/src/utils/emailPlainText.ts`, `frontend/src/__tests__/emailPlainText.test.ts`
-- `frontend/playwright.demo.config.ts`, `frontend/tests/demo-recording.spec.ts`
 
 ---
 
