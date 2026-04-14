@@ -62,6 +62,8 @@ The following are **optional** follow-ups (not required for main app deploy):
 
 - `core/gmail_inline_images.py`, `tests/test_gmail_inline_images.py`
 
+**Demo / video recording (local only, not Vercel):** `frontend/playwright.demo.config.ts`, `frontend/tests/demo-recording.spec.ts`, and `npm run record:demo` — use a dedicated demo user (e.g. fikiridemo) via `TEST_USER_EMAIL` / `TEST_USER_PASSWORD` per `tests/auth.setup.ts`.
+
 ---
 
 ## 6. Verification log (pre-push)
