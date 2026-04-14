@@ -114,6 +114,7 @@ except ImportError:
 from routes import auth_bp, business_bp, test_bp, user_bp, monitoring_bp, jobs_bp, expert_bp, kpi_bp
 from routes.integrations import integrations_bp
 from routes.appointments import appointments_bp
+from routes.google_risc import google_risc_bp
 
 # Global services dictionary
 services = {}
@@ -710,8 +711,11 @@ def register_blueprints(app):
         (monitoring_bp, 'routes_monitoring'),
         (expert_bp, 'routes_expert'),
         (kpi_bp, 'routes_kpi'),
-        (integrations_bp, 'integrations')
+        (integrations_bp, 'integrations'),
     ]
+
+    if os.getenv("GOOGLE_RISC_ENABLED", "").strip().lower() in ("1", "true", "yes"):
+        blueprints.append((google_risc_bp, "google_risc"))
     
     # Add dev test blueprint in development
     if os.getenv('FLASK_ENV') == 'development':

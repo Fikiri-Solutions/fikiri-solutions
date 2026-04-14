@@ -106,6 +106,36 @@ def decrypt(s: str) -> str:
         import base64
         return base64.b64decode(s.encode()).decode()
 
+
+def merge_user_google_sub(user_id: int, google_sub: str) -> None:
+    """Persist Google subject identifier for Cross-Account Protection (RISC) user mapping."""
+    if not user_id or not google_sub:
+        return
+    try:
+        from core.database_optimization import db_optimizer
+
+        rows = db_optimizer.execute_query("SELECT metadata FROM users WHERE id = ?", (user_id,))
+        if not rows:
+            return
+        raw = rows[0].get("metadata") if isinstance(rows[0], dict) else rows[0][0]
+        meta: Dict[str, Any] = {}
+        if raw:
+            try:
+                meta = json.loads(raw) if isinstance(raw, str) else {}
+            except json.JSONDecodeError:
+                meta = {}
+        if meta.get("google_sub") == google_sub:
+            return
+        meta["google_sub"] = google_sub
+        db_optimizer.execute_query(
+            "UPDATE users SET metadata = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (json.dumps(meta), user_id),
+            fetch=False,
+        )
+    except Exception as e:
+        logger.warning("Could not store google_sub for user %s: %s", user_id, e)
+
+
 @oauth.route("/gmail/start", methods=["GET"])
 def gmail_start():
     """Start Gmail OAuth flow with CSRF protection"""
@@ -314,29 +344,32 @@ def gmail_callback():
                 "message": "Failed to get access token from Google. Please try again."
             }), 400
         
-        # If we still don't have user_id, try to get it from userinfo endpoint
-        if not user_id and access_token:
+        userinfo: Dict[str, Any] = {}
+        if access_token:
             try:
                 userinfo_response = requests.get(
-                    'https://www.googleapis.com/oauth2/v2/userinfo',
-                    headers={'Authorization': f'Bearer {access_token}'}
+                    "https://www.googleapis.com/oauth2/v2/userinfo",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    timeout=15,
                 )
                 if userinfo_response.status_code == 200:
                     userinfo = userinfo_response.json()
-                    user_email = userinfo.get('email')
-                    if user_email:
-                        # Try to find user by email
-                        from core.database_optimization import db_optimizer
-                        user_data = db_optimizer.execute_query(
-                            "SELECT id FROM users WHERE email = ? LIMIT 1",
-                            (user_email,)
-                        )
-                        if user_data:
-                            user_id = user_data[0]['id']
-                            logger.info(f"✅ Found user_id {user_id} from email {user_email}")
             except Exception as e:
-                logger.warning(f"⚠️ Could not get user_id from userinfo: {e}")
-        
+                logger.warning("⚠️ Could not fetch Google userinfo: %s", e)
+
+        if not user_id and userinfo:
+            user_email = userinfo.get("email")
+            if user_email:
+                from core.database_optimization import db_optimizer
+
+                user_data = db_optimizer.execute_query(
+                    "SELECT id FROM users WHERE email = ? LIMIT 1",
+                    (user_email,),
+                )
+                if user_data:
+                    user_id = user_data[0]["id"]
+                    logger.info("✅ Found user_id %s from email %s", user_id, user_email)
+
         # If still no user_id, we can't proceed
         if not user_id:
             logger.error("❌ No user_id available - cannot store tokens")
@@ -344,7 +377,11 @@ def gmail_callback():
                 "error": "no_user_session",
                 "message": "Please sign in first, then connect your Gmail account."
             }), 400
-        
+
+        google_sub = userinfo.get("id") if userinfo else None
+        if google_sub:
+            merge_user_google_sub(int(user_id), str(google_sub))
+
         # Calculate expiry timestamp
         expiry_timestamp = int(time.time()) + expires_in
         

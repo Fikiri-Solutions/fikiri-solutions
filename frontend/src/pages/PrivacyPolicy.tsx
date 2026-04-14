@@ -62,7 +62,7 @@ const PrivacyPolicy: React.FC = () => {
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300 mb-6">
                 <strong>Effective Date:</strong> October 18, 2025<br />
-                <strong>Last Updated:</strong> March 12, 2026
+                <strong>Last Updated:</strong> April 14, 2026
               </p>
 
               <section className="mb-8">
@@ -81,7 +81,7 @@ const PrivacyPolicy: React.FC = () => {
                 <h3 className="text-xl font-medium text-green-300 mb-3">Information You Provide</h3>
                 <ul className="list-disc list-inside text-gray-300 mb-4 space-y-2">
                   <li><strong>Account Information:</strong> Email address, name, and password</li>
-                  <li><strong>Gmail Data:</strong> Emails, contacts, and calendar information (with your explicit consent)</li>
+                  <li><strong>Gmail and Google account data (when you connect Google):</strong> With your explicit consent through Google&apos;s OAuth screens, we may access categories of data needed to run the Service, including your Google Account email address; basic profile details you have made available to the app (such as name or profile photo, depending on what you grant); email message content, headers, metadata, and thread identifiers; labels and organization data; and permissions needed to read, send, modify, or organize mail in Gmail as described at connect time. We only request the scopes necessary for the features you use.</li>
                   <li><strong>Usage Data:</strong> How you interact with our Service</li>
                   <li><strong>Communication Data:</strong> Messages you send through our platform</li>
                     </ul>
@@ -99,27 +99,30 @@ const PrivacyPolicy: React.FC = () => {
                 <h2 className="text-2xl font-semibold text-muted-foreground mb-4">How We Use Your Information (Data Use & Processing)</h2>
                 <p className="text-gray-300 mb-3">We use your information to:</p>
                 <ul className="list-disc list-inside text-gray-300 space-y-2">
-                  <li><strong>Service Delivery:</strong> Process emails, generate AI responses, manage automation rules, and provide account features</li>
-                  <li><strong>Personalization:</strong> Remember your preferences and tailor the Service to your use</li>
+                  <li><strong>Service Delivery:</strong> Process emails, generate AI-assisted responses and automations you configure, manage rules, and provide account features</li>
+                  <li><strong>In-app personalization:</strong> Remember your preferences and tailor the Service experience (for example, display name, signatures, and how automation behaves for your mailbox)—not interest-based advertising across third-party sites or apps</li>
                   <li><strong>Security:</strong> Detect and prevent fraud, abuse, and unauthorized access; enforce our Terms</li>
-                  <li><strong>Improvement:</strong> Analyze usage patterns (in aggregated form where possible), optimize performance, and develop new features</li>
-                  <li><strong>Communication:</strong> Send service updates, security alerts, and support responses; with your consent, we may send marketing (you can opt out at any time)</li>
+                  <li><strong>Improvement of the Service:</strong> Optimize reliability and performance of Fikiri and develop user-facing product features; where we analyze patterns, we prefer aggregated or de-identified information when feasible</li>
+                  <li><strong>Communication:</strong> Send service updates, security alerts, and support responses; with your separate consent where required, we may send marketing about Fikiri (you can opt out at any time). We do not use Google user data to send third-party promotional or interest-based ads on our behalf</li>
                   <li><strong>Legal & Compliance:</strong> Meet regulatory obligations and respond to lawful requests</li>
                     </ul>
+                <p className="text-gray-300 mt-4">
+                  <strong>Google user data — limited use:</strong> We use Google user data only to provide and improve user-facing features of the Service (for example, reading and sending mail as you direct, inbox organization, and security). We do not use Google user data for targeted advertising, selling personal information, sale to data brokers, providing data to information resellers, creditworthiness or lending decisions, user retargeting, interest-based advertising, or building standalone contact databases unrelated to operating the Service for you. We do not use Google user data to train or improve generalized or foundation machine-learning models for unrelated purposes; processing supports the Service you signed up for (such as drafting or classifying your messages in context), not third-party ad profiling.
+                </p>
               </section>
 
               <section className="mb-8">
                 <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Third-Party Sharing</h2>
                 <p className="text-gray-300 mb-3">
-                  We do not sell your personal information for money. We may share your information only in these circumstances:
+                  We do not sell Google user data or your personal information. We may share your information only in these circumstances:
                 </p>
                 <ul className="list-disc list-inside text-gray-300 mb-4 space-y-2">
-                  <li><strong>Service Providers:</strong> With vendors who help us operate the Service (e.g., hosting, analytics, payment processing, email delivery), under contracts that limit their use of your data</li>
+                  <li><strong>Service Providers:</strong> With vendors who help us operate the Service (for example, cloud hosting, infrastructure, payment processing, transactional email), under agreements that limit use to providing services to us and require appropriate security measures</li>
                   <li><strong>Legal & Safety:</strong> When required by law, court order, or government request, or to protect the rights, safety, or property of Fikiri, our users, or the public</li>
                   <li><strong>Business Transfers:</strong> In connection with a merger, sale, or acquisition, subject to the same privacy commitments</li>
                 </ul>
-                <p className="text-gray-300">
-                  We do not share your Gmail or email content with third parties for their advertising or marketing. Any analytics we use are configured to support service operation and improvement, not to track you across other sites for ads.
+                <p className="text-gray-300 mb-3">
+                  We do not transfer or disclose Google user data or Gmail content to third parties for their advertising, marketing, data brokerage, or the prohibited purposes listed under &quot;Google user data — limited use&quot; above. Subprocessors receive data only as needed to host and run the Service, not to monetize your mailbox content.
                 </p>
               </section>
 
@@ -127,13 +130,28 @@ const PrivacyPolicy: React.FC = () => {
                 <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Gmail API Integration</h2>
                 <p className="text-gray-300 mb-3">Our Service integrates with Gmail API to:</p>
                 <ul className="list-disc list-inside text-gray-300 mb-4 space-y-2">
-                  <li><strong>Read Emails:</strong> Process incoming messages for AI analysis and automation</li>
-                  <li><strong>Send Emails:</strong> Deliver AI-generated responses on your behalf</li>
+                  <li><strong>Read Emails:</strong> Process incoming messages for analysis and automation you enable</li>
+                  <li><strong>Send Emails:</strong> Deliver responses and outbound messages you initiate or configure</li>
                   <li><strong>Manage Labels:</strong> Organize emails according to your automation rules</li>
-                  <li><strong>Access Metadata:</strong> Retrieve email headers, timestamps, and thread information</li>
+                  <li><strong>Access Metadata:</strong> Retrieve email headers, timestamps, and thread information needed for those features</li>
                     </ul>
+                <p className="text-gray-300 mb-3">
+                  <strong>Your Consent:</strong> We only access your Gmail data with your explicit permission through Google&apos;s OAuth consent process. You can review or revoke the connection anytime in your Google Account (Third-party access) and through in-app disconnect options where available.
+                </p>
+              </section>
+
+              <section className="mb-8">
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Retention and Deletion</h2>
+                <p className="text-gray-300 mb-3">
+                  We retain personal information, including Google OAuth tokens and data processed from Gmail, for as long as your account is active and as needed to provide the Service, unless a longer period is required or permitted by law (for example, security logs or billing records).
+                </p>
+                <ul className="list-disc list-inside text-gray-300 mb-4 space-y-2">
+                  <li><strong>While you use the Service:</strong> We keep connection credentials (for example, encrypted OAuth tokens) and operational copies of data needed to run automations and show you results.</li>
+                  <li><strong>When you disconnect Google:</strong> We stop new access using that connection; we may retain limited records as described in your account settings and as needed for security or legal compliance.</li>
+                  <li><strong>Deletion requests:</strong> You may request deletion of your account and associated data by contacting <a href="mailto:privacy@fikirisolutions.com" className="text-brand-primary hover:text-muted-foreground">privacy@fikirisolutions.com</a> and, where offered, through in-app privacy or account tools. When retention periods expire or after a completed deletion request (subject to legal holds), we delete or irreversibly anonymize data in line with our technical and organizational capabilities.</li>
+                </ul>
                 <p className="text-gray-300">
-                  <strong>Your Consent:</strong> We only access your Gmail data with your explicit permission through Google's OAuth consent process.
+                  If we materially change how we collect, use, store, or share Google user data, we will update this Privacy Policy and notify you as described under &quot;Policy Updates&quot; below.
                 </p>
               </section>
 
@@ -156,12 +174,12 @@ const PrivacyPolicy: React.FC = () => {
 
               <section className="mb-8">
                 <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Data Security</h2>
-                <p className="text-gray-300 mb-3">We implement measures to protect your information:</p>
+                <p className="text-gray-300 mb-3">We implement administrative, technical, and organizational measures designed to protect Google user data and other personal information, including:</p>
                 <ul className="list-disc list-inside text-gray-300 space-y-2">
-                  <li><strong>Encryption:</strong> Data in transit is protected with TLS; sensitive data at rest is encrypted where applicable</li>
-                  <li><strong>Access Controls:</strong> Role-based access and authentication measures to limit who can access your data</li>
-                  <li><strong>Data Minimization:</strong> We collect only what is needed for the Service</li>
-                  <li><strong>Monitoring & Audits:</strong> Security monitoring and periodic assessments to address risks</li>
+                  <li><strong>Encryption:</strong> Data in transit is protected with TLS; sensitive credentials (including OAuth tokens) are stored encrypted where our systems support encryption at rest</li>
+                  <li><strong>Access Controls:</strong> Authentication, authorization, and least-privilege practices to limit access to production systems and customer data</li>
+                  <li><strong>Data Minimization:</strong> We collect and retain only what is needed to provide the Service</li>
+                  <li><strong>Monitoring & Reviews:</strong> Security monitoring and periodic review to address risks; no security practice can guarantee absolute protection</li>
                     </ul>
               </section>
 
