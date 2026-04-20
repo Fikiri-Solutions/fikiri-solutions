@@ -2025,7 +2025,8 @@ def create_automation_rule():
         else:
             error_msg = result.get('error', 'Failed to create automation rule')
             error_code = result.get('error_code', 'AUTOMATION_CREATE_ERROR')
-            return create_error_response(error_msg, 500, error_code)
+            http_status = 400 if error_code == 'INVALID_TRIGGER_CONDITIONS' else 500
+            return create_error_response(error_msg, http_status, error_code)
             
     except Exception as e:
         logger.error(f"Create automation rule error: {e}")
@@ -2103,11 +2104,32 @@ def update_automation_rule(rule_id):
         else:
             error_msg = result.get('error', 'Failed to update automation rule')
             error_code = result.get('error_code', 'AUTOMATION_UPDATE_ERROR')
-            return create_error_response(error_msg, 500, error_code)
+            http_status = 400 if error_code == 'INVALID_TRIGGER_CONDITIONS' else 500
+            return create_error_response(error_msg, http_status, error_code)
             
     except Exception as e:
         logger.error(f"Update automation rule error: {e}")
         return create_error_response("Failed to update automation rule", 500, 'AUTOMATION_ERROR')
+
+@business_bp.route('/automation/trigger-condition-metadata', methods=['GET'])
+@handle_api_errors
+def get_trigger_condition_metadata():
+    """Fields and operators for trigger IF-groups (Automation Studio)."""
+    try:
+        user_id = get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+        result = automation_engine.get_trigger_condition_metadata()
+        if result.get('success'):
+            return create_success_response(result['data'], 'Trigger condition metadata retrieved')
+        return create_error_response(
+            result.get('error', 'Failed to load trigger metadata'),
+            500,
+            'TRIGGER_METADATA_ERROR',
+        )
+    except Exception as e:
+        logger.error(f"Get trigger condition metadata error: {e}")
+        return create_error_response("Failed to retrieve trigger metadata", 500, 'TRIGGER_METADATA_ERROR')
 
 @business_bp.route('/automation/suggestions', methods=['GET'])
 @handle_api_errors

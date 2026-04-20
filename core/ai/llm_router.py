@@ -12,6 +12,12 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 from core.ai.llm_client import LLMClient
+from core.ai.model_policy import (
+    FALLBACK_LLM_MODEL,
+    INTENT_MODEL_CONFIG,
+    KNOWN_INTENTS,
+    PREMIUM_LLM_MODEL,
+)
 from core.ai.validators import SchemaValidator
 from core.ai.ai_event_log import (
     build_router_envelope_base,
@@ -22,20 +28,6 @@ from core.ai.ai_event_log import (
 )
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Centralized intent registry (Phase 3). Unknown intents fall back to 'general'.
-# Output schemas: see core.ai.schemas (ChatbotResponseSchema, EmailClassificationSchema, LeadAnalysisSchema).
-# ---------------------------------------------------------------------------
-INTENT_MODEL_CONFIG = {
-    "email_reply": {"model": "gpt-3.5-turbo", "max_tokens": 300, "temperature": 0.7},
-    "classification": {"model": "gpt-3.5-turbo", "max_tokens": 100, "temperature": 0.3},
-    "extraction": {"model": "gpt-3.5-turbo", "max_tokens": 200, "temperature": 0.1},
-    "summarization": {"model": "gpt-3.5-turbo", "max_tokens": 500, "temperature": 0.5},
-    "chatbot_response": {"model": "gpt-3.5-turbo", "max_tokens": 500, "temperature": 0.4},
-    "general": {"model": "gpt-3.5-turbo", "max_tokens": 500, "temperature": 0.7},
-}
-KNOWN_INTENTS = tuple(INTENT_MODEL_CONFIG.keys())
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -547,21 +539,20 @@ class LLMRouter:
         """
         config = INTENT_MODEL_CONFIG.get(intent, INTENT_MODEL_CONFIG["general"]).copy()
         
-        # Adjust based on cost budget
+        # Adjust based on cost budget (premium model only when explicitly high budget).
         if cost_budget is not None:
-            if cost_budget < 0.01:  # Very low budget
-                config['model'] = 'gpt-3.5-turbo'
-                config['max_tokens'] = min(config['max_tokens'], 200)
-            elif cost_budget > 0.10:  # High budget
-                config['model'] = 'gpt-4-turbo'
-                config['max_tokens'] = min(config['max_tokens'] * 2, 2000)
-        
-        # Adjust based on latency requirement
-        if latency_requirement == 'low':
-            config['model'] = 'gpt-3.5-turbo'  # Faster model
-        elif latency_requirement == 'high':
-            config['model'] = 'gpt-4-turbo'  # Better quality, slower
-        
+            if cost_budget < 0.01:
+                config["model"] = FALLBACK_LLM_MODEL
+                config["max_tokens"] = min(config["max_tokens"], 200)
+            elif cost_budget > 0.10:
+                config["model"] = PREMIUM_LLM_MODEL
+                config["max_tokens"] = min(config["max_tokens"] * 2, 2000)
+
+        if latency_requirement == "low":
+            config["model"] = FALLBACK_LLM_MODEL
+        elif latency_requirement == "high":
+            config["model"] = PREMIUM_LLM_MODEL
+
         return config
     
     def postprocess(

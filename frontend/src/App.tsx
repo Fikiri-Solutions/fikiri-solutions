@@ -15,8 +15,10 @@ import { Services } from './pages/Services'
 import { CRM } from './pages/CRM'
 import { AIAssistant } from './pages/AIAssistant'
 import { Automations } from './pages/Automations'
+import { AutomationSetupCaptureLeadsEmail } from './pages/AutomationSetupCaptureLeadsEmail'
 import { CorrelationDebugPage } from './pages/CorrelationDebugPage'
 import { ChatbotBuilder } from './pages/ChatbotBuilder'
+import { ContentMigration } from './pages/ContentMigration'
 import { GmailConnect } from './pages/GmailConnect'
 import { OutlookConnect } from './pages/OutlookConnect'
 import { Integrations } from './pages/Integrations'
@@ -37,6 +39,7 @@ import LandingPage from './pages/LandingPage'
 import InstallPage from './pages/Install'
 import RadiantLandingPage from './pages/RadiantLandingPage'
 import PricingPage from './pages/PricingPage'
+import FaqPage from './pages/FaqPage'
 import { BillingPage } from './pages/BillingPage'
 import { QueryProvider } from './providers/QueryProvider'
 import { ToastProvider } from './components/Toast'
@@ -98,6 +101,7 @@ function App() {
                           <Route path="/" element={<RadiantLandingPage />} />
                           <Route path="/landing-classic" element={<LandingPage />} />
                           <Route path="/pricing" element={<PricingPage />} />
+                          <Route path="/faq" element={<FaqPage />} />
                           <Route path="/services-landing" element={<ServicesLanding />} />
                           <Route path="/ai-landing" element={<AIAssistantLanding />} />
                           <Route path="/industries/landscaping" element={<LandscapingLanding />} />
@@ -206,6 +210,11 @@ function App() {
                               <Layout><Automations /></Layout>
                             </ProtectedRoute>
                           } />
+                          <Route path="/automations/setup/capture-leads-email" element={
+                            <ProtectedRoute>
+                              <Layout><AutomationSetupCaptureLeadsEmail /></Layout>
+                            </ProtectedRoute>
+                          } />
                           <Route path="/debug/correlation" element={
                             <ProtectedRoute>
                               <Layout><CorrelationDebugPage /></Layout>
@@ -214,6 +223,11 @@ function App() {
                           <Route path="/ai/chatbot-builder" element={
                             <ProtectedRoute>
                               <Layout><ChatbotBuilder /></Layout>
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/import-center" element={
+                            <ProtectedRoute>
+                              <Layout><ContentMigration /></Layout>
                             </ProtectedRoute>
                           } />
                           <Route path="/integrations" element={<Navigate to="/automations" replace />} />

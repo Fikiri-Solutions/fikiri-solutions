@@ -68,7 +68,6 @@ def _ensure_tables() -> None:
 
 
 def _get_risc_config() -> Tuple[str, str]:
-    global _risc_config_cache
     now = time.time()
     if (
         now - float(_risc_config_cache["fetched_at"]) < 3600

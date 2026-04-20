@@ -13,6 +13,7 @@ const { apiClientMock } = vi.hoisted(() => ({
     getAutomationCapabilities: vi.fn(),
     getAutomationMetrics: vi.fn(),
     getAutomationLogs: vi.fn(),
+    getTriggerConditionMetadata: vi.fn(),
     createAutomationRule: vi.fn(),
     updateAutomationRule: vi.fn(),
     runAutomationPreset: vi.fn(),
@@ -107,6 +108,36 @@ describe('Automations page', () => {
         executed_at: new Date().toISOString(),
       },
     ])
+    apiClientMock.getTriggerConditionMetadata.mockResolvedValue({
+      if_match_values: ['all'],
+      operator_labels: {},
+      triggers: {
+        email_received: {
+          fields: [{ value: 'sender_email', label: 'Sender email' }],
+          string_operators: ['contains'],
+          numeric_operators: [],
+          numeric_fields: ['lead_id', 'score'],
+        },
+        lead_created: {
+          fields: [{ value: 'source', label: 'Source' }],
+          string_operators: ['equals'],
+          numeric_operators: [],
+          numeric_fields: ['lead_id', 'score'],
+        },
+        time_based: {
+          fields: [{ value: 'frequency', label: 'Frequency' }],
+          string_operators: ['equals'],
+          numeric_operators: [],
+          numeric_fields: ['lead_id', 'score'],
+        },
+        lead_stage_changed: {
+          fields: [{ value: 'new_stage', label: 'New stage' }],
+          string_operators: ['equals'],
+          numeric_operators: [],
+          numeric_fields: ['lead_id', 'score'],
+        },
+      },
+    })
   })
 
   it('renders automations dashboard with queue health and capability badges', async () => {
@@ -119,5 +150,8 @@ describe('Automations page', () => {
     expect(await screen.findByText('Partial (depends on configuration)')).toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: 'Recent executions' })).toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: 'Suggested automations' })).toBeInTheDocument()
+    const guided = await screen.findByRole('link', { name: /Capture leads from email/i })
+    expect(guided).toHaveAttribute('href', '/automations/setup/capture-leads-email')
+    expect(await screen.findByRole('heading', { name: 'Automation studio' })).toBeInTheDocument()
   })
 })

@@ -224,6 +224,82 @@ export interface KnowledgeSearchResult {
   content_preview: string
 }
 
+/** GET /api/migration/capabilities — structured import & migration map */
+export interface ContentMigrationCapabilities {
+  feature: string
+  version: number
+  sections: {
+    knowledge_marketing: {
+      title: string
+      description: string
+      modes: Array<{ id: string; label: string; notes: string }>
+      api: Array<{ method: string; path: string; auth: string; notes?: string; role?: string }>
+      related_ui_path: string
+    }
+    documents: {
+      title: string
+      description: string
+      supported_file_extensions: string[]
+      file_categories: Record<string, string[]>
+      api: Array<{ method: string; path: string; auth: string; notes?: string; role?: string }>
+      document_templates: Array<{
+        id: string
+        name: string
+        document_type: string
+        industry: string
+        variable_count: number
+      }>
+      related_ui_path: string
+    }
+    forms: {
+      title: string
+      description: string
+      api: Array<{ method: string; path: string; auth: string; notes?: string }>
+      form_templates: Array<{
+        id: string
+        name: string
+        industry: string
+        purpose: string
+        field_count: number
+      }>
+    }
+    contacts: {
+      title: string
+      description: string
+      csv_requirements: {
+        required_columns: string[]
+        optional_columns: string[]
+        max_file_mb: number
+        max_rows: number
+      }
+      on_duplicate_policies: string[]
+      api: Array<{ method: string; path: string; auth: string; notes?: string }>
+      related_ui_path: string
+    }
+  }
+}
+
+export interface DocsFormsDocumentTemplateSummary {
+  id: string
+  name: string
+  description: string
+  document_type: string
+  industry: string
+  format: string
+  variable_count: number
+  created_at: string
+}
+
+export interface DocsFormsFormTemplateSummary {
+  id: string
+  name: string
+  description: string
+  industry: string
+  purpose: string
+  field_count: number
+  created_at: string
+}
+
 export interface ApiKeySummary {
   id: number
   key_prefix: string
@@ -931,6 +1007,30 @@ class ApiClient {
     return response.data?.data?.capabilities || response.data?.capabilities || []
   }
 
+  async getTriggerConditionMetadata(): Promise<{
+    if_match_values: string[]
+    operator_labels: Record<string, string>
+    triggers: Record<
+      string,
+      {
+        fields: { value: string; label: string }[]
+        string_operators: string[]
+        numeric_operators: string[]
+        numeric_fields: string[]
+      }
+    >
+  }> {
+    const response = await this.client.get('/automation/trigger-condition-metadata')
+    const raw = response.data?.data ?? response.data
+    return (
+      raw ?? {
+        if_match_values: ['all'],
+        operator_labels: {},
+        triggers: {},
+      }
+    )
+  }
+
   async getAutomationQueueStats(): Promise<{
     queued: number
     running: number
@@ -1126,6 +1226,50 @@ class ApiClient {
     return response.data
   }
 
+  /** Aggregated migration map: formats, endpoints, template inventory */
+  async getContentMigrationCapabilities(): Promise<ContentMigrationCapabilities> {
+    const response = await this.client.get('/migration/capabilities')
+    const data = response.data?.data ?? response.data
+    return data as ContentMigrationCapabilities
+  }
+
+  async listDocsFormsDocumentTemplates(): Promise<DocsFormsDocumentTemplateSummary[]> {
+    const response = await this.client.get('/docs-forms/templates')
+    return response.data?.templates || []
+  }
+
+  async listDocsFormsFormTemplates(): Promise<DocsFormsFormTemplateSummary[]> {
+    const response = await this.client.get('/docs-forms/forms/templates')
+    return response.data?.templates || []
+  }
+
+  /**
+   * POST /api/chatbot/knowledge/import — same shape as public API; uses session JWT.
+   */
+  async importKnowledgeItem(payload: {
+    title?: string
+    content?: string
+    question?: string
+    answer?: string
+    category?: string
+    document_type?: string
+    tags?: string[]
+    keywords?: string[]
+  }): Promise<{ success?: boolean; document_id?: string }> {
+    const response = await this.client.post('/chatbot/knowledge/import', payload)
+    return response.data
+  }
+
+  async bulkImportKnowledgeDocuments(documents: Record<string, unknown>[]): Promise<{
+    success?: boolean
+    imported?: number
+    total?: number
+    results?: Array<{ index: number; success: boolean; document_id?: string; error?: string }>
+  }> {
+    const response = await this.client.post('/chatbot/knowledge/import/bulk', { documents })
+    return response.data
+  }
+
   async addFaq(payload: {
     question: string
     answer: string
@@ -1261,8 +1405,14 @@ class ApiClient {
     URL.revokeObjectURL(url)
   }
 
-  /** Import leads from a CSV file. Returns summary: imported, created, updated, skipped, skipped_details. */
-  async importLeadsCsv(file: File): Promise<{
+  /**
+   * Import leads from a CSV file. Returns summary: imported, created, updated, skipped, skipped_details.
+   * onDuplicate: skip | update | merge (server default update).
+   */
+  async importLeadsCsv(
+    file: File,
+    options?: { onDuplicate?: 'skip' | 'update' | 'merge' }
+  ): Promise<{
     imported: number
     created: number
     updated: number
@@ -1272,7 +1422,11 @@ class ApiClient {
   }> {
     const formData = new FormData()
     formData.append('file', file)
-    const response = await this.client.post('/crm/leads/import/csv', formData)
+    const onDup = options?.onDuplicate ?? 'update'
+    formData.append('on_duplicate', onDup)
+    const response = await this.client.post('/crm/leads/import/csv', formData, {
+      params: { on_duplicate: onDup },
+    })
     const data = response.data?.data ?? response.data
     return data
   }
@@ -1366,9 +1520,21 @@ class ApiClient {
     return response.data
   }
 
-  async getCustomerDetails(): Promise<any> {
+  /**
+   * Stripe customer record for the logged-in user, or null when unavailable / misconfigured Stripe.
+   */
+  async getCustomerDetails(): Promise<{
+    customer: Record<string, unknown> | null
+    billingUnavailable?: boolean
+    message?: string
+  }> {
     const response = await this.client.get('/billing/customer/details')
-    return response.data?.customer || null
+    const d = response.data
+    return {
+      customer: (d?.customer as Record<string, unknown> | undefined) ?? null,
+      billingUnavailable: Boolean(d?.billing_unavailable),
+      message: typeof d?.message === 'string' ? d.message : undefined,
+    }
   }
 
   async createSetupIntent(paymentMethodTypes: string[] = ['card', 'us_bank_account']): Promise<{ client_secret: string; setup_intent_id: string }> {

@@ -13,6 +13,8 @@ Quick reference for project documentation. Root-level: [`README.md`](../README.m
 | [gmail-api-scope-justification.md](gmail-api-scope-justification.md) | Gmail API scope justification (OAuth verification) |
 | [OUTLOOK_SETUP.md](OUTLOOK_SETUP.md) | Outlook/Microsoft OAuth setup |
 | [DOMAIN_SSL_SETUP.md](DOMAIN_SSL_SETUP.md) | Domain and SSL configuration |
+| [DEV_SMTP_VERIFICATION.md](DEV_SMTP_VERIFICATION.md) | Dev SMTP and transactional email verification |
+| [CONNECT_GMAIL_OUTLOOK.md](CONNECT_GMAIL_OUTLOOK.md) | Connecting Gmail and Outlook in the product |
 
 ## Architecture & Planning
 
@@ -21,6 +23,8 @@ Quick reference for project documentation. Root-level: [`README.md`](../README.m
 | [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md) | System architecture overview |
 | [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) | Database schema reference |
 | [CRITICAL_INTEGRATIONS_PLAN.md](CRITICAL_INTEGRATIONS_PLAN.md) | Integration priority matrix |
+| [CAPACITY_AND_SCALING_SUMMARY.md](CAPACITY_AND_SCALING_SUMMARY.md) | Capacity and scaling summary |
+| [SCHEMA_STRATEGY_LLM_DATA.md](SCHEMA_STRATEGY_LLM_DATA.md) | Schema strategy for LLM-related data |
 
 ## Frontend
 
@@ -28,6 +32,7 @@ Quick reference for project documentation. Root-level: [`README.md`](../README.m
 |-----|-------------|
 | [FRONTEND_UX_PATTERNS.md](FRONTEND_UX_PATTERNS.md) | Tooltips, modals, scroll—consistent UX patterns |
 | [FRONTEND_AUTH_CHECKLIST.md](FRONTEND_AUTH_CHECKLIST.md) | Frontend auth checklist |
+| [SERVICES_PRICING_PAGE_COPY.md](SERVICES_PRICING_PAGE_COPY.md) | Services / pricing page copy |
 
 ## Testing
 
@@ -36,6 +41,8 @@ Quick reference for project documentation. Root-level: [`README.md`](../README.m
 | [TESTING.md](TESTING.md) | Pytest commands, sellability gate, stability run |
 | [AUTOMATION_READINESS.md](AUTOMATION_READINESS.md) | Readiness script, SELLABLE requirements |
 | [PUBLIC_API_TESTING.md](PUBLIC_API_TESTING.md) | Public API unit tests and smoke test |
+| [E2E_TEST_PLAN.md](E2E_TEST_PLAN.md) | Playwright E2E test plan |
+| [CURSOR_QUALITY_GATE.md](CURSOR_QUALITY_GATE.md) | Quality gate for automation, queues, and workflows |
 
 ## Implementation Reference
 
@@ -51,6 +58,17 @@ Quick reference for project documentation. Root-level: [`README.md`](../README.m
 | [PUBLIC_API_IMPLEMENTATION.md](PUBLIC_API_IMPLEMENTATION.md) | Public API implementation summary |
 | [CHATBOT_EMBED.md](CHATBOT_EMBED.md) | Website chatbot embed (public endpoint) |
 | [SMS_CONSENT_TWILIO.md](SMS_CONSENT_TWILIO.md) | SMS express consent (CTIA/TCPA) and Twilio proof |
+| [CHATBOT_IMPLEMENTATION.md](CHATBOT_IMPLEMENTATION.md) | Chatbot implementation overview |
+| [CHATBOT_FEEDBACK_API.md](CHATBOT_FEEDBACK_API.md) | Chatbot feedback API |
+| [CHATBOT_KB_IMPORT.md](CHATBOT_KB_IMPORT.md) | Knowledge base import |
+| [CHATBOT_KB_PIPELINE_MAP.md](CHATBOT_KB_PIPELINE_MAP.md) | Chatbot KB pipeline map |
+| [CRM_LEAD_SCORING.md](CRM_LEAD_SCORING.md) | CRM lead scoring |
+| [EXPERT_ESCALATION_IMPLEMENTATION.md](EXPERT_ESCALATION_IMPLEMENTATION.md) | Expert escalation implementation |
+| [EXPERT_ESCALATION_SYSTEM.md](EXPERT_ESCALATION_SYSTEM.md) | Expert escalation system design |
+| [EXPORT_IMPORT_DATA_FORMATS.md](EXPORT_IMPORT_DATA_FORMATS.md) | Export/import data formats |
+| [IMPLEMENTATION_PROPOSAL_TEMPLATE.md](IMPLEMENTATION_PROPOSAL_TEMPLATE.md) | Template for implementation proposals |
+| [KPI_TRACKING_SYSTEM.md](KPI_TRACKING_SYSTEM.md) | KPI tracking system |
+| [TENANT_ISOLATION_IMPLEMENTATION.md](TENANT_ISOLATION_IMPLEMENTATION.md) | Tenant isolation implementation |
 
 ## Operations & Reliability
 
@@ -62,6 +80,17 @@ Quick reference for project documentation. Root-level: [`README.md`](../README.m
 | [DISASTER_RECOVERY_CHECKLIST.md](DISASTER_RECOVERY_CHECKLIST.md) | Disaster recovery procedures |
 | [PRODUCTION_READINESS_CHECKLIST.md](PRODUCTION_READINESS_CHECKLIST.md) | Production deployment checklist |
 | [FINANCIAL_MODEL_AND_RATE_LIMITING.md](FINANCIAL_MODEL_AND_RATE_LIMITING.md) | Pricing, cost, rate limiting, capacity |
+| [AUTOMATION_RELIABILITY.md](AUTOMATION_RELIABILITY.md) | Automation reliability |
+| [BACKGROUND_JOBS_ARCHITECTURE.md](BACKGROUND_JOBS_ARCHITECTURE.md) | Background jobs architecture |
+| [BACKUP_STRATEGY.md](BACKUP_STRATEGY.md) | Backup strategy |
+| [CI_CD_STRATEGY.md](CI_CD_STRATEGY.md) | CI/CD strategy |
+| [LAUNCH_CRITICAL_FIXES.md](LAUNCH_CRITICAL_FIXES.md) | Launch-critical fixes |
+| [LAUNCH_SAFE_REMAINING.md](LAUNCH_SAFE_REMAINING.md) | Post-launch safe remaining work |
+| [OPERATIONAL_SAFEGUARDS.md](OPERATIONAL_SAFEGUARDS.md) | Operational safeguards |
+| [PRODUCTION_RELEASE_NOTES.md](PRODUCTION_RELEASE_NOTES.md) | Production release notes |
+| [SLOs.md](SLOs.md) | Service level objectives |
+| [STAGING_AND_PROVIDER_READINESS.md](STAGING_AND_PROVIDER_READINESS.md) | Staging and provider readiness |
+| [WORKFLOW_DIAGNOSTIC_PLAYBOOK.md](WORKFLOW_DIAGNOSTIC_PLAYBOOK.md) | Workflow diagnostics playbook |
 
 ## Security & Debugging
 
@@ -70,6 +99,9 @@ Quick reference for project documentation. Root-level: [`README.md`](../README.m
 | [SECURITY_ASSESSMENT.md](SECURITY_ASSESSMENT.md) | Security assessment report |
 | [AUTHENTICATION_DEBUG_GUIDE.md](AUTHENTICATION_DEBUG_GUIDE.md) | Auth debugging guide |
 | [TROUBLESHOOTING_GUIDE.md](TROUBLESHOOTING_GUIDE.md) | General troubleshooting |
+| [WEBHOOK_SECURITY.md](WEBHOOK_SECURITY.md) | Webhook security |
+| [STRUCTURED_LOGGING.md](STRUCTURED_LOGGING.md) | Structured logging |
+| [TWILIO_WEBHOOKS.md](TWILIO_WEBHOOKS.md) | Twilio webhooks |
 
 ## Technical Deep Dives
 
@@ -78,6 +110,17 @@ Quick reference for project documentation. Root-level: [`README.md`](../README.m
 | [CRUD_RAG_ARCHITECTURE.md](CRUD_RAG_ARCHITECTURE.md) | CRUD, RAG flow, identity/merge policy |
 | [MUTEX_CONTENTION_MITIGATION.md](MUTEX_CONTENTION_MITIGATION.md) | Mutex contention fixes |
 | [CLIENT_ONBOARDING_GUIDE.md](CLIENT_ONBOARDING_GUIDE.md) | Client onboarding flow |
+| [CORRELATION_AND_EVENTS.md](CORRELATION_AND_EVENTS.md) | Correlation IDs and events |
+| [SQLITE_DATETIME_COMPARISONS.md](SQLITE_DATETIME_COMPARISONS.md) | SQLite datetime comparisons |
+| [MIGRATIONS.md](MIGRATIONS.md) | Database migrations |
+
+## Admin & developer tooling
+
+| Doc | Description |
+|-----|-------------|
+| [ADMIN_ROUTES_STRATEGY.md](ADMIN_ROUTES_STRATEGY.md) | Admin routes and RBAC strategy |
+| [AUTHORIZATION_MATRIX.md](AUTHORIZATION_MATRIX.md) | Authorization matrix |
+| [CODEX_SETUP.md](CODEX_SETUP.md) | Codex setup for this repository |
 
 ## Reference
 

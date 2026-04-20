@@ -9,9 +9,11 @@ from typing import Optional, List
 
 logger = logging.getLogger(__name__)
 
-# Default dimension for text-embedding-ada-002
+# Default: text-embedding-3-small (typically cheaper than ada-002 at 1536 dims).
+# If you change FIKIRI_EMBEDDING_MODEL on an existing deployment, re-build the vector
+# index: embeddings from different models are not comparable in the same space.
 OPENAI_EMBEDDING_DIMENSION = 1536
-OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
+OPENAI_EMBEDDING_MODEL = (os.getenv("FIKIRI_EMBEDDING_MODEL") or "text-embedding-3-small").strip()
 
 
 def get_embedding(text: str, api_key: Optional[str] = None) -> Optional[List[float]]:

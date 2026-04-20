@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Upload, FileText, MessageSquare, BookOpen, Sparkles, Loader2, Search } from 'lucide-react'
+import { Upload, FileText, MessageSquare, BookOpen, Sparkles, Loader2, Search, Code2 } from 'lucide-react'
 import { apiClient, KnowledgeSearchResult } from '../services/apiClient'
 import { useToast } from '../components/Toast'
 import { EmptyState } from '../components/EmptyState'
@@ -128,6 +129,18 @@ export const ChatbotBuilder: React.FC = () => {
         <p className="text-sm uppercase tracking-wide text-brand-text/60 dark:text-gray-400">Chatbot Builder</p>
         <h1 className="text-3xl font-bold text-brand-text dark:text-white">Knowledge & FAQ Studio</h1>
         <p className="mt-2 text-brand-text/70 dark:text-gray-300">Upload documents, add FAQs, and preview chatbot responses.</p>
+        <div className="mt-4 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+          <Link
+            to="/install"
+            className="inline-flex w-fit items-center gap-2 rounded-xl border border-brand-primary/40 bg-brand-primary/10 px-4 py-2.5 text-sm font-medium text-brand-primary hover:bg-brand-primary/20 dark:text-teal-200"
+          >
+            <Code2 className="h-4 w-4 shrink-0" aria-hidden />
+            Add chatbot to your website
+          </Link>
+          <p className="text-sm text-brand-text/60 dark:text-gray-400 max-w-xl">
+            This page is for your knowledge and FAQs. The Install page has the embed script, platform steps, and your public API key.
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

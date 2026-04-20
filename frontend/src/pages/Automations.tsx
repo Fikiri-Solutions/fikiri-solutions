@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import {
@@ -21,6 +21,11 @@ import { apiClient, AutomationLog, AutomationRule, AutomationSafetyStatus } from
 import { useToast } from '../components/Toast'
 import { AutomationWizard } from '../components/AutomationWizard'
 import { WebhookPayloadBuilder } from '../components/WebhookPayloadBuilder'
+import {
+  TriggerIfGroup,
+  TriggerIfConditionRow,
+  TriggerIfGroupValue,
+} from '../components/TriggerIfGroup'
 import { useAuth } from '../contexts/AuthContext'
 import { FIKIRI_LAST_AUTOMATION_CORRELATION_KEY } from '../constants/correlationDebug'
 
@@ -151,6 +156,71 @@ const findRuleForPreset = (rules: AutomationRule[] = [], presetId: string) => {
   return rules.find(rule => rule.action_parameters?.slug === presetId || rule.name === presetId)
 }
 
+function emptyTriggerIfByPreset(): Record<string, TriggerIfGroupValue> {
+  const init: Record<string, TriggerIfGroupValue> = {}
+  automationPresets.forEach(p => {
+    init[p.id] = { match: 'all', conditions: [] }
+  })
+  return init
+}
+
+function normalizeTriggerConditions(tc: unknown): Record<string, unknown> | undefined {
+  if (tc == null) return undefined
+  if (typeof tc === 'string') {
+    try {
+      return JSON.parse(tc) as Record<string, unknown>
+    } catch {
+      return undefined
+    }
+  }
+  if (typeof tc === 'object') return tc as Record<string, unknown>
+  return undefined
+}
+
+function deriveIfGroupFromRule(
+  tc: Record<string, unknown> | undefined,
+  triggerType: string
+): TriggerIfGroupValue {
+  const base: TriggerIfGroupValue = { match: 'all', conditions: [] }
+  const obj = normalizeTriggerConditions(tc)
+  if (!obj) return base
+  const ifBlock = (obj as { if?: { conditions?: TriggerIfConditionRow[] } }).if
+  if (Array.isArray(ifBlock?.conditions) && ifBlock.conditions.length > 0) {
+    return {
+      match: 'all',
+      conditions: ifBlock.conditions.map(c => ({
+        field: c.field,
+        op: c.op,
+        value: c.value,
+      })),
+    }
+  }
+  const conds: TriggerIfConditionRow[] = []
+  const legacy = obj as { sender_domain?: string; source?: string }
+  if (triggerType === 'email_received' && legacy.sender_domain) {
+    conds.push({ field: 'sender_email', op: 'ends_with', value: String(legacy.sender_domain) })
+  }
+  if (triggerType === 'lead_created' && legacy.source) {
+    conds.push({ field: 'source', op: 'equals', value: String(legacy.source) })
+  }
+  return { match: 'all', conditions: conds }
+}
+
+function mapRuleToConfigSlice(rule: AutomationRule | undefined, preset: AutomationPreset, defaults: Record<string, any>) {
+  if (!rule) {
+    return { ...defaults }
+  }
+  const params = rule.action_parameters || {}
+  if (rule.action_type === 'trigger_webhook') {
+    return {
+      ...params,
+      webhook_url: params.webhook_url || params.sheet_url || '',
+      payload: params.payload || {},
+    }
+  }
+  return { ...params }
+}
+
 const formatAbsoluteTimestamp = (timestamp?: string) => {
   if (!timestamp) {
     return 'No executions yet'
@@ -200,6 +270,9 @@ export const Automations: React.FC = () => {
     return defaults
   }, [])
   const [configState, setConfigState] = useState<Record<string, Record<string, any>>>(baseConfig)
+  const [triggerIfByPreset, setTriggerIfByPreset] =
+    useState<Record<string, TriggerIfGroupValue>>(emptyTriggerIfByPreset)
+  const [dirtyByPreset, setDirtyByPreset] = useState<Record<string, boolean>>({})
   const [lastCorrelationId, setLastCorrelationId] = useState<string | null>(null)
   const [tracePreview, setTracePreview] = useState<string | null>(null)
   const [traceLoading, setTraceLoading] = useState(false)
@@ -224,13 +297,56 @@ export const Automations: React.FC = () => {
           mapped[slug] = params
         }
       })
-      setConfigState(prev => ({ ...prev, ...mapped }))
+      setConfigState(prev => {
+        const next = { ...prev }
+        Object.entries(mapped).forEach(([slug, params]) => {
+          if (dirtyByPreset[slug]) return
+          next[slug] = params
+        })
+        return next
+      })
       return data
     },
     staleTime: 1 * 60 * 1000, // 1 minute
     gcTime: 10 * 60 * 1000, // 10 minutes
     refetchInterval: 2 * 60 * 1000, // Auto-refresh every 2 minutes
   })
+
+  useEffect(() => {
+    if (isLoading) return
+    setTriggerIfByPreset(prev => {
+      const next = { ...prev }
+      automationPresets.forEach(preset => {
+        if (!next[preset.id]) {
+          next[preset.id] = { match: 'all', conditions: [] }
+        }
+      })
+      rules.forEach((rule: AutomationRule) => {
+        const slug = rule.action_parameters?.slug ?? ''
+        if (!slug || next[slug] === undefined || dirtyByPreset[slug]) return
+        next[slug] = deriveIfGroupFromRule(rule.trigger_conditions, rule.trigger_type)
+      })
+      return next
+    })
+  }, [rules, isLoading, dirtyByPreset])
+
+  const discardLocalChanges = useCallback(
+    (preset: AutomationPreset) => {
+      const rule = findRuleForPreset(rules, preset.id)
+      setDirtyByPreset(prev => ({ ...prev, [preset.id]: false }))
+      setConfigState(prev => ({
+        ...prev,
+        [preset.id]: mapRuleToConfigSlice(rule, preset, baseConfig[preset.id]),
+      }))
+      setTriggerIfByPreset(prev => ({
+        ...prev,
+        [preset.id]: rule
+          ? deriveIfGroupFromRule(rule.trigger_conditions, rule.trigger_type)
+          : { match: 'all', conditions: [] },
+      }))
+    },
+    [rules, baseConfig]
+  )
 
   const { data: safetyStatus } = useQuery<AutomationSafetyStatus>({
     queryKey: ['automation-safety'],
@@ -251,6 +367,13 @@ export const Automations: React.FC = () => {
     queryFn: () => apiClient.getAutomationCapabilities(),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
+  })
+
+  const { data: triggerConditionMeta } = useQuery({
+    queryKey: ['automation-trigger-condition-metadata'],
+    queryFn: () => apiClient.getTriggerConditionMetadata(),
+    staleTime: 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
   })
 
   const capabilityByAction = useMemo(() => {
@@ -331,15 +454,19 @@ export const Automations: React.FC = () => {
   }
 
   const createMutation = useMutation({
-    mutationFn: (rule: {
+    mutationFn: (payload: {
+      presetId: string
+      rule: {
       name: string
       description: string
       trigger_type: string
       trigger_conditions: Record<string, any>
       action_type: string
       action_parameters: Record<string, any>
-    }) => apiClient.createAutomationRule(rule),
-    onSuccess: () => {
+      }
+    }) => apiClient.createAutomationRule(payload.rule),
+    onSuccess: (_data, variables) => {
+      setDirtyByPreset(prev => ({ ...prev, [variables.presetId]: false }))
       addToast({ type: 'success', title: 'Automation enabled' })
       refetchRules()
       refetchLogs()
@@ -356,9 +483,12 @@ export const Automations: React.FC = () => {
   })
 
   const updateMutation = useMutation({
-    mutationFn: ({ ruleId, updates }: { ruleId: number; updates: Partial<AutomationRule> }) =>
+    mutationFn: ({ ruleId, updates }: { ruleId: number; updates: Partial<AutomationRule>; presetId?: string }) =>
       apiClient.updateAutomationRule(ruleId, updates),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      if (variables.presetId) {
+        setDirtyByPreset(prev => ({ ...prev, [variables.presetId as string]: false }))
+      }
       addToast({ type: 'success', title: 'Automation updated' })
       refetchRules()
       refetchLogs()
@@ -373,6 +503,46 @@ export const Automations: React.FC = () => {
       console.error('Automation update error:', error)
     }
   })
+
+  const buildTriggerConditions = (presetId: string): Record<string, unknown> => {
+    const group = triggerIfByPreset[presetId]
+    const out: Record<string, unknown> = { slug: presetId }
+    if (!group?.conditions?.length) return out
+    const conditions = group.conditions.map(c => {
+      const row: Record<string, unknown> = { field: c.field, op: c.op }
+      if (c.op === 'is_empty' || c.op === 'is_not_empty') return row
+      if (typeof c.value === 'boolean') {
+        row.value = c.value
+        return row
+      }
+      if (typeof c.value === 'number' && !Number.isNaN(c.value)) {
+        row.value = c.value
+        return row
+      }
+      if (c.value === '' || c.value === null || c.value === undefined) {
+        row.value = ''
+        return row
+      }
+      const num = Number(c.value)
+      if (['gt', 'gte', 'lt', 'lte'].includes(c.op) && !Number.isNaN(num)) {
+        row.value = num
+        return row
+      }
+      if (
+        (c.field === 'lead_id' || c.field === 'score') &&
+        (c.op === 'equals' || c.op === 'not_equals') &&
+        !Number.isNaN(num) &&
+        String(c.value).trim() !== ''
+      ) {
+        row.value = num
+        return row
+      }
+      row.value = c.value
+      return row
+    })
+    out.if = { match: 'all', conditions }
+    return out
+  }
 
   const handleToggle = (preset: AutomationPreset, active: boolean) => {
     const existing = findRuleForPreset(rules, preset.id)
@@ -391,34 +561,43 @@ export const Automations: React.FC = () => {
           actionParams.payload = configState[preset.id].payload
         }
       }
+
+      const trigger_conditions = buildTriggerConditions(preset.id)
       
       if (existing) {
         updateMutation.mutate({
           ruleId: existing.id,
+          presetId: preset.id,
           updates: {
             status: 'active',
-            action_parameters: actionParams
+            action_parameters: actionParams,
+            trigger_conditions,
           }
         })
       } else {
         createMutation.mutate({
-          name: preset.name,
-          description: preset.description,
-          trigger_type: preset.triggerType,
-          trigger_conditions: { ...preset.defaultConfig, slug: preset.id },
-          action_type: preset.actionType,
-          action_parameters: actionParams
+          presetId: preset.id,
+          rule: {
+            name: preset.name,
+            description: preset.description,
+            trigger_type: preset.triggerType,
+            trigger_conditions,
+            action_type: preset.actionType,
+            action_parameters: actionParams
+          }
         })
       }
     } else if (existing) {
       updateMutation.mutate({
         ruleId: existing.id,
+        presetId: preset.id,
         updates: { status: 'inactive' }
       })
     }
   }
 
   const handleConfigChange = (presetId: string, field: string, value: any) => {
+    setDirtyByPreset(prev => ({ ...prev, [presetId]: true }))
     setConfigState(prev => ({
       ...prev,
       [presetId]: {
@@ -429,6 +608,7 @@ export const Automations: React.FC = () => {
   }
 
   const handleWebhookUrlChange = (presetId: string, url: string) => {
+    setDirtyByPreset(prev => ({ ...prev, [presetId]: true }))
     setConfigState(prev => ({
       ...prev,
       [presetId]: {
@@ -440,6 +620,7 @@ export const Automations: React.FC = () => {
   }
 
   const handleWebhookPayloadChange = (presetId: string, payload: Record<string, any>) => {
+    setDirtyByPreset(prev => ({ ...prev, [presetId]: true }))
     setConfigState(prev => ({
       ...prev,
       [presetId]: {
@@ -481,7 +662,7 @@ export const Automations: React.FC = () => {
           <p className="text-sm uppercase tracking-wide text-brand-text/60 dark:text-gray-400">Automation Studio</p>
           <h1 className="text-2xl font-bold text-brand-text dark:text-white mt-0.5">Workflow Automations</h1>
           <p className="mt-1.5 text-sm text-brand-text/70 dark:text-gray-300 max-w-xl">
-            Toggle always-on workflows without writing code. Each automation runs using your connected Gmail and CRM.
+            Start with a guided setup for common outcomes, or use Automation studio for every preset, filters, and integrations.
           </p>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
@@ -522,6 +703,35 @@ export const Automations: React.FC = () => {
         </div>
       </div>
 
+      {!isLoading && (
+        <section
+          className="rounded-xl border border-brand-primary/25 bg-gradient-to-br from-brand-primary/[0.06] to-transparent dark:from-brand-primary/15 dark:border-brand-primary/30 p-5 shadow-sm"
+          aria-labelledby="automations-get-started-heading"
+        >
+          <h2 id="automations-get-started-heading" className="text-sm font-semibold uppercase tracking-wide text-brand-text/70 dark:text-gray-300">
+            Get started
+          </h2>
+          <p className="mt-1.5 text-sm text-brand-text/80 dark:text-gray-300 max-w-2xl">
+            Guided setup walks through inbox connection, where leads go in CRM, and optional sender filters — then you go live
+            on the same engine as the studio below.
+          </p>
+          <div className="mt-4 flex flex-col sm:flex-row flex-wrap gap-3">
+            <Link
+              to="/automations/setup/capture-leads-email"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-primary px-4 py-3 text-sm font-semibold text-white shadow-sm hover:opacity-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 dark:ring-offset-gray-900"
+            >
+              Capture leads from email
+            </Link>
+            <a
+              href="#automation-studio"
+              className="inline-flex items-center justify-center rounded-lg border border-brand-text/20 dark:border-gray-600 px-4 py-3 text-sm font-medium text-brand-text dark:text-gray-200 hover:bg-brand-text/5"
+            >
+              Automation studio (advanced)
+            </a>
+          </div>
+        </section>
+      )}
+
       {/* Show wizard if user has no active automations */}
       {!isLoading && rules.filter((r: any) => r.status === 'active').length === 0 && showWizard && (
         <AutomationWizard
@@ -539,6 +749,14 @@ export const Automations: React.FC = () => {
           Loading automations…
         </div>
       ) : (
+        <section id="automation-studio" className="space-y-3 scroll-mt-24">
+          <div>
+            <h2 className="text-lg font-semibold text-brand-text dark:text-white">Automation studio</h2>
+            <p className="text-sm text-brand-text/65 dark:text-gray-400 mt-0.5">
+              All workflow presets, trigger conditions (IF groups), and actions. For a step-by-step first workflow, use Get
+              started above.
+            </p>
+          </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {automationPresets.map((preset) => {
             const Icon = preset.icon
@@ -575,13 +793,28 @@ export const Automations: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  <button
+                                   <button
                     onClick={() => handleToggle(preset, !isActive)}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${isActive ? 'bg-brand-primary' : 'bg-brand-text/30'}`}
                   >
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-gray-300 transition ${isActive ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
+
+                {dirtyByPreset[preset.id] && (
+                  <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-500/35 bg-amber-500/10 dark:bg-amber-500/15 px-2.5 py-1.5">
+                    <span className="text-xs font-medium text-amber-900 dark:text-amber-100">
+                      Unsaved changes — use Save &amp; Activate to persist, or discard.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => discardLocalChanges(preset)}
+                      className="text-xs font-semibold text-amber-900 dark:text-amber-100 hover:underline flex-shrink-0"
+                    >
+                      Discard
+                    </button>
+                  </div>
+                )}
 
                 {preset.actionType === 'trigger_webhook' && (
                   <div className="space-y-3 mt-1">
@@ -606,6 +839,19 @@ export const Automations: React.FC = () => {
                     ))}
                   </div>
                 )}
+
+                <TriggerIfGroup
+                  triggerType={preset.triggerType}
+                  value={triggerIfByPreset[preset.id] ?? { match: 'all', conditions: [] }}
+                  onChange={next => {
+                    setDirtyByPreset(prev => ({ ...prev, [preset.id]: true }))
+                    setTriggerIfByPreset(prev => ({
+                      ...prev,
+                      [preset.id]: next,
+                    }))
+                  }}
+                  metadata={triggerConditionMeta ?? null}
+                />
 
                 <div className="rounded-lg border border-brand-text/10 dark:border-gray-700 bg-brand-accent/5 dark:bg-gray-900 p-3">
                   <div className="flex items-center justify-between gap-2">
@@ -658,6 +904,7 @@ export const Automations: React.FC = () => {
             )
           })}
         </div>
+        </section>
       )}
 
       <div className="rounded-xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">

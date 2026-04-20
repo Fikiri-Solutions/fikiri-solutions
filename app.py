@@ -10,7 +10,7 @@ import time
 import uuid
 import logging
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_cors import CORS
 
 # Environment file loading for local development
@@ -90,6 +90,7 @@ from core.billing_api import billing_bp
 from core.webhook_api import webhook_bp
 from crm.completion_api import crm_bp
 from core.docs_forms_api import docs_forms_bp
+from core.migration_api import migration_bp
 from core.chatbot_smart_faq_api import chatbot_bp
 from core.public_chatbot_api import public_chatbot_bp
 from core.ai_analysis_api import ai_analysis_bp
@@ -636,6 +637,17 @@ def setup_routes(app):
             'frontend': 'https://fikirisolutions.com'
         })
 
+    @app.route('/integrations/universal/fikiri-sdk.js')
+    def serve_fikiri_universal_sdk():
+        """Embed SDK for PublicChatbotWidget and external installs (same-origin or proxied)."""
+        universal_dir = os.path.join(app.root_path, 'integrations', 'universal')
+        return send_from_directory(
+            universal_dir,
+            'fikiri-sdk.js',
+            mimetype='application/javascript',
+            max_age=3600,
+        )
+
     # Frontend routes
     @app.route('/dashboard')
     def dashboard():
@@ -695,6 +707,7 @@ def register_blueprints(app):
         (webhook_bp, 'webhook'),
         (crm_bp, 'crm'),
         (docs_forms_bp, 'docs_forms'),
+        (migration_bp, 'migration'),
         (chatbot_bp, 'chatbot'),
         (public_chatbot_bp, 'public_chatbot'),
         (ai_analysis_bp, 'ai_analysis'),

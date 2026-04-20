@@ -7,7 +7,6 @@ from flask import Blueprint, request, jsonify
 import logging
 from typing import Dict, Any
 from core.workflow_templates_system import workflow_templates_system, WorkflowCategory
-# from core.enterprise_logging import log_api_request
 
 logger = logging.getLogger(__name__)
 

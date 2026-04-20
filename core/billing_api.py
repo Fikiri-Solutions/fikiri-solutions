@@ -124,6 +124,31 @@ def get_user_name(user_id):
     return user_row['name'] if hasattr(user_row, 'keys') else user_row[0]
 
 
+def _stripe_dashboard_message(exc: BaseException) -> str:
+    """User-safe copy when Stripe calls fail (misconfigured keys, outages, circuit breaker)."""
+    text = str(exc).lower()
+    if "invalid api key" in text:
+        return (
+            "Stripe rejected the API key. Set STRIPE_SECRET_KEY to a secret key "
+            "(sk_test_... or sk_live_...), not a publishable or restricted key."
+        )
+    if "circuit breaker" in text and "open" in text:
+        return "Billing is temporarily unavailable after repeated Stripe errors. Try again in a few minutes."
+    return "Billing profile could not be loaded. Check Stripe configuration or try again later."
+
+
+def _stripe_customer_display_name(user_id, user_email):
+    """Stripe Customer `name` — use profile name or email local-part; avoid `User <id>` in production."""
+    n = get_user_name(user_id)
+    if n and str(n).strip():
+        return str(n).strip()
+    if user_email and '@' in user_email:
+        local = user_email.split('@', 1)[0].strip()
+        if local:
+            return local
+    return 'Customer'
+
+
 def _get_current_user_customer_id():
     """Return (stripe_customer_id, user_id) for the current JWT user, or (None, None)."""
     user_id = get_jwt_identity()
@@ -325,8 +350,8 @@ def create_subscription():
         # Get user info from JWT
         user_id = get_jwt_identity()
         user_email = get_user_email(user_id) or f"user_{user_id}@fikiri.com"
-        user_name = get_user_name(user_id) or f"User {user_id}"
-        
+        user_name = _stripe_customer_display_name(user_id, user_email)
+
         # Create customer if doesn't exist
         customer = stripe_manager.create_customer(
             email=user_email,
@@ -405,22 +430,31 @@ def get_current_subscription():
         customer_id = get_stripe_customer_id(user_email, user_id)
         if customer_id:
             try:
-                def _list_subscriptions():
-                    return stripe.Subscription.list(
+                # Stripe status filters are exclusive: `trialing` is not included in `active`.
+                # List recent subscriptions and pick the first active or trialing (matches DB cache query).
+                def _fetch_billable_subscription_from_stripe():
+                    subs = stripe.Subscription.list(
                         customer=customer_id,
-                        status='active',
-                        limit=1
+                        limit=20,
                     )
-                
+                    for sub in subs.data:
+                        if sub.status in ('active', 'trialing'):
+                            return stripe_manager.get_subscription(sub.id)
+                    return None
+
                 if TIMEOUT_AVAILABLE:
                     breaker = get_circuit_breaker("stripe", failure_threshold=5, timeout_seconds=60, fail_open=False)
-                    subscriptions = breaker.call(lambda: stripe_call_with_timeout(_list_subscriptions, timeout=DEFAULT_STRIPE_TIMEOUT))
+                    subscription_payload = breaker.call(
+                        lambda: stripe_call_with_timeout(
+                            _fetch_billable_subscription_from_stripe,
+                            timeout=DEFAULT_STRIPE_TIMEOUT,
+                        )
+                    )
                 else:
-                    subscriptions = _list_subscriptions()
-                
-                if subscriptions.data and len(subscriptions.data) > 0:
-                    subscription = stripe_manager.get_subscription(subscriptions.data[0].id)
-                    return jsonify({'success': True, 'subscription': subscription, 'cached': False})
+                    subscription_payload = _fetch_billable_subscription_from_stripe()
+
+                if subscription_payload:
+                    return jsonify({'success': True, 'subscription': subscription_payload, 'cached': False})
             except stripe.error.StripeError as e:
                 logger.error(f"Stripe API error: {e}")
                 return jsonify({
@@ -595,15 +629,27 @@ def get_customer_details():
             try:
                 customer = stripe_manager.create_customer(
                     email=user_email,
-                    name=f"User {user_id}",
+                    name=_stripe_customer_display_name(user_id, user_email),
                     metadata={'user_id': str(user_id)}
                 )
                 customer_id = customer['id']
             except Exception as e:
                 logger.warning("Failed to create customer for details: %s", e)
-                return jsonify({'success': False, 'error': 'No customer found. Please create a subscription first.'}), 400
+                return jsonify({
+                    'success': True,
+                    'customer': None,
+                    'billing_unavailable': True,
+                    'message': _stripe_dashboard_message(e),
+                })
         
         details = stripe_manager.get_customer_details(customer_id)
+        if not details:
+            return jsonify({
+                'success': True,
+                'customer': None,
+                'billing_unavailable': True,
+                'message': 'Could not load billing details from Stripe.',
+            })
         return jsonify({'success': True, 'customer': details})
     except Exception as e:
         logger.error(f"Failed to get customer details: {e}")
@@ -619,19 +665,26 @@ def create_setup_intent():
         if not user_email:
             return jsonify({'success': False, 'error': 'User not found'}), 404
         
+        if not STRIPE_AVAILABLE:
+            return jsonify({
+                'success': False,
+                'error': 'Stripe is not configured on this server.',
+                'error_code': 'STRIPE_UNAVAILABLE',
+            }), 200
+        
         data = request.get_json() or {}
         payment_method_types = data.get('payment_method_types', ['card', 'us_bank_account'])
         
-        customer_id = get_stripe_customer_id(user_email)
-        if not customer_id:
-            customer = stripe_manager.create_customer(
-                email=user_email,
-                name=f"User {user_id}",
-                metadata={'user_id': str(user_id)}
-            )
-            customer_id = customer['id']
-        
-        if STRIPE_AVAILABLE:
+        try:
+            customer_id = get_stripe_customer_id(user_email, user_id)
+            if not customer_id:
+                customer = stripe_manager.create_customer(
+                    email=user_email,
+                    name=_stripe_customer_display_name(user_id, user_email),
+                    metadata={'user_id': str(user_id)}
+                )
+                customer_id = customer['id']
+
             setup_intent = stripe.SetupIntent.create(
                 customer=customer_id,
                 payment_method_types=payment_method_types,
@@ -642,8 +695,14 @@ def create_setup_intent():
                 'client_secret': setup_intent.client_secret,
                 'setup_intent_id': setup_intent.id
             })
-        
-        return jsonify({'success': False, 'error': 'Stripe not available'}), 500
+        except Exception as e:
+            logger.warning("SetupIntent / customer creation failed: %s", e)
+            msg = _stripe_dashboard_message(e)
+            return jsonify({
+                'success': False,
+                'error': msg,
+                'error_code': 'STRIPE_ERROR',
+            }), 200
     except Exception as e:
         logger.error(f"Failed to create setup intent: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500

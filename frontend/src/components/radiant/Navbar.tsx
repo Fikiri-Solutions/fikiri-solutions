@@ -7,13 +7,24 @@ import { FikiriLogo } from '@/components/FikiriLogo'
 import { PlusGrid, PlusGridItem, PlusGridRow } from './PlusGrid'
 import { useAuth } from '@/contexts/AuthContext'
 
-const links = [
-  { to: '/pricing', label: 'Pricing' },
-  { to: '/about', label: 'About' },
-  { to: '/login', label: 'Login' },
-]
+function buildNavLinks(
+  isAuthenticated: boolean,
+  onboardingCompleted: boolean | undefined
+): { to: string; label: string }[] {
+  const authLink =
+    !isAuthenticated
+      ? { to: '/login', label: 'Login' }
+      : onboardingCompleted
+        ? { to: '/dashboard', label: 'Dashboard' }
+        : { to: '/onboarding', label: 'Continue setup' }
+  return [
+    { to: '/pricing', label: 'Pricing' },
+    { to: '/about', label: 'About' },
+    authLink,
+  ]
+}
 
-function DesktopNav() {
+function DesktopNav({ links }: { links: { to: string; label: string }[] }) {
   return (
     <nav className="relative hidden lg:flex">
       {links.map(({ to, label }) => (
@@ -41,7 +52,7 @@ function MobileNavButton() {
   )
 }
 
-function MobileNav() {
+function MobileNav({ links }: { links: { to: string; label: string }[] }) {
   return (
     <DisclosurePanel className="lg:hidden">
       <div className="flex flex-col gap-6 py-4">
@@ -74,6 +85,7 @@ export function Navbar({ banner }: { banner?: React.ReactNode }) {
   const { pathname } = useLocation()
   const { isAuthenticated, user } = useAuth()
   const homeTo = isAuthenticated && user?.onboarding_completed ? '/dashboard' : '/'
+  const links = buildNavLinks(isAuthenticated, user?.onboarding_completed)
   return (
     <Disclosure as="header" className="pt-12 sm:pt-16" key={pathname}>
       <PlusGrid>
@@ -91,14 +103,14 @@ export function Navbar({ banner }: { banner?: React.ReactNode }) {
             )}
           </div>
           <div className="hidden lg:flex justify-center">
-            <DesktopNav />
+            <DesktopNav links={links} />
           </div>
           <div className="flex justify-end">
             <MobileNavButton />
           </div>
         </PlusGridRow>
       </PlusGrid>
-      <MobileNav />
+      <MobileNav links={links} />
     </Disclosure>
   )
 }

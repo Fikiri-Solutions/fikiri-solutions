@@ -12,6 +12,8 @@ import random
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
 
+from core.ai.model_policy import FALLBACK_LLM_MODEL
+
 logger = logging.getLogger(__name__)
 
 # Import circuit breaker
@@ -79,7 +81,7 @@ class LLMClient:
         Call LLM with exponential backoff, error handling, and cost tracking.
         
         Args:
-            model: Model name (e.g., "gpt-3.5-turbo", "gpt-4")
+            model: Model name (Fikiri defaults: gpt-4o-mini; premium: gpt-4o)
             prompt: User prompt
             max_tokens: Maximum tokens to generate (bounded, required)
             temperature: Temperature (0.0-2.0, default 0.7)
@@ -275,9 +277,9 @@ class LLMClient:
                     user_msg = 'Rate limit exceeded. Wait and retry.'
                 elif 'model' in error_lower and ('not found' in error_lower or 'invalid' in error_lower):
                     error_type = 'model_error'
-                    user_msg = f'Model {model} unavailable. Falling back to gpt-3.5-turbo.'
-                    if model != 'gpt-3.5-turbo' and attempt == 0:
-                        model = 'gpt-3.5-turbo'
+                    user_msg = f'Model {model} unavailable. Falling back to {FALLBACK_LLM_MODEL}.'
+                    if model != FALLBACK_LLM_MODEL and attempt == 0:
+                        model = FALLBACK_LLM_MODEL
                         continue
                 else:
                     error_type = 'unknown'
@@ -332,25 +334,29 @@ class LLMClient:
     
     def _calculate_cost(self, model: str, tokens: int) -> float:
         """
-        Calculate cost in USD based on model and token usage.
-        Uses approximate pricing as of 2024.
+        Approximate USD cost from token counts. Rates are list-price hints aligned
+        with OpenAI $/1M published tiers (converted to $/1K for this formula).
+        Uses a 70/30 input/output split when only total_tokens is available.
         """
-        # Pricing per 1K tokens (approximate)
-        pricing = {
-            'gpt-4': {'input': 0.03, 'output': 0.06},
-            'gpt-4-turbo': {'input': 0.01, 'output': 0.03},
-            'gpt-3.5-turbo': {'input': 0.0015, 'output': 0.002},
-            'gpt-3.5-turbo-16k': {'input': 0.003, 'output': 0.004},
-        }
-        
-        # Default to gpt-3.5-turbo pricing if model not found
-        model_pricing = pricing.get(model, pricing['gpt-3.5-turbo'])
-        
-        # Rough estimate: assume 70% input, 30% output tokens
+        m = (model or "").lower()
+        # Prefix order: longer first (gpt-4o-mini before gpt-4o).
+        # Tuple: prefix, $/1K input, $/1K output
+        table = (
+            ("gpt-4o-mini", 0.15 / 1000, 0.60 / 1000),
+            ("gpt-4o", 2.50 / 1000, 10.00 / 1000),
+            ("gpt-4-turbo", 10.00 / 1000, 30.00 / 1000),
+            ("gpt-4", 30.00 / 1000, 60.00 / 1000),
+            ("gpt-3.5-turbo-16k", 3.00 / 1000, 4.00 / 1000),
+            ("gpt-3.5-turbo", 0.50 / 1000, 1.50 / 1000),
+        )
+        # Unknown model: assume gpt-4o-mini (Fikiri default pair is mini + 4o).
+        inp_rate, out_rate = 0.15 / 1000, 0.60 / 1000
+        for prefix, ir, ort in table:
+            if m.startswith(prefix):
+                inp_rate, out_rate = ir, ort
+                break
+
         input_tokens = int(tokens * 0.7)
         output_tokens = int(tokens * 0.3)
-        
-        cost = (input_tokens / 1000 * model_pricing['input']) + \
-               (output_tokens / 1000 * model_pricing['output'])
-        
+        cost = (input_tokens / 1000) * inp_rate + (output_tokens / 1000) * out_rate
         return round(cost, 6)

@@ -10,11 +10,30 @@ declare global {
 
 const DEFAULT_SDK_URL = '/integrations/universal/fikiri-sdk.js'
 
+/** Same key Install page uses after POST /user/api-keys — avoids duplicating secrets in .env for local dev. */
+const INSTALL_FLOW_STORAGE_KEY = 'fikiri-public-api-key'
+
+/** SDK builds URLs as apiUrl + '/api/public/...'; config.apiUrl already ends with /api — strip it. */
+function sdkApiOrigin(apiUrl: string): string {
+  const trimmed = apiUrl.trim().replace(/\/+$/, '')
+  return trimmed.replace(/\/api\/?$/i, '') || trimmed
+}
+
+function resolvePublicChatbotApiKey(): string {
+  const fromEnv = (import.meta.env.VITE_CHATBOT_API_KEY || '').trim()
+  if (fromEnv.startsWith('fik_')) return fromEnv
+  if (import.meta.env.DEV && typeof window !== 'undefined') {
+    const fromInstall = (localStorage.getItem(INSTALL_FLOW_STORAGE_KEY) || '').trim()
+    if (fromInstall.startsWith('fik_')) return fromInstall
+  }
+  return ''
+}
+
 export const PublicChatbotWidget: React.FC = () => {
   useEffect(() => {
-    const apiKey = (import.meta.env.VITE_CHATBOT_API_KEY || '').trim()
+    const apiKey = resolvePublicChatbotApiKey()
     // Backend only accepts keys prefixed with fik_; skip placeholder/empty to avoid 401 spam
-    if (!apiKey || !apiKey.startsWith('fik_')) return
+    if (!apiKey) return
 
     if (window.__fikiriWidgetLoaded) return
     window.__fikiriWidgetLoaded = true
@@ -25,7 +44,7 @@ export const PublicChatbotWidget: React.FC = () => {
       try {
         window.Fikiri.init({
           apiKey,
-          apiUrl: config.apiUrl,
+          apiUrl: sdkApiOrigin(config.apiUrl),
           features: ['chatbot', 'leadCapture'],
           debug: false
         })

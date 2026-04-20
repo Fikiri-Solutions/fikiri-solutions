@@ -36,6 +36,8 @@ export default defineConfig(({ mode }) => ({
     // Proxy API so embedded email images (same-origin /api/...) load in dev
     proxy: {
       '/api': { target: 'http://localhost:5000', changeOrigin: true },
+      // Universal SDK lives on Flask (repo integrations/universal); same path as production CDN layout
+      '/integrations': { target: 'http://localhost:5000', changeOrigin: true },
     },
   },
   plugins: [

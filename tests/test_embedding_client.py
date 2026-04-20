@@ -19,7 +19,7 @@ class TestEmbeddingClientModule:
         assert embedding_client.OPENAI_EMBEDDING_DIMENSION == 1536
 
     def test_openai_embedding_model_constant(self):
-        assert embedding_client.OPENAI_EMBEDDING_MODEL == "text-embedding-ada-002"
+        assert embedding_client.OPENAI_EMBEDDING_MODEL == "text-embedding-3-small"
 
     def test_get_embedding_returns_none_when_client_disabled(self):
         with patch.object(embedding_client, "_get_client", return_value=None):

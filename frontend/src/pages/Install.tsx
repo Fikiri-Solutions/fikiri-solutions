@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, Check, Play, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Copy, Check, Play, ExternalLink, LayoutDashboard, Home } from 'lucide-react';
 import { apiClient } from '../services/apiClient';
+import { useAuth } from '../contexts/AuthContext';
 
 type Platform = 'wordpress' | 'wix' | 'squarespace' | 'shopify' | 'godaddy' | 'custom';
 
@@ -18,6 +20,7 @@ interface PlatformConfig {
 }
 
 const InstallPage: React.FC = () => {
+  const { isAuthenticated, user } = useAuth();
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>('wordpress');
   const [copied, setCopied] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState<string | null>(null);
@@ -310,6 +313,46 @@ const InstallPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-6xl mx-auto">
+        <nav
+          className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm"
+          aria-label="Site"
+        >
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-teal-700"
+          >
+            <Home className="h-4 w-4 shrink-0 text-teal-600" aria-hidden />
+            Home
+          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {isAuthenticated && user?.onboarding_completed && (
+              <Link
+                to="/dashboard"
+                className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
+              >
+                <LayoutDashboard className="h-4 w-4 shrink-0" aria-hidden />
+                Dashboard
+              </Link>
+            )}
+            {isAuthenticated && !user?.onboarding_completed && (
+              <Link
+                to="/onboarding"
+                className="inline-flex items-center gap-2 rounded-lg border border-teal-600 px-4 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50"
+              >
+                Continue setup
+              </Link>
+            )}
+            {!isAuthenticated && (
+              <Link
+                to="/login"
+                className="inline-flex items-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+              >
+                Sign in
+              </Link>
+            )}
+          </div>
+        </nav>
+
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">

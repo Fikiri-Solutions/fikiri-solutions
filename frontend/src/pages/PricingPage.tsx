@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 import { RadiantLayout, Gradient, Container, AnimatedBackground } from '../components/radiant';
@@ -646,46 +646,15 @@ const PricingPage: React.FC = () => {
         </Container>
       </section>
 
-      {/* FAQ Section */}
-      <section className="relative py-20 bg-muted/50 z-10">
+      <section className="relative py-10 z-10 border-t border-border/60">
         <Container>
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-foreground">
-                Frequently Asked Questions
-              </h2>
-            </div>
-
-            <div className="space-y-6">
-              {[
-                {
-                  question: "Which plan is right for me?",
-                  answer: "We help businesses of all sizes save money through automation. Starter is great for small businesses getting started. Growth fits teams that need more automation and higher limits. Business is for established companies, and Enterprise is for large organizations with custom needs."
-                },
-                {
-                  question: "Can I change plans anytime?",
-                  answer: "Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately, and we'll prorate any billing differences."
-                },
-                {
-                  question: "Do you offer a free trial?",
-                  answer: "Yes, all plans come with a 7-day free trial. No credit card required to get started."
-                },
-                {
-                  question: "What happens if I exceed my response limit?",
-                  answer: "We'll notify you when you're approaching your limit. You can upgrade your plan or purchase additional responses as needed."
-                },
-                {
-                  question: "Are all automation actions production-complete today?",
-                  answer: "No. Core automation paths are live now. Some advanced actions are marked as partial or coming soon in Automation Studio so teams can plan safely."
-                }
-              ].map((faq, index) => (
-                <div key={index} className="bg-card/90 backdrop-blur-sm rounded-xl p-6 border border-border shadow-sm">
-                  <h3 className="text-lg font-semibold text-foreground mb-3">{faq.question}</h3>
-                  <p className="text-muted-foreground">{faq.answer}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+          <p className="text-center text-muted-foreground text-sm sm:text-base">
+            Questions about plans or trials?{' '}
+            <Link to="/faq" className="font-medium text-brand-primary hover:text-brand-secondary underline-offset-4 hover:underline">
+              Read the FAQ
+            </Link>
+            .
+          </p>
         </Container>
       </section>
 

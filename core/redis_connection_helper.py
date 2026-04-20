@@ -83,7 +83,7 @@ def _connection_identity() -> str:
 
 def reset_redis_connection_helper_cache() -> None:
     """Close and drop cached clients (tests / process reload)."""
-    global _redis_client_cache, _connection_info_logged, _redis_failed_for_identity
+    global _redis_failed_for_identity
     with _cache_lock:
         for _key, client in list(_redis_client_cache.items()):
             try:

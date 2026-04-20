@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Mail, Users, Brain, Settings, Menu, X, Palette, LogOut, BarChart3, Shield, Zap, User, PlugZap, BookOpen, CreditCard } from 'lucide-react'
+import { LayoutDashboard, Mail, Users, Brain, Settings, Menu, X, Palette, LogOut, BarChart3, Shield, Zap, User, PlugZap, BookOpen, CreditCard, Package } from 'lucide-react'
 import { MobileBottomNav } from './MobileBottomNav'
 import { ThemeToggle } from './ThemeToggle'
 import { CustomizationPanel } from './CustomizationPanel'
@@ -10,6 +10,7 @@ import { useCustomization } from '../contexts/CustomizationContext'
 import { useAuth } from '../contexts/AuthContext'
 import { FikiriLogo } from './FikiriLogo'
 import { EmailVerificationBanner } from './EmailVerificationBanner'
+import { SubscriptionGate } from './SubscriptionGate'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -55,6 +56,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Automations', href: '/automations', icon: Zap },
     { name: 'CRM', href: '/crm', icon: Users },
     { name: 'AI Assistant', href: '/ai', icon: Brain },
+    { name: 'Import center', href: '/import-center', icon: Package },
     { name: 'Chatbot Builder', href: '/ai/chatbot-builder', icon: BookOpen },
     { name: 'Usage Analytics', href: '/analytics', icon: BarChart3 },
     { name: 'Billing', href: '/billing', icon: CreditCard },
@@ -188,7 +190,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         <main id="main-content" className="py-6 pb-20 lg:pb-6">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <EmailVerificationBanner user={user} />
-            {children}
+            <SubscriptionGate>{children}</SubscriptionGate>
           </div>
         </main>
       </div>

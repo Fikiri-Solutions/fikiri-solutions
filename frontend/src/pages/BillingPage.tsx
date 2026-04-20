@@ -13,6 +13,7 @@ import {
   Loader2,
   Settings
 } from 'lucide-react'
+import { getSubscriptionSignupSteps } from '../content/subscriptionSignupInstructions'
 
 export const BillingPage: React.FC = () => {
   const navigate = useNavigate()
@@ -78,14 +79,14 @@ export const BillingPage: React.FC = () => {
     retry: 1
   })
 
-  const { data: customerDetails, isLoading: customerDetailsLoading } = useQuery({
+  const { data: billingCustomerPayload, isLoading: customerDetailsLoading } = useQuery({
     queryKey: ['customer-details', user?.id],
     queryFn: async () => {
       try {
         return await apiClient.getCustomerDetails()
       } catch (error: any) {
-        if (error?.response?.status === 404 || error?.response?.status === 401) {
-          return null
+        if ([404, 401, 400, 500, 503].includes(error?.response?.status)) {
+          return { customer: null as Record<string, unknown> | null }
         }
         throw error
       }
@@ -94,6 +95,8 @@ export const BillingPage: React.FC = () => {
     staleTime: 60 * 1000,
     retry: 1
   })
+
+  const stripeCustomer = billingCustomerPayload?.customer ?? null
 
   const handleSelectPlan = async (tierName: string) => {
     if (!isAuthenticated) {
@@ -216,10 +219,14 @@ export const BillingPage: React.FC = () => {
       const { url } = await apiClient.createPortalSession()
       window.location.href = url
     } catch (error: any) {
+      const msg =
+        (typeof error?.response?.data?.error === 'string' && error.response.data.error) ||
+        error?.message ||
+        'Failed to add payment method'
       addToast({
         type: 'error',
         title: 'Add Payment Method Failed',
-        message: error?.message || 'Failed to add payment method'
+        message: msg,
       })
       setLoadingAction(null)
     }
@@ -257,12 +264,22 @@ export const BillingPage: React.FC = () => {
     )
   }
 
+  const subscriptionReady = !subscriptionLoading
+  const hasStripeSubscription = Boolean(subscription?.subscription)
+
   return (
     <div className="bg-gray-50 dark:bg-gray-900 py-12 px-4">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Billing & Subscription</h1>
           <p className="text-gray-600 dark:text-gray-400">Manage your subscription, payment methods, and invoices</p>
+          {subscriptionReady && !hasStripeSubscription && (
+            <p className="mt-4 text-gray-700 dark:text-gray-300 text-base max-w-3xl">
+              You do not have an active plan yet. Follow the steps under &quot;How to subscribe,&quot; then pick a tier
+              below and click <strong className="font-semibold text-gray-900 dark:text-white">Select Plan</strong> to open
+              Stripe Checkout and complete payment (or start a trial when your plan includes one).
+            </p>
+          )}
         </div>
 
         {/* Current Subscription */}
@@ -354,17 +371,55 @@ export const BillingPage: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 mb-8 text-center">
-            <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Active Subscription</h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">Select a plan below to get started</p>
-          </div>
+          <section
+            className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 sm:p-8 mb-8 text-left border border-gray-200 dark:border-gray-700"
+            aria-labelledby="billing-no-sub"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-6">
+              <CreditCard className="h-12 w-12 text-gray-400 shrink-0 mx-auto sm:mx-0" aria-hidden />
+              <div className="flex-1 text-center sm:text-left">
+                <h2 id="billing-no-sub" className="text-xl font-semibold text-gray-900 dark:text-white">
+                  No active subscription
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400 mt-1">
+                  Subscribe to unlock the app. Use the same email you signed in with.
+                </p>
+              </div>
+            </div>
+
+            <h3 id="billing-how-to-subscribe" className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+              How to subscribe
+            </h3>
+            <ol className="list-decimal space-y-3 pl-5 text-sm text-gray-600 dark:text-gray-300 marker:text-orange-600">
+              {getSubscriptionSignupSteps('billing').map((step) => (
+                <li key={step.heading}>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{step.heading}.</span> {step.detail}
+                </li>
+              ))}
+            </ol>
+            <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+              Payment is processed securely by Stripe. After checkout, return to this site; your subscription status
+              should update within about a minute. If something looks wrong, refresh the page or contact support.
+            </p>
+            <p className="mt-6 text-sm font-medium text-gray-800 dark:text-gray-200 text-center sm:text-left">
+              Next: choose <strong className="font-semibold">Monthly</strong> or <strong className="font-semibold">Yearly</strong>, then select a plan in the section below.
+            </p>
+          </section>
         )}
 
         {/* Available Plans */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Available Plans</h2>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Available Plans</h2>
+              {!hasStripeSubscription && subscriptionReady && (
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 max-w-2xl">
+                  Each <strong className="font-medium text-gray-800 dark:text-gray-200">Select Plan</strong> button opens
+                  Stripe Checkout in this browser window. Complete the form to pay or start a trial; you will be
+                  redirected back when finished.
+                </p>
+              )}
+            </div>
             <div className="flex gap-2 bg-gray-200 dark:bg-gray-700 rounded-lg p-1">
               <button
                 onClick={() => setBillingPeriod('monthly')}
@@ -478,7 +533,7 @@ export const BillingPage: React.FC = () => {
                               ? `${pm.card?.brand?.toUpperCase() || 'Card'} •••• ${pm.card?.last4 || ''}`
                               : `${pm.us_bank_account?.bank_name || 'Bank'} •••• ${pm.us_bank_account?.last4 || ''}`}
                           </p>
-                          {pm.id === customerDetails?.default_payment_method && (
+                          {pm.id === (stripeCustomer?.default_payment_method as string | undefined) && (
                             <span className="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded text-xs font-medium">
                               Default
                             </span>
@@ -497,7 +552,7 @@ export const BillingPage: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      {pm.id !== customerDetails?.default_payment_method && (
+                      {pm.id !== (stripeCustomer?.default_payment_method as string | undefined) && (
                         <button
                           onClick={() => handleSetDefault(pm.id)}
                           disabled={loadingAction === `default-${pm.id}`}
@@ -541,37 +596,59 @@ export const BillingPage: React.FC = () => {
         </div>
 
         {/* Account Information */}
-        {customerDetails && (
+        {billingCustomerPayload?.billingUnavailable && billingCustomerPayload?.message && (
+          <div className="mb-8 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+            <p className="text-sm font-medium">Billing profile unavailable</p>
+            <p className="mt-1 text-sm opacity-90">{billingCustomerPayload.message}</p>
+          </div>
+        )}
+
+        {stripeCustomer && (
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Account Information</h2>
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Email</p>
-                  <p className="font-semibold text-gray-900 dark:text-white">{customerDetails.email || 'N/A'}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{String(stripeCustomer.email || 'N/A')}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Name</p>
-                  <p className="font-semibold text-gray-900 dark:text-white">{customerDetails.name || 'N/A'}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{String(stripeCustomer.name || 'N/A')}</p>
                 </div>
-                {customerDetails.phone && (
+                {stripeCustomer.phone != null && String(stripeCustomer.phone).length > 0 && (
                   <div>
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Phone</p>
-                    <p className="font-semibold text-gray-900 dark:text-white">{customerDetails.phone}</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">{String(stripeCustomer.phone)}</p>
                   </div>
                 )}
-                {customerDetails.address && (
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Address</p>
-                    <p className="font-semibold text-gray-900 dark:text-white">
-                      {customerDetails.address.line1}
-                      {customerDetails.address.line2 && `, ${customerDetails.address.line2}`}
-                      {customerDetails.address.city && `, ${customerDetails.address.city}`}
-                      {customerDetails.address.state && ` ${customerDetails.address.state}`}
-                      {customerDetails.address.postal_code && ` ${customerDetails.address.postal_code}`}
-                    </p>
-                  </div>
-                )}
+                {(() => {
+                  const addr = stripeCustomer.address as
+                    | {
+                        line1?: string
+                        line2?: string
+                        city?: string
+                        state?: string
+                        postal_code?: string
+                      }
+                    | undefined
+                  if (!addr || typeof addr !== 'object') return null
+                  const line = [
+                    addr.line1,
+                    addr.line2,
+                    [addr.city, addr.state].filter(Boolean).join(' '),
+                    addr.postal_code,
+                  ]
+                    .filter(Boolean)
+                    .join(', ')
+                  if (!line) return null
+                  return (
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Address</p>
+                      <p className="font-semibold text-gray-900 dark:text-white">{line}</p>
+                    </div>
+                  )
+                })()}
               </div>
             </div>
           </div>

@@ -197,7 +197,7 @@ export const AutomationWizard: React.FC<AutomationWizardProps> = ({ onComplete, 
                       presetId === 'lead_scoring' ? 'update_crm_field' :
                       presetId === 'calendar_followups' ? 'schedule_follow_up' : 'update_crm_field',
           status: 'active',
-          trigger_conditions: {},
+          trigger_conditions: { slug: presetId },
           action_parameters: {
             slug: presetId,
             ...(presetId === 'gmail_crm' ? { target_stage: 'new' } : {}),

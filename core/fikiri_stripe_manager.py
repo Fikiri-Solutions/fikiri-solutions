@@ -604,6 +604,66 @@ class FikiriStripeManager:
             logger.error(f"Failed to create checkout session: {e}")
             raise
 
+    def get_subscription(self, subscription_id: str) -> Dict[str, Any]:
+        """Retrieve subscription for billing API (same shape as core.billing_manager.BillingManager)."""
+        if not STRIPE_AVAILABLE:
+            raise RuntimeError("Stripe is not available")
+        try:
+            subscription = stripe.Subscription.retrieve(subscription_id)
+            return {
+                'id': subscription.id,
+                'status': subscription.status,
+                'current_period_start': subscription.current_period_start,
+                'current_period_end': subscription.current_period_end,
+                'trial_end': subscription.trial_end,
+                'cancel_at_period_end': subscription.cancel_at_period_end,
+                'items': subscription.items.data,
+            }
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to retrieve subscription {subscription_id}: {e}")
+            raise
+
+    def cancel_subscription(self, subscription_id: str, at_period_end: bool = True) -> Dict[str, Any]:
+        if not STRIPE_AVAILABLE:
+            raise RuntimeError("Stripe is not available")
+        try:
+            if at_period_end:
+                subscription = stripe.Subscription.modify(
+                    subscription_id,
+                    cancel_at_period_end=True,
+                )
+            else:
+                subscription = stripe.Subscription.delete(subscription_id)
+
+            logger.info("Cancelled subscription %s", subscription_id)
+            return {
+                'id': subscription.id,
+                'status': subscription.status,
+                'cancel_at_period_end': subscription.cancel_at_period_end,
+            }
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to cancel subscription {subscription_id}: {e}")
+            raise
+
+    def upgrade_subscription(self, subscription_id: str, new_price_id: str) -> Dict[str, Any]:
+        if not STRIPE_AVAILABLE:
+            raise RuntimeError("Stripe is not available")
+        try:
+            subscription = stripe.Subscription.retrieve(subscription_id)
+            stripe.Subscription.modify(
+                subscription_id,
+                items=[{
+                    'id': subscription.items.data[0].id,
+                    'price': new_price_id,
+                }],
+                proration_behavior='create_prorations',
+            )
+            logger.info("Upgraded subscription %s to price %s", subscription_id, new_price_id)
+            return {'success': True, 'subscription_id': subscription_id}
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to upgrade subscription {subscription_id}: {e}")
+            raise
+
     def get_price_id(self, tier_name: str, billing_period: str = 'monthly') -> Optional[str]:
         """Get Stripe price ID for a tier and billing period"""
         if not STRIPE_AVAILABLE:

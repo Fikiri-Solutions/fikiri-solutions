@@ -6,6 +6,7 @@ const LANDING_PATHS = [
   '/',
   '/landing-classic',
   '/pricing',
+  '/faq',
   '/services-landing',
   '/ai-landing',
   '/industries',

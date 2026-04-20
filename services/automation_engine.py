@@ -20,6 +20,11 @@ from core.automation_run_events import (
     record_automation_step_started,
 )
 from core.workflow_followups import schedule_follow_up as workflow_schedule_follow_up
+from core.automation_trigger_conditions import (
+    evaluate_if_group,
+    trigger_condition_metadata,
+    validate_if_group_structure,
+)
 from crm.service import enhanced_crm_service
 from email_automation.parser import MinimalEmailParser
 
@@ -161,6 +166,24 @@ class AutomationEngine:
             ActionType.ASSIGN_TEAM_MEMBER: self._execute_assign_team_member
         }
     
+    def get_trigger_condition_metadata(self) -> Dict[str, Any]:
+        """Schema for trigger IF-groups (fields and operators per trigger type)."""
+        return {"success": True, "data": trigger_condition_metadata()}
+
+    def _validate_trigger_conditions_shape(
+        self, trigger_type: str, trigger_conditions: Any
+    ) -> Optional[str]:
+        if trigger_conditions is None:
+            return None
+        if not isinstance(trigger_conditions, dict):
+            return "trigger_conditions must be a JSON object"
+        if "if" not in trigger_conditions:
+            return None
+        ok, err = validate_if_group_structure(trigger_type, trigger_conditions.get("if"))
+        if not ok:
+            return err
+        return None
+
     def get_action_capabilities(self) -> Dict[str, Any]:
         """Return per-action capability flags for UI/API. implemented | partial | stub."""
         capabilities = []
@@ -183,7 +206,18 @@ class AutomationEngine:
                     'error': validation_result['error'],
                     'error_code': 'INVALID_RULE_DATA'
                 }
-            
+
+            tc_err = self._validate_trigger_conditions_shape(
+                rule_data["trigger_type"],
+                rule_data.get("trigger_conditions"),
+            )
+            if tc_err:
+                return {
+                    "success": False,
+                    "error": tc_err,
+                    "error_code": "INVALID_TRIGGER_CONDITIONS",
+                }
+
             # Create rule
             rule_id = db_optimizer.execute_query(
                 """INSERT INTO automation_rules 
@@ -289,7 +323,19 @@ class AutomationEngine:
             update_values = []
             
             allowed_fields = ['name', 'description', 'trigger_conditions', 'action_parameters', 'status']
-            
+
+            if "trigger_conditions" in updates:
+                tc_err = self._validate_trigger_conditions_shape(
+                    rule_data[0]["trigger_type"],
+                    updates["trigger_conditions"],
+                )
+                if tc_err:
+                    return {
+                        "success": False,
+                        "error": tc_err,
+                        "error_code": "INVALID_TRIGGER_CONDITIONS",
+                    }
+
             for field, value in updates.items():
                 if field in allowed_fields:
                     if field in ['trigger_conditions', 'action_parameters']:
@@ -746,7 +792,17 @@ class AutomationEngine:
     def _check_trigger_conditions(self, rule: AutomationRule, trigger_data: Dict[str, Any]) -> bool:
         """Check if trigger conditions are met"""
         conditions = rule.trigger_conditions
-        
+        if isinstance(conditions, dict):
+            if_block = conditions.get("if")
+            if isinstance(if_block, dict):
+                cond_list = if_block.get("conditions")
+                if isinstance(cond_list, list) and len(cond_list) > 0:
+                    return evaluate_if_group(
+                        rule.trigger_type.value,
+                        trigger_data or {},
+                        if_block,
+                    )
+
         if rule.trigger_type == TriggerType.KEYWORD_DETECTED:
             keywords = conditions.get('keywords', [])
             text = trigger_data.get('text', '').lower()
