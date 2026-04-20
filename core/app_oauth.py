@@ -75,6 +75,8 @@ else:
 
 # Gmail OAuth scopes
 GMAIL_SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",  # read messages/threads
+    "https://www.googleapis.com/auth/gmail.send",      # send/reply as user
     "https://www.googleapis.com/auth/gmail.modify",  # modify gives reply+labels; readonly if truly read-only
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile"
