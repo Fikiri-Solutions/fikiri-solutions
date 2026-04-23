@@ -60,7 +60,7 @@ def record_crm_event(
                 correlation_id, supersedes_event_id,
                 payload_json, payload_truncated,
                 status, error_message, source, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,

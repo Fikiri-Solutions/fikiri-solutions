@@ -3,8 +3,9 @@
 Lead Scoring Service
 Computes lead_score (0-100) and lead_quality (A/B/C/D) with configurable weights.
 
-Technique: weighted sum of five 0-100 components (source, recency, stage, engagement,
-attributes). Weights configurable via LEAD_SCORING_WEIGHTS env JSON. Breakdown returned
+Technique: convex combination (weighted average) of five 0-100 rule-based components
+(source, recency, stage, engagement, attributes)—not a trained ML model. Weights sum to 1
+after optional normalization (see LEAD_SCORING_WEIGHTS). Breakdown returned
 for transparency. Used by crm/service on create_lead, update_lead, and recalculate_lead_score.
 See docs/CRM_LEAD_SCORING.md for full process and code map.
 """
@@ -44,6 +45,8 @@ DEFAULT_STAGE_SCORES = {
     "contacted": 55,
     "replied": 65,
     "qualified": 80,
+    # CRM pipeline uses "booked" for won deals (see frontend pipeline boards).
+    "booked": 95,
     "closed": 95,
 }
 
@@ -62,10 +65,22 @@ class LeadScoringService:
         self.stage_scores = DEFAULT_STAGE_SCORES.copy()
         self._load_config()
 
+    def _normalize_weights(self) -> None:
+        """Keep weights as a convex combination so score stays in [0, 100] when all components are."""
+        total = sum(self.weights.values())
+        if total <= 0:
+            logger.warning("LEAD_SCORING_WEIGHTS sum invalid; resetting to defaults")
+            self.weights = DEFAULT_WEIGHTS.copy()
+            return
+        if abs(total - 1.0) > 1e-6:
+            for k in self.weights:
+                self.weights[k] /= total
+
     def _load_config(self):
         """Load optional config from env JSON."""
         raw = os.getenv("LEAD_SCORING_WEIGHTS")
         if not raw:
+            self._normalize_weights()
             return
         try:
             data = json.loads(raw)
@@ -73,6 +88,7 @@ class LeadScoringService:
                 self.weights.update({k: float(v) for k, v in data.items() if k in self.weights})
         except Exception as e:
             logger.warning("Failed to parse LEAD_SCORING_WEIGHTS: %s", e)
+        self._normalize_weights()
 
     def score_lead(
         self,

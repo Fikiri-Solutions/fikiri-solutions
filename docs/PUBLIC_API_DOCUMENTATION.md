@@ -436,6 +436,6 @@ export default ChatbotWidget;
 ## Support
 
 For API support, contact:
-- Email: api@fikirisolutions.com
+- Email: info@fikirisolutions.com
 - Documentation: https://docs.fikirisolutions.com
 - Status Page: https://status.fikirisolutions.com

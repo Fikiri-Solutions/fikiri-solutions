@@ -197,7 +197,7 @@ class EmailJobManager:
                 'company_name': company_name or 'Your Company',
                 'signup_date': _utcnow_naive().isoformat(),
                 'dashboard_url': 'https://fikirisolutions.com/dashboard',
-                'support_email': 'support@fikirisolutions.com'
+                'support_email': 'info@fikirisolutions.com'
             }
             
             job = EmailJob(
@@ -605,7 +605,7 @@ class EmailJobManager:
                     </a>
                 </div>
 
-                <p>If you have any questions, feel free to reach out to our support team at <a href="mailto:{data.get('support_email', 'support@fikirisolutions.com')}">{data.get('support_email', 'support@fikirisolutions.com')}</a>.</p>
+                <p>If you have any questions, feel free to reach out to our support team at <a href="mailto:{data.get('support_email', 'info@fikirisolutions.com')}">{data.get('support_email', 'info@fikirisolutions.com')}</a>.</p>
 
                 <p>Best regards,<br>The Fikiri Solutions Team</p>
         """

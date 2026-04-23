@@ -282,7 +282,7 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({ userId, onComplete }
       {/* Support Link */}
       <div className="text-center">
         <a
-          href="mailto:support@fikirisolutions.com"
+          href="mailto:info@fikirisolutions.com"
           className="text-sm text-blue-600 hover:text-blue-700"
         >
           Need help? Contact Support

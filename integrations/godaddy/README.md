@@ -356,4 +356,4 @@ Add custom CSS in **Settings** → **Site Settings** → **Code** → **Header C
 
 ---
 
-*Need help? Contact support@fikirisolutions.com*
+*Need help? Contact info@fikirisolutions.com*

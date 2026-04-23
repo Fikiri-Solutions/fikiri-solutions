@@ -475,7 +475,7 @@ const InstallPage: React.FC = () => {
             Our support team is here to help you get set up in minutes.
           </p>
           <a
-            href="mailto:support@fikirisolutions.com"
+            href="mailto:info@fikirisolutions.com"
             className="inline-block bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 transition-colors"
           >
             Contact Support

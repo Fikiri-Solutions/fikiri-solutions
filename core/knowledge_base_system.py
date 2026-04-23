@@ -246,7 +246,7 @@ Welcome to Fikiri Solutions! This guide will help you set up your account and st
 - Join our community forum for tips and tricks
 - Schedule a training session with our team
 
-Need help? Contact support@fikirisolutions.com or use our in-app chat.""",
+Need help? Contact info@fikirisolutions.com or use our in-app chat.""",
             summary="Complete guide to setting up and using Fikiri Solutions, from account creation to your first automation.",
             document_type=DocumentType.GUIDE,
             format=ContentFormat.MARKDOWN,
@@ -545,7 +545,7 @@ Configure webhooks to receive real-time notifications:
 ## Support
 
 For API support:
-- Email: api-support@fikirisolutions.com
+- Email: info@fikirisolutions.com
 - Documentation: docs.fikirisolutions.com
 - Community: community.fikirisolutions.com""",
             summary="Complete API documentation with endpoints, authentication, and examples.",
@@ -702,7 +702,7 @@ Quick solutions to frequently encountered problems.
 If these solutions don't resolve your issue:
 
 1. **Search Knowledge Base**: Use the search function for specific topics
-2. **Contact Support**: Email support@fikirisolutions.com
+2. **Contact Support**: Email info@fikirisolutions.com
 3. **Live Chat**: Use in-app chat for immediate help
 4. **Community Forum**: Ask questions in our community
 5. **Schedule Call**: Book a call with our support team
@@ -930,7 +930,7 @@ Create templates for:
 - [ ] Monitor performance metrics
 - [ ] Gather customer feedback
 
-Need help setting up? Contact our landscaping specialists at landscaping@fikirisolutions.com""",
+Need help setting up? Contact our landscaping specialists at info@fikirisolutions.com""",
             summary="Complete guide for landscaping businesses to use Fikiri Solutions effectively.",
             document_type=DocumentType.GUIDE,
             format=ContentFormat.MARKDOWN,

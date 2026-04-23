@@ -299,7 +299,7 @@ class EmailHandler(ChannelHandler):
             'subject': f"Re: {response.metadata.get('original_subject', 'Your Inquiry')}",
             'body_text': response.content,
             'body_html': self._convert_to_html(response.content),
-            'reply_to': response.metadata.get('reply_to', 'support@fikirisolutions.com'),
+            'reply_to': response.metadata.get('reply_to', 'info@fikirisolutions.com'),
             'in_reply_to': response.metadata.get('original_message_id', ''),
             'references': response.metadata.get('thread_references', [])
         }

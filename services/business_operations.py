@@ -50,7 +50,7 @@ PRIVACY_POLICY_TEMPLATE = """
     <p>You have the right to access, update, or delete your personal information. You may also opt out of certain communications from us.</p>
     
     <h2>6. Contact Us</h2>
-    <p>If you have any questions about this Privacy Policy, please contact us at privacy@fikirisolutions.com</p>
+    <p>If you have any questions about this Privacy Policy, please contact us at info@fikirisolutions.com</p>
 </body>
 </html>
 """
@@ -92,7 +92,7 @@ TERMS_OF_SERVICE_TEMPLATE = """
     <p>In no event shall Fikiri Solutions be liable for any indirect, incidental, special, consequential, or punitive damages.</p>
     
     <h2>7. Contact Information</h2>
-    <p>If you have any questions about these Terms of Service, please contact us at legal@fikirisolutions.com</p>
+    <p>If you have any questions about these Terms of Service, please contact us at info@fikirisolutions.com</p>
 </body>
 </html>
 """

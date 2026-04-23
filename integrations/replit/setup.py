@@ -12,7 +12,7 @@ setup(
     name="fikiri-replit",
     version="1.0.0",
     author="Fikiri Solutions",
-    author_email="support@fikirisolutions.com",
+    author_email="info@fikirisolutions.com",
     description="Fikiri integration package for Replit projects",
     long_description=long_description,
     long_description_content_type="text/markdown",

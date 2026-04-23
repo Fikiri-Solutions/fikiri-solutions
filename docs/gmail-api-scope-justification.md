@@ -2,7 +2,7 @@
 
 **Application:** Fikiri Solutions  
 **Website:** https://fikirisolutions.com  
-**Contact:** legal@fikirisolutions.com  
+**Contact:** info@fikirisolutions.com  
 **Date:** October 18, 2025  
 
 ## Business Overview
@@ -178,8 +178,8 @@ Automated email responses are our primary value proposition. This scope is essen
 
 ## Contact Information
 
-**Legal Contact:** legal@fikirisolutions.com  
-**Technical Contact:** support@fikirisolutions.com  
+**Legal Contact:** info@fikirisolutions.com  
+**Technical Contact:** info@fikirisolutions.com  
 **Website:** https://fikirisolutions.com  
 **Privacy Policy:** https://fikirisolutions.com/privacy  
 **Terms of Service:** https://fikirisolutions.com/terms  

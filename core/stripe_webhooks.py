@@ -37,7 +37,7 @@ class StripeWebhookHandler:
         else:
             self.billing_manager = None
         self.webhook_secret = os.getenv('STRIPE_WEBHOOK_SECRET')
-        self._billing_from_email = os.getenv('BILLING_FROM_EMAIL', 'billing@fikirisolutions.com')
+        self._billing_from_email = os.getenv('BILLING_FROM_EMAIL', 'info@fikirisolutions.com')
     
     def _get_customer_email(self, customer_id: str) -> str:
         """Get customer email from Stripe. Returns empty string if unavailable."""

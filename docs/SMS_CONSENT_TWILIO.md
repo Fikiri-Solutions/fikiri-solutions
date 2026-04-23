@@ -56,7 +56,7 @@ Exact copy:
    - **Opt-In Confirmation Message:** e.g.  
      `Fikiri Solutions: You are subscribed to account notifications. Reply STOP to opt out. Reply HELP for help. Msg & data rates may apply.`  
    - **Help Message Sample:** e.g.  
-     `Fikiri Solutions: For help, contact support@fikirisolutions.com or visit https://fikirisolutions.com. Reply STOP to opt out.`  
+     `Fikiri Solutions: For help, contact info@fikirisolutions.com or visit https://fikirisolutions.com. Reply STOP to opt out.`  
    - **Additional Info:** state that checkbox consent is required before SMS is enabled and is collected on the same screen as the phone field.
 
 ## Backend storage

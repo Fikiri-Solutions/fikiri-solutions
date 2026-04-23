@@ -8,7 +8,7 @@ set -e
 BACKEND_URL="https://fikirisolutions.onrender.com"
 FRONTEND_URL="https://fikirisolutions.vercel.app"
 LOG_FILE="/tmp/fikiri-health.log"
-ALERT_EMAIL="admin@fikirisolutions.com"
+ALERT_EMAIL="info@fikirisolutions.com"
 
 # Colors for output
 RED='\033[0;31m'

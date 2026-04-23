@@ -130,4 +130,4 @@ Fikiri.LeadCapture.capture({
 
 ## Support
 
-For help, visit [Fikiri Support](https://fikirisolutions.com/support) or email support@fikirisolutions.com
+For help, visit [Fikiri Support](https://fikirisolutions.com/support) or email info@fikirisolutions.com

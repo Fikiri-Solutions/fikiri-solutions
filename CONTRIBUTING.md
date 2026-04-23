@@ -385,7 +385,7 @@ git push origin main
 ### Getting Help
 
 - **Slack**: #dev-support channel
-- **Email**: dev-support@fikirisolutions.com
+- **Email**: info@fikirisolutions.com
 - **Issues**: GitHub Issues
 - **Wiki**: Internal documentation wiki
 

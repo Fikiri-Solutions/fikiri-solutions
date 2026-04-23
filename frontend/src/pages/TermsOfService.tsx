@@ -223,7 +223,7 @@ const TermsOfService: React.FC = () => {
                 </p>
                 <div className="bg-gray-700 p-4 rounded-lg mt-4">
                   <p className="text-gray-300">
-                    <strong>Email:</strong> legal@fikirisolutions.com<br />
+                    <strong>Email:</strong> info@fikirisolutions.com<br />
                     <strong>Address:</strong> Fikiri Solutions, Legal Department<br />
                     <strong>Website:</strong> <a href="/contact" className="text-brand-primary hover:text-muted-foreground">https://fikirisolutions.com/contact</a>
                   </p>

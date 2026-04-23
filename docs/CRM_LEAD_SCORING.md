@@ -2,7 +2,9 @@
 
 ## Overview
 
-Lead scoring in Fikiri is a **rule-based, weighted model** that produces a 0–100 score and a quality band (A/B/C/D). The score is stored on the lead and used for prioritization and automation (e.g. auto-moving high-scoring leads to "qualified").
+Lead scoring in Fikiri is a **rule-based, weighted model** that produces a 0–100 score and a quality band (A/B/C/D). It is a **weighted average** of five hand-defined subscores (each in 0–100). This is **not** a trained neural network or embedding model; you do **not** need linear-algebra references from open-source ML projects to reason about it—only that **weights are nonnegative and normalized to sum to 1** so the final score stays in **0–100** when each component is in **0–100**.
+
+The score is stored on the lead and used for prioritization and automation (e.g. auto-moving high-scoring leads to "qualified").
 
 ---
 
@@ -36,7 +38,7 @@ score = round( clamp(
 , 0, 100) )
 ```
 
-**Default weights** (configurable via `LEAD_SCORING_WEIGHTS` env JSON):
+**Default weights** (configurable via `LEAD_SCORING_WEIGHTS` env JSON). After any override, weights are **renormalized** to sum to **1** so partial env JSON (or scaled values) does not blow the composite above 100.
 
 - `source`: 0.25  
 - `recency`: 0.20  
@@ -48,7 +50,7 @@ score = round( clamp(
 
 - **Source** (0–100): Lookup from a fixed map (e.g. referral=100, partner=90, gmail=75, website=65, manual=40). Unknown source → 50.
 - **Recency** (0–100): Newer = higher. `100 - min(age_days, 60) * 1.5`; if no `created_at`, treat as 30 days old.
-- **Stage** (0–100): Lookup (e.g. new=40, contacted=55, replied=65, qualified=80, closed=95).
+- **Stage** (0–100): Lookup (e.g. new=40, contacted=55, replied=65, qualified=80, **booked=95** for the CRM pipeline “won” column, closed=95). Unknown stage → 40.
 - **Engagement** (0–100):  
   - Up to 60 from activity count: `min(activity_count * 10, 60)`.  
   - Up to 40 from last activity recency: `40 - min(days_since_activity, 30) * 1.3`.  

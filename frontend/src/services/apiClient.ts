@@ -108,6 +108,7 @@ export interface LeadData {
   email: string
   company: string
   stage: string
+  /** 0–100 from backend `LeadScoringService`. */
   score: number
   lastContact: string
   source: string
@@ -821,15 +822,36 @@ class ApiClient {
   }
 
   // CRM endpoints
+  /**
+   * Loads leads for the current user. The API paginates (default 100, max 500 per request);
+   * we page until `has_more` is false so the CRM board matches the full dataset up to a
+   * safety cap (large inboxes should move to server-side filters + virtualized UI later).
+   */
   async getLeads(): Promise<LeadData[]> {
-    const response = await this.client.get('/crm/leads', {
-      params: { user_id: this.getUserId() ?? 1 }
-    })
-    const payload = response.data?.data ?? response.data
-    const backendLeads = payload?.leads ?? []
-    
-    // Map backend data to frontend interface
-    return backendLeads.map((lead: any) => this.mapLead(lead))
+    const pageSize = 500
+    const maxLeads = 25000
+    const uid = this.getUserId() ?? 1
+    const out: LeadData[] = []
+    let offset = 0
+
+    while (out.length < maxLeads) {
+      const response = await this.client.get('/crm/leads', {
+        params: { user_id: uid, limit: pageSize, offset }
+      })
+      const payload = response.data?.data ?? response.data
+      const backendLeads = payload?.leads ?? []
+      const pagination = payload?.pagination as
+        | { has_more?: boolean }
+        | undefined
+
+      out.push(...backendLeads.map((lead: any) => this.mapLead(lead)))
+
+      const hasMore = pagination?.has_more === true
+      if (!hasMore || backendLeads.length === 0) break
+      offset += backendLeads.length
+    }
+
+    return out
   }
 
   async getPipeline(): Promise<Record<string, LeadData[]>> {

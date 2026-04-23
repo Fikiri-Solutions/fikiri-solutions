@@ -229,7 +229,7 @@ Set up automatic lead scoring based on:
 ### Getting Help
 
 #### Support Channels
-- **Email**: support@fikirisolutions.com
+- **Email**: info@fikirisolutions.com
 - **Live Chat**: Available in your dashboard
 - **Phone**: 1-800-FIKIRI-1 (1-800-345-4741)
 - **Help Center**: [help.fikirisolutions.com](https://help.fikirisolutions.com)
@@ -378,7 +378,7 @@ Set up automatic lead scoring based on:
 
 **Fikiri Solutions**
 - **Website**: [https://fikirisolutions.com](https://fikirisolutions.com)
-- **Email**: hello@fikirisolutions.com
+- **Email**: info@fikirisolutions.com
 - **Phone**: 1-800-FIKIRI-1 (1-800-345-4741)
 - **Address**: 123 Business Ave, Suite 100, City, State 12345
 

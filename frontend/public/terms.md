@@ -155,7 +155,7 @@ Our Service complies with Google API Services User Data Policy, including:
 
 For questions about these Terms, please contact us:
 
-**Email:** legal@fikirisolutions.com  
+**Email:** info@fikirisolutions.com  
 **Address:** Fikiri Solutions, Legal Department  
 **Website:** https://fikirisolutions.com/contact
 

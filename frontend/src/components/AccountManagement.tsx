@@ -45,11 +45,9 @@ interface SecuritySettings {
   currentPassword: string
   newPassword: string
   confirmPassword: string
-  twoFactorEnabled: boolean
-  sessionTimeout: number
-  loginNotifications: boolean
 }
 
+/** Persisted under user metadata.notification_preferences (merged on save). */
 interface NotificationSettings {
   email: {
     marketing: boolean
@@ -66,6 +64,12 @@ interface NotificationSettings {
     mentions: boolean
     updates: boolean
   }
+  security: {
+    /** Preference only until login-alert email is implemented end-to-end. */
+    login_notifications: boolean
+    /** Preference only; SMS/app 2FA enrollment is not yet available in-app. */
+    two_factor_enabled: boolean
+  }
 }
 
 interface AccountManagementProps {
@@ -78,7 +82,8 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
   const { addToast } = useToast()
   
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'preferences'>('profile')
-  const [isEditing, setIsEditing] = useState(false)
+  /** Profile fields are disabled when false; users often miss "Edit" and think the UI is broken. */
+  const [isEditing, setIsEditing] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [showPasswords, setShowPasswords] = useState({
     current: false,
@@ -132,17 +137,30 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
           setSmsConsent(!!profile?.sms_consent)
           if (profile?.notification_preferences && typeof profile.notification_preferences === 'object') {
             const np = profile.notification_preferences as Record<string, unknown>
+            const sec = np.security && typeof np.security === 'object' ? (np.security as Record<string, boolean>) : {}
             setNotificationSettings(prev => ({
               ...prev,
               email: { ...prev.email, ...(np.email as Record<string, boolean> || {}) },
               sms: { ...prev.sms, ...(np.sms as Record<string, boolean> || {}) },
-              push: { ...prev.push, ...(np.push as Record<string, boolean> || {}) }
+              push: { ...prev.push, ...(np.push as Record<string, boolean> || {}) },
+              security: {
+                ...prev.security,
+                login_notifications: typeof sec.login_notifications === 'boolean' ? sec.login_notifications : prev.security.login_notifications,
+                two_factor_enabled: typeof sec.two_factor_enabled === 'boolean' ? sec.two_factor_enabled : prev.security.two_factor_enabled,
+              },
             }))
           }
         }).catch(() => {})
       })
     }
   }, [isOpen, user?.id])
+
+  // Open Profile in an editable state so inputs are not stuck disabled (disabled={!isEditing}).
+  React.useEffect(() => {
+    if (isOpen && activeTab === 'profile') {
+      setIsEditing(true)
+    }
+  }, [isOpen, activeTab])
 
   // Lock body scroll while modal is open
   React.useEffect(() => {
@@ -351,6 +369,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Profile Information</h3>
         <button
+          type="button"
           onClick={() => setIsEditing(!isEditing)}
           className="flex items-center space-x-2 text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300"
         >
@@ -903,7 +922,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 overflow-y-auto">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}

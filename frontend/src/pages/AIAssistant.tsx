@@ -345,8 +345,8 @@ Response should include a next step and keep tone professional but warm.`
             ) : (
               leadInbox.map((lead) => {
                 const sentiment =
-                  lead.score >= 7 ? { label: 'Hot', classes: 'bg-red-100 text-red-700' } :
-                  lead.score >= 4 ? { label: 'Warm', classes: 'bg-amber-100 text-amber-700' } :
+                  lead.score >= 70 ? { label: 'Hot', classes: 'bg-red-100 text-red-700' } :
+                  lead.score >= 40 ? { label: 'Warm', classes: 'bg-amber-100 text-amber-700' } :
                   { label: 'Cold', classes: 'bg-blue-100 text-blue-700' }
 
                 return (
@@ -410,7 +410,7 @@ Response should include a next step and keep tone professional but warm.`
                 <p className="text-xs text-brand-text/60 dark:text-gray-400 break-words">{selectedLead.email}</p>
                 <div className="flex items-center gap-2 text-xs text-brand-text/70 dark:text-gray-400">
                   <Sparkles className="h-3.5 w-3.5" />
-                  Lead score {selectedLead.score}/10 · Source: {selectedLead.source || 'Inbox'}
+                  Lead score {selectedLead.score}/100 · Source: {selectedLead.source || 'Inbox'}
                 </div>
               </div>
 

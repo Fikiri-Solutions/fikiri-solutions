@@ -148,7 +148,7 @@ const PrivacyPolicy: React.FC = () => {
                 <ul className="list-disc list-inside text-gray-300 mb-4 space-y-2">
                   <li><strong>While you use the Service:</strong> We keep connection credentials (for example, encrypted OAuth tokens) and operational copies of data needed to run automations and show you results.</li>
                   <li><strong>When you disconnect Google:</strong> We stop new access using that connection; we may retain limited records as described in your account settings and as needed for security or legal compliance.</li>
-                  <li><strong>Deletion requests:</strong> You may request deletion of your account and associated data by contacting <a href="mailto:privacy@fikirisolutions.com" className="text-brand-primary hover:text-muted-foreground">privacy@fikirisolutions.com</a> and, where offered, through in-app privacy or account tools. When retention periods expire or after a completed deletion request (subject to legal holds), we delete or irreversibly anonymize data in line with our technical and organizational capabilities.</li>
+                  <li><strong>Deletion requests:</strong> You may request deletion of your account and associated data by contacting <a href="mailto:info@fikirisolutions.com" className="text-brand-primary hover:text-muted-foreground">info@fikirisolutions.com</a> and, where offered, through in-app privacy or account tools. When retention periods expire or after a completed deletion request (subject to legal holds), we delete or irreversibly anonymize data in line with our technical and organizational capabilities.</li>
                 </ul>
                 <p className="text-gray-300">
                   If we materially change how we collect, use, store, or share Google user data, we will update this Privacy Policy and notify you as described under &quot;Policy Updates&quot; below.
@@ -214,7 +214,7 @@ const PrivacyPolicy: React.FC = () => {
                 </p>
                 <div className="bg-gray-700 p-4 rounded-lg mt-4">
                   <p className="text-gray-300">
-                    <strong>Email:</strong> privacy@fikirisolutions.com<br />
+                    <strong>Email:</strong> info@fikirisolutions.com<br />
                     <strong>Address:</strong> Fikiri Solutions, Privacy Department<br />
                     <strong>Website:</strong> <a href="/contact" className="text-brand-primary hover:text-muted-foreground">https://fikirisolutions.com/contact</a>
                   </p>

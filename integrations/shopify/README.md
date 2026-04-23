@@ -432,4 +432,4 @@ app.post('/api/webhooks/shopify/orders/create', async (req, res) => {
 
 ---
 
-*Need help? Contact support@fikirisolutions.com*
+*Need help? Contact info@fikirisolutions.com*

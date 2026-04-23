@@ -364,4 +364,4 @@ Fikiri.Forms.submit({
 
 ---
 
-*Need help? Contact support@fikirisolutions.com*
+*Need help? Contact info@fikirisolutions.com*

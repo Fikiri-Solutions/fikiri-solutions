@@ -252,9 +252,10 @@ export const CRM: React.FC = () => {
     }
   }
 
+  /** Backend stores lead score as 0–100 (`LeadScoringService`). */
   const getScoreColor = (score: number) => {
-    if (score >= 8) return 'text-green-600 dark:text-green-400'
-    if (score >= 6) return 'text-yellow-600 dark:text-yellow-400'
+    if (score >= 80) return 'text-green-600 dark:text-green-400'
+    if (score >= 60) return 'text-yellow-600 dark:text-yellow-400'
     return 'text-red-600 dark:text-red-400'
   }
 
@@ -458,11 +459,11 @@ export const CRM: React.FC = () => {
                                   <p className="text-xs text-brand-text/60 dark:text-gray-400">{lead.email}</p>
                                 </div>
                                 <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                                  lead.score >= 7 ? 'bg-emerald-100 text-emerald-700' :
-                                  lead.score >= 4 ? 'bg-amber-100 text-amber-700' :
+                                  lead.score >= 70 ? 'bg-emerald-100 text-emerald-700' :
+                                  lead.score >= 40 ? 'bg-amber-100 text-amber-700' :
                                   'bg-rose-100 text-rose-700'
                                 }`}>
-                                  {lead.score}/10
+                                  {lead.score}/100
                                 </span>
                               </div>
                               <div className="mt-3 flex items-center justify-between text-xs text-brand-text/60 dark:text-gray-400">
@@ -610,7 +611,7 @@ export const CRM: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className={`text-sm font-medium ${getScoreColor(lead.score)}`}>
-                        {lead.score}/10
+                        {lead.score}/100
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-brand-text/70 dark:text-gray-400">

@@ -367,7 +367,7 @@ class SmartFAQSystem:
             FAQEntry(
                 id="support_contact",
                 question="How can I contact support?",
-                answer="You can reach our support team via email at support@fikirisolutions.com, through our in-app chat, or by scheduling a call. Our support hours are Monday-Friday 9AM-6PM EST. Enterprise customers get priority 24/7 support.",
+                answer="You can reach our support team via email at info@fikirisolutions.com, through our in-app chat, or by scheduling a call. Our support hours are Monday-Friday 9AM-6PM EST. Enterprise customers get priority 24/7 support.",
                 category=FAQCategory.SUPPORT,
                 keywords=["support", "contact", "help", "assistance", "email", "chat"],
                 variations=[
@@ -735,7 +735,7 @@ class SmartFAQSystem:
         elif any(word in query.lower() for word in ["technical", "api", "integration"]):
             return "For technical questions and integration details, please check our API documentation or contact our technical support team."
         elif any(word in query.lower() for word in ["help", "support", "problem"]):
-            return "I'd be happy to help! Please contact our support team at support@fikirisolutions.com or use our in-app chat for immediate assistance."
+            return "I'd be happy to help! Please contact our support team at info@fikirisolutions.com or use our in-app chat for immediate assistance."
         
         return fallback_responses[0]  # Default fallback
     

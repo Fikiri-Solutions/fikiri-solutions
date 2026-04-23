@@ -63,7 +63,7 @@ We retain personal information, including Google OAuth tokens and data processed
 
 - **While you use the Service:** We keep connection credentials (for example, encrypted OAuth tokens) and operational copies of data needed to run automations and show you results.
 - **When you disconnect Google:** We stop new access using that connection; we may retain limited records as described in your account settings and as needed for security or legal compliance.
-- **Deletion requests:** You may request deletion of your account and associated data by contacting privacy@fikirisolutions.com and, where offered, through in-app privacy or account tools. When retention periods expire or after a completed deletion request (subject to legal holds), we delete or irreversibly anonymize data in line with our technical and organizational capabilities.
+- **Deletion requests:** You may request deletion of your account and associated data by contacting info@fikirisolutions.com and, where offered, through in-app privacy or account tools. When retention periods expire or after a completed deletion request (subject to legal holds), we delete or irreversibly anonymize data in line with our technical and organizational capabilities.
 
 If we materially change how we collect, use, store, or share Google user data, we will update this Privacy Policy and notify you as described under "Policy Updates" below.
 
@@ -82,7 +82,7 @@ We implement administrative, technical, and organizational measures designed to 
 
 ## Your Rights and Choices (User Rights & Controls)
 
-You have the right to access, correction, deletion, portability (where feasible), opt-out of marketing, and in certain jurisdictions to restrict or object to processing. Contact privacy@fikirisolutions.com to exercise these rights. If you are in the EEA, UK, or California, additional rights may apply under GDPR, UK GDPR, or CCPA.
+You have the right to access, correction, deletion, portability (where feasible), opt-out of marketing, and in certain jurisdictions to restrict or object to processing. Contact info@fikirisolutions.com to exercise these rights. If you are in the EEA, UK, or California, additional rights may apply under GDPR, UK GDPR, or CCPA.
 
 ## Policy Updates
 
@@ -90,7 +90,7 @@ We may update this Privacy Policy from time to time. When we do, we will change 
 
 ## Contact Information
 
-**Email:** privacy@fikirisolutions.com  
+**Email:** info@fikirisolutions.com  
 **Address:** Fikiri Solutions, Privacy Department  
 **Website:** https://fikirisolutions.com/contact
 

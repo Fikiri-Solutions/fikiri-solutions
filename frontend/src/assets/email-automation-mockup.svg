@@ -57,7 +57,7 @@
   <!-- Email Header -->
   <rect x="720" y="180" width="1080" height="80" fill="#F9FAFB" rx="4"/>
   <text x="740" y="210" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#1F2937">Re: Interested in your automation services</text>
-  <text x="740" y="235" font-family="Arial, sans-serif" font-size="14" fill="#6B7280">From: Sarah Johnson • To: support@fikirisolutions.com</text>
+  <text x="740" y="235" font-family="Arial, sans-serif" font-size="14" fill="#6B7280">From: Sarah Johnson • To: info@fikirisolutions.com</text>
   <text x="740" y="250" font-family="Arial, sans-serif" font-size="12" fill="#9CA3AF">Today at 2:34 PM</text>
   
   <!-- AI Response Indicator -->

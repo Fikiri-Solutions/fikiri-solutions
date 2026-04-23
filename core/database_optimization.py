@@ -731,6 +731,10 @@ class DatabaseOptimizer:
                 FOREIGN KEY (lead_id) REFERENCES leads (id) ON DELETE CASCADE
             )
         """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_lead_activities_lead_id
+            ON lead_activities (lead_id)
+        """)
 
         # Append-only CRM audit / timeline (mutations also recorded from crm/service.py)
         cursor.execute("""
@@ -1854,6 +1858,8 @@ class DatabaseOptimizer:
             ("idx_leads_user_id", "leads", ["user_id"]),
             ("idx_leads_email", "leads", ["email"]),
             ("idx_leads_created_at", "leads", ["created_at"]),
+            # Tenant list sorted by recency: WHERE user_id = ? ORDER BY created_at DESC
+            ("idx_leads_user_created", "leads", ["user_id", "created_at"]),
         ]
         
         for index_name, table_name, columns in indexes:

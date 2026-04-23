@@ -84,8 +84,8 @@ https://api.fikirisolutions.com/api/health
 ### **Step 3: Configure Notifications**
 ```bash
 # Email Notifications
-- Primary: admin@fikirisolutions.com
-- Secondary: support@fikirisolutions.com
+- Primary: info@fikirisolutions.com
+- Secondary: info@fikirisolutions.com
 
 # Slack Notifications
 - Webhook: https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK
@@ -140,8 +140,8 @@ https://api.fikirisolutions.com/api/health
 ### **Step 3: Configure Alerts**
 ```bash
 # Email Alerts
-- Primary: admin@fikirisolutions.com
-- Secondary: support@fikirisolutions.com
+- Primary: info@fikirisolutions.com
+- Secondary: info@fikirisolutions.com
 
 # Slack Alerts
 - Webhook: https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK
@@ -279,8 +279,8 @@ UPTIMEROBOT_API_KEY=your-uptimerobot-api-key
 HEALTHCHECKS_IO_API_KEY=your-healthchecks-io-api-key
 
 # Alert Configuration
-ALERT_EMAIL_PRIMARY=admin@fikirisolutions.com
-ALERT_EMAIL_SECONDARY=support@fikirisolutions.com
+ALERT_EMAIL_PRIMARY=info@fikirisolutions.com
+ALERT_EMAIL_SECONDARY=info@fikirisolutions.com
 ALERT_SLACK_WEBHOOK=https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK
 ALERT_SMS_PHONE=+1-555-0123
 ```

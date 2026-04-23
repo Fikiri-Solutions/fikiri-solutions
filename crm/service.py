@@ -5,7 +5,7 @@ Manages leads, contacts, and activities with automatic Gmail integration
 
 import json
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, asdict, is_dataclass
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
@@ -159,53 +159,42 @@ class EnhancedCRMService:
             "data": {"events": [dict(r) for r in (rows or [])], "limit": limit, "offset": offset},
         }
     
-    def get_leads_summary(self, user_id: int, filters: Dict[str, Any] = None, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
-        """Get comprehensive leads summary with analytics and pagination"""
-        base_query = """SELECT id, user_id, email, name, phone, company, source, stage, score, 
-                       created_at, updated_at, last_contact, notes, tags, metadata 
-                       FROM leads WHERE user_id = ?"""
-        params = [user_id]
+    def _leads_where_clause(self, user_id: int, filters: Optional[Dict[str, Any]]) -> Tuple[str, List[Any]]:
+        """Same predicates as list + count queries (single source of truth for filters)."""
+        parts = ["user_id = ?"]
+        params: List[Any] = [user_id]
         if not (filters and filters.get("include_withdrawn")):
-            base_query += f" AND {_ACTIVE_LEADS_SQL}"
-        
+            parts.append("(withdrawn_at IS NULL)")
         if filters:
             if filters.get('stage'):
-                base_query += " AND stage = ?"
+                parts.append("stage = ?")
                 params.append(filters['stage'])
             if filters.get('time_period'):
                 cutoff_date = self._get_cutoff_date(filters['time_period'])
-                base_query += " AND created_at >= ?"
+                parts.append("created_at >= ?")
                 params.append(cutoff_date.isoformat())
             if filters.get('company'):
-                base_query += " AND company LIKE ?"
+                parts.append("company LIKE ?")
                 params.append(f"%{filters['company']}%")
-        
-        base_query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
-        params.extend([limit, offset])
-        
-        leads_data = db_optimizer.execute_query(base_query, tuple(params))
-        
-        count_query = "SELECT COUNT(*) as total FROM leads WHERE user_id = ?"
-        count_params = [user_id]
-        if not (filters and filters.get("include_withdrawn")):
-            count_query += f" AND {_ACTIVE_LEADS_SQL}"
-        if filters:
-            if filters.get('stage'):
-                count_query += " AND stage = ?"
-                count_params.append(filters['stage'])
-            if filters.get('time_period'):
-                cutoff_date = self._get_cutoff_date(filters['time_period'])
-                count_query += " AND created_at >= ?"
-                count_params.append(cutoff_date.isoformat())
-            if filters.get('company'):
-                count_query += " AND company LIKE ?"
-                count_params.append(f"%{filters['company']}%")
-        
-        total_count_result = db_optimizer.execute_query(count_query, tuple(count_params))
+        return " AND ".join(parts), params
+
+    def get_leads_summary(self, user_id: int, filters: Dict[str, Any] = None, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
+        """Get comprehensive leads summary with analytics and pagination"""
+        where_sql, params = self._leads_where_clause(user_id, filters)
+
+        base_query = f"""SELECT id, user_id, email, name, phone, company, source, stage, score,
+                       created_at, updated_at, last_contact, notes, tags, metadata
+                       FROM leads WHERE {where_sql}
+                       ORDER BY created_at DESC LIMIT ? OFFSET ?"""
+        list_params = list(params) + [limit, offset]
+        leads_data = db_optimizer.execute_query(base_query, tuple(list_params))
+
+        count_query = f"SELECT COUNT(*) as total FROM leads WHERE {where_sql}"
+        total_count_result = db_optimizer.execute_query(count_query, tuple(params))
         total_count = total_count_result[0]['total'] if total_count_result else 0
-        
+
         leads = [self._format_lead(lead_data) for lead_data in leads_data]
-        analytics = self._get_leads_analytics(user_id, leads)
+        analytics = self._get_leads_analytics_filtered(where_sql, params, total_count)
         
         return {
             'success': True,
@@ -1128,45 +1117,63 @@ class EnhancedCRMService:
                 "error_code": "DELETE_ERROR",
             }
     
-    def _get_leads_analytics(self, user_id: int, leads: List[Lead]) -> Dict[str, Any]:
-        """Get analytics for leads"""
-        if not leads:
+    def _get_leads_analytics_filtered(
+        self,
+        where_sql: str,
+        where_params: List[Any],
+        total_count: int,
+    ) -> Dict[str, Any]:
+        """Aggregate analytics over the full filtered lead set (not just the current page)."""
+        if total_count <= 0:
             return {
                 'total_leads': 0,
                 'leads_by_stage': {},
                 'leads_by_source': {},
                 'avg_score': 0,
-                'recent_leads': 0
+                'recent_leads': 0,
             }
-        
-        # Calculate analytics
-        leads_by_stage = {}
-        leads_by_source = {}
-        total_score = 0
-        recent_leads = 0
-        
-        cutoff_date = datetime.now() - timedelta(days=7)
-        
-        for lead in leads:
-            # By stage
-            leads_by_stage[lead.stage] = leads_by_stage.get(lead.stage, 0) + 1
-            
-            # By source
-            leads_by_source[lead.source] = leads_by_source.get(lead.source, 0) + 1
-            
-            # Total score
-            total_score += lead.score
-            
-            # Recent leads
-            if lead.created_at >= cutoff_date:
-                recent_leads += 1
-        
+
+        leads_by_stage: Dict[str, int] = {}
+        stage_rows = db_optimizer.execute_query(
+            f"SELECT stage, COUNT(*) AS cnt FROM leads WHERE {where_sql} GROUP BY stage",
+            tuple(where_params),
+        )
+        for row in stage_rows or []:
+            key = row.get('stage') or 'unknown'
+            leads_by_stage[str(key)] = int(row.get('cnt') or 0)
+
+        leads_by_source: Dict[str, int] = {}
+        source_rows = db_optimizer.execute_query(
+            f"SELECT source, COUNT(*) AS cnt FROM leads WHERE {where_sql} GROUP BY source",
+            tuple(where_params),
+        )
+        for row in source_rows or []:
+            raw = row.get('source')
+            key = str(raw).strip() if raw is not None else ''
+            key = key if key else 'unknown'
+            leads_by_source[key] = int(row.get('cnt') or 0)
+
+        avg_row = db_optimizer.execute_query(
+            f"SELECT AVG(score) AS avg_score FROM leads WHERE {where_sql}",
+            tuple(where_params),
+        )
+        raw_avg = avg_row[0].get('avg_score') if avg_row else None
+        avg_score = round(float(raw_avg), 1) if raw_avg is not None else 0.0
+
+        recent_cutoff = datetime.now() - timedelta(days=7)
+        recent_params = list(where_params) + [recent_cutoff.isoformat()]
+        recent_row = db_optimizer.execute_query(
+            f"SELECT COUNT(*) AS cnt FROM leads WHERE {where_sql} AND created_at >= ?",
+            tuple(recent_params),
+        )
+        recent_leads = int(recent_row[0]['cnt']) if recent_row else 0
+
         return {
-            'total_leads': len(leads),
+            'total_leads': total_count,
             'leads_by_stage': leads_by_stage,
             'leads_by_source': leads_by_source,
-            'avg_score': round(total_score / len(leads), 1),
-            'recent_leads': recent_leads
+            'avg_score': avg_score,
+            'recent_leads': recent_leads,
         }
 
 # Global enhanced CRM service instance

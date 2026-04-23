@@ -8,7 +8,7 @@ set -e
 BACKEND_URL="https://fikirisolutions.onrender.com"
 FRONTEND_URL="https://www.fikirisolutions.com"
 LOG_FILE="/tmp/fikiri-first-hour-monitor.log"
-ALERT_EMAIL="admin@fikirisolutions.com"
+ALERT_EMAIL="info@fikirisolutions.com"
 MONITOR_DURATION=3600  # 1 hour in seconds
 
 # Colors
