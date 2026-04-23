@@ -14,6 +14,7 @@ import {
   Settings
 } from 'lucide-react'
 import { getSubscriptionSignupSteps } from '../content/subscriptionSignupInstructions'
+import { LegalFooterLinks } from '../components/LegalFooterLinks'
 
 export const BillingPage: React.FC = () => {
   const navigate = useNavigate()
@@ -716,6 +717,10 @@ export const BillingPage: React.FC = () => {
               <p className="text-gray-600 dark:text-gray-400">No invoices yet</p>
             </div>
           )}
+        </div>
+
+        <div className="mt-10 border-t border-gray-200 pt-6 dark:border-gray-700">
+          <LegalFooterLinks className="text-center text-xs text-gray-500 dark:text-gray-400" />
         </div>
       </div>
     </div>

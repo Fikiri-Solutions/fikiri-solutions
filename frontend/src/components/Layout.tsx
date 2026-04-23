@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Mail, Users, Brain, Settings, Menu, X, Palette, LogOut, BarChart3, Shield, Zap, User, PlugZap, BookOpen, CreditCard, Package } from 'lucide-react'
+import { Menu, X, Palette, LogOut, User } from 'lucide-react'
+import { getDashboardSidebarNav, isDashboardNavItemActive } from '../navigation/dashboardNav'
 import { MobileBottomNav } from './MobileBottomNav'
 import { ThemeToggle } from './ThemeToggle'
 import { CustomizationPanel } from './CustomizationPanel'
@@ -11,6 +12,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { FikiriLogo } from './FikiriLogo'
 import { EmailVerificationBanner } from './EmailVerificationBanner'
 import { SubscriptionGate } from './SubscriptionGate'
+import { LegalFooterLinks } from './LegalFooterLinks'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -48,25 +50,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     logout()
   }
 
-  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Inbox', href: '/inbox', icon: Mail },
-    { name: 'Integrations', href: '/integrations/gmail', icon: PlugZap },
-    { name: 'Services', href: '/services', icon: Settings },
-    { name: 'Automations', href: '/automations', icon: Zap },
-    { name: 'CRM', href: '/crm', icon: Users },
-    { name: 'AI Assistant', href: '/ai', icon: Brain },
-    { name: 'Import center', href: '/import-center', icon: Package },
-    { name: 'Chatbot Builder', href: '/ai/chatbot-builder', icon: BookOpen },
-    { name: 'Usage Analytics', href: '/analytics', icon: BarChart3 },
-    { name: 'Billing', href: '/billing', icon: CreditCard },
-    { name: 'Privacy', href: '/privacy-settings', icon: Shield },
-  ]
-
-  // Add onboarding link if not completed
-  if (user && !user.onboarding_completed) {
-    navigation.unshift({ name: 'Complete Setup', href: '/onboarding', icon: Zap })
-  }
+  const navigation = getDashboardSidebarNav(user)
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
@@ -90,10 +74,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <nav className="flex-1 px-4 py-4">
             {navigation.map((item) => (
               <Link
-                key={item.name}
+                key={item.href}
                 to={item.href}
                 className={`flex min-h-[44px] items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
-                  location.pathname === item.href
+                  isDashboardNavItemActive(location.pathname, item.href)
                     ? 'bg-brand-accent/20 dark:bg-brand-accent/20 text-brand-primary dark:text-brand-accent'
                     : 'text-brand-text dark:text-gray-300 hover:bg-brand-accent/10 dark:hover:bg-gray-700'
                 }`}
@@ -104,6 +88,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </Link>
             ))}
           </nav>
+          <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 px-4 py-3">
+            <LegalFooterLinks
+              className="text-xs text-gray-500 dark:text-gray-400"
+              linkClassName="text-gray-600 hover:text-brand-primary hover:underline dark:text-gray-300 dark:hover:text-brand-accent"
+            />
+          </div>
         </div>
       </div>
 
@@ -123,10 +113,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <nav className="flex-1 px-4 py-4">
             {navigation.map((item) => (
               <Link
-                key={item.name}
+                key={item.href}
                 to={item.href}
                 className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
-                  location.pathname === item.href
+                  isDashboardNavItemActive(location.pathname, item.href)
                     ? 'bg-brand-accent/20 dark:bg-brand-accent/20 text-brand-primary dark:text-brand-accent'
                     : 'text-brand-text dark:text-gray-300 hover:bg-brand-accent/10 dark:hover:bg-gray-700'
                 }`}
@@ -136,6 +126,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </Link>
             ))}
           </nav>
+          <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 px-4 py-3">
+            <LegalFooterLinks
+              className="text-xs text-gray-500 dark:text-gray-400"
+              linkClassName="text-gray-600 hover:text-brand-primary hover:underline dark:text-gray-300 dark:hover:text-brand-accent"
+            />
+          </div>
         </div>
       </div>
 
@@ -191,6 +187,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <EmailVerificationBanner user={user} />
             <SubscriptionGate>{children}</SubscriptionGate>
+            <footer className="mt-10 border-t border-gray-200 pt-6 dark:border-gray-700">
+              <LegalFooterLinks className="text-center text-xs text-gray-500 dark:text-gray-400" />
+            </footer>
           </div>
         </main>
       </div>

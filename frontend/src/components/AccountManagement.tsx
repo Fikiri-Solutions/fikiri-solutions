@@ -24,6 +24,7 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from './Toast'
 import { SMS_CONSENT } from '../constants/smsConsent'
+import { LegalFooterLinks } from './LegalFooterLinks'
 
 interface AccountData {
   username: string
@@ -951,6 +952,10 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             {activeTab === 'notifications' && <NotificationsTab key="notifications" />}
             {activeTab === 'preferences' && <PreferencesTab key="preferences" />}
           </AnimatePresence>
+        </div>
+
+        <div className="flex-shrink-0 border-t border-gray-200 px-6 py-3 dark:border-gray-700">
+          <LegalFooterLinks className="text-center text-xs text-gray-500 dark:text-gray-400 sm:text-left" />
         </div>
       </motion.div>
     </div>
