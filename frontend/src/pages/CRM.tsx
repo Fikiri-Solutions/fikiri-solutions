@@ -259,6 +259,18 @@ export const CRM: React.FC = () => {
     return 'text-red-600 dark:text-red-400'
   }
 
+  const scoreBreakdownSummary = (lead: LeadData): string | null => {
+    const b = lead.scoreBreakdown
+    if (!b) return null
+    const keys = ['identity', 'intent', 'icp_match', 'engagement', 'lifecycle_modifier']
+    const parts = keys
+      .filter((k) => typeof b[k] === 'number')
+      .map((k) => `${k.replace('_', ' ')} ${b[k]}`)
+    if (parts.length === 0) return null
+    const suffix = lead.scoringVersion ? ` · ${lead.scoringVersion}` : ''
+    return `${parts.join(' · ')}${suffix}`
+  }
+
   return (
     <div className="space-y-6">
         {/* Header */}
@@ -462,7 +474,7 @@ export const CRM: React.FC = () => {
                                   lead.score >= 70 ? 'bg-emerald-100 text-emerald-700' :
                                   lead.score >= 40 ? 'bg-amber-100 text-amber-700' :
                                   'bg-rose-100 text-rose-700'
-                                }`}>
+                                }`} title={scoreBreakdownSummary(lead) ?? undefined}>
                                   {lead.score}/100
                                 </span>
                               </div>
@@ -610,9 +622,17 @@ export const CRM: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className={`text-sm font-medium ${getScoreColor(lead.score)}`}>
+                      <div
+                        className={`text-sm font-medium ${getScoreColor(lead.score)}`}
+                        title={scoreBreakdownSummary(lead) ?? undefined}
+                      >
                         {lead.score}/100
                       </div>
+                      {scoreBreakdownSummary(lead) ? (
+                        <div className="mt-0.5 text-[10px] text-brand-text/60 dark:text-gray-500 truncate max-w-[260px]">
+                          {scoreBreakdownSummary(lead)}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-brand-text/70 dark:text-gray-400">
                       {lead.lastContact}

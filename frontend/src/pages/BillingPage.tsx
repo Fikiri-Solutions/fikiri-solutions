@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { apiClient } from '../services/apiClient'
 import { useToast } from '../components/Toast'
@@ -18,10 +18,12 @@ import { LegalFooterLinks } from '../components/LegalFooterLinks'
 
 export const BillingPage: React.FC = () => {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { user, isAuthenticated } = useAuth()
   const { addToast } = useToast()
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly')
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
+  const [accessCode, setAccessCode] = useState('')
 
   const { data: pricingTiers = {}, isLoading: pricingLoading } = useQuery({
     queryKey: ['pricing-tiers'],
@@ -29,7 +31,7 @@ export const BillingPage: React.FC = () => {
     staleTime: 5 * 60 * 1000
   })
 
-  const { data: subscription, isLoading: subscriptionLoading, error: subscriptionError } = useQuery({
+  const { data: subscription, isLoading: subscriptionLoading, error: subscriptionError, refetch: refetchSubscription } = useQuery({
     queryKey: ['current-subscription', user?.id],
     queryFn: async () => {
       try {
@@ -94,6 +96,16 @@ export const BillingPage: React.FC = () => {
     },
     enabled: !!isAuthenticated,
     staleTime: 60 * 1000,
+    retry: 1
+  })
+
+  const isAdmin = String(user?.role || '').toLowerCase() === 'admin'
+
+  const { data: testAccessAudit = [], isLoading: testAccessAuditLoading } = useQuery({
+    queryKey: ['test-access-audit', user?.id],
+    queryFn: () => apiClient.getTestAccessAudit(100),
+    enabled: !!isAuthenticated && isAdmin,
+    staleTime: 30 * 1000,
     retry: 1
   })
 
@@ -233,6 +245,39 @@ export const BillingPage: React.FC = () => {
     }
   }
 
+  const handleRedeemAccessCode = async () => {
+    const code = accessCode.trim()
+    if (!code) {
+      addToast({
+        type: 'error',
+        title: 'Code required',
+        message: 'Enter an access code to continue.'
+      })
+      return
+    }
+
+    try {
+      setLoadingAction('redeem-access')
+      await apiClient.redeemTestAccessCode(code)
+      setAccessCode('')
+      await queryClient.invalidateQueries({ queryKey: ['current-subscription', user?.id] })
+      await refetchSubscription()
+      addToast({
+        type: 'success',
+        title: 'Access granted',
+        message: 'Your test access is active now.'
+      })
+    } catch (error: any) {
+      addToast({
+        type: 'error',
+        title: 'Invalid code',
+        message: error?.message || 'Unable to redeem that code.'
+      })
+    } finally {
+      setLoadingAction(null)
+    }
+  }
+
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -243,6 +288,16 @@ export const BillingPage: React.FC = () => {
 
   const formatCurrency = (amount: number, currency: string = 'USD') => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount)
+  }
+
+  const formatDateTime = (timestamp: number) => {
+    return new Date(timestamp * 1000).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    })
   }
 
   if (!isAuthenticated) {
@@ -405,6 +460,35 @@ export const BillingPage: React.FC = () => {
             <p className="mt-6 text-sm font-medium text-gray-800 dark:text-gray-200 text-center sm:text-left">
               Next: choose <strong className="font-semibold">Monthly</strong> or <strong className="font-semibold">Yearly</strong>, then select a plan in the section below.
             </p>
+
+            <div className="mt-6 border-t border-gray-200 pt-6 dark:border-gray-700">
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Have a test access code?</h4>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Enter a code shared by the Fikiri team to unlock temporary production testing access.
+              </p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="text"
+                  value={accessCode}
+                  onChange={(e) => setAccessCode(e.target.value)}
+                  placeholder="Enter access code"
+                  autoComplete="off"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                />
+                <button
+                  type="button"
+                  onClick={handleRedeemAccessCode}
+                  disabled={loadingAction === 'redeem-access'}
+                  className="inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-60 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
+                >
+                  {loadingAction === 'redeem-access' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    'Redeem code'
+                  )}
+                </button>
+              </div>
+            </div>
           </section>
         )}
 
@@ -718,6 +802,56 @@ export const BillingPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {isAdmin && (
+          <div className="mt-10">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Test Access Audit</h2>
+            {testAccessAuditLoading ? (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8">
+                <div className="animate-pulse">Loading audit log...</div>
+              </div>
+            ) : testAccessAudit.length > 0 ? (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">User</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Code</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Redeemed</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Expires</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {testAccessAudit.map((row) => (
+                      <tr key={row.id}>
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                          {row.email || `User #${row.user_id}`}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{row.code_hint || 'N/A'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{formatDateTime(row.redeemed_at)}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{formatDateTime(row.expires_at)}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            row.currently_active
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                          }`}>
+                            {row.currently_active ? 'Active' : 'Expired/Revoked'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
+                <p className="text-gray-600 dark:text-gray-400">No test access redemptions yet.</p>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="mt-10 border-t border-gray-200 pt-6 dark:border-gray-700">
           <LegalFooterLinks className="text-center text-xs text-gray-500 dark:text-gray-400" />

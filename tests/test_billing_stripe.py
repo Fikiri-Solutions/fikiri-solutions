@@ -67,6 +67,87 @@ class TestBillingAPI(unittest.TestCase):
         self.assertEqual(data.get("customer", {}).get("id"), "cus_123")
         mock_stripe_manager.create_customer.assert_called_once()
 
+    @patch.dict(os.environ, {"ENABLE_TEST_ACCESS_CODES": "true", "TEST_ACCESS_CODES": "QA-CODE-1"}, clear=False)
+    @patch("core.jwt_auth.get_jwt_manager")
+    @patch("core.database_optimization.DatabaseOptimizer")
+    def test_redeem_test_access_code_grants_trialing_access(self, mock_db_cls, mock_jwt_manager):
+        mock_jwt_manager.return_value.verify_access_token.return_value = {"user_id": 42}
+        mock_db = MagicMock()
+        mock_db.execute_query.return_value = []
+        mock_db_cls.return_value = mock_db
+
+        response = self.client.post(
+            "/api/billing/test-access/redeem",
+            headers={"Authorization": "Bearer test-token"},
+            json={"code": "QA-CODE-1"},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        self.assertEqual((payload.get("access") or {}).get("status"), "trialing")
+        self.assertTrue(any("INSERT INTO test_access_redemptions" in (call.args[0] if call.args else "") for call in mock_db.execute_query.call_args_list))
+
+    @patch.dict(os.environ, {"ENABLE_TEST_ACCESS_CODES": "true", "TEST_ACCESS_CODES": "QA-CODE-1"}, clear=False)
+    @patch("core.jwt_auth.get_jwt_manager")
+    def test_redeem_test_access_code_rejects_invalid_code(self, mock_jwt_manager):
+        mock_jwt_manager.return_value.verify_access_token.return_value = {"user_id": 42}
+
+        response = self.client.post(
+            "/api/billing/test-access/redeem",
+            headers={"Authorization": "Bearer test-token"},
+            json={"code": "WRONG-CODE"},
+        )
+        self.assertEqual(response.status_code, 403)
+        payload = response.get_json() or {}
+        self.assertFalse(payload.get("success", True))
+
+    @patch.dict(os.environ, {"ENABLE_TEST_ACCESS_CODES": "true", "ADMIN_USER_IDS": "1"}, clear=False)
+    @patch("core.jwt_auth.get_jwt_manager")
+    @patch("core.database_optimization.DatabaseOptimizer")
+    def test_test_access_audit_requires_admin(self, mock_db_cls, mock_jwt_manager):
+        mock_jwt_manager.return_value.verify_access_token.return_value = {"user_id": 2}
+        mock_db = MagicMock()
+        mock_db_cls.return_value = mock_db
+
+        response = self.client.get(
+            "/api/billing/test-access/audit",
+            headers={"Authorization": "Bearer test-token"},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    @patch.dict(os.environ, {"ENABLE_TEST_ACCESS_CODES": "true", "ADMIN_USER_IDS": "1"}, clear=False)
+    @patch("core.jwt_auth.get_jwt_manager")
+    @patch("core.database_optimization.DatabaseOptimizer")
+    def test_test_access_audit_returns_redemptions_for_admin(self, mock_db_cls, mock_jwt_manager):
+        mock_jwt_manager.return_value.verify_access_token.return_value = {"user_id": 1}
+        mock_db = MagicMock()
+
+        def _db_side_effect(query, params=None, fetch=True, user_id=None, endpoint=None):
+            if "SELECT" in query and "FROM test_access_redemptions" in query:
+                return [{
+                    "id": 9,
+                    "user_id": 77,
+                    "email": "tester@example.com",
+                    "code_hint": "QA-***",
+                    "redeemed_at": 1714000000,
+                    "expires_at": 1714600000,
+                    "currently_active": 1,
+                }]
+            return []
+
+        mock_db.execute_query.side_effect = _db_side_effect
+        mock_db_cls.return_value = mock_db
+
+        response = self.client.get(
+            "/api/billing/test-access/audit?limit=10",
+            headers={"Authorization": "Bearer test-token"},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        self.assertEqual(len(payload.get("audit") or []), 1)
+        self.assertEqual(payload["audit"][0]["email"], "tester@example.com")
+
 
 class TestStripeWebhookHandler(unittest.TestCase):
     """Test stripe_webhooks module (handler) with mocked Stripe events."""

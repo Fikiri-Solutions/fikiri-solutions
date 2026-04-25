@@ -389,25 +389,47 @@ def upsert_lead(user_id: int, lead_data: Dict[str, Any]) -> bool:
     """Create or update lead in CRM. Merges on (user_id, email); email is unique per user."""
     try:
         from core.database_optimization import db_optimizer
+        from core.lead_scoring_service import get_lead_scoring_service
 
         raw_email = lead_data.get("email") or ""
         email_norm = raw_email.strip().lower()
         if not email_norm:
             return False
 
+        scoring_input = {
+            "email": email_norm,
+            "name": lead_data.get("name", ""),
+            "company": lead_data.get("company", ""),
+            "source": lead_data.get("source", "gmail"),
+            "stage": lead_data.get("stage", "new"),
+            "subject": lead_data.get("subject", ""),
+            "metadata": {
+                "subject": lead_data.get("subject", ""),
+                "last_email_subject": lead_data.get("subject", ""),
+            },
+        }
+        scoring = get_lead_scoring_service().score_lead(scoring_input, activity_count=0, last_activity=None)
+        scoring_metadata = {
+            "lead_quality": scoring.quality,
+            "score_breakdown": scoring.breakdown,
+            "scoring_version": scoring.breakdown.get("version"),
+        }
+
         # Single-statement upsert avoids TOCTOU when many messages share the same sender.
         db_optimizer.execute_query(
             """
             INSERT INTO leads
-            (user_id, email, name, subject, source, external_id, stage,
+            (user_id, email, name, subject, source, external_id, stage, score, metadata,
              created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ON CONFLICT(user_id, email) DO UPDATE SET
                 name = excluded.name,
                 subject = excluded.subject,
                 external_id = excluded.external_id,
                 source = excluded.source,
                 stage = excluded.stage,
+                score = excluded.score,
+                metadata = excluded.metadata,
                 updated_at = CURRENT_TIMESTAMP
             """,
             (
@@ -418,6 +440,8 @@ def upsert_lead(user_id: int, lead_data: Dict[str, Any]) -> bool:
                 lead_data.get("source", "gmail"),
                 lead_data.get("external_id"),
                 lead_data.get("stage", "new"),
+                scoring.score,
+                json.dumps(scoring_metadata),
             ),
             fetch=False,
         )

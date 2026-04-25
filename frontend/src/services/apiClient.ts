@@ -110,6 +110,8 @@ export interface LeadData {
   stage: string
   /** 0–100 from backend `LeadScoringService`. */
   score: number
+  scoreBreakdown?: Record<string, number | string>
+  scoringVersion?: string
   lastContact: string
   source: string
 }
@@ -1454,6 +1456,28 @@ class ApiClient {
   }
 
   private mapLead(lead: any): LeadData {
+    const metadata =
+      lead && typeof lead.metadata === 'object'
+        ? lead.metadata
+        : (() => {
+            if (typeof lead?.metadata !== 'string') return {}
+            try {
+              return JSON.parse(lead.metadata)
+            } catch {
+              return {}
+            }
+          })()
+    const breakdown =
+      metadata && typeof metadata.score_breakdown === 'object'
+        ? (metadata.score_breakdown as Record<string, number | string>)
+        : undefined
+    const scoringVersion =
+      typeof metadata?.scoring_version === 'string'
+        ? metadata.scoring_version
+        : typeof breakdown?.version === 'string'
+          ? breakdown.version
+          : undefined
+
     return {
       id: (lead.id ?? lead.lead_id ?? '').toString(),
       name: lead.name || 'Unknown',
@@ -1461,6 +1485,8 @@ class ApiClient {
       company: lead.company || '',
       stage: lead.stage || 'new',
       score: lead.score || 0,
+      scoreBreakdown: breakdown,
+      scoringVersion,
       lastContact: lead.last_contact || lead.updated_at || lead.created_at || new Date().toISOString(),
       source: lead.source || 'manual'
     }
@@ -1496,6 +1522,36 @@ class ApiClient {
   async getCurrentSubscription(): Promise<any> {
     const response = await this.client.get('/billing/subscription/current')
     return response.data
+  }
+
+  async redeemTestAccessCode(code: string): Promise<{
+    success: boolean
+    message?: string
+    access?: { status: string; tier: string; expires_at: number }
+  }> {
+    const response = await this.client.post('/billing/test-access/redeem', { code })
+    if (!response.data?.success) {
+      throw new Error(response.data?.error || 'Failed to redeem access code')
+    }
+    return response.data
+  }
+
+  async getTestAccessAudit(limit = 50): Promise<Array<{
+    id: number
+    user_id: number
+    email: string | null
+    code_hint: string | null
+    redeemed_at: number
+    expires_at: number
+    currently_active: boolean
+  }>> {
+    const response = await this.client.get('/billing/test-access/audit', {
+      params: { limit }
+    })
+    if (!response.data?.success) {
+      throw new Error(response.data?.error || 'Failed to load test access audit')
+    }
+    return response.data?.audit || []
   }
 
   async cancelSubscription(subscriptionId: string, atPeriodEnd: boolean = true): Promise<any> {

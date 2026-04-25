@@ -9,7 +9,7 @@ from core.lead_scoring_service import LeadScoringService, DEFAULT_WEIGHTS
 
 class TestLeadScoringService(unittest.TestCase):
     def test_weights_sum_to_one_after_env_override(self):
-        raw = '{"source": 2, "recency": 2, "stage": 2, "engagement": 2, "attributes": 2}'
+        raw = '{"identity": 2, "intent": 2, "icp_match": 2, "engagement": 2, "lifecycle_modifier": 2}'
         with patch.dict(os.environ, {"LEAD_SCORING_WEIGHTS": raw}):
             svc = LeadScoringService()
         s = sum(svc.weights.values())
@@ -37,10 +37,32 @@ class TestLeadScoringService(unittest.TestCase):
             "email": "x@y.z",
             "name": "N",
             "created_at": "2099-01-01T00:00:00",
+            "metadata": {"subject": "intro"},
         }
         new_r = svc.score_lead({**base, "stage": "new"}, 0, None)
         booked_r = svc.score_lead({**base, "stage": "booked"}, 0, None)
-        self.assertGreater(booked_r.score, new_r.score)
+        self.assertGreater(
+            booked_r.breakdown.get("lifecycle_modifier", 0),
+            new_r.breakdown.get("lifecycle_modifier", 0),
+        )
+        self.assertGreaterEqual(booked_r.score, new_r.score)
+
+    def test_intent_keywords_raise_score(self):
+        svc = LeadScoringService()
+        base = {
+            "source": "gmail",
+            "email": "contact@acme.com",
+            "name": "Buyer",
+            "company": "Acme",
+            "created_at": "2099-01-01T00:00:00",
+        }
+        low = svc.score_lead({**base, "metadata": {"subject": "hello"}}, 0, None)
+        high = svc.score_lead(
+            {**base, "metadata": {"subject": "demo proposal pricing contract meeting this week"}},
+            0,
+            None,
+        )
+        self.assertGreater(high.score, low.score)
 
     def test_default_weights_unchanged_sum(self):
         svc = LeadScoringService()

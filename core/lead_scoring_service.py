@@ -3,28 +3,37 @@
 Lead Scoring Service
 Computes lead_score (0-100) and lead_quality (A/B/C/D) with configurable weights.
 
-Technique: convex combination (weighted average) of five 0-100 rule-based components
-(source, recency, stage, engagement, attributes)—not a trained ML model. Weights sum to 1
-after optional normalization (see LEAD_SCORING_WEIGHTS). Breakdown returned
-for transparency. Used by crm/service on create_lead, update_lead, and recalculate_lead_score.
-See docs/CRM_LEAD_SCORING.md for full process and code map.
+Technique (Scoring V1.1): deterministic weighted components in [0, 100] with explainable
+breakdown fields. This is intentionally rule-based (not ML) so results are stable and
+auditable in production.
 """
 
 import json
 import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
+SCORING_VERSION = "v1.1-deterministic"
+LIFECYCLE_MAX_MULTIPLIER_DELTA = 0.10  # lifecycle applies up to +/-10%
+
 DEFAULT_WEIGHTS = {
-    "source": 0.25,
-    "recency": 0.20,
-    "stage": 0.20,
+    "identity": 0.20,
+    "intent": 0.30,
+    "icp_match": 0.20,
     "engagement": 0.20,
-    "attributes": 0.15,
+    "lifecycle_modifier": 0.10,
+}
+
+LEGACY_WEIGHT_KEY_MAP = {
+    "source": "identity",
+    "attributes": "intent",
+    "recency": "icp_match",
+    "engagement": "engagement",
+    "stage": "lifecycle_modifier",
 }
 
 DEFAULT_SOURCE_SCORES = {
@@ -40,7 +49,7 @@ DEFAULT_SOURCE_SCORES = {
     "webhook": 50,
 }
 
-DEFAULT_STAGE_SCORES = {
+DEFAULT_LIFECYCLE_SCORES = {
     "new": 40,
     "contacted": 55,
     "replied": 65,
@@ -62,7 +71,7 @@ class LeadScoringService:
     def __init__(self):
         self.weights = DEFAULT_WEIGHTS.copy()
         self.source_scores = DEFAULT_SOURCE_SCORES.copy()
-        self.stage_scores = DEFAULT_STAGE_SCORES.copy()
+        self.lifecycle_scores = DEFAULT_LIFECYCLE_SCORES.copy()
         self._load_config()
 
     def _normalize_weights(self) -> None:
@@ -85,10 +94,116 @@ class LeadScoringService:
         try:
             data = json.loads(raw)
             if isinstance(data, dict):
-                self.weights.update({k: float(v) for k, v in data.items() if k in self.weights})
+                for k, v in data.items():
+                    key = k if k in self.weights else LEGACY_WEIGHT_KEY_MAP.get(k)
+                    if key in self.weights:
+                        self.weights[key] = float(v)
         except Exception as e:
             logger.warning("Failed to parse LEAD_SCORING_WEIGHTS: %s", e)
         self._normalize_weights()
+
+    def _domain_score(self, email: str) -> int:
+        if "@" not in email:
+            return 35
+        domain = email.split("@", 1)[1].strip().lower()
+        if not domain:
+            return 35
+        if domain in {"gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com"}:
+            return 45
+        if domain.endswith(".edu"):
+            return 55
+        if domain.endswith(".org"):
+            return 65
+        return 80
+
+    def _collect_text_for_intent(self, lead_data: Dict[str, Any]) -> str:
+        metadata = lead_data.get("metadata") or {}
+        if isinstance(metadata, str):
+            try:
+                metadata = json.loads(metadata)
+            except Exception:
+                metadata = {}
+        pieces = [
+            str(lead_data.get("notes") or ""),
+            str(lead_data.get("subject") or ""),
+            str(metadata.get("subject") or ""),
+            str(metadata.get("last_email_subject") or ""),
+            str(metadata.get("message") or ""),
+            str(metadata.get("body") or ""),
+            str(metadata.get("last_email_body") or ""),
+        ]
+        return " ".join(pieces).lower().strip()
+
+    def _intent_score(self, lead_data: Dict[str, Any]) -> int:
+        text = self._collect_text_for_intent(lead_data)
+        if not text:
+            return 35
+        score = 40
+        high_intent = {
+            "demo": 18,
+            "proposal": 20,
+            "pricing": 16,
+            "quote": 14,
+            "contract": 20,
+            "meeting": 14,
+            "budget": 16,
+            "timeline": 12,
+            "implementation": 12,
+            "asap": 8,
+            "urgent": 10,
+        }
+        negative = {
+            "unsubscribe": -30,
+            "not interested": -24,
+            "spam": -20,
+            "wrong person": -16,
+            "student project": -12,
+        }
+        for kw, pts in high_intent.items():
+            if kw in text:
+                score += pts
+        for kw, pts in negative.items():
+            if kw in text:
+                score += pts
+        return int(max(0, min(100, score)))
+
+    def _icp_match_score(self, lead_data: Dict[str, Any]) -> int:
+        text = self._collect_text_for_intent(lead_data)
+        score = 30
+        if lead_data.get("company"):
+            score += 15
+        source = str(lead_data.get("source") or "").lower()
+        if source in {"referral", "partner", "website", "typeform", "tally"}:
+            score += 10
+        configured = os.getenv("LEAD_SCORING_ICP_KEYWORDS", "").strip()
+        if configured:
+            terms = [t.strip().lower() for t in configured.split(",") if t.strip()]
+        else:
+            terms = ["automation", "crm", "ai", "workflow", "integration", "inbox", "sales"]
+        score += sum(8 for t in terms if t in text)
+        return int(max(0, min(100, score)))
+
+    def _engagement_score(
+        self,
+        lead_data: Dict[str, Any],
+        activity_count: int,
+        last_activity: Optional[datetime],
+        now: datetime,
+    ) -> int:
+        score = min(activity_count * 10, 60)
+        if last_activity:
+            delta_days = max((now - last_activity).days, 0)
+            score += max(0, 40 - min(delta_days, 30) * 1.3)
+        created_at = lead_data.get("created_at")
+        if isinstance(created_at, str):
+            try:
+                created_at = datetime.fromisoformat(created_at)
+            except Exception:
+                created_at = None
+        if created_at:
+            age_days = max((now - created_at).days, 0)
+            score += max(0, 20 - min(age_days, 40) * 0.5)
+        return int(max(0, min(100, score)))
 
     def score_lead(
         self,
@@ -98,65 +213,38 @@ class LeadScoringService:
         now: Optional[datetime] = None,
     ) -> LeadScoreResult:
         now = now or datetime.now(timezone.utc).replace(tzinfo=None)
-
-        # Source score
         source = (lead_data.get("source") or "").lower()
         source_score = self.source_scores.get(source, 50)
-
-        # Recency score (newer is better)
-        created_at = lead_data.get("created_at")
-        if isinstance(created_at, str):
-            try:
-                created_at = datetime.fromisoformat(created_at)
-            except Exception:
-                created_at = None
-        if created_at:
-            age_days = max((now - created_at).days, 0)
-        else:
-            age_days = 30
-        recency_score = max(0, 100 - min(age_days, 60) * 1.5)
-
-        # Stage score
+        identity_score = int(round((source_score * 0.55) + (self._domain_score(str(lead_data.get("email") or "")) * 0.45), 0))
+        intent_score = self._intent_score(lead_data)
+        icp_match_score = self._icp_match_score(lead_data)
+        engagement_score = self._engagement_score(lead_data, activity_count, last_activity, now)
         stage = (lead_data.get("stage") or "new").lower()
-        stage_score = self.stage_scores.get(stage, 40)
+        lifecycle_score = self.lifecycle_scores.get(stage, 40)
 
-        # Engagement score (activity count + recency of last activity)
-        engagement_score = min(activity_count * 10, 60)
-        if last_activity:
-            delta_days = max((now - last_activity).days, 0)
-            engagement_score += max(0, 40 - min(delta_days, 30) * 1.3)
-        engagement_score = min(engagement_score, 100)
-
-        # Attribute score
-        attributes_score = 0
-        if lead_data.get("company"):
-            attributes_score += 30
-        if lead_data.get("phone"):
-            attributes_score += 25
-        if lead_data.get("email") and "@" in lead_data.get("email"):
-            attributes_score += 25
-        if lead_data.get("name"):
-            attributes_score += 20
-        attributes_score = min(attributes_score, 100)
-
-        weighted = (
-            source_score * self.weights["source"]
-            + recency_score * self.weights["recency"]
-            + stage_score * self.weights["stage"]
+        base_weighted = (
+            identity_score * self.weights["identity"]
+            + intent_score * self.weights["intent"]
+            + icp_match_score * self.weights["icp_match"]
             + engagement_score * self.weights["engagement"]
-            + attributes_score * self.weights["attributes"]
         )
+        lifecycle_centered = (lifecycle_score - 50) / 50.0
+        lifecycle_factor = 1.0 + (self.weights["lifecycle_modifier"] * LIFECYCLE_MAX_MULTIPLIER_DELTA * lifecycle_centered)
+        weighted = base_weighted * lifecycle_factor
 
-        score = int(round(max(0, min(100, weighted)), 0))
+        score = int(round(max(0.0, min(100.0, weighted)), 0))
         quality = self._quality_from_score(score)
 
         breakdown = {
-            "source": source_score,
-            "recency": recency_score,
-            "stage": stage_score,
+            "version": SCORING_VERSION,
+            "identity": identity_score,
+            "intent": intent_score,
+            "icp_match": icp_match_score,
             "engagement": engagement_score,
-            "attributes": attributes_score,
+            "lifecycle_modifier": lifecycle_score,
             "weights": self.weights,
+            "lifecycle_factor": round(lifecycle_factor, 4),
+            "base_weighted_score": round(base_weighted, 2),
         }
 
         return LeadScoreResult(score=score, quality=quality, breakdown=breakdown)

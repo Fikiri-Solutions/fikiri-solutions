@@ -7,6 +7,7 @@ from flask import Blueprint, request, jsonify, current_app
 import logging
 import os
 import time
+import hmac
 from functools import wraps
 
 # JWT integration - use custom JWT auth from core
@@ -204,6 +205,95 @@ def _verify_subscription_owned_by_user(subscription_id):
     except Exception as e:
         logger.warning(f"Stripe check for subscription ownership: {e}")
         return False
+
+
+def _test_access_enabled() -> bool:
+    """Gate test-access code flow behind explicit env toggle."""
+    return os.getenv('ENABLE_TEST_ACCESS_CODES', 'false').strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def _allowed_test_access_codes():
+    """
+    Return configured test access codes from env.
+    Comma-separated string in TEST_ACCESS_CODES.
+    """
+    raw = os.getenv('TEST_ACCESS_CODES', '')
+    return [code.strip() for code in raw.split(',') if code and code.strip()]
+
+
+def _test_access_code_matches(candidate_code: str) -> bool:
+    """Constant-time comparison against configured codes."""
+    candidate = (candidate_code or '').strip()
+    if not candidate:
+        return False
+    for expected in _allowed_test_access_codes():
+        if hmac.compare_digest(candidate, expected):
+            return True
+    return False
+
+
+def _test_access_duration_days() -> int:
+    """Clamp grant lifetime to a safe range."""
+    try:
+        days = int(os.getenv('TEST_ACCESS_DURATION_DAYS', '14'))
+    except ValueError:
+        days = 14
+    return max(1, min(days, 90))
+
+
+def _ensure_test_access_grants_table(db):
+    db.execute_query("""
+        CREATE TABLE IF NOT EXISTS test_access_grants (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL UNIQUE,
+            code_hint TEXT,
+            status TEXT NOT NULL DEFAULT 'active',
+            granted_at INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL,
+            revoked_at INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+    """, fetch=False)
+    db.execute_query("""
+        CREATE TABLE IF NOT EXISTS test_access_redemptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            code_hint TEXT,
+            redeemed_at INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL,
+            source TEXT NOT NULL DEFAULT 'self_serve',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+    """, fetch=False)
+    db.execute_query("""
+        CREATE INDEX IF NOT EXISTS idx_test_access_redemptions_redeemed_at
+        ON test_access_redemptions (redeemed_at DESC)
+    """, fetch=False)
+
+
+def _get_user_role(user_id):
+    """Get role for a user id from local database."""
+    if not user_id:
+        return None
+    from core.database_optimization import DatabaseOptimizer
+    db = DatabaseOptimizer()
+    rows = db.execute_query("SELECT role FROM users WHERE id = ? LIMIT 1", (user_id,))
+    if not rows:
+        return None
+    row = rows[0]
+    return (row.get('role') if hasattr(row, 'keys') else row[0]) or None
+
+
+def _is_admin_user(user_id):
+    """Admin check: env allow-list OR role=admin."""
+    admin_ids = [x.strip() for x in (os.getenv('ADMIN_USER_IDS') or '').split(',') if x.strip()]
+    if admin_ids and str(user_id) in admin_ids:
+        return True
+    role = str(_get_user_role(user_id) or '').strip().lower()
+    return role == 'admin'
 
 def _fetch_customer_from_stripe(user_email):
     """Fetch customer ID from Stripe API with timeout protection"""
@@ -462,10 +552,180 @@ def get_current_subscription():
                     'error': 'Unable to fetch subscription. Please try again later.'
                 }), 503
         
+        # Final fallback: local test-access grants (time-limited, env-gated).
+        if _test_access_enabled():
+            try:
+                _ensure_test_access_grants_table(db)
+                now_ts = int(time.time())
+                grant_rows = db.execute_query("""
+                    SELECT expires_at
+                    FROM test_access_grants
+                    WHERE user_id = ?
+                      AND status = 'active'
+                      AND revoked_at IS NULL
+                      AND expires_at > ?
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                """, (user_id, now_ts))
+                if grant_rows and len(grant_rows) > 0 and grant_rows[0]:
+                    grant = grant_rows[0]
+                    expires_at = grant['expires_at'] if hasattr(grant, 'keys') else grant[0]
+                    return jsonify({
+                        'success': True,
+                        'subscription': {
+                            'id': f"test_access_user_{user_id}",
+                            'status': 'trialing',
+                            'tier': 'test_access',
+                            'billing_period': 'test',
+                            'current_period_start': now_ts,
+                            'current_period_end': expires_at,
+                            'trial_end': expires_at,
+                            'cancel_at_period_end': True,
+                            'source': 'test_access_code'
+                        },
+                        'cached': True
+                    })
+            except Exception as e:
+                logger.warning(f"Failed to evaluate test access grant for user {user_id}: {e}")
+
         return jsonify({'success': True, 'subscription': None, 'message': 'No active subscription'})
     except Exception as e:
         logger.error(f"Failed to get current subscription: {e}")
         return jsonify({'success': False, 'error': 'An error occurred. Please try again.'}), 500
+
+
+@billing_bp.route('/test-access/redeem', methods=['POST'])
+@jwt_required()
+def redeem_test_access_code():
+    """
+    Redeem a temporary access code to grant test access in production.
+    Requires:
+      - ENABLE_TEST_ACCESS_CODES=true
+      - TEST_ACCESS_CODES=comma,separated,codes
+    """
+    if not _test_access_enabled():
+        return jsonify({'success': False, 'error': 'Test access codes are disabled'}), 404
+
+    try:
+        user_id = get_jwt_identity()
+        if not user_id:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+
+        payload = request.get_json(silent=True) or {}
+        submitted_code = str(payload.get('code') or '').strip()
+        if not submitted_code:
+            return jsonify({'success': False, 'error': 'Access code is required'}), 400
+        if not _test_access_code_matches(submitted_code):
+            return jsonify({'success': False, 'error': 'Invalid access code'}), 403
+
+        from core.database_optimization import DatabaseOptimizer
+        db = DatabaseOptimizer()
+        _ensure_test_access_grants_table(db)
+
+        now_ts = int(time.time())
+        expires_at = now_ts + (_test_access_duration_days() * 24 * 60 * 60)
+        code_hint = submitted_code[:3] + '***'
+
+        # One active grant per user; redemption refreshes expiry.
+        db.execute_query("""
+            INSERT INTO test_access_redemptions (user_id, code_hint, redeemed_at, expires_at, source)
+            VALUES (?, ?, ?, ?, 'self_serve')
+        """, (user_id, code_hint, now_ts, expires_at), fetch=False)
+        db.execute_query("""
+            INSERT INTO test_access_grants (user_id, code_hint, status, granted_at, expires_at, revoked_at, updated_at)
+            VALUES (?, ?, 'active', ?, ?, NULL, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id) DO UPDATE SET
+                code_hint = excluded.code_hint,
+                status = 'active',
+                granted_at = excluded.granted_at,
+                expires_at = excluded.expires_at,
+                revoked_at = NULL,
+                updated_at = CURRENT_TIMESTAMP
+        """, (user_id, code_hint, now_ts, expires_at), fetch=False)
+
+        logger.info(f"Test access granted for user_id={user_id} until {expires_at}")
+        return jsonify({
+            'success': True,
+            'message': 'Test access granted',
+            'access': {
+                'status': 'trialing',
+                'tier': 'test_access',
+                'expires_at': expires_at
+            }
+        })
+    except Exception as e:
+        logger.error(f"Failed to redeem test access code: {e}")
+        return jsonify({'success': False, 'error': 'Failed to redeem access code'}), 500
+
+
+@billing_bp.route('/test-access/audit', methods=['GET'])
+@jwt_required()
+def get_test_access_audit():
+    """Admin-only audit log of test-access code redemptions."""
+    if not _test_access_enabled():
+        return jsonify({'success': False, 'error': 'Test access codes are disabled'}), 404
+
+    try:
+        user_id = get_jwt_identity()
+        if not user_id:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+        if not _is_admin_user(user_id):
+            return jsonify({'success': False, 'error': 'Admin access required'}), 403
+
+        from core.database_optimization import DatabaseOptimizer
+        db = DatabaseOptimizer()
+        _ensure_test_access_grants_table(db)
+
+        try:
+            limit = int(request.args.get('limit', 50))
+        except ValueError:
+            limit = 50
+        limit = max(1, min(limit, 200))
+
+        rows = db.execute_query("""
+            SELECT
+                r.id,
+                r.user_id,
+                COALESCE(u.email, '') AS email,
+                r.code_hint,
+                r.redeemed_at,
+                r.expires_at,
+                CASE
+                    WHEN g.status = 'active' AND g.revoked_at IS NULL AND g.expires_at > ? THEN 1
+                    ELSE 0
+                END AS currently_active
+            FROM test_access_redemptions r
+            LEFT JOIN users u ON u.id = r.user_id
+            LEFT JOIN test_access_grants g ON g.user_id = r.user_id
+            ORDER BY r.redeemed_at DESC
+            LIMIT ?
+        """, (int(time.time()), limit))
+
+        audit = []
+        for row in rows or []:
+            as_map = row if hasattr(row, 'keys') else {
+                'id': row[0],
+                'user_id': row[1],
+                'email': row[2],
+                'code_hint': row[3],
+                'redeemed_at': row[4],
+                'expires_at': row[5],
+                'currently_active': row[6],
+            }
+            audit.append({
+                'id': as_map.get('id'),
+                'user_id': as_map.get('user_id'),
+                'email': as_map.get('email') or None,
+                'code_hint': as_map.get('code_hint') or None,
+                'redeemed_at': as_map.get('redeemed_at'),
+                'expires_at': as_map.get('expires_at'),
+                'currently_active': bool(as_map.get('currently_active')),
+            })
+
+        return jsonify({'success': True, 'audit': audit})
+    except Exception as e:
+        logger.error(f"Failed to load test access audit: {e}")
+        return jsonify({'success': False, 'error': 'Failed to load audit'}), 500
 
 @billing_bp.route('/subscription/<subscription_id>', methods=['GET'])
 @jwt_required()

@@ -84,7 +84,11 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'preferences'>('profile')
   /** Profile fields are disabled when false; users often miss "Edit" and think the UI is broken. */
   const [isEditing, setIsEditing] = useState(true)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const [isSavingNotifications, setIsSavingNotifications] = useState(false)
+  const [isSavingSecurityPreferences, setIsSavingSecurityPreferences] = useState(false)
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false)
   const [showPasswords, setShowPasswords] = useState({
     current: false,
     new: false,
@@ -107,6 +111,34 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
   })
 
   const [smsConsent, setSmsConsent] = useState(false)
+
+  const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  })
+
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
+    email: {
+      marketing: true,
+      updates: true,
+      security: true,
+      weekly: false
+    },
+    sms: {
+      security: true,
+      urgent: false
+    },
+    push: {
+      all: true,
+      mentions: true,
+      updates: true
+    },
+    security: {
+      login_notifications: true,
+      two_factor_enabled: false,
+    },
+  })
 
   // Update accountData when user changes
   React.useEffect(() => {
@@ -150,10 +182,15 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
               },
             }))
           }
-        }).catch(() => {})
+        }).catch(() => {
+          addToast({
+            type: 'error',
+            title: 'Could not load your latest profile settings. Showing cached values.',
+          })
+        })
       })
     }
-  }, [isOpen, user?.id])
+  }, [isOpen, user?.id, addToast])
 
   // Open Profile in an editable state so inputs are not stuck disabled (disabled={!isEditing}).
   React.useEffect(() => {
@@ -173,33 +210,6 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
     }
     return undefined
   }, [isOpen])
-
-  const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-    twoFactorEnabled: false,
-    sessionTimeout: 24,
-    loginNotifications: true
-  })
-
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
-    email: {
-      marketing: true,
-      updates: true,
-      security: true,
-      weekly: false
-    },
-    sms: {
-      security: true,
-      urgent: false
-    },
-    push: {
-      all: true,
-      mentions: true,
-      updates: true
-    }
-  })
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
@@ -238,16 +248,18 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
   ]
 
   const handleSaveProfile = async () => {
-    setIsLoading(true)
+    setIsSavingProfile(true)
     try {
       const { apiClient } = await import('../services/apiClient')
+      const normalizedPhone = accountData.phone.trim()
       const payload = {
         name: accountData.username,
         business_name: accountData.businessName,
         business_email: accountData.businessEmail,
         industry: accountData.industry,
         team_size: accountData.teamSize,
-        phone: accountData.phone?.trim() || undefined,
+        // Send explicit empty string so backend clears stored phone metadata when user removes it.
+        phone: normalizedPhone,
         sms_consent: smsConsent,
         timezone: accountData.timezone || undefined,
       }
@@ -270,7 +282,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
     } catch (_error) {
       addToast({ type: 'error', title: 'Failed to update profile. Please try again.' })
     } finally {
-      setIsLoading(false)
+      setIsSavingProfile(false)
     }
   }
 
@@ -285,7 +297,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
       return
     }
 
-    setIsLoading(true)
+    setIsChangingPassword(true)
     try {
       const { apiClient } = await import('../services/apiClient')
       await apiClient.changePassword(securitySettings.currentPassword, securitySettings.newPassword)
@@ -302,12 +314,12 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
       addToast({ type: 'error', title: msg || 'Failed to change password. Please try again.' })
     } finally {
-      setIsLoading(false)
+      setIsChangingPassword(false)
     }
   }
 
   const handleSaveNotifications = async () => {
-    setIsLoading(true)
+    setIsSavingNotifications(true)
     try {
       const { apiClient } = await import('../services/apiClient')
       await apiClient.updateProfile({ notification_preferences: notificationSettings })
@@ -315,7 +327,24 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
     } catch (_err) {
       addToast({ type: 'error', title: 'Failed to save notification preferences.' })
     } finally {
-      setIsLoading(false)
+      setIsSavingNotifications(false)
+    }
+  }
+
+  /** Same payload as Notifications tab; Security tab edits `notificationSettings.security`. */
+  const handleSaveSecurityPreferences = async () => {
+    setIsSavingSecurityPreferences(true)
+    try {
+      const { apiClient } = await import('../services/apiClient')
+      await apiClient.updateProfile({ notification_preferences: notificationSettings })
+      addToast({
+        type: 'success',
+        title: 'Security preferences saved (preference-only until feature rollout).',
+      })
+    } catch (_err) {
+      addToast({ type: 'error', title: 'Failed to save security preferences.' })
+    } finally {
+      setIsSavingSecurityPreferences(false)
     }
   }
 
@@ -323,7 +352,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
     try {
       const data = {
         profile: accountData,
-        security: securitySettings,
+        passwordFieldsRedacted: '(passwords never exported)',
         notifications: notificationSettings,
         exportDate: new Date().toISOString()
       }
@@ -346,7 +375,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
 
   const handleDeleteAccount = async () => {
     if (!window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) return
-    setIsLoading(true)
+    setIsDeletingAccount(true)
     try {
       const { apiClient } = await import('../services/apiClient')
       await apiClient.deleteAccount()
@@ -356,7 +385,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
     } catch (_err) {
       addToast({ type: 'error', title: 'Failed to delete account. Please try again.' })
     } finally {
-      setIsLoading(false)
+      setIsDeletingAccount(false)
     }
   }
 
@@ -537,17 +566,19 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
       {isEditing && (
         <div className="flex items-center justify-end space-x-4 pt-4 border-t border-gray-200 dark:border-gray-700">
           <button
+            type="button"
             onClick={() => setIsEditing(false)}
             className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={handleSaveProfile}
-            disabled={isLoading}
+            disabled={isSavingProfile}
             className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
           >
-            {isLoading ? (
+            {isSavingProfile ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
                 <span>Saving...</span>
@@ -656,11 +687,12 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             </div>
 
             <button
+              type="button"
               onClick={handleChangePassword}
-              disabled={isLoading || !securitySettings.currentPassword || !securitySettings.newPassword || !securitySettings.confirmPassword}
+              disabled={isChangingPassword || !securitySettings.currentPassword || !securitySettings.newPassword || !securitySettings.confirmPassword}
               className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
             >
-              {isLoading ? (
+              {isChangingPassword ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
                   <span>Changing...</span>
@@ -680,7 +712,9 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             <Shield className="w-5 h-5 mr-2" />
             Two-Factor Authentication
           </h4>
-          
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            In-app enrollment (authenticator / SMS) is not available yet. Your choice is saved and will apply when 2FA is enabled for your account.
+          </p>
           <div className="flex items-center justify-between">
             <div>
               <h5 className="font-medium text-gray-900 dark:text-white">Enable 2FA</h5>
@@ -689,8 +723,13 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
-                checked={securitySettings.twoFactorEnabled}
-                onChange={(e) => setSecuritySettings(prev => ({ ...prev, twoFactorEnabled: e.target.checked }))}
+                checked={notificationSettings.security.two_factor_enabled}
+                onChange={(e) =>
+                  setNotificationSettings((prev) => ({
+                    ...prev,
+                    security: { ...prev.security, two_factor_enabled: e.target.checked },
+                  }))
+                }
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 dark:peer-focus:ring-orange-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-orange-500"></div>
@@ -703,7 +742,9 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             <Bell className="w-5 h-5 mr-2" />
             Login Notifications
           </h4>
-          
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            When supported, we will email your account address when a new login is detected. Toggle and save to record your preference.
+          </p>
           <div className="flex items-center justify-between">
             <div>
               <h5 className="font-medium text-gray-900 dark:text-white">Email notifications for new logins</h5>
@@ -712,13 +753,39 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
-                checked={securitySettings.loginNotifications}
-                onChange={(e) => setSecuritySettings(prev => ({ ...prev, loginNotifications: e.target.checked }))}
+                checked={notificationSettings.security.login_notifications}
+                onChange={(e) =>
+                  setNotificationSettings((prev) => ({
+                    ...prev,
+                    security: { ...prev.security, login_notifications: e.target.checked },
+                  }))
+                }
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 dark:peer-focus:ring-orange-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-orange-500"></div>
             </label>
           </div>
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <button
+            type="button"
+            onClick={handleSaveSecurityPreferences}
+            disabled={isSavingSecurityPreferences}
+            className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+          >
+            {isSavingSecurityPreferences ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                <span>Save security preferences</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
     </motion.div>
@@ -733,11 +800,12 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Notification Preferences</h3>
         <button
+          type="button"
           onClick={handleSaveNotifications}
-          disabled={isLoading}
+          disabled={isSavingNotifications}
           className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
         >
-          {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          {isSavingNotifications ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           <span>Save</span>
         </button>
       </div>
@@ -879,6 +947,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
           </p>
           
           <button
+            type="button"
             onClick={handleExportData}
             className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center space-x-2"
           >
@@ -898,11 +967,12 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
           </p>
           
           <button
+            type="button"
             onClick={handleDeleteAccount}
-            disabled={isLoading}
+            disabled={isDeletingAccount}
             className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
           >
-            {isLoading ? (
+            {isDeletingAccount ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
                 <span>Deleting...</span>
@@ -934,6 +1004,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Account Management</h2>
           {onClose && (
             <button
+              type="button"
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
             >
@@ -943,14 +1014,22 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+        <div
+          className="flex border-b border-gray-200 dark:border-gray-700 flex-shrink-0 overflow-x-auto overflow-y-hidden"
+          role="tablist"
+          aria-label="Account settings sections"
+        >
           {tabs.map((tab) => {
             const Icon = tab.icon
             return (
               <button
+                type="button"
                 key={tab.id}
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                id={`account-tab-${tab.id}`}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 px-6 py-4 font-medium transition-colors ${
+                className={`flex shrink-0 items-center space-x-2 px-6 py-4 font-medium transition-colors ${
                   activeTab === tab.id
                     ? 'text-orange-600 dark:text-orange-400 border-b-2 border-orange-500'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
