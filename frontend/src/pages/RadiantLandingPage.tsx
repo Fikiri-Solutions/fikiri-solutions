@@ -2,7 +2,6 @@ import { useState } from 'react'
 import {
   Container,
   Button,
-  Gradient,
   Navbar,
   Footer,
   BentoCard,
@@ -11,10 +10,8 @@ import {
   Subheading,
   AnimatedBackground,
 } from '@/components/radiant'
-import { EmailIcon } from '@/components/icons/EmailIcon'
-import { CRMIcon } from '@/components/icons/CRMIcon'
-import { IntegrationsIcon } from '@/components/icons/IntegrationsIcon'
 import { PublicChatbotWidget } from '../components/PublicChatbotWidget'
+import { publicMedia } from '@/lib/publicMedia'
 
 function Hero() {
   return (
@@ -40,10 +37,15 @@ function Hero() {
   )
 }
 
+/**
+ * In-app screen snapshots: `public/images/preview-tab-*.png` (see `publicMedia.landing.tab`).
+ * Renders in the **lower** product-preview block (under the Features bento), not in the bento images.
+ */
 const previewTabs = [
-  { key: 'dashboard', label: 'Dashboard', src: '/img/previews/dashboard-preview.webp', fallback: '/img/previews/dashboard-preview.png' },
-  { key: 'crm',       label: 'CRM',       src: '/img/previews/crm-preview.webp',       fallback: '/img/previews/crm-preview.png' },
-  { key: 'automations', label: 'Automations', src: '/img/previews/automations-preview.webp', fallback: '/img/previews/automations-preview.png' },
+  { key: 'dashboard', label: 'Dashboard', image: publicMedia.landing.tab.dashboard },
+  { key: 'inbox', label: 'Inbox', image: publicMedia.landing.tab.inbox },
+  { key: 'crm', label: 'CRM', image: publicMedia.landing.tab.crm },
+  { key: 'automations', label: 'Automations', image: publicMedia.landing.tab.automations },
 ] as const
 
 function FeatureSection() {
@@ -58,12 +60,13 @@ function FeatureSection() {
         </Heading>
 
         {/* Tab bar */}
-        <div className="mt-8 sm:mt-12 flex justify-center gap-2">
+        <div className="mt-8 sm:mt-12 flex max-w-3xl flex-wrap items-center justify-center gap-2 sm:mx-auto">
           {previewTabs.map((tab, i) => (
             <button
               key={tab.key}
               onClick={() => setActive(i)}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              type="button"
+              className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors sm:px-4 ${
                 i === active
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'bg-muted/60 text-muted-foreground hover:bg-muted'
@@ -74,22 +77,24 @@ function FeatureSection() {
           ))}
         </div>
 
-        {/* Screenshot */}
-        <div className="mt-6 sm:mt-10 flex justify-center">
-          <div className="relative w-full max-w-5xl overflow-hidden rounded-2xl shadow-xl ring-1 ring-border">
-            <Gradient className="absolute inset-0 pointer-events-none" />
-            <picture>
-              <source srcSet={current.src} type="image/webp" />
+        {/* App preview — your PNGs 1:1 (object-contain); warm gradient ties into section below */}
+        <div className="mt-6 sm:mt-8 flex justify-center px-1 sm:px-0">
+          <div className="relative w-full max-w-4xl overflow-hidden rounded-2xl bg-background/50 shadow-sm ring-1 ring-border/30 dark:bg-muted/20 dark:ring-border/50">
+            <div className="relative flex w-full min-h-[280px] max-h-[min(60vh,560px)] items-start justify-center sm:min-h-[320px]">
               <img
-                src={current.fallback}
+                key={current.key}
+                src={current.image}
                 alt={`${current.label} preview`}
-                width={1280}
-                height={800}
-                className="relative block w-full h-auto"
+                sizes="(max-width: 640px) 100vw, 56rem"
+                className="h-auto w-full max-h-[min(60vh,560px)] object-contain object-top"
                 loading="lazy"
                 decoding="async"
               />
-            </picture>
+              <div
+                className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-[#FDF2E9]/20 to-[#F4E0D2]/90 dark:from-transparent dark:via-white/[0.04] dark:to-background/80"
+                aria-hidden
+              />
+            </div>
           </div>
         </div>
       </Container>
@@ -98,6 +103,9 @@ function FeatureSection() {
 }
 
 function BentoSection() {
+  const featureImageClasses =
+    'h-48 sm:h-52 md:h-56 lg:h-64'
+
   return (
     <Container>
       <Subheading>Features</Subheading>
@@ -109,9 +117,16 @@ function BentoSection() {
           eyebrow="Email"
           title="AI-powered replies"
           description="Draft and send professional responses in seconds. Templates and AI suggestions keep your tone consistent and on-brand."
+          graphicClassName={featureImageClasses}
           graphic={
-            <div className="h-80 bg-white/50 dark:bg-gray-800/50 flex items-center justify-center p-8">
-              <EmailIcon className="w-48 h-32" />
+            <div className="h-full w-full overflow-hidden rounded-t-2xl bg-muted/30">
+              <img
+                src={publicMedia.landing.bento.email}
+                alt="Email feature preview"
+                className="h-full w-full object-cover object-center transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+                loading="lazy"
+                decoding="async"
+              />
             </div>
           }
           fade={['bottom']}
@@ -120,9 +135,16 @@ function BentoSection() {
           eyebrow="CRM"
           title="Leads in one place"
           description="Track contacts, deals, and activity. Automatically create and update records from email and calendar."
+          graphicClassName={featureImageClasses}
           graphic={
-            <div className="h-80 bg-white/50 dark:bg-gray-800/50 flex items-center justify-center p-8">
-              <CRMIcon className="w-48 h-36" />
+            <div className="h-full w-full overflow-hidden rounded-t-2xl bg-muted/30">
+              <img
+                src={publicMedia.landing.bento.crm}
+                alt="CRM feature preview"
+                className="h-full w-full object-cover object-[50%_38%] transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+                loading="lazy"
+                decoding="async"
+              />
             </div>
           }
           fade={['bottom']}
@@ -131,9 +153,16 @@ function BentoSection() {
           eyebrow="Automations"
           title="Workflows that run for you"
           description="Rules, triggers, and follow-ups that run on their own. Set it once and let Fikiri handle the rest—from lead capture to reminders."
+          graphicClassName={featureImageClasses}
           graphic={
-            <div className="h-80 bg-white/50 dark:bg-gray-800/50 flex items-center justify-center p-8">
-              <IntegrationsIcon className="w-48 h-48" />
+            <div className="h-full w-full overflow-hidden rounded-t-2xl bg-muted/30">
+              <img
+                src={publicMedia.landing.bento.automation}
+                alt="Automations feature preview"
+                className="h-full w-full object-cover object-center transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+                loading="lazy"
+                decoding="async"
+              />
             </div>
           }
           fade={['bottom']}
@@ -154,8 +183,10 @@ export default function RadiantLandingPage() {
         <Hero />
         <main>
           <div className="py-24">
-            <FeatureSection />
             <BentoSection />
+            <div className="pt-4 sm:pt-8">
+              <FeatureSection />
+            </div>
           </div>
         </main>
         <Testimonials />

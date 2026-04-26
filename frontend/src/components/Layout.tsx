@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Menu, X, Palette, LogOut, User } from 'lucide-react'
+import { Menu, X, Palette, LogOut, User, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { getDashboardSidebarNav, isDashboardNavItemActive } from '../navigation/dashboardNav'
 import { MobileBottomNav } from './MobileBottomNav'
 import { ThemeToggle } from './ThemeToggle'
@@ -18,30 +18,39 @@ interface LayoutProps {
   children: React.ReactNode
 }
 
+const SIDEBAR_COLLAPSED_KEY = 'fikiri:sidebar-collapsed'
+
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [customizationOpen, setCustomizationOpen] = useState(false)
   const [accountManagementOpen, setAccountManagementOpen] = useState(false)
   const location = useLocation()
   const { customization } = useCustomization()
   const { user, logout } = useAuth()
 
-  // Persist sidebar state in localStorage
   useEffect(() => {
-    const savedSidebarState = localStorage.getItem('sidebarOpen')
-    if (savedSidebarState !== null) {
-      setSidebarOpen(JSON.parse(savedSidebarState))
+    try {
+      if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1') {
+        setSidebarCollapsed(true)
+      }
+    } catch {
+      // ignore
     }
   }, [])
 
   useEffect(() => {
-    localStorage.setItem('sidebarOpen', JSON.stringify(sidebarOpen))
-  }, [sidebarOpen])
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, sidebarCollapsed ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  }, [sidebarCollapsed])
 
-  // Close sidebar on mobile when route changes
+  // Close mobile drawer when route changes
   useEffect(() => {
-    if (window.innerWidth < 1024) {
-      setSidebarOpen(false)
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setMobileMenuOpen(false)
     }
   }, [location.pathname])
 
@@ -55,8 +64,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
       {/* Mobile sidebar */}
-      <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`}>
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-75" onClick={() => setSidebarOpen(false)} />
+      <div className={`fixed inset-0 z-50 lg:hidden ${mobileMenuOpen ? 'block' : 'hidden'}`}>
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-75" onClick={() => setMobileMenuOpen(false)} />
         <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-colors duration-300">
           <div className="flex h-16 items-center justify-between px-4">
             <Link to="/dashboard" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
@@ -67,7 +76,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 className="hover:scale-105 transition-transform duration-200"
               />
             </Link>
-            <button onClick={() => setSidebarOpen(false)} className="text-brand-text dark:text-gray-300 hover:text-brand-primary dark:hover:text-white">
+            <button onClick={() => setMobileMenuOpen(false)} className="text-brand-text dark:text-gray-300 hover:text-brand-primary dark:hover:text-white">
               <X className="h-6 w-6" />
             </button>
           </div>
@@ -81,7 +90,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     ? 'bg-brand-accent/20 dark:bg-brand-accent/20 text-brand-primary dark:text-brand-accent'
                     : 'text-brand-text dark:text-gray-300 hover:bg-brand-accent/10 dark:hover:bg-gray-700'
                 }`}
-                onClick={() => setSidebarOpen(false)}
+                onClick={() => setMobileMenuOpen(false)}
               >
                 <item.icon className="mr-3 h-5 w-5" />
                 {item.name}
@@ -98,51 +107,119 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       </div>
 
       {/* Desktop sidebar */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex flex-col flex-grow bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-colors duration-300">
-          <div className="flex h-16 items-center px-4">
-            <Link to="/dashboard" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
-              <FikiriLogo 
-                size="lg" 
-                variant="full" 
-                animated={true}
-                className="hover:scale-105 transition-transform duration-200"
-              />
-            </Link>
+      <div
+        className={`hidden lg:fixed lg:inset-y-0 lg:z-30 lg:flex lg:flex-col transition-[width] duration-200 ease-in-out ${
+          sidebarCollapsed ? 'lg:w-20' : 'lg:w-64'
+        }`}
+      >
+        <div className="flex min-h-0 flex-1 flex-col bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-colors duration-300">
+          <div
+            className={`shrink-0 border-b border-gray-200 dark:border-gray-700 ${
+              sidebarCollapsed
+                ? 'flex flex-col items-center gap-1.5 py-2.5 px-1'
+                : 'flex h-16 items-center gap-1 px-3'
+            }`}
+          >
+            {sidebarCollapsed ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setSidebarCollapsed(false)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-brand-primary dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
+                  aria-expanded={false}
+                  aria-label="Expand navigation"
+                  title="Expand sidebar"
+                >
+                  <ChevronsRight className="h-5 w-5" />
+                </button>
+                <Link
+                  to="/dashboard"
+                  className="flex items-center justify-center rounded-lg hover:opacity-80 transition-opacity"
+                  title="Dashboard home"
+                >
+                  <FikiriLogo size="xs" variant="circle" animated={false} className="h-8 w-8 shrink-0" />
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/dashboard"
+                  className="flex min-h-0 min-w-0 flex-1 items-center space-x-2 hover:opacity-80 transition-opacity duration-200"
+                  title="Dashboard home"
+                >
+                  <FikiriLogo
+                    size="lg"
+                    variant="full"
+                    animated={true}
+                    className="min-w-0 hover:scale-105 transition-transform duration-200"
+                  />
+                </Link>
+              </>
+            )}
           </div>
-          <nav className="flex-1 px-4 py-4">
+          {!sidebarCollapsed && (
+            <div className="shrink-0 px-3 pb-2">
+              <button
+                type="button"
+                onClick={() => setSidebarCollapsed(true)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-brand-primary dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
+                aria-expanded={true}
+                aria-label="Collapse navigation"
+                title="Collapse sidebar"
+              >
+                <ChevronsLeft className="h-5 w-5" />
+              </button>
+            </div>
+          )}
+          <nav className={`flex-1 py-3 overflow-y-auto ${sidebarCollapsed ? 'px-1.5' : 'px-3'}`}>
             {navigation.map((item) => (
               <Link
                 key={item.href}
                 to={item.href}
-                className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                title={item.name}
+                className={`flex items-center text-sm font-medium rounded-lg transition-colors duration-200 ${
+                  sidebarCollapsed ? 'mb-0.5 justify-center px-2 py-2.5' : 'mb-0.5 px-3 py-2'
+                } ${
                   isDashboardNavItemActive(location.pathname, item.href)
                     ? 'bg-brand-accent/20 dark:bg-brand-accent/20 text-brand-primary dark:text-brand-accent'
                     : 'text-brand-text dark:text-gray-300 hover:bg-brand-accent/10 dark:hover:bg-gray-700'
                 }`}
               >
-                <item.icon className="mr-3 h-5 w-5" />
-                {item.name}
+                <item.icon
+                  className={`h-5 w-5 shrink-0 ${sidebarCollapsed ? '' : 'mr-3'}`}
+                  aria-hidden
+                />
+                {sidebarCollapsed ? (
+                  <span className="sr-only">{item.name}</span>
+                ) : (
+                  <span className="truncate">{item.name}</span>
+                )}
               </Link>
             ))}
           </nav>
-          <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 px-4 py-3">
-            <LegalFooterLinks
-              className="text-xs text-gray-500 dark:text-gray-400"
-              linkClassName="text-gray-600 hover:text-brand-primary hover:underline dark:text-gray-300 dark:hover:text-brand-accent"
-            />
-          </div>
+          {!sidebarCollapsed && (
+            <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 px-3 py-3">
+              <LegalFooterLinks
+                className="text-xs text-gray-500 dark:text-gray-400"
+                linkClassName="text-gray-600 hover:text-brand-primary hover:underline dark:text-gray-300 dark:hover:text-brand-accent"
+              />
+            </div>
+          )}
         </div>
       </div>
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div
+        className={`transition-[padding] duration-200 ease-in-out ${
+          sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'
+        }`}
+      >
         {/* Top bar */}
         <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8 transition-colors duration-300">
           <button
             type="button"
             className="lg:hidden flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-brand-text dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-brand-primary dark:hover:text-white transition-colors"
-            onClick={() => setSidebarOpen(true)}
+            onClick={() => setMobileMenuOpen(true)}
             aria-label="Open menu"
           >
             <Menu className="h-6 w-6" />

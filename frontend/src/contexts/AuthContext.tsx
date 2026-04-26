@@ -64,6 +64,14 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const isAuthDebugEnabled =
+    import.meta.env.DEV && import.meta.env.VITE_AUTH_DEBUG === 'true'
+  const authDebugLog = (...args: unknown[]) => {
+    if (isAuthDebugEnabled) {
+      console.log(...args)
+    }
+  }
+
   // Initialize auth state synchronously from localStorage if available
   // This prevents race conditions where RouteGuard checks before useEffect runs
   const getInitialAuthState = (): AuthState => {
@@ -77,20 +85,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     try {
-      console.log('🔍 getInitialAuthState - Checking localStorage...')
+      authDebugLog('🔍 getInitialAuthState - Checking localStorage...')
       let userData = localStorage.getItem('fikiri-user')
       let userId = localStorage.getItem('fikiri-user-id')
       
       // Fallback: Check Zustand store if AuthContext keys don't exist
       if (!userData || !userId) {
-        console.log('🔍 Checking Zustand store (fikiri-auth) as fallback...')
+        authDebugLog('🔍 Checking Zustand store (fikiri-auth) as fallback...')
         const zustandAuth = localStorage.getItem('fikiri-auth')
         if (zustandAuth) {
           try {
             const zustandData = JSON.parse(zustandAuth)
             const zustandUser = zustandData?.state?.user
             if (zustandUser && zustandUser.id && zustandUser.email) {
-              console.log('✅ Found user in Zustand store, migrating to AuthContext format')
+              authDebugLog('✅ Found user in Zustand store, migrating to AuthContext format')
               // Migrate from Zustand to AuthContext format
               userData = JSON.stringify(zustandUser)
               userId = zustandUser.id.toString()
@@ -104,7 +112,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       }
       
-      console.log('🔍 getInitialAuthState - localStorage check:', {
+      authDebugLog('🔍 getInitialAuthState - localStorage check:', {
         hasUserData: !!userData,
         hasUserId: !!userId,
         userDataLength: userData?.length || 0,
@@ -115,7 +123,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
           const user = JSON.parse(userData)
           if (user && user.id && user.email) {
-            console.log('✅ Initial auth state loaded from localStorage:', {
+            authDebugLog('✅ Initial auth state loaded from localStorage:', {
               userId: user.id,
               email: user.email,
               onboarding_completed: user.onboarding_completed
@@ -137,14 +145,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.error('❌ Error parsing initial user data:', error)
         }
       } else {
-        console.log('⚠️ No auth data in localStorage during initial state check')
+        authDebugLog('⚠️ No auth data in localStorage during initial state check')
       }
     } catch (error) {
       console.error('❌ Error reading initial auth state:', error)
     }
 
     // Default: no auth data found, will check async
-    console.log('⚠️ Returning default (unauthenticated) initial state')
+    authDebugLog('⚠️ Returning default (unauthenticated) initial state')
     return {
       user: null,
       isAuthenticated: false,
@@ -157,31 +165,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   
   const navigate = useNavigate()
   
-  // Monitor localStorage for unexpected clears (development only)
-  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  // Optional localStorage instrumentation for auth debugging only
+  useEffect(() => {
+    if (typeof window === 'undefined' || !isAuthDebugEnabled) {
+      return
+    }
+
     const originalSetItem = Storage.prototype.setItem
     const originalRemoveItem = Storage.prototype.removeItem
     const originalClear = Storage.prototype.clear
-    
+
     Storage.prototype.setItem = function(key: string, value: string) {
       if (key.startsWith('fikiri-')) {
-        console.log(`[localStorage] SET ${key}:`, value.substring(0, 50) + (value.length > 50 ? '...' : ''))
+        console.log(
+          `[localStorage] SET ${key}:`,
+          value.substring(0, 50) + (value.length > 50 ? '...' : '')
+        )
       }
       return originalSetItem.call(this, key, value)
     }
-    
+
     Storage.prototype.removeItem = function(key: string) {
       if (key.startsWith('fikiri-')) {
         console.log(`[localStorage] REMOVE ${key}`, new Error().stack)
       }
       return originalRemoveItem.call(this, key)
     }
-    
+
     Storage.prototype.clear = function() {
-      console.log(`[localStorage] CLEAR ALL`, new Error().stack)
+      console.log('[localStorage] CLEAR ALL', new Error().stack)
       return originalClear.call(this)
     }
-  }
+
+    return () => {
+      Storage.prototype.setItem = originalSetItem
+      Storage.prototype.removeItem = originalRemoveItem
+      Storage.prototype.clear = originalClear
+    }
+  }, [isAuthDebugEnabled])
 
   // Define clearAuthData first (used by checkAuthStatus)
   const clearAuthData = () => {

@@ -1,12 +1,13 @@
 import React from 'react';
+import { publicAsset } from '../lib/publicAsset';
 
 export function HeroImage() {
   return (
     <picture>
-      <source srcSet="/optimized/img/hero.avif" type="image/avif" />
-      <source srcSet="/optimized/img/hero.webp" type="image/webp" />
+      <source srcSet={publicAsset('optimized/img/hero.avif')} type="image/avif" />
+      <source srcSet={publicAsset('optimized/img/hero.webp')} type="image/webp" />
       <img
-        src="/img/hero.png"             // final fallback
+        src={publicAsset('img/hero.png')}
         alt="Fikiri Solutions automation preview"
         width={1600}
         height={900}

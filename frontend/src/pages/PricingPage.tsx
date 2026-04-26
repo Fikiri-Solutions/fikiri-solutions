@@ -123,7 +123,6 @@ const PricingPage: React.FC = () => {
   const { ref: heroRef, inView: heroInView } = useInView({ triggerOnce: true });
   const { ref: pricingRef, inView: pricingInView } = useInView({ triggerOnce: true });
   const { ref: featuresRef, inView: featuresInView } = useInView({ triggerOnce: true });
-  const { ref: industriesRef, inView: industriesInView } = useInView({ triggerOnce: true });
 
   const pricingTiers: PricingTier[] = [
     {
@@ -203,100 +202,6 @@ const PricingPage: React.FC = () => {
       ],
       cta: 'Contact Sales',
       buttonStyle: 'bg-brand-primary hover:bg-fikiri-400 text-white'
-    }
-  ];
-
-  const industries = [
-    {
-      name: 'Real Estate',
-      icon: '🏠',
-      tier: 'Business',
-      price: billingPeriod === 'monthly' ? 199 : (199 * 12) - Math.round(199 * 12 * 0.10), // Exactly 10% discount
-      features: ['Property listings', 'Client consultations', 'Market analysis', 'Showings scheduling']
-    },
-    {
-      name: 'Property Management',
-      icon: '🏘️',
-      tier: 'Growth',
-      price: billingPeriod === 'monthly' ? 99 : (99 * 12) - Math.round(99 * 12 * 0.10), // Exactly 10% discount
-      features: ['Tenant communication', 'Maintenance requests', 'Lease renewals', 'Rent collection']
-    },
-    {
-      name: 'Construction',
-      icon: '🔨',
-      tier: 'Growth',
-      price: billingPeriod === 'monthly' ? 99 : (99 * 12) - Math.round(99 * 12 * 0.10), // Exactly 10% discount
-      features: ['Project quotes', 'Client communication', 'Scheduling', 'Material orders']
-    },
-    {
-      name: 'Legal Services',
-      icon: '⚖️',
-      tier: 'Business',
-      price: billingPeriod === 'monthly' ? 199 : (199 * 12) - Math.round(199 * 12 * 0.10), // Exactly 10% discount
-      features: ['Client intake', 'Appointment scheduling', 'Document management', 'Case updates']
-    },
-    {
-      name: 'Cleaning Services',
-      icon: '🧹',
-      tier: 'Starter',
-      price: billingPeriod === 'monthly' ? 49 : (49 * 12) - Math.round(49 * 12 * 0.10), // Exactly 10% discount
-      features: ['Service scheduling', 'Quote requests', 'Recurring appointments', 'Customer follow-up']
-    },
-    {
-      name: 'Auto Services',
-      icon: '🚗',
-      tier: 'Starter',
-      price: billingPeriod === 'monthly' ? 49 : (49 * 12) - Math.round(49 * 12 * 0.10), // Exactly 10% discount
-      features: ['Appointment booking', 'Service reminders', 'Estimate requests', 'Customer follow-up']
-    },
-    {
-      name: 'Event Planning',
-      icon: '🎉',
-      tier: 'Growth',
-      price: billingPeriod === 'monthly' ? 99 : (99 * 12) - Math.round(99 * 12 * 0.10), // Exactly 10% discount
-      features: ['Client consultations', 'Vendor coordination', 'Timeline management', 'Follow-up']
-    },
-    {
-      name: 'Fitness & Wellness',
-      icon: '💪',
-      tier: 'Starter',
-      price: billingPeriod === 'monthly' ? 49 : (49 * 12) - Math.round(49 * 12 * 0.10), // Exactly 10% discount
-      features: ['Class scheduling', 'Membership inquiries', 'Appointment booking', 'Wellness tips']
-    },
-    {
-      name: 'Beauty & Spa',
-      icon: '💅',
-      tier: 'Starter',
-      price: billingPeriod === 'monthly' ? 49 : (49 * 12) - Math.round(49 * 12 * 0.10), // Exactly 10% discount
-      features: ['Appointment booking', 'Service inquiries', 'Reminders', 'Promotions']
-    },
-    {
-      name: 'Accounting & Consulting',
-      icon: '📊',
-      tier: 'Business',
-      price: billingPeriod === 'monthly' ? 199 : (199 * 12) - Math.round(199 * 12 * 0.10), // Exactly 10% discount
-      features: ['Client onboarding', 'Appointment scheduling', 'Document requests', 'Tax reminders']
-    },
-    {
-      name: 'Restaurant',
-      icon: '🍽️',
-      tier: 'Growth',
-      price: billingPeriod === 'monthly' ? 99 : (99 * 12) - Math.round(99 * 12 * 0.10), // Exactly 10% discount
-      features: ['Reservation management', 'Menu recommendations', 'Special promotions', 'Catering inquiries']
-    },
-    {
-      name: 'Medical Practice',
-      icon: '🏥',
-      tier: 'Business',
-      price: billingPeriod === 'monthly' ? 199 : (199 * 12) - Math.round(199 * 12 * 0.10), // Exactly 10% discount
-      features: ['Appointment scheduling', 'Patient reminders', 'HIPAA compliance', 'Follow-up care']
-    },
-    {
-      name: 'Enterprise Solutions',
-      icon: '🏢',
-      tier: 'Enterprise',
-      price: billingPeriod === 'monthly' ? 499 : (499 * 12) - Math.round(499 * 12 * 0.10), // Exactly 10% discount
-      features: ['Custom workflows', 'Multi-industry support', 'Advanced analytics', 'White-label options']
     }
   ];
 
@@ -511,62 +416,6 @@ const PricingPage: React.FC = () => {
                       <span>{tier.cta}</span>
                     </>
                   )}
-                </button>
-              </motion.div>
-            ))}
-          </div>
-        </Container>
-      </section>
-
-      {/* Industry-Specific Pricing */}
-      <section ref={industriesRef} className="relative py-20 bg-muted/50 z-10">
-        <Container>
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={industriesInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
-            transition={{ duration: 0.8 }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-foreground">
-              Industry-Specific Solutions
-            </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Tailored automation for your specific industry needs
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {industries.map((industry, index) => (
-              <motion.div
-                key={industry.name}
-                initial={{ opacity: 0, y: 30 }}
-                animate={industriesInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
-                transition={{ duration: 0.8, delay: index * 0.1 }}
-                className="bg-card/90 backdrop-blur-sm rounded-xl p-6 border border-border shadow-sm hover:border-brand-primary/30 transition-all duration-300"
-              >
-                <div className="text-center mb-4">
-                  <div className="text-4xl mb-2">{industry.icon}</div>
-                  <h3 className="text-xl font-semibold text-foreground">{industry.name}</h3>
-                  <div className="flex items-center justify-center gap-2 mt-2">
-                    <span className="text-brand-primary font-medium">{industry.tier}</span>
-                    <span className="text-foreground font-bold">${industry.price}{billingPeriod === 'monthly' ? '/mo' : '/yr'}</span>
-                  </div>
-                </div>
-
-                <ul className="space-y-2">
-                  {industry.features.map((feature, featureIndex) => (
-                    <li key={featureIndex} className="flex items-center text-foreground text-sm">
-                      <Check className="w-4 h-4 text-green-600 mr-2 flex-shrink-0" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-
-                <button
-                  onClick={() => navigate('/analytics')}
-                  className="w-full mt-4 py-2 px-4 bg-brand-primary hover:bg-fikiri-400 text-white font-medium rounded-lg transition-all duration-300"
-                >
-                  View Usage Analytics
                 </button>
               </motion.div>
             ))}

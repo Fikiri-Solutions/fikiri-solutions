@@ -1,6 +1,24 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Mail, Search, Sparkles, Send, Reply, Archive, MoreVertical, Loader2, RefreshCw, Paperclip, Download, Activity, ChevronLeft } from 'lucide-react'
+import {
+  Mail,
+  Search,
+  Sparkles,
+  Send,
+  Reply,
+  Archive,
+  MoreVertical,
+  Loader2,
+  RefreshCw,
+  Paperclip,
+  Download,
+  Activity,
+  ChevronLeft,
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
+  FileText,
+} from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { apiClient } from '../services/apiClient'
@@ -19,6 +37,26 @@ interface Attachment {
   filename: string
   mime_type: string
   size: number
+}
+
+function isImageMime(mimeType?: string): boolean {
+  return Boolean(mimeType && mimeType.startsWith('image/'))
+}
+
+function isAudioMime(mimeType?: string): boolean {
+  return Boolean(mimeType && mimeType.startsWith('audio/'))
+}
+
+function isVideoMime(mimeType?: string): boolean {
+  return Boolean(mimeType && mimeType.startsWith('video/'))
+}
+
+function isPdfMime(mimeType?: string): boolean {
+  return mimeType === 'application/pdf'
+}
+
+function canPreviewAttachment(mimeType?: string): boolean {
+  return isImageMime(mimeType) || isAudioMime(mimeType) || isVideoMime(mimeType) || isPdfMime(mimeType)
 }
 
 interface Email {
@@ -227,6 +265,33 @@ const EmailBodyRenderer: React.FC<{ content: string; emailId?: string }> = ({ co
           }
           .email-body-html table {
             max-width: 100%;
+            width: auto;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 0;
+          }
+          .email-body-html table td,
+          .email-body-html table th {
+            vertical-align: top;
+          }
+          .email-body-html blockquote {
+            border-left: 4px solid #3b82f6;
+            padding-left: 16px;
+            margin: 12px 0;
+            color: rgba(0, 0, 0, 0.7);
+          }
+          .dark .email-body-html blockquote {
+            color: rgba(255, 255, 255, 0.7);
+            border-left-color: #60a5fa;
+          }
+          .email-body-html pre {
+            background: rgba(0, 0, 0, 0.05);
+            padding: 12px;
+            border-radius: 4px;
+            overflow-x: auto;
+          }
+          .dark .email-body-html pre {
+            background: rgba(255, 255, 255, 0.05);
           }
           .email-body-html img[src^="http"] {
             image-rendering: auto;
@@ -248,44 +313,11 @@ const EmailBodyRenderer: React.FC<{ content: string; emailId?: string }> = ({ co
           .dark .email-body-html a:hover {
             color: #bfdbfe;
           }
-          .email-body-html table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 12px 0;
-          }
-          .email-body-html table td,
-          .email-body-html table th {
-            padding: 8px;
-            border: 1px solid rgba(0, 0, 0, 0.1);
-          }
-          .dark .email-body-html table td,
-          .dark .email-body-html table th {
-            border-color: rgba(255, 255, 255, 0.12);
-          }
-          .email-body-html blockquote {
-            border-left: 4px solid #3b82f6;
-            padding-left: 16px;
-            margin: 12px 0;
-            color: rgba(0, 0, 0, 0.7);
-          }
-          .dark .email-body-html blockquote {
-            color: rgba(255, 255, 255, 0.7);
-            border-left-color: #60a5fa;
-          }
-          .email-body-html pre {
-            background: rgba(0, 0, 0, 0.05);
-            padding: 12px;
-            border-radius: 4px;
-            overflow-x: auto;
-          }
-          .dark .email-body-html pre {
-            background: rgba(255, 255, 255, 0.05);
-          }
         `}</style>
         <div className="email-body-html-wrap min-w-0">
           <div
             ref={containerRef}
-            className="email-body-html prose dark:prose-invert max-w-none text-brand-text dark:text-white"
+            className="email-body-html max-w-none text-brand-text dark:text-white"
             dangerouslySetInnerHTML={{ __html: sanitizedHTML }}
           />
         </div>
@@ -317,6 +349,24 @@ interface AIAnalysis {
   }
 }
 
+const AI_PANEL_EXPANDED_KEY = 'fikiri:inbox-ai-panel-expanded'
+
+function hasAiPanelContent(a: AIAnalysis | null, loading: boolean): boolean {
+  if (loading) return true
+  if (!a) return false
+  return Boolean(
+    a.summary ||
+      a.intent ||
+      a.urgency ||
+      a.suggested_action ||
+      a.suggested_reply ||
+      (a.contact_info &&
+        Object.values(a.contact_info).some(
+          (v) => v != null && String(v).trim() !== ''
+        ))
+  )
+}
+
 export const EmailInbox: React.FC = () => {
   const { user } = useAuth()
   const { addToast } = useToast()
@@ -332,11 +382,28 @@ export const EmailInbox: React.FC = () => {
   const [showReplyComposer, setShowReplyComposer] = useState(false)
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [loadingAttachments, setLoadingAttachments] = useState(false)
+  const [previewAttachmentId, setPreviewAttachmentId] = useState<string | null>(null)
   const [emailLimit, setEmailLimit] = useState(50) // Initial page size; use "Load more" for additional pages
   const [loadingMore, setLoadingMore] = useState(false)
   const [syncInboxPending, setSyncInboxPending] = useState(false)
   const [isNarrowViewport, setIsNarrowViewport] = useState(false)
+  const [aiPanelExpanded, setAiPanelExpanded] = useState(() => {
+    if (typeof window === 'undefined') return false
+    try {
+      return localStorage.getItem(AI_PANEL_EXPANDED_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
   const markReadAttemptedRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(AI_PANEL_EXPANDED_KEY, aiPanelExpanded ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  }, [aiPanelExpanded])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -378,8 +445,18 @@ export const EmailInbox: React.FC = () => {
       void loadAttachments(selectedEmail.id)
     } else {
       setAttachments([])
+      setPreviewAttachmentId(null)
     }
   }, [selectedEmail?.id, loadAttachments])
+
+  useEffect(() => {
+    if (attachments.length === 0) {
+      setPreviewAttachmentId(null)
+      return
+    }
+    const preferred = attachments.find((att) => canPreviewAttachment(att.mime_type))
+    setPreviewAttachmentId(preferred?.attachment_id ?? null)
+  }, [attachments])
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 Bytes'
@@ -556,6 +633,7 @@ export const EmailInbox: React.FC = () => {
         email.from
       )
       setAiAnalysis(data)
+      setAiPanelExpanded(true)
     } catch (error) {
       console.error('Error analyzing email:', error)
       addToast({ type: 'error', title: 'AI analysis unavailable', message: 'The AI assistant is currently unavailable.' })
@@ -582,8 +660,9 @@ export const EmailInbox: React.FC = () => {
       )
       const reply = data?.reply || data?.data?.reply || data?.suggested_reply
       if (reply) {
-        setAiAnalysis(prev => ({ ...prev, suggested_reply: reply }))
+        setAiAnalysis((prev) => ({ ...prev, suggested_reply: reply }))
         setReplyText(reply)
+        setAiPanelExpanded(true)
         addToast({ type: 'success', title: 'Reply generated', message: 'AI has generated a suggested reply.' })
       } else {
         addToast({ type: 'warning', title: 'No reply generated', message: 'AI could not generate a reply for this email.' })
@@ -690,6 +769,24 @@ export const EmailInbox: React.FC = () => {
       return matchesSearch && matchesFilter
     })
   }, [emails, searchQuery, filter])
+
+  const getAttachmentDownloadUrl = useCallback(
+    (attachmentId: string) => {
+      if (!selectedEmail?.id) return '#'
+      return `/api/email/${selectedEmail.id}/attachments/${attachmentId}/download`
+    },
+    [selectedEmail?.id]
+  )
+
+  const selectedPreviewAttachment = useMemo(() => {
+    if (!previewAttachmentId) return null
+    return attachments.find((att) => att.attachment_id === previewAttachmentId) || null
+  }, [attachments, previewAttachmentId])
+
+  const hasPreviewableAttachment = useMemo(
+    () => attachments.some((a) => canPreviewAttachment(a.mime_type)),
+    [attachments]
+  )
 
   // Show loading state while checking connection
   if (checkingConnection && gmailConnected === null) {
@@ -1168,30 +1265,123 @@ export const EmailInbox: React.FC = () => {
                       <Paperclip className="h-4 w-4" />
                       Attachments ({attachments.length})
                     </h3>
+                    {!hasPreviewableAttachment ? (
+                      <p className="mb-3 rounded-md border border-dashed border-gray-300 bg-white/80 px-3 py-2 text-xs text-brand-text/75 dark:border-gray-600 dark:bg-gray-900/40 dark:text-gray-300">
+                        Inline preview is not available for these file types. Use{' '}
+                        <span className="font-medium">Open</span> or <span className="font-medium">Download</span> for
+                        each attachment.
+                      </p>
+                    ) : null}
                     <div className="space-y-2">
-                      {attachments.map((att) => (
-                        <a
-                          key={att.id}
-                          href={`/api/email/${selectedEmail.id}/attachments/${att.attachment_id}/download`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-3 p-3 bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg border border-gray-200 dark:border-gray-600 transition-colors group"
-                        >
-                          <div className="flex-shrink-0 w-10 h-10 bg-brand-primary/10 dark:bg-brand-primary/20 rounded-lg flex items-center justify-center">
-                            <Paperclip className="h-5 w-5 text-brand-primary" />
+                      {attachments.map((att) => {
+                        const url = getAttachmentDownloadUrl(att.attachment_id)
+                        const previewable = canPreviewAttachment(att.mime_type)
+                        const isPreviewSelected = previewAttachmentId === att.attachment_id
+                        return (
+                          <div
+                            key={att.id}
+                            className={`rounded-lg border bg-white p-3 transition-colors dark:bg-gray-700 ${
+                              isPreviewSelected
+                                ? 'border-brand-primary/50'
+                                : 'border-gray-200 dark:border-gray-600'
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="flex-shrink-0 w-10 h-10 bg-brand-primary/10 dark:bg-brand-primary/20 rounded-lg flex items-center justify-center">
+                                <Paperclip className="h-5 w-5 text-brand-primary" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-brand-text dark:text-white truncate">
+                                  {att.filename}
+                                </p>
+                                <p className="text-xs text-brand-text/60 dark:text-gray-400 break-all">
+                                  {att.mime_type || 'unknown'} • {formatBytes(att.size)}
+                                </p>
+                                {hasPreviewableAttachment && !previewable ? (
+                                  <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                    Preview not supported for this file type. Use Open or Download.
+                                  </p>
+                                ) : null}
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                {previewable ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setPreviewAttachmentId(att.attachment_id)}
+                                    className={`rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                                      isPreviewSelected
+                                        ? 'bg-brand-primary text-white'
+                                        : 'bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20'
+                                    }`}
+                                  >
+                                    Preview
+                                  </button>
+                                ) : null}
+                                <a
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-brand-text hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-600"
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                  Open
+                                </a>
+                                <a
+                                  href={url}
+                                  download={att.filename}
+                                  className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-brand-text hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-600"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                  Download
+                                </a>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-brand-text dark:text-white truncate">
-                              {att.filename}
-                            </p>
-                            <p className="text-xs text-brand-text/60 dark:text-gray-400">
-                              {att.mime_type} • {formatBytes(att.size)}
-                            </p>
-                          </div>
-                          <Download className="h-4 w-4 text-brand-text/50 dark:text-gray-400 group-hover:text-brand-primary transition-colors" />
-                        </a>
-                      ))}
+                        )
+                      })}
                     </div>
+                    {selectedPreviewAttachment && (
+                      <div className="mt-4 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-600 dark:bg-gray-700/60">
+                        <div className="mb-2 flex items-center gap-2 text-xs text-brand-text/70 dark:text-gray-300">
+                          <FileText className="h-3.5 w-3.5" />
+                          <span className="truncate">
+                            Previewing {selectedPreviewAttachment.filename}
+                          </span>
+                        </div>
+                        {isImageMime(selectedPreviewAttachment.mime_type) ? (
+                          <img
+                            src={getAttachmentDownloadUrl(selectedPreviewAttachment.attachment_id)}
+                            alt={selectedPreviewAttachment.filename}
+                            className="max-h-80 w-auto max-w-full rounded border border-gray-200 dark:border-gray-600"
+                            loading="lazy"
+                          />
+                        ) : isAudioMime(selectedPreviewAttachment.mime_type) ? (
+                          <audio
+                            controls
+                            preload="metadata"
+                            className="w-full"
+                            src={getAttachmentDownloadUrl(selectedPreviewAttachment.attachment_id)}
+                          />
+                        ) : isVideoMime(selectedPreviewAttachment.mime_type) ? (
+                          <video
+                            controls
+                            preload="metadata"
+                            className="max-h-80 w-full rounded border border-gray-200 dark:border-gray-600"
+                            src={getAttachmentDownloadUrl(selectedPreviewAttachment.attachment_id)}
+                          />
+                        ) : isPdfMime(selectedPreviewAttachment.mime_type) ? (
+                          <iframe
+                            title={selectedPreviewAttachment.filename}
+                            className="h-72 w-full rounded border border-gray-200 dark:border-gray-600"
+                            src={getAttachmentDownloadUrl(selectedPreviewAttachment.attachment_id)}
+                          />
+                        ) : (
+                          <p className="text-sm text-brand-text/70 dark:text-gray-400">
+                            Preview not supported for this file type. Use Open or Download.
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
                 </div>
@@ -1212,122 +1402,163 @@ export const EmailInbox: React.FC = () => {
 
       {selectedEmail ? (
         <aside
-          className="flex max-h-[min(38vh,22rem)] min-h-[10rem] shrink-0 flex-col overflow-hidden border-t border-gray-200 bg-gray-50 shadow-[inset_0_1px_0_0_rgba(0,0,0,0.04)] dark:border-gray-700 dark:bg-gray-900/50 dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] lg:max-h-[min(34vh,20rem)]"
+          className="shrink-0 border-t border-gray-200 bg-gray-50 shadow-[inset_0_1px_0_0_rgba(0,0,0,0.04)] dark:border-gray-700 dark:bg-gray-900/50 dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]"
           aria-label="AI analysis"
         >
-          <div className="shrink-0 border-b border-gray-200/90 bg-gray-100/80 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-900/80 sm:px-4">
-            <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setAiPanelExpanded((e) => !e)}
+            className="flex w-full min-h-[48px] items-center justify-between gap-2 border-b border-gray-200/90 bg-gray-100/80 px-3 py-2.5 text-left transition-colors hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900/80 dark:hover:bg-gray-900/90 sm:px-4"
+            aria-expanded={aiPanelExpanded}
+            aria-controls="inbox-ai-analysis-panel"
+            id="inbox-ai-analysis-toggle"
+          >
+            <div className="flex min-w-0 items-center gap-2">
               <Sparkles className="h-5 w-5 shrink-0 text-brand-primary" />
-              <div>
+              <div className="min-w-0">
                 <h4 className="text-sm font-semibold text-brand-text dark:text-white">AI analysis</h4>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Runs along the bottom on desktop — use Analyze or Suggest reply above
+                <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                  {aiPanelExpanded
+                    ? 'Tap to collapse and give the message more room'
+                    : aiLoading
+                      ? 'Working…'
+                      : hasAiPanelContent(aiAnalysis, false)
+                        ? 'Results ready — open to view'
+                        : 'Use AI Analyze or Suggest reply in the toolbar above'}
                 </p>
               </div>
             </div>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4 sm:py-4 lg:overflow-x-auto lg:overflow-y-hidden">
-            <div className="flex min-h-full flex-col gap-4 lg:flex-row lg:gap-6 lg:pr-1">
+            <div className="flex shrink-0 items-center gap-2">
               {aiLoading ? (
-                <div className="flex items-center gap-2 text-brand-text/70 dark:text-gray-400">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Analyzing email...</span>
-                </div>
-              ) : aiAnalysis ? (
-                <>
-                  {aiAnalysis.summary ? (
-                    <div className="min-w-0 shrink-0 lg:max-w-[28%] lg:border-r lg:border-gray-200/80 lg:pr-6 dark:lg:border-gray-700/80">
-                      <p className="mb-1 text-sm font-medium text-brand-text dark:text-white">Summary</p>
-                      <p className="text-sm text-brand-text/70 dark:text-gray-400">{aiAnalysis.summary}</p>
+                <Loader2 className="h-4 w-4 animate-spin text-brand-primary" aria-hidden />
+              ) : hasAiPanelContent(aiAnalysis, false) ? (
+                <span className="hidden rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:text-emerald-300 sm:inline">
+                  Ready
+                </span>
+              ) : null}
+              {aiPanelExpanded ? (
+                <ChevronDown className="h-5 w-5 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden />
+              ) : (
+                <ChevronUp className="h-5 w-5 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden />
+              )}
+            </div>
+          </button>
+
+          <div
+            id="inbox-ai-analysis-panel"
+            role="region"
+            aria-labelledby="inbox-ai-analysis-toggle"
+            className="grid transition-[grid-template-rows] duration-200 ease-in-out"
+            style={{ gridTemplateRows: aiPanelExpanded ? '1fr' : '0fr' }}
+          >
+            <div className="min-h-0 overflow-hidden">
+              <div
+                className="max-h-[min(44vh,26rem)] overflow-y-auto overscroll-contain border-t border-transparent px-3 py-3 sm:px-4 sm:py-4 lg:max-h-[min(40vh,24rem)] lg:overflow-x-auto lg:overflow-y-hidden"
+                aria-hidden={!aiPanelExpanded}
+              >
+                <div className="flex min-h-full flex-col gap-4 lg:flex-row lg:gap-6 lg:pr-1">
+                  {aiLoading ? (
+                    <div className="flex items-center gap-2 text-brand-text/70 dark:text-gray-400">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Analyzing email...</span>
                     </div>
-                  ) : null}
+                  ) : aiAnalysis ? (
+                    <>
+                      {aiAnalysis.summary ? (
+                        <div className="min-w-0 shrink-0 lg:max-w-[28%] lg:border-r lg:border-gray-200/80 lg:pr-6 dark:lg:border-gray-700/80">
+                          <p className="mb-1 text-sm font-medium text-brand-text dark:text-white">Summary</p>
+                          <p className="text-sm text-brand-text/70 dark:text-gray-400">{aiAnalysis.summary}</p>
+                        </div>
+                      ) : null}
 
-                  <div className="flex min-w-0 flex-1 flex-wrap gap-x-6 gap-y-3 lg:flex-nowrap lg:items-start">
-                    {aiAnalysis.intent ? (
-                      <div className="min-w-[8rem]">
-                        <p className="mb-1 text-sm font-medium text-brand-text dark:text-white">Intent</p>
-                        <span className="inline-block rounded bg-brand-primary/10 px-2 py-1 text-xs text-brand-primary">
-                          {aiAnalysis.intent}
-                        </span>
-                      </div>
-                    ) : null}
+                      <div className="flex min-w-0 flex-1 flex-wrap gap-x-6 gap-y-3 lg:flex-nowrap lg:items-start">
+                        {aiAnalysis.intent ? (
+                          <div className="min-w-[8rem]">
+                            <p className="mb-1 text-sm font-medium text-brand-text dark:text-white">Intent</p>
+                            <span className="inline-block rounded bg-brand-primary/10 px-2 py-1 text-xs text-brand-primary">
+                              {aiAnalysis.intent}
+                            </span>
+                          </div>
+                        ) : null}
 
-                    {aiAnalysis.urgency ? (
-                      <div className="min-w-[8rem]">
-                        <p className="mb-1 text-sm font-medium text-brand-text dark:text-white">Urgency</p>
-                        <span
-                          className={`inline-block rounded px-2 py-1 text-xs ${
-                            aiAnalysis.urgency === 'high'
-                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                              : aiAnalysis.urgency === 'medium'
-                                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                                : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          }`}
-                        >
-                          {aiAnalysis.urgency.toUpperCase()}
-                        </span>
-                      </div>
-                    ) : null}
+                        {aiAnalysis.urgency ? (
+                          <div className="min-w-[8rem]">
+                            <p className="mb-1 text-sm font-medium text-brand-text dark:text-white">Urgency</p>
+                            <span
+                              className={`inline-block rounded px-2 py-1 text-xs ${
+                                aiAnalysis.urgency === 'high'
+                                  ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                  : aiAnalysis.urgency === 'medium'
+                                    ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                    : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              }`}
+                            >
+                              {aiAnalysis.urgency.toUpperCase()}
+                            </span>
+                          </div>
+                        ) : null}
 
-                    {aiAnalysis.suggested_action ? (
-                      <div className="min-w-0 flex-1 basis-[14rem] lg:max-w-md">
-                        <p className="mb-1 text-sm font-medium text-brand-text dark:text-white">Suggested action</p>
-                        <p className="text-sm text-brand-text/70 dark:text-gray-400">{aiAnalysis.suggested_action}</p>
-                      </div>
-                    ) : null}
+                        {aiAnalysis.suggested_action ? (
+                          <div className="min-w-0 flex-1 basis-[14rem] lg:max-w-md">
+                            <p className="mb-1 text-sm font-medium text-brand-text dark:text-white">Suggested action</p>
+                            <p className="text-sm text-brand-text/70 dark:text-gray-400">{aiAnalysis.suggested_action}</p>
+                          </div>
+                        ) : null}
 
-                    {(() => {
-                      if (!aiAnalysis.contact_info) return null
-                      const entries = [
-                        { label: 'Phone', value: aiAnalysis.contact_info?.phone },
-                        { label: 'Company', value: aiAnalysis.contact_info?.company },
-                        { label: 'Website', value: aiAnalysis.contact_info?.website },
-                        { label: 'Location', value: aiAnalysis.contact_info?.location },
-                        { label: 'Budget', value: aiAnalysis.contact_info?.budget },
-                        { label: 'Timeline', value: aiAnalysis.contact_info?.timeline },
-                      ].filter((entry) => entry.value)
-                      if (entries.length === 0) return null
-                      return (
-                        <div className="min-w-0 flex-1 basis-[16rem] lg:max-w-sm">
-                          <p className="mb-2 text-sm font-medium text-brand-text dark:text-white">Contact info</p>
-                          <div className="grid grid-cols-1 gap-2 text-sm text-brand-text/70 dark:text-gray-400 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                            {entries.map((entry) => (
-                              <div key={entry.label} className="flex gap-2">
-                                <span className="font-medium text-brand-text dark:text-white">{entry.label}:</span>
-                                <span className="truncate">{entry.value}</span>
+                        {(() => {
+                          if (!aiAnalysis.contact_info) return null
+                          const entries = [
+                            { label: 'Phone', value: aiAnalysis.contact_info?.phone },
+                            { label: 'Company', value: aiAnalysis.contact_info?.company },
+                            { label: 'Website', value: aiAnalysis.contact_info?.website },
+                            { label: 'Location', value: aiAnalysis.contact_info?.location },
+                            { label: 'Budget', value: aiAnalysis.contact_info?.budget },
+                            { label: 'Timeline', value: aiAnalysis.contact_info?.timeline },
+                          ].filter((entry) => entry.value)
+                          if (entries.length === 0) return null
+                          return (
+                            <div className="min-w-0 flex-1 basis-[16rem] lg:max-w-sm">
+                              <p className="mb-2 text-sm font-medium text-brand-text dark:text-white">Contact info</p>
+                              <div className="grid grid-cols-1 gap-2 text-sm text-brand-text/70 dark:text-gray-400 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                                {entries.map((entry) => (
+                                  <div key={entry.label} className="flex gap-2">
+                                    <span className="font-medium text-brand-text dark:text-white">{entry.label}:</span>
+                                    <span className="truncate">{entry.value}</span>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
+                            </div>
+                          )
+                        })()}
+                      </div>
+
+                      {aiAnalysis.suggested_reply ? (
+                        <div className="min-w-0 shrink-0 border-t border-gray-200/90 pt-3 dark:border-gray-700 lg:min-w-[min(24rem,28vw)] lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+                          <div className="rounded-lg border border-brand-text/20 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+                            <p className="mb-2 text-sm font-medium text-brand-text dark:text-white">Suggested reply</p>
+                            <div className="mb-3 whitespace-pre-wrap text-sm text-brand-text/80 dark:text-gray-300">
+                              {aiAnalysis.suggested_reply}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleUseSuggestedReply}
+                              className="min-h-[44px] rounded-lg bg-brand-primary px-4 py-2.5 text-sm text-white transition-colors hover:bg-brand-primary/90 touch-manipulation"
+                            >
+                              Use this reply
+                            </button>
                           </div>
                         </div>
-                      )
-                    })()}
-                  </div>
-
-                  {aiAnalysis.suggested_reply ? (
-                    <div className="min-w-0 shrink-0 border-t border-gray-200/90 pt-3 dark:border-gray-700 lg:min-w-[min(24rem,28vw)] lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-                      <div className="rounded-lg border border-brand-text/20 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
-                        <p className="mb-2 text-sm font-medium text-brand-text dark:text-white">Suggested reply</p>
-                        <div className="mb-3 whitespace-pre-wrap text-sm text-brand-text/80 dark:text-gray-300">
-                          {aiAnalysis.suggested_reply}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleUseSuggestedReply}
-                          className="min-h-[44px] rounded-lg bg-brand-primary px-4 py-2.5 text-sm text-white transition-colors hover:bg-brand-primary/90 touch-manipulation"
-                        >
-                          Use this reply
-                        </button>
-                      </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="text-sm text-brand-text/60 dark:text-gray-500">
+                      Use <span className="font-medium text-brand-text/80 dark:text-gray-300">AI Analyze</span> or{' '}
+                      <span className="font-medium text-brand-text/80 dark:text-gray-300">Suggest reply</span> in the
+                      toolbar above.
                     </div>
-                  ) : null}
-                </>
-              ) : (
-                <div className="text-sm text-brand-text/60 dark:text-gray-500">
-                  Use <span className="font-medium text-brand-text/80 dark:text-gray-300">AI Analyze</span> or{' '}
-                  <span className="font-medium text-brand-text/80 dark:text-gray-300">Suggest reply</span> in the toolbar
-                  above.
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </aside>

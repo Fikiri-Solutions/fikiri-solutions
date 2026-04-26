@@ -1,7 +1,29 @@
 import React from 'react'
-import { Mail, Users, Brain } from 'lucide-react'
 import { RadiantLayout, Container, Gradient, AnimatedBackground } from '../components/radiant'
 import { PublicChatbotWidget } from '../components/PublicChatbotWidget'
+import { publicMedia } from '../lib/publicMedia'
+
+const serviceCards: {
+  imageSrc: string
+  title: string
+  description: string
+}[] = [
+  {
+    imageSrc: publicMedia.about.serviceEmail,
+    title: 'Email Automation',
+    description: 'AI-powered email processing and response automation',
+  },
+  {
+    imageSrc: publicMedia.about.serviceCrm,
+    title: 'CRM Management',
+    description: 'Customer relationship management and lead tracking',
+  },
+  {
+    imageSrc: publicMedia.about.serviceAi,
+    title: 'AI Assistant',
+    description: 'Intelligent business automation and analytics',
+  },
+]
 
 export const About: React.FC = () => {
   return (
@@ -33,42 +55,31 @@ export const About: React.FC = () => {
               Our Services
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-              <div className="group text-center bg-card/90 backdrop-blur-sm rounded-2xl border border-border/80 shadow-sm p-8 relative overflow-hidden">
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-500/5 via-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="relative bg-gradient-to-r from-orange-500 to-red-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 shadow-lg">
-                  <Mail className="w-7 h-7 text-white" />
-                </div>
-                <h3 className="text-lg font-medium text-foreground mb-2">
-                  Email Automation
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                  AI-powered email processing and response automation
-                </p>
-              </div>
-              <div className="group text-center bg-card/90 backdrop-blur-sm rounded-2xl border border-border/80 shadow-sm p-8 relative overflow-hidden">
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-500/5 via-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="relative bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 shadow-lg">
-                  <Users className="w-7 h-7 text-white" />
-                </div>
-                <h3 className="text-lg font-medium text-foreground mb-2">
-                  CRM Management
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                  Customer relationship management and lead tracking
-                </p>
-              </div>
-              <div className="group text-center bg-card/90 backdrop-blur-sm rounded-2xl border border-border/80 shadow-sm p-8 relative overflow-hidden">
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-sky-500/5 via-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="relative bg-gradient-to-r from-sky-500 to-indigo-600 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 shadow-lg">
-                  <Brain className="w-7 h-7 text-white" />
-                </div>
-                <h3 className="text-lg font-medium text-foreground mb-2">
-                  AI Assistant
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                  Intelligent business automation and analytics
-                </p>
-              </div>
+              {serviceCards.map((card) => (
+                <article
+                  key={card.imageSrc}
+                  className="group text-center relative overflow-hidden flex flex-col rounded-2xl bg-card/40 backdrop-blur-sm shadow-md shadow-stone-900/8 ring-1 ring-stone-900/6 dark:ring-white/8"
+                >
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-500/5 via-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="relative w-full aspect-[3/4] min-h-[220px] sm:min-h-[280px]">
+                    <img
+                      src={card.imageSrc}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover object-center"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </div>
+                  <div className="relative border-t border-stone-900/5 bg-gradient-to-b from-card/30 to-card/50 px-5 pb-6 pt-4 dark:border-white/5 dark:from-white/[0.04] dark:to-white/[0.07] sm:px-6">
+                    <h3 className="text-lg font-medium text-foreground mb-1.5">
+                      {card.title}
+                    </h3>
+                    <p className="text-muted-foreground text-sm leading-relaxed">
+                      {card.description}
+                    </p>
+                  </div>
+                </article>
+              ))}
             </div>
 
             {/* Specializations / social proof by example */}

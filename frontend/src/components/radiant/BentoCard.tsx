@@ -5,6 +5,7 @@ import { Subheading } from './Text'
 export function BentoCard({
   dark = false,
   className = '',
+  graphicClassName = '',
   eyebrow,
   title,
   description,
@@ -13,6 +14,7 @@ export function BentoCard({
 }: {
   dark?: boolean
   className?: string
+  graphicClassName?: string
   eyebrow: React.ReactNode
   title: React.ReactNode
   description: React.ReactNode
@@ -32,7 +34,7 @@ export function BentoCard({
         dark && 'bg-gray-800/90'
       )}
     >
-      <div className="relative h-80 shrink-0">
+      <div className={clsx('relative h-80 shrink-0', graphicClassName)}>
         {graphic}
         {fade.includes('top') && (
           <div
@@ -45,9 +47,11 @@ export function BentoCard({
         {fade.includes('bottom') && (
           <div
             className={clsx(
-              'absolute inset-0 bg-gradient-to-t to-transparent to-50%',
-              dark ? 'from-gray-800' : 'from-white/80'
+              'pointer-events-none absolute inset-0 rounded-t-2xl',
+              'bg-gradient-to-b from-transparent via-orange-100/15 to-[#FDF2E9]/70',
+              'dark:via-white/[0.02] dark:to-gray-900/88'
             )}
+            aria-hidden
           />
         )}
       </div>

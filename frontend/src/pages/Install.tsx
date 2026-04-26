@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import { Copy, Check, Play, ExternalLink, LayoutDashboard, Home } from 'lucide-react';
 import { apiClient } from '../services/apiClient';
 import { useAuth } from '../contexts/AuthContext';
+import { publicAsset } from '../lib/publicAsset';
+
+const installScreenshot = (file: string) => publicAsset(`screenshots/${file}`);
 
 type Platform = 'wordpress' | 'wix' | 'squarespace' | 'shopify' | 'godaddy' | 'custom';
 
@@ -92,17 +95,17 @@ const InstallPage: React.FC = () => {
   });
 </script>`,
           instruction: 'Copy the code above',
-          screenshot: '/screenshots/wordpress-step1.png'
+          screenshot: installScreenshot('wordpress-step1.png')
         },
         {
           title: 'Step 2: Paste in WordPress',
           instruction: 'Go to Appearance → Theme Editor → theme.liquid (or use "Insert Headers and Footers" plugin). Paste before </head> tag.',
-          screenshot: '/screenshots/wordpress-step2.png'
+          screenshot: installScreenshot('wordpress-step2.png')
         },
         {
           title: 'Step 3: Done! ✅',
           instruction: 'Save and preview your site. The chatbot will appear in the bottom-right corner.',
-          screenshot: '/screenshots/wordpress-step3.png'
+          screenshot: installScreenshot('wordpress-step3.png')
         }
       ],
       videoUrl: 'https://www.loom.com/share/wordpress-install',
@@ -132,17 +135,17 @@ const InstallPage: React.FC = () => {
   });
 </script>`,
           instruction: 'Copy the code above',
-          screenshot: '/screenshots/wix-step1.png'
+          screenshot: installScreenshot('wix-step1.png')
         },
         {
           title: 'Step 2: Add HTML Embed',
           instruction: 'Go to Add → Embed → HTML Code. Paste the code and position it.',
-          screenshot: '/screenshots/wix-step2.png'
+          screenshot: installScreenshot('wix-step2.png')
         },
         {
           title: 'Step 3: Done! ✅',
           instruction: 'Publish your site. The chatbot will appear automatically.',
-          screenshot: '/screenshots/wix-step3.png'
+          screenshot: installScreenshot('wix-step3.png')
         }
       ],
       videoUrl: 'https://www.loom.com/share/wix-install',
@@ -168,17 +171,17 @@ const InstallPage: React.FC = () => {
   });
 </script>`,
           instruction: 'Copy the code above',
-          screenshot: '/screenshots/squarespace-step1.png'
+          screenshot: installScreenshot('squarespace-step1.png')
         },
         {
           title: 'Step 2: Add Code Block',
           instruction: 'Edit page → Add Block → Code. Paste the code and save.',
-          screenshot: '/screenshots/squarespace-step2.png'
+          screenshot: installScreenshot('squarespace-step2.png')
         },
         {
           title: 'Step 3: Done! ✅',
           instruction: 'The chatbot will appear on your page.',
-          screenshot: '/screenshots/squarespace-step3.png'
+          screenshot: installScreenshot('squarespace-step3.png')
         }
       ],
       videoUrl: 'https://www.loom.com/share/squarespace-install',
@@ -206,17 +209,17 @@ const InstallPage: React.FC = () => {
   });
 </script>`,
           instruction: 'Copy the code above',
-          screenshot: '/screenshots/shopify-step1.png'
+          screenshot: installScreenshot('shopify-step1.png')
         },
         {
           title: 'Step 2: Edit Theme',
           instruction: 'Go to Online Store → Themes → Edit code → theme.liquid. Paste before </head>.',
-          screenshot: '/screenshots/shopify-step2.png'
+          screenshot: installScreenshot('shopify-step2.png')
         },
         {
           title: 'Step 3: Done! ✅',
           instruction: 'Save and preview. Chatbot appears on all pages.',
-          screenshot: '/screenshots/shopify-step3.png'
+          screenshot: installScreenshot('shopify-step3.png')
         }
       ],
       videoUrl: 'https://www.loom.com/share/shopify-install',
@@ -246,17 +249,17 @@ const InstallPage: React.FC = () => {
   });
 </script>`,
           instruction: 'Copy the code above',
-          screenshot: '/screenshots/godaddy-step1.png'
+          screenshot: installScreenshot('godaddy-step1.png')
         },
         {
           title: 'Step 2: Add Custom HTML Block',
           instruction: 'Go to Website → Edit Site → Add Section → Custom HTML. Paste the code.',
-          screenshot: '/screenshots/godaddy-step2.png'
+          screenshot: installScreenshot('godaddy-step2.png')
         },
         {
           title: 'Step 3: Done! ✅',
           instruction: 'Publish your site. Chatbot appears automatically.',
-          screenshot: '/screenshots/godaddy-step3.png'
+          screenshot: installScreenshot('godaddy-step3.png')
         }
       ],
       videoUrl: 'https://www.loom.com/share/godaddy-install',
@@ -284,17 +287,17 @@ const InstallPage: React.FC = () => {
   });
 </script>`,
           instruction: 'Copy the code above',
-          screenshot: '/screenshots/custom-step1.png'
+          screenshot: installScreenshot('custom-step1.png')
         },
         {
           title: 'Step 2: Paste in your HTML',
           instruction: 'Add before </head> tag in your HTML file.',
-          screenshot: '/screenshots/custom-step2.png'
+          screenshot: installScreenshot('custom-step2.png')
         },
         {
           title: 'Step 3: Done! ✅',
           instruction: 'Save and refresh. Chatbot appears on your site.',
-          screenshot: '/screenshots/custom-step3.png'
+          screenshot: installScreenshot('custom-step3.png')
         }
       ],
       videoUrl: 'https://www.loom.com/share/custom-install',
