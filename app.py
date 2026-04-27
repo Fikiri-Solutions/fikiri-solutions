@@ -20,6 +20,12 @@ try:
 except ImportError:
     pass  # python-dotenv not available - using system environment variables
 
+try:
+    from supabase import create_client, Client
+except ImportError:
+    create_client = None
+    Client = None
+
 from config import IS_PRODUCTION
 
 # Ensure logging directories exist
@@ -37,6 +43,28 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _create_supabase_client():
+    """Create a Supabase client when env vars and dependency are available."""
+    if not create_client:
+        logger.info("Supabase package is not available; skipping Supabase client setup")
+        return None
+
+    supabase_url = os.environ.get("SUPABASE_URL")
+    supabase_key = os.environ.get("SUPABASE_KEY")
+    if not supabase_url or not supabase_key:
+        logger.info("SUPABASE_URL/SUPABASE_KEY not configured; skipping Supabase client setup")
+        return None
+
+    try:
+        return create_client(supabase_url, supabase_key)
+    except Exception as exc:
+        logger.warning("Failed to initialize Supabase client: %s", exc)
+        return None
+
+
+supabase_client = _create_supabase_client()
 
 # Environment Mode Validation
 if os.getenv("FLASK_ENV") not in ["production", "development", "staging"]:
@@ -636,6 +664,30 @@ def setup_routes(app):
             'timestamp': datetime.now().isoformat(),
             'frontend': 'https://fikirisolutions.com'
         })
+
+    @app.route('/supabase-todos')
+    def supabase_todos():
+        """Simple Supabase sample route to fetch todos."""
+        if not supabase_client:
+            return jsonify({
+                'success': False,
+                'error': 'Supabase client not configured'
+            }), 503
+
+        try:
+            response = supabase_client.table('todos').select("*").execute()
+            todos = response.data or []
+            html = '<h1>Todos</h1><ul>'
+            for todo in todos:
+                html += f'<li>{todo.get("name", "Unnamed todo")}</li>'
+            html += '</ul>'
+            return html
+        except Exception as exc:
+            logger.error("Supabase todos query failed: %s", exc)
+            return jsonify({
+                'success': False,
+                'error': 'Failed to fetch todos from Supabase'
+            }), 500
 
     @app.route('/integrations/universal/fikiri-sdk.js')
     def serve_fikiri_universal_sdk():
