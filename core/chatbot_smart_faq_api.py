@@ -5,6 +5,7 @@ Unified API for chatbot, FAQ, knowledge base, and multi-channel support
 
 import json
 import logging
+import os
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 from flask import Blueprint, request, jsonify, g
@@ -25,6 +26,7 @@ from core.chatbot_content_events import (
     set_faq_vector_key,
 )
 from core.request_correlation import get_or_create_correlation_id
+from core.user_feedback_router import get_user_feedback_router
 
 logger = logging.getLogger(__name__)
 
@@ -946,6 +948,16 @@ def revectorize_knowledge():
 CHATBOT_FEEDBACK_RATINGS = frozenset({'correct', 'somewhat_correct', 'somewhat_incorrect', 'incorrect'})
 
 
+def _is_production_env() -> bool:
+    return (os.getenv("FLASK_ENV") or "").strip().lower() == "production"
+
+
+def _feedback_error(message: str, status_code: int, error_code: str) -> tuple:
+    if _is_production_env():
+        return create_error_response(message, status_code)
+    return create_error_response(message, status_code, error_code)
+
+
 @chatbot_bp.route('/feedback', methods=['POST'])
 @handle_api_errors
 def submit_chatbot_feedback():
@@ -970,20 +982,16 @@ def submit_chatbot_feedback():
         feedback_correlation_id = get_or_create_correlation_id(request, data)
 
         if not question:
-            return create_error_response("question is required", 400, 'MISSING_QUESTION')
+            return _feedback_error("Please share your question.", 400, 'MISSING_QUESTION')
         if not answer:
-            return create_error_response("answer is required", 400, 'MISSING_ANSWER')
+            return _feedback_error("Please share the chatbot answer you are rating.", 400, 'MISSING_ANSWER')
         if rating not in CHATBOT_FEEDBACK_RATINGS:
-            return create_error_response(
-                "rating must be one of: correct, somewhat_correct, somewhat_incorrect, incorrect",
-                400,
-                'INVALID_RATING'
-            )
+            return _feedback_error("Please select a valid rating.", 400, 'INVALID_RATING')
 
         if retrieved_doc_ids is not None and not isinstance(retrieved_doc_ids, list):
-            return create_error_response("retrieved_doc_ids must be an array", 400, 'INVALID_RETRIEVED_DOC_IDS')
+            return _feedback_error("Invalid feedback format.", 400, 'INVALID_RETRIEVED_DOC_IDS')
         if metadata is not None and not isinstance(metadata, dict):
-            return create_error_response("metadata must be an object", 400, 'INVALID_METADATA')
+            return _feedback_error("Invalid feedback format.", 400, 'INVALID_METADATA')
 
         user_id = get_current_user_id()
 
@@ -991,7 +999,7 @@ def submit_chatbot_feedback():
         metadata_json = json.dumps(metadata) if isinstance(metadata, dict) else None
 
         if not db_optimizer.table_exists("chatbot_feedback"):
-            return create_error_response("Chatbot feedback table not available", 503, 'SERVICE_UNAVAILABLE')
+            return _feedback_error("Feedback service is temporarily unavailable.", 503, 'SERVICE_UNAVAILABLE')
 
         db_optimizer.execute_query(
             """INSERT INTO chatbot_feedback
@@ -999,6 +1007,25 @@ def submit_chatbot_feedback():
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (user_id, session_id, question, answer, retrieved_json, rating, metadata_json, prompt_version, retriever_version),
             fetch=False,
+        )
+        feedback_router = get_user_feedback_router()
+        feedback_router.record_feedback_event(
+            source="api.chatbot.feedback",
+            user_id=str(user_id) if user_id is not None else None,
+            tenant_id=str(user_id) if user_id is not None else None,
+            category="chatbot",
+            conversation_id=(metadata or {}).get("conversation_id") if isinstance(metadata, dict) else None,
+            message_id=message_id_fb,
+            correlation_id=feedback_correlation_id,
+            payload={
+                "rating": rating,
+                "question": question,
+                "answer": answer,
+                "retrieved_doc_ids": retrieved_doc_ids if isinstance(retrieved_doc_ids, list) else [],
+                "metadata": metadata if isinstance(metadata, dict) else {},
+                "corrected_answer_present": bool(corrected_answer),
+            },
+            idempotency_key=data.get("idempotency_key"),
         )
         if corrected_answer:
             record_chatbot_response_corrected(
@@ -1011,16 +1038,16 @@ def submit_chatbot_feedback():
                 rating=rating,
                 source="api.chatbot.feedback",
             )
-        return jsonify(
-            {
-                "success": True,
-                "message": "Feedback recorded",
-                "correlation_id": feedback_correlation_id,
-            }
-        )
+        response = {
+            "success": True,
+            "message": "Thanks for your feedback.",
+        }
+        if not _is_production_env():
+            response["correlation_id"] = feedback_correlation_id
+        return jsonify(response)
     except Exception as e:
         logger.exception("Chatbot feedback failed")
-        return create_error_response("Failed to record feedback", 500, 'FEEDBACK_ERROR')
+        return _feedback_error("We couldn't save your feedback right now. Please try again.", 500, 'FEEDBACK_ERROR')
 
 
 @chatbot_bp.route('/knowledge/categories', methods=['GET'])

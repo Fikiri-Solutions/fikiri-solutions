@@ -1238,6 +1238,35 @@ class DatabaseOptimizer:
                 retriever_version TEXT
             )
         """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_feedback_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source TEXT NOT NULL,
+                user_id TEXT,
+                tenant_id TEXT,
+                category TEXT NOT NULL,
+                route TEXT NOT NULL,
+                conversation_id TEXT,
+                message_id TEXT,
+                correlation_id TEXT,
+                payload_json TEXT NOT NULL,
+                idempotency_key TEXT NOT NULL UNIQUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_feedback_events_route_created
+            ON user_feedback_events (route, created_at DESC)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_feedback_events_user_created
+            ON user_feedback_events (user_id, created_at DESC)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_feedback_events_tenant_created
+            ON user_feedback_events (tenant_id, created_at DESC)
+        """)
 
         # Append-only chatbot / FAQ / KB content events (audit + rollback-ready snapshots)
         cursor.execute("""

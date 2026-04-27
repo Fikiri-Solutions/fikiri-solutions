@@ -31,6 +31,7 @@ from core.chatbot_content_events import (
     record_chatbot_response_generated,
 )
 from core.request_correlation import get_or_create_correlation_id
+from core.user_feedback_router import get_user_feedback_router
 
 logger = logging.getLogger(__name__)
 
@@ -200,6 +201,18 @@ def _low_confidence_message() -> str:
     )
 
 
+def _is_production_env() -> bool:
+    return (os.getenv("FLASK_ENV") or "").strip().lower() == "production"
+
+
+def _public_error_payload(message: str, error_code: Optional[str] = None, **extra: Any) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {"success": False, "error": message}
+    payload.update(extra)
+    if not _is_production_env() and error_code:
+        payload["error_code"] = error_code
+    return payload
+
+
 def _confidence_threshold() -> float:
     """Minimum combined confidence to show the model answer; below this we show clarifying message."""
     try:
@@ -347,43 +360,43 @@ def public_chatbot_key_status():
 
     raw = _parse_request_api_key()
     if not raw:
+        payload = {
+            "success": True,
+            "valid": False,
+            "message": "Send header X-API-Key with your Fikiri API key.",
+        }
+        if not _is_production_env():
+            payload["error_code"] = "MISSING_API_KEY"
         return (
-            jsonify(
-                {
-                    "success": True,
-                    "valid": False,
-                    "error_code": "MISSING_API_KEY",
-                    "message": "Send header X-API-Key with your Fikiri API key.",
-                }
-            ),
+            jsonify(payload),
             200,
         )
 
     key_info = api_key_manager.validate_api_key(raw)
     if not key_info:
+        payload = {
+            "success": True,
+            "valid": False,
+            "message": "This API key is not valid or was revoked.",
+        }
+        if not _is_production_env():
+            payload["error_code"] = "INVALID_API_KEY"
         return (
-            jsonify(
-                {
-                    "success": True,
-                    "valid": False,
-                    "error_code": "INVALID_API_KEY",
-                    "message": "This API key is not valid or was revoked.",
-                }
-            ),
+            jsonify(payload),
             200,
         )
 
     query_endpoint = "public_chatbot.public_chatbot_query"
     if not _scopes_allow_for_endpoint(key_info, query_endpoint):
+        payload = {
+            "success": True,
+            "valid": False,
+            "message": "This API key does not include chatbot query access.",
+        }
+        if not _is_production_env():
+            payload["error_code"] = "INSUFFICIENT_SCOPE"
         return (
-            jsonify(
-                {
-                    "success": True,
-                    "valid": False,
-                    "error_code": "INSUFFICIENT_SCOPE",
-                    "message": "This API key does not include chatbot query access.",
-                }
-            ),
+            jsonify(payload),
             200,
         )
 
@@ -429,11 +442,7 @@ def public_chatbot_query():
         
         if not query:
             record_api_usage(response_status=400)
-            return jsonify({
-                "success": False,
-                "error": "Query is required",
-                "error_code": "MISSING_QUERY"
-            }), 400
+            return jsonify(_public_error_payload("Query is required", "MISSING_QUERY")), 400
 
         correlation_id = get_or_create_correlation_id(request, data)
         
@@ -490,11 +499,7 @@ def public_chatbot_query():
         allow_llm = plan_info.get("allow_llm", True)
         if not allow_llm:
             record_api_usage(response_status=402)
-            return jsonify({
-                "success": False,
-                "error": "Plan limit exceeded",
-                "error_code": "PLAN_LIMIT_EXCEEDED"
-            }), 402
+            return jsonify(_public_error_payload("Plan limit exceeded", "PLAN_LIMIT_EXCEEDED")), 402
 
         answer = _safe_fallback_response()
         llm_confidence: Optional[float] = 0.2
@@ -505,19 +510,20 @@ def public_chatbot_query():
             budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
             if not budget_decision.allowed:
                 record_api_usage(response_status=402)
-                return jsonify({
-                    "success": False,
-                    "error": "AI monthly budget cap reached. Upgrade or wait until next billing period."
-                    if budget_decision.reason == "monthly_budget_cap_reached"
-                    else "AI monthly budget approval required.",
-                    "error_code": "AI_BUDGET_SOFT_STOP",
-                    "tier": budget_decision.tier,
-                    "month": budget_decision.month,
-                    "budget_cap_usd": budget_decision.budget_cap_usd,
-                    "estimated_cost_usd": budget_decision.estimated_cost_usd,
-                    "projected_cost_usd": budget_decision.projected_cost_usd,
-                    "requires_approval": budget_decision.requires_approval
-                }), 402
+                return jsonify(
+                    _public_error_payload(
+                        "AI monthly budget cap reached. Upgrade or wait until next billing period."
+                        if budget_decision.reason == "monthly_budget_cap_reached"
+                        else "AI monthly budget approval required.",
+                        "AI_BUDGET_SOFT_STOP",
+                        tier=budget_decision.tier,
+                        month=budget_decision.month,
+                        budget_cap_usd=budget_decision.budget_cap_usd,
+                        estimated_cost_usd=budget_decision.estimated_cost_usd,
+                        projected_cost_usd=budget_decision.projected_cost_usd,
+                        requires_approval=budget_decision.requires_approval,
+                    )
+                ), 402
 
             router = LLMRouter()
             prompt = (
@@ -714,7 +720,7 @@ def public_chatbot_query():
         
         retrieved_doc_ids, retrieval_scores = _retrieval_metadata(sources)
         
-        return jsonify({
+        response = {
             "success": True,
             "query": query,
             "response": answer,
@@ -726,17 +732,19 @@ def public_chatbot_query():
             "llm_confidence": llm_confidence,
             "conversation_id": conversation_id,
             "message_id": message_id,
-            "correlation_id": correlation_id,
             "tenant_id": tenant_id,
             "schema_version": "v1",
             "fallback_used": fallback_used,
             "plan": plan_info.get("plan"),
-            "llm_trace_id": llm_trace_id,
             "lead_id": lead_id,
             "escalated": should_escalate,
             "escalated_question_id": escalated_question_id,
             "ai_usage_recorded": bool(llm_attempted)
-        })
+        }
+        if not _is_production_env():
+            response["correlation_id"] = correlation_id
+            response["llm_trace_id"] = llm_trace_id
+        return jsonify(response)
         
     except Exception as e:
         logger.error(f"❌ Public chatbot query failed: {e}", exc_info=True)
@@ -766,14 +774,17 @@ def submit_feedback():
             metadata = None
 
         if not conversation_id:
-            return jsonify({
+            response = {
                 "success": False,
-                "error": "conversation_id is required",
-                "error_code": "MISSING_FIELD"
-            }), 400
+                "error": "Please include the conversation id for this feedback.",
+            }
+            if not _is_production_env():
+                response["error_code"] = "MISSING_FIELD"
+            return jsonify(response), 400
 
         tenant_id = g.api_key_info.get('tenant_id')
         user_id = g.api_key_info.get('user_id')
+        correlation_id = get_or_create_correlation_id(request, data)
 
         feedback_system = get_feedback_system()
         result = feedback_system.record_feedback(
@@ -784,22 +795,47 @@ def submit_feedback():
             user_id=str(user_id) if user_id else None,
             metadata=metadata,
         )
+        feedback_router = get_user_feedback_router()
+        feedback_router.record_feedback_event(
+            source="api.public_chatbot.feedback",
+            user_id=str(user_id) if user_id is not None else None,
+            tenant_id=str(tenant_id) if tenant_id is not None else None,
+            category="chatbot",
+            conversation_id=conversation_id,
+            message_id=message_id,
+            correlation_id=correlation_id,
+            payload={
+                "helpful": bool(helpful),
+                "feedback_text": feedback_text,
+                "confidence": confidence,
+                "metadata": metadata if isinstance(metadata, dict) else {},
+            },
+            idempotency_key=data.get("idempotency_key"),
+        )
         
         if not result.get('success'):
-            return jsonify({
+            logger.error("Public feedback persistence failed: %s", result)
+            response = {
                 "success": False,
-                "error": result.get('error', 'Failed to record feedback'),
-                "error_code": result.get('error_code', 'FEEDBACK_ERROR')
-            }), 500
+                "error": "We couldn't save your feedback right now. Please try again.",
+            }
+            if not _is_production_env():
+                response["error_code"] = result.get('error_code', 'FEEDBACK_ERROR')
+            return jsonify(response), 500
         
         return jsonify({
             "success": True,
             "feedback_id": result.get('feedback_id'),
-            "message": "Feedback recorded successfully"
+            "message": "Thanks for your feedback."
         })
         
     except Exception as e:
         logger.error(f"❌ Feedback submission failed: {e}", exc_info=True)
+        if _is_production_env():
+            return jsonify({
+                "success": False,
+                "error": "We couldn't save your feedback right now. Please try again.",
+            }), 500
         return create_error_response("Internal server error", 500, 'INTERNAL_ERROR')
 
 

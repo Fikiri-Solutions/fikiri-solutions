@@ -135,6 +135,41 @@ class TestChatbotFeedbackEndpoint(unittest.TestCase):
                     )
                     self.assertEqual(resp.status_code, 200, f"rating={rating}")
 
+    @patch("core.chatbot_smart_faq_api.db_optimizer")
+    @patch("core.chatbot_smart_faq_api.get_current_user_id")
+    @patch("core.chatbot_smart_faq_api.os.getenv")
+    def test_feedback_production_response_hides_technical_fields(self, mock_getenv, mock_user_id, mock_db):
+        mock_user_id.return_value = None
+        mock_db.table_exists.return_value = True
+        mock_db.execute_query.return_value = None
+        mock_getenv.return_value = "production"
+
+        resp = self.client.post(
+            "/api/chatbot/feedback",
+            json={
+                "question": "Q",
+                "answer": "A",
+                "retrieved_doc_ids": ["doc1"],
+                "rating": "correct",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.data)
+        self.assertTrue(data.get("success"))
+        self.assertNotIn("correlation_id", data)
+        self.assertEqual(data.get("message"), "Thanks for your feedback.")
+
+        bad_resp = self.client.post(
+            "/api/chatbot/feedback",
+            json={"answer": "A", "retrieved_doc_ids": [], "rating": "correct"},
+            content_type="application/json",
+        )
+        self.assertEqual(bad_resp.status_code, 400)
+        bad_data = json.loads(bad_resp.data)
+        self.assertFalse(bad_data.get("success", True))
+        self.assertNotIn("code", bad_data)
+
 
 if __name__ == "__main__":
     unittest.main()

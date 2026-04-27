@@ -6,6 +6,7 @@ Endpoints for expert teams, escalated questions, and Q&A management
 
 import json
 import logging
+import os
 import uuid
 from flask import Blueprint, request, jsonify
 from typing import Any, Dict, Optional
@@ -18,8 +19,13 @@ from core.api_validation import handle_api_errors, create_success_response, crea
 from core.secure_sessions import get_current_user_id
 from core.smart_faq_system import get_smart_faq
 from core.knowledge_base_system import get_knowledge_base, DocumentType
+from core.user_feedback_router import get_user_feedback_router
 
 logger = logging.getLogger(__name__)
+
+def _is_production_env() -> bool:
+    return (os.getenv("FLASK_ENV") or "").strip().lower() == "production"
+
 
 # Create blueprint
 expert_bp = Blueprint('expert', __name__, url_prefix='/api/expert')
@@ -359,6 +365,8 @@ def record_feedback():
     user_id = data.get('user_id')
     
     if not conversation_id:
+        if _is_production_env():
+            return create_error_response("Please include the conversation id for this feedback.", 400)
         return create_error_response("conversation_id is required", 400, 'MISSING_FIELD')
     
     result = feedback_system.record_feedback(
@@ -368,15 +376,33 @@ def record_feedback():
         message_id=message_id,
         user_id=user_id
     )
+    get_user_feedback_router().record_feedback_event(
+        source="api.expert.feedback",
+        user_id=str(user_id) if user_id is not None else None,
+        tenant_id=str(user_id) if user_id is not None else None,
+        category="chatbot",
+        conversation_id=conversation_id,
+        message_id=message_id,
+        correlation_id=None,
+        payload={
+            "helpful": bool(helpful),
+            "feedback_text": feedback_text,
+            "via": "expert_api",
+        },
+        idempotency_key=data.get("idempotency_key"),
+    )
     
     if not result.get('success'):
+        logger.error("Expert feedback persistence failed: %s", result)
+        if _is_production_env():
+            return create_error_response("We couldn't save your feedback right now. Please try again.", 500)
         return create_error_response(
             result.get('error', 'Failed to record feedback'),
             500,
             result.get('error_code', 'FEEDBACK_ERROR')
         )
     
-    return create_success_response(result, 'Feedback recorded successfully')
+    return create_success_response(result, 'Thanks for your feedback.')
 
 @expert_bp.route('/feedback/<conversation_id>', methods=['GET'])
 @handle_api_errors
