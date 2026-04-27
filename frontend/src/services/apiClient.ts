@@ -1504,11 +1504,17 @@ class ApiClient {
     return response.data?.pricing_tiers || {}
   }
 
-  async createCheckoutSession(tierName: string, billingPeriod: 'monthly' | 'annual' = 'monthly', useTrial: boolean = true): Promise<{ checkout_url: string; session_id: string }> {
+  async createCheckoutSession(
+    tierName: string,
+    billingPeriod: 'monthly' | 'annual' = 'monthly',
+    useTrial: boolean = true,
+    paymentMethodTypes: string[] = ['card', 'us_bank_account']
+  ): Promise<{ checkout_url: string; session_id: string }> {
     const response = await this.client.post('/billing/checkout', {
       tier_name: tierName,
       billing_period: billingPeriod,
-      trial: useTrial
+      trial: useTrial,
+      payment_method_types: paymentMethodTypes,
     })
     if (!response.data.success) {
       throw new Error(response.data.error || 'Failed to create checkout session')
@@ -1625,6 +1631,19 @@ class ApiClient {
     return {
       client_secret: response.data.client_secret,
       setup_intent_id: response.data.setup_intent_id
+    }
+  }
+
+  async createSetupCheckoutSession(paymentMethodTypes: string[] = ['card']): Promise<{ url: string; session_id?: string }> {
+    const response = await this.client.post('/billing/setup-checkout', {
+      payment_method_types: paymentMethodTypes
+    })
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Failed to create setup checkout session')
+    }
+    return {
+      url: response.data.url,
+      session_id: response.data.session_id
     }
   }
 

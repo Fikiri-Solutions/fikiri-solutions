@@ -80,7 +80,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <X className="h-6 w-6" />
             </button>
           </div>
-          <nav className="flex-1 px-4 py-4">
+          <nav className="flex-1 px-4 py-4 overflow-y-auto">
             {navigation.map((item) => (
               <Link
                 key={item.href}
@@ -97,6 +97,41 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </Link>
             ))}
           </nav>
+          <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 space-y-2">
+            <button
+              type="button"
+              onClick={() => {
+                setCustomizationOpen(true)
+                setMobileMenuOpen(false)
+              }}
+              className="w-full flex min-h-[44px] items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-brand-text dark:text-gray-300 hover:bg-brand-accent/10 dark:hover:bg-gray-700"
+            >
+              <Palette className="h-5 w-5" />
+              Customize appearance
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAccountManagementOpen(true)
+                setMobileMenuOpen(false)
+              }}
+              className="w-full flex min-h-[44px] items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-brand-text dark:text-gray-300 hover:bg-brand-accent/10 dark:hover:bg-gray-700"
+            >
+              <User className="h-5 w-5" />
+              Account settings
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false)
+                handleSignOut()
+              }}
+              className="w-full flex min-h-[44px] items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-brand-text dark:text-gray-300 hover:bg-brand-accent/10 dark:hover:bg-gray-700"
+            >
+              <LogOut className="h-5 w-5" />
+              Sign out
+            </button>
+          </div>
           <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 px-4 py-3">
             <LegalFooterLinks
               className="text-xs text-gray-500 dark:text-gray-400"
@@ -231,7 +266,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <button
                 type="button"
                 onClick={() => setCustomizationOpen(true)}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-brand-text hover:bg-gray-100 hover:text-brand-primary dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
+                className="hidden sm:flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-brand-text hover:bg-gray-100 hover:text-brand-primary dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
                 title="Customize appearance"
                 aria-label="Customize appearance"
               >
@@ -240,7 +275,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <button
                 type="button"
                 onClick={() => setAccountManagementOpen(true)}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-brand-text hover:bg-gray-100 hover:text-brand-primary dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
+                className="hidden sm:flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-brand-text hover:bg-gray-100 hover:text-brand-primary dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
                 title="Account settings"
                 aria-label="Account settings"
               >
@@ -249,7 +284,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <button 
                 type="button"
                 onClick={handleSignOut}
-                className="flex h-11 min-w-[44px] shrink-0 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-brand-text hover:bg-gray-100 hover:text-brand-primary dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
+                className="hidden sm:flex h-11 min-w-[44px] shrink-0 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-brand-text hover:bg-gray-100 hover:text-brand-primary dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
                 aria-label="Sign out"
               >
                 <LogOut className="h-4 w-4 shrink-0" />

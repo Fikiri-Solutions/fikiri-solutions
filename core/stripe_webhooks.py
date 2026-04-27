@@ -168,6 +168,10 @@ class StripeWebhookHandler:
             'payment_method.attached': self.handle_payment_method_attached,
             'checkout.session.completed': self.handle_checkout_completed,
             'checkout.session.expired': self.handle_checkout_expired,
+            'checkout.session.async_payment_succeeded': self.handle_checkout_async_payment_succeeded,
+            'checkout.session.async_payment_failed': self.handle_checkout_async_payment_failed,
+            'setup_intent.succeeded': self.handle_setup_intent_succeeded,
+            'setup_intent.setup_failed': self.handle_setup_intent_failed,
             'payment_intent.succeeded': self.handle_payment_intent_succeeded,
             'payment_intent.payment_failed': self.handle_payment_intent_failed,
             'charge.succeeded': self.handle_charge_succeeded,
@@ -504,6 +508,85 @@ class StripeWebhookHandler:
             
         except Exception as e:
             logger.error(f"Error handling checkout expired: {e}")
+            return {'status': 'error', 'error': str(e)}
+
+    def handle_checkout_async_payment_succeeded(self, session: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle asynchronous checkout payment success (common with ACH)."""
+        try:
+            session_id = session['id']
+            customer_id = session.get('customer')
+            subscription_id = session.get('subscription')
+            logger.info(f"Checkout async payment succeeded: Session {session_id} - Customer {customer_id}")
+            if subscription_id and customer_id:
+                self._update_user_subscription(subscription_id, customer_id, 'active')
+            self._track_checkout_event('async_payment_succeeded', session_id, customer_id, subscription_id)
+            return {
+                'status': 'success',
+                'session_id': session_id,
+                'customer_id': customer_id,
+                'subscription_id': subscription_id,
+                'action': 'checkout_async_payment_succeeded'
+            }
+        except Exception as e:
+            logger.error(f"Error handling checkout async payment succeeded: {e}")
+            return {'status': 'error', 'error': str(e)}
+
+    def handle_checkout_async_payment_failed(self, session: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle asynchronous checkout payment failure (common with ACH)."""
+        try:
+            session_id = session['id']
+            customer_id = session.get('customer')
+            subscription_id = session.get('subscription')
+            logger.warning(f"Checkout async payment failed: Session {session_id} - Customer {customer_id}")
+            if subscription_id and customer_id:
+                self._update_user_subscription(subscription_id, customer_id, 'past_due')
+            self._track_checkout_event('async_payment_failed', session_id, customer_id, subscription_id)
+            return {
+                'status': 'success',
+                'session_id': session_id,
+                'customer_id': customer_id,
+                'subscription_id': subscription_id,
+                'action': 'checkout_async_payment_failed'
+            }
+        except Exception as e:
+            logger.error(f"Error handling checkout async payment failed: {e}")
+            return {'status': 'error', 'error': str(e)}
+
+    def handle_setup_intent_succeeded(self, setup_intent: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle successful setup intent (card or bank account added)."""
+        try:
+            setup_intent_id = setup_intent['id']
+            customer_id = setup_intent.get('customer')
+            payment_method = setup_intent.get('payment_method')
+            logger.info(f"Setup intent succeeded: {setup_intent_id} for customer {customer_id}")
+            return {
+                'status': 'success',
+                'setup_intent_id': setup_intent_id,
+                'customer_id': customer_id,
+                'payment_method_id': payment_method,
+                'action': 'setup_intent_succeeded'
+            }
+        except Exception as e:
+            logger.error(f"Error handling setup intent succeeded: {e}")
+            return {'status': 'error', 'error': str(e)}
+
+    def handle_setup_intent_failed(self, setup_intent: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle failed setup intent (card or bank account setup failed)."""
+        try:
+            setup_intent_id = setup_intent['id']
+            customer_id = setup_intent.get('customer')
+            last_setup_error = setup_intent.get('last_setup_error', {})
+            error_message = last_setup_error.get('message', 'Setup failed')
+            logger.warning(f"Setup intent failed: {setup_intent_id} for customer {customer_id} - {error_message}")
+            return {
+                'status': 'success',
+                'setup_intent_id': setup_intent_id,
+                'customer_id': customer_id,
+                'action': 'setup_intent_failed',
+                'error_message': error_message,
+            }
+        except Exception as e:
+            logger.error(f"Error handling setup intent failed: {e}")
             return {'status': 'error', 'error': str(e)}
     
     def handle_payment_intent_succeeded(self, payment_intent: Dict[str, Any]) -> Dict[str, Any]:

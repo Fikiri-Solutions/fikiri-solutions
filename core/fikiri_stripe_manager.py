@@ -566,7 +566,15 @@ class FikiriStripeManager:
             logger.error(f"Failed to create customer: {e}")
             raise
 
-    def create_checkout_session(self, price_id: str, customer_id: str = None, success_url: str = None, cancel_url: str = None, trial_days: int = 14) -> Dict[str, Any]:
+    def create_checkout_session(
+        self,
+        price_id: str,
+        customer_id: str = None,
+        success_url: str = None,
+        cancel_url: str = None,
+        trial_days: int = 14,
+        payment_method_types: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
         """Create Stripe Checkout session with optional trial period"""
         if not STRIPE_AVAILABLE:
             logger.warning("Stripe not available")
@@ -574,8 +582,13 @@ class FikiriStripeManager:
         
         try:
             frontend_url = Config.FRONTEND_URL.rstrip('/')
+            requested_types = payment_method_types or ['card', 'us_bank_account']
+            allowed_types = [pm for pm in requested_types if pm in ('card', 'us_bank_account')]
+            if not allowed_types:
+                allowed_types = ['card']
+
             session_params = {
-                'payment_method_types': ['card'],
+                'payment_method_types': allowed_types,
                 'line_items': [{'price': price_id, 'quantity': 1}],
                 'mode': 'subscription',
                 'success_url': success_url or f"{frontend_url}/dashboard?success=true",
@@ -588,9 +601,16 @@ class FikiriStripeManager:
                 'subscription_data': {
                     'metadata': {'source': 'fikiri_checkout', 'purchase_type': 'trial' if trial_days > 0 else 'immediate'}
                 },
-                'payment_method_options': {'card': {'request_three_d_secure': 'automatic'}},
+                'payment_method_options': {
+                    'card': {'request_three_d_secure': 'automatic'},
+                },
                 'metadata': {'checkout_type': 'subscription_with_trial' if trial_days > 0 else 'subscription_immediate', 'trial_days': str(trial_days)}
             }
+
+            if 'us_bank_account' in allowed_types:
+                session_params['payment_method_options']['us_bank_account'] = {
+                    'verification_method': 'automatic'
+                }
             
             if trial_days > 0:
                 session_params['trial_period_days'] = trial_days
@@ -602,6 +622,41 @@ class FikiriStripeManager:
             
         except stripe.error.StripeError as e:
             logger.error(f"Failed to create checkout session: {e}")
+            raise
+
+    def create_setup_checkout_session(
+        self,
+        customer_id: str,
+        payment_method_types: List[str],
+        success_url: str,
+        cancel_url: str,
+    ) -> Dict[str, Any]:
+        """Create a Checkout setup-mode session for collecting a payment method."""
+        if not STRIPE_AVAILABLE:
+            logger.warning("Stripe not available")
+            return {}
+
+        try:
+            cleaned_types = [pm for pm in payment_method_types if pm in ('card', 'us_bank_account')]
+            if not cleaned_types:
+                cleaned_types = ['card']
+
+            session = stripe.checkout.Session.create(
+                mode='setup',
+                customer=customer_id,
+                payment_method_types=cleaned_types,
+                success_url=success_url,
+                cancel_url=cancel_url,
+            )
+            logger.info(
+                "Created setup checkout session %s for customer %s (%s)",
+                session.id,
+                customer_id,
+                ",".join(cleaned_types),
+            )
+            return {'session_id': session.id, 'url': session.url}
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to create setup checkout session: {e}")
             raise
 
     def get_subscription(self, subscription_id: str) -> Dict[str, Any]:

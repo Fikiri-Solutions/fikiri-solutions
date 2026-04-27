@@ -230,9 +230,9 @@ export const EnhancedDashboardCharts: React.FC<DashboardChartsProps> = ({
       {/* Analytics Overview - Modern Design */}
       <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
         <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="flex items-center gap-3 text-2xl font-bold text-gray-900 dark:text-white">
+              <CardTitle className="flex items-center gap-3 text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                 <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                   <Activity className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
@@ -242,7 +242,7 @@ export const EnhancedDashboardCharts: React.FC<DashboardChartsProps> = ({
                 Real-time data visualization with interactive controls
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -267,11 +267,11 @@ export const EnhancedDashboardCharts: React.FC<DashboardChartsProps> = ({
         </CardHeader>
         <CardContent>
           {/* Time Range and Chart Type Controls */}
-          <div className="flex flex-wrap items-center gap-6 mb-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-4 mb-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl sm:flex-row sm:flex-wrap sm:items-center sm:gap-6">
+            <div className="flex flex-wrap items-center gap-3">
               <Filter className="h-4 w-4 text-gray-500" />
               <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Time Range:</span>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {(['7d', '30d', '90d'] as const).map((range) => (
                   <Button
                     key={range}
@@ -288,9 +288,9 @@ export const EnhancedDashboardCharts: React.FC<DashboardChartsProps> = ({
                 ))}
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Chart Type:</span>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {[
                   { key: 'line', icon: TrendingUp, label: 'Line' },
                   { key: 'bar', icon: BarChart3, label: 'Bar' },
@@ -306,7 +306,7 @@ export const EnhancedDashboardCharts: React.FC<DashboardChartsProps> = ({
                       : "border-gray-300 dark:border-gray-600"
                     }
                   >
-                    <Icon className="h-4 w-4 mr-1" />
+                      <Icon className="h-4 w-4 sm:mr-1" />
                     {label}
                   </Button>
                 ))}
@@ -383,7 +383,7 @@ export const EnhancedDashboardCharts: React.FC<DashboardChartsProps> = ({
           {/* Main Chart - Sleek Design */}
           <Card className="border border-gray-200 dark:border-gray-700 shadow-md bg-white dark:bg-gray-800">
             <CardContent className="p-6">
-              <div className="h-96">
+              <div className="h-72 sm:h-96">
                 <ResponsiveContainer width="100%" height="100%">
                   {activeChart === 'line' ? (
                     <LineChart data={filteredData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
@@ -548,7 +548,7 @@ export const EnhancedDashboardCharts: React.FC<DashboardChartsProps> = ({
       {/* Service Performance Overview - Using Real Data */}
       <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
         <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-3 text-2xl font-bold text-gray-900 dark:text-white">
+          <CardTitle className="flex items-center gap-3 text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
             <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
               <PieChartIcon className="h-6 w-6 text-purple-600 dark:text-purple-400" />
             </div>

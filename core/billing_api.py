@@ -399,6 +399,12 @@ def create_checkout_session():
         price_id = data.get('price_id')
         billing_period = data.get('billing_period', 'monthly')
         use_trial = data.get('trial', True)
+        requested_types = data.get('payment_method_types', ['card', 'us_bank_account'])
+        if not isinstance(requested_types, list):
+            requested_types = ['card', 'us_bank_account']
+        payment_method_types = [pm for pm in requested_types if pm in ('card', 'us_bank_account')]
+        if not payment_method_types:
+            payment_method_types = ['card']
         
         if tier_name and not price_id:
             price_id = stripe_manager.get_price_id(tier_name, billing_period)
@@ -413,7 +419,8 @@ def create_checkout_session():
             price_id=price_id,
             success_url=f"{frontend_url}/dashboard?success=true",
             cancel_url=f"{frontend_url}/pricing?canceled=true",
-            trial_days=14 if use_trial else 0
+            trial_days=14 if use_trial else 0,
+            payment_method_types=payment_method_types,
         )
         
         return jsonify({'success': True, 'checkout_url': session['url'], 'session_id': session['session_id']})
@@ -933,7 +940,12 @@ def create_setup_intent():
             }), 200
         
         data = request.get_json() or {}
-        payment_method_types = data.get('payment_method_types', ['card', 'us_bank_account'])
+        requested_types = data.get('payment_method_types', ['card', 'us_bank_account'])
+        if not isinstance(requested_types, list):
+            requested_types = ['card', 'us_bank_account']
+        payment_method_types = [pm for pm in requested_types if pm in ('card', 'us_bank_account')]
+        if not payment_method_types:
+            payment_method_types = ['card']
         
         try:
             customer_id = get_stripe_customer_id(user_email, user_id)
@@ -965,6 +977,55 @@ def create_setup_intent():
             }), 200
     except Exception as e:
         logger.error(f"Failed to create setup intent: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@billing_bp.route('/setup-checkout', methods=['POST'])
+@jwt_required()
+def create_setup_checkout_session():
+    """Create Stripe Checkout setup-mode session for card or ACH collection."""
+    try:
+        user_id = get_jwt_identity()
+        user_email = get_user_email(user_id)
+        if not user_email:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+
+        if not STRIPE_AVAILABLE:
+            return jsonify({
+                'success': False,
+                'error': 'Stripe is not configured on this server.',
+                'error_code': 'STRIPE_UNAVAILABLE',
+            }), 200
+
+        data = request.get_json() or {}
+        requested_types = data.get('payment_method_types', ['card'])
+        if not isinstance(requested_types, list):
+            requested_types = ['card']
+        payment_method_types = [pm for pm in requested_types if pm in ('card', 'us_bank_account')]
+        if not payment_method_types:
+            payment_method_types = ['card']
+
+        customer_id = get_stripe_customer_id(user_email, user_id)
+        if not customer_id:
+            customer = stripe_manager.create_customer(
+                email=user_email,
+                name=_stripe_customer_display_name(user_id, user_email),
+                metadata={'user_id': str(user_id)}
+            )
+            customer_id = customer['id']
+
+        frontend_url = (current_app.config.get('FRONTEND_URL') or Config.FRONTEND_URL).rstrip('/')
+        success_url = f"{frontend_url}/billing?setup=success"
+        cancel_url = f"{frontend_url}/billing?setup=cancelled"
+        session = stripe_manager.create_setup_checkout_session(
+            customer_id=customer_id,
+            payment_method_types=payment_method_types,
+            success_url=success_url,
+            cancel_url=cancel_url,
+        )
+        return jsonify({'success': True, 'url': session.get('url'), 'session_id': session.get('session_id')})
+    except Exception as e:
+        logger.error(f"Failed to create setup checkout session: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @billing_bp.route('/customer/<customer_id>/entitlements', methods=['GET'])

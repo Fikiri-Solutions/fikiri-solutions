@@ -238,7 +238,7 @@ const PricingPage: React.FC = () => {
         </div>
         <div className="relative z-10">
       {/* Hero Section */}
-      <section ref={heroRef} className="relative py-16 sm:py-20 z-10">
+      <section ref={heroRef} className="relative py-12 sm:py-20 z-10">
         <Container>
           <div className="max-w-4xl mx-auto text-center">
             <motion.div
@@ -246,17 +246,17 @@ const PricingPage: React.FC = () => {
               animate={heroInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
               transition={{ duration: 0.8 }}
             >
-              <h1 className="text-4xl sm:text-6xl font-bold mb-6 text-foreground">
+              <h1 className="text-3xl sm:text-6xl font-bold mb-6 text-foreground">
                 Plans for businesses of any size
               </h1>
-              <p className="text-xl text-muted-foreground mb-4">
+              <p className="text-lg sm:text-xl text-muted-foreground mb-4">
                 Get all the Fikiri Solutions features — pay for what you use
               </p>
               <p className="text-sm text-muted-foreground mb-4">
                 Verified now: core CRM, lead capture, and core automation actions. Optional integrations: Gmail, Outlook, Twilio, Slack, Stripe.
                 Some advanced automation actions are marked partial or coming soon.
               </p>
-              <p className="text-sm text-muted-foreground mb-8">
+              <p className="text-sm text-muted-foreground mb-8 px-2 sm:px-0">
                 {purchaseType === 'trial' ? (
                   <span className="inline-flex items-center gap-2">
                     <CreditCard className="w-4 h-4" />
@@ -278,10 +278,10 @@ const PricingPage: React.FC = () => {
               transition={{ duration: 0.8, delay: 0.2 }}
               className="flex flex-col items-center justify-center mb-8 gap-4"
             >
-              <div className="bg-card/90 backdrop-blur-sm rounded-lg p-1 border border-border shadow-sm">
+              <div className="bg-card/90 backdrop-blur-sm rounded-lg p-1 border border-border shadow-sm flex flex-col sm:flex-row w-full sm:w-auto">
                 <button
                   onClick={() => setBillingPeriod('monthly')}
-                  className={`px-6 py-2 rounded-md font-medium transition-all duration-300 ${
+                  className={`px-4 sm:px-6 py-2 rounded-md font-medium transition-all duration-300 ${
                     billingPeriod === 'monthly'
                       ? 'bg-brand-primary text-white'
                       : 'text-foreground hover:bg-muted'
@@ -291,7 +291,7 @@ const PricingPage: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setBillingPeriod('yearly')}
-                  className={`px-6 py-2 rounded-md font-medium transition-all duration-300 ${
+                  className={`px-4 sm:px-6 py-2 rounded-md font-medium transition-all duration-300 ${
                     billingPeriod === 'yearly'
                       ? 'bg-brand-primary text-white'
                       : 'text-foreground hover:bg-muted'
@@ -302,10 +302,10 @@ const PricingPage: React.FC = () => {
                 </button>
               </div>
 
-              <div className="bg-card/90 backdrop-blur-sm rounded-lg p-1 border border-border shadow-sm">
+              <div className="bg-card/90 backdrop-blur-sm rounded-lg p-1 border border-border shadow-sm flex flex-col sm:flex-row w-full sm:w-auto">
                 <button
                   onClick={() => setPurchaseType('trial')}
-                  className={`px-6 py-2 rounded-md font-medium transition-all duration-300 ${
+                  className={`px-4 sm:px-6 py-2 rounded-md font-medium transition-all duration-300 ${
                     purchaseType === 'trial'
                       ? 'bg-brand-primary text-white'
                       : 'text-foreground hover:bg-muted'
@@ -316,7 +316,7 @@ const PricingPage: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setPurchaseType('immediate')}
-                  className={`px-6 py-2 rounded-md font-medium transition-all duration-300 ${
+                  className={`px-4 sm:px-6 py-2 rounded-md font-medium transition-all duration-300 ${
                     purchaseType === 'immediate'
                       ? 'bg-brand-primary text-white'
                       : 'text-foreground hover:bg-muted'
@@ -331,17 +331,17 @@ const PricingPage: React.FC = () => {
       </section>
 
       {/* Pricing Cards - Radiant-style gradient behind */}
-      <section ref={pricingRef} className="relative py-20 z-10">
+      <section ref={pricingRef} className="relative py-14 sm:py-20 z-10 overflow-x-hidden">
         <Gradient className="absolute inset-x-2 top-24 bottom-0 rounded-3xl ring-1 ring-black/5 ring-inset opacity-30" />
         <Container className="relative">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
             {pricingTiers.map((tier, index) => (
               <motion.div
                 key={tier.name}
                 initial={{ opacity: 0, y: 30 }}
                 animate={pricingInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
                 transition={{ duration: 0.8, delay: index * 0.1 }}
-                className={`relative bg-card/90 backdrop-blur-sm rounded-2xl p-8 border border-border shadow-lg ring-1 ring-black/5 transition-all duration-300 hover:shadow-xl ${
+                className={`relative min-w-0 bg-card/90 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-border shadow-lg ring-1 ring-black/5 transition-all duration-300 hover:shadow-xl ${
                   tier.highlighted
                     ? 'ring-2 ring-brand-primary/30'
                     : 'hover:border-brand-primary/30'
@@ -365,11 +365,11 @@ const PricingPage: React.FC = () => {
                   <p className="text-muted-foreground text-sm">{tier.description}</p>
                 </div>
 
-                <ul className="space-y-3 mb-8">
+                <ul className="space-y-3 mb-8 min-w-0">
                   {tier.features.map((feature, featureIndex) => (
-                    <li key={featureIndex} className="flex items-center text-foreground">
+                    <li key={featureIndex} className="flex items-center text-foreground min-w-0">
                       <Check className="w-5 h-5 text-green-600 mr-3 flex-shrink-0" />
-                      <span className="text-sm text-foreground">{feature}</span>
+                      <span className="text-sm text-foreground break-words">{feature}</span>
                     </li>
                   ))}
                 </ul>
@@ -403,7 +403,7 @@ const PricingPage: React.FC = () => {
                     await handleCheckout(tier.name.toLowerCase());
                   }}
                   disabled={loadingTier === tier.name}
-                  className={`w-full py-3 px-6 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${tier.buttonStyle}`}
+                  className={`w-full py-3 px-6 rounded-lg font-semibold transition-all duration-300 sm:transform sm:hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${tier.buttonStyle}`}
                 >
                   {loadingTier === tier.name ? (
                     <>
@@ -423,8 +423,108 @@ const PricingPage: React.FC = () => {
         </Container>
       </section>
 
+      {/* Consultation & Implementation Services */}
+      <section className="relative py-14 sm:py-20 z-10">
+        <Container>
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={featuresInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
+            transition={{ duration: 0.8 }}
+            className="text-center mb-12"
+          >
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-foreground">
+              Consultation & Implementation
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+              Subscription gives you platform access. Consultation covers hands-on setup so your CRM, inbox, and
+              automation work reliably for your team.
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="bg-card/90 backdrop-blur-sm rounded-2xl p-6 border border-border shadow-sm">
+              <h3 className="text-xl font-semibold text-foreground mb-3">Workflow Diagnostic</h3>
+              <p className="text-muted-foreground text-sm mb-4">
+                We review one part of your business from start to finish and show where time is being lost.
+              </p>
+              <ul className="space-y-2 text-sm text-foreground">
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-green-600" />
+                  Simple map of how work happens now vs. how it should work
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-green-600" />
+                  Clear checklist of what can be automated now (and what should wait)
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-green-600" />
+                  Realistic estimate of time and cost savings
+                </li>
+              </ul>
+            </div>
+
+            <div className="bg-card/90 backdrop-blur-sm rounded-2xl p-6 border border-border shadow-sm">
+              <h3 className="text-xl font-semibold text-foreground mb-3">Foundations Sprint</h3>
+              <p className="text-muted-foreground text-sm mb-4">
+                We clean up your CRM and inbox so automation works reliably.
+              </p>
+              <ul className="space-y-2 text-sm text-foreground">
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-green-600" />
+                  Clear rules for who owns each lead and next step
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-green-600" />
+                  Better email routing and response templates
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-green-600" />
+                  3-5 simple numbers to track progress
+                </li>
+              </ul>
+            </div>
+
+            <div className="bg-card/90 backdrop-blur-sm rounded-2xl p-6 border border-border shadow-sm">
+              <h3 className="text-xl font-semibold text-foreground mb-3">Automation Build Sprint</h3>
+              <p className="text-muted-foreground text-sm mb-4">
+                We build one automation from start to finish, train your team, and support rollout.
+              </p>
+              <ul className="space-y-2 text-sm text-foreground">
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-green-600" />
+                  End-to-end automation delivery
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-green-600" />
+                  Live testing with your real scenarios
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-green-600" />
+                  30 days of in-scope fixes after launch
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-8 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-orange-900 dark:text-orange-200">Not sure where to start?</p>
+              <p className="text-sm text-orange-800 dark:text-orange-300">
+                Book a consultation and we will tell you if a diagnostic is the right next step.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/support/contact')}
+              className="px-4 py-2 bg-brand-primary hover:bg-fikiri-400 text-white font-medium rounded-lg transition-all duration-300"
+            >
+              Book Consultation
+            </button>
+          </div>
+        </Container>
+      </section>
+
       {/* Feature Comparison */}
-      <section ref={featuresRef} className="relative py-20 z-10">
+      <section ref={featuresRef} className="relative py-14 sm:py-20 z-10">
         <Container>
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -508,7 +608,7 @@ const PricingPage: React.FC = () => {
       </section>
 
       {/* CTA Section - Radiant-style gradient strip */}
-      <section className="relative py-20 z-10">
+      <section className="relative py-14 sm:py-20 z-10">
         <Gradient className="absolute inset-0 opacity-20" />
         <Container className="relative">
           <div className="max-w-4xl mx-auto text-center">

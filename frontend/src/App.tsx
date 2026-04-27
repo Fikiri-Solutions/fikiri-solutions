@@ -34,6 +34,7 @@ import { Layout } from './components/Layout'
 import { UsageAnalytics } from './pages/UsageAnalytics'
 import { About } from './pages/About'
 import { Contact } from './pages/Contact'
+import { InternalContact } from './pages/InternalContact'
 import { PrivacySettings } from './components/PrivacySettings'
 import LandingPage from './pages/LandingPage'
 import InstallPage from './pages/Install'
@@ -244,6 +245,11 @@ function App() {
                           <Route path="/billing" element={
                             <ProtectedRoute>
                               <Layout><BillingPage /></Layout>
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/support/contact" element={
+                            <ProtectedRoute>
+                              <Layout><InternalContact /></Layout>
                             </ProtectedRoute>
                           } />
                           <Route path="/inbox" element={

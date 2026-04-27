@@ -223,13 +223,11 @@ export const BillingPage: React.FC = () => {
   }
 
   const handleAddPaymentMethod = async (type: 'card' | 'ach' = 'card') => {
+    const actionKey = type === 'ach' ? 'add-payment-ach' : 'add-payment-card'
     try {
-      setLoadingAction('add-payment')
-      const { client_secret } = await apiClient.createSetupIntent(type === 'ach' ? ['us_bank_account'] : ['card'])
-      
-      // Redirect to Stripe Elements or use Stripe.js to collect payment method
-      // For now, redirect to portal for adding payment methods
-      const { url } = await apiClient.createPortalSession()
+      setLoadingAction(actionKey)
+      const paymentMethodTypes = type === 'ach' ? ['us_bank_account'] : ['card']
+      const { url } = await apiClient.createSetupCheckoutSession(paymentMethodTypes)
       window.location.href = url
     } catch (error: any) {
       const msg =
@@ -241,6 +239,7 @@ export const BillingPage: React.FC = () => {
         title: 'Add Payment Method Failed',
         message: msg,
       })
+    } finally {
       setLoadingAction(null)
     }
   }
@@ -345,7 +344,7 @@ export const BillingPage: React.FC = () => {
           </div>
         ) : subscription?.subscription ? (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
               <div>
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Current Plan</h2>
                 <p className="text-gray-600 dark:text-gray-400 mt-1">
@@ -374,10 +373,10 @@ export const BillingPage: React.FC = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Current Period</p>
-                <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                <p className="text-lg font-semibold text-gray-900 dark:text-white break-words">
                   {subscription.subscription?.current_period_start && subscription.subscription?.current_period_end
                     ? `${formatDate(subscription.subscription.current_period_start)} - ${formatDate(subscription.subscription.current_period_end)}`
                     : 'N/A'}
@@ -393,7 +392,7 @@ export const BillingPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={handleManagePayment}
                 disabled={loadingAction === 'portal'}
@@ -505,7 +504,7 @@ export const BillingPage: React.FC = () => {
                 </p>
               )}
             </div>
-            <div className="flex gap-2 bg-gray-200 dark:bg-gray-700 rounded-lg p-1">
+            <div className="flex flex-wrap gap-2 bg-gray-200 dark:bg-gray-700 rounded-lg p-1 w-full sm:w-auto">
               <button
                 onClick={() => setBillingPeriod('monthly')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -562,17 +561,79 @@ export const BillingPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Consultation & Implementation Services */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Need implementation support?</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 max-w-3xl">
+            Subscription gives you platform access. Consultation covers hands-on setup so your CRM, inbox, and
+            automation work reliably for your team.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Workflow Diagnostic</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                We review one part of your business from start to finish and show where time is being lost.
+              </p>
+              <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                <li>• Simple map of how work happens now vs. how it should work</li>
+                <li>• Clear checklist of what can be automated now (and what should wait)</li>
+                <li>• Realistic estimate of time and cost savings</li>
+              </ul>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Foundations Sprint</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                We clean up your CRM and inbox so automation works reliably.
+              </p>
+              <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                <li>• Clear rules for who owns each lead and next step</li>
+                <li>• Better email routing and response templates</li>
+                <li>• 3-5 simple numbers to track progress</li>
+              </ul>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Automation Build Sprint</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                We build one automation from start to finish, train your team, and support rollout.
+              </p>
+              <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                <li>• End-to-end automation delivery</li>
+                <li>• Live testing with your real scenarios</li>
+                <li>• 30 days of in-scope fixes after launch</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-6 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-orange-900 dark:text-orange-200">Not sure where to start?</p>
+              <p className="text-sm text-orange-800 dark:text-orange-300">
+                Book a consultation and we will tell you if a diagnostic is the right next step.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/support/contact')}
+              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+            >
+              Book Consultation
+            </button>
+          </div>
+        </div>
+
         {/* Payment Methods */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Payment Methods</h2>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <button
                 onClick={() => handleAddPaymentMethod('card')}
-                disabled={loadingAction === 'add-payment'}
-                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
+                disabled={loadingAction === 'add-payment-card' || loadingAction === 'add-payment-ach'}
+                className="w-full sm:w-auto px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {loadingAction === 'add-payment' ? (
+                {loadingAction === 'add-payment-card' ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <CreditCard className="w-4 h-4" />
@@ -581,10 +642,10 @@ export const BillingPage: React.FC = () => {
               </button>
               <button
                 onClick={() => handleAddPaymentMethod('ach')}
-                disabled={loadingAction === 'add-payment'}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                disabled={loadingAction === 'add-payment-card' || loadingAction === 'add-payment-ach'}
+                className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {loadingAction === 'add-payment' ? (
+                {loadingAction === 'add-payment-ach' ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Settings className="w-4 h-4" />
@@ -602,8 +663,8 @@ export const BillingPage: React.FC = () => {
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
               <div className="divide-y divide-gray-200 dark:divide-gray-700">
                 {paymentMethods.map((pm: any) => (
-                  <div key={pm.id} className="p-6 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
+                  <div key={pm.id} className="p-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex items-start sm:items-center gap-4 min-w-0">
                       <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
                         {pm.type === 'card' ? (
                           <CreditCard className="w-6 h-6 text-gray-600 dark:text-gray-300" />
@@ -611,9 +672,9 @@ export const BillingPage: React.FC = () => {
                           <Settings className="w-6 h-6 text-gray-600 dark:text-gray-300" />
                         )}
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-gray-900 dark:text-white">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-gray-900 dark:text-white break-words">
                             {pm.type === 'card' 
                               ? `${pm.card?.brand?.toUpperCase() || 'Card'} •••• ${pm.card?.last4 || ''}`
                               : `${pm.us_bank_account?.bank_name || 'Bank'} •••• ${pm.us_bank_account?.last4 || ''}`}
@@ -636,12 +697,12 @@ export const BillingPage: React.FC = () => {
                         )}
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                       {pm.id !== (stripeCustomer?.default_payment_method as string | undefined) && (
                         <button
                           onClick={() => handleSetDefault(pm.id)}
                           disabled={loadingAction === `default-${pm.id}`}
-                          className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
+                          className="w-full sm:w-auto px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
                         >
                           {loadingAction === `default-${pm.id}` ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -653,7 +714,7 @@ export const BillingPage: React.FC = () => {
                       <button
                         onClick={() => handleRemovePaymentMethod(pm.id)}
                         disabled={loadingAction === `remove-${pm.id}`}
-                        className="px-3 py-1 text-sm bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800 disabled:opacity-50"
+                        className="w-full sm:w-auto px-3 py-1 text-sm bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800 disabled:opacity-50"
                       >
                         {loadingAction === `remove-${pm.id}` ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -748,7 +809,8 @@ export const BillingPage: React.FC = () => {
             </div>
           ) : invoices.length > 0 ? (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-              <table className="w-full">
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px]">
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Invoice</th>
@@ -794,6 +856,7 @@ export const BillingPage: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           ) : (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
@@ -812,7 +875,8 @@ export const BillingPage: React.FC = () => {
               </div>
             ) : testAccessAudit.length > 0 ? (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                <table className="w-full">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px]">
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">User</th>
@@ -844,6 +908,7 @@ export const BillingPage: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             ) : (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">

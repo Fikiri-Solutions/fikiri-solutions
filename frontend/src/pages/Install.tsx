@@ -314,7 +314,7 @@ const InstallPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
+    <div className="min-h-screen bg-gray-50 py-8 sm:py-12 px-4">
       <div className="max-w-6xl mx-auto">
         <nav
           className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm"
@@ -357,11 +357,11 @@ const InstallPage: React.FC = () => {
         </nav>
 
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+        <div className="text-center mb-10 sm:mb-12">
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
             Install Fikiri on Your Website
           </h1>
-          <p className="text-xl text-gray-600">
+          <p className="text-base sm:text-xl text-gray-600">
             Get more leads in 5 minutes. Choose your platform below.
           </p>
           {apiKeyStatus === 'loading' && (
@@ -373,36 +373,36 @@ const InstallPage: React.FC = () => {
         </div>
 
         {/* Platform Selector */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-10 sm:mb-12">
           {(Object.keys(platforms) as Platform[]).map((platform) => (
             <button
               key={platform}
               onClick={() => setSelectedPlatform(platform)}
-              className={`p-6 rounded-lg border-2 transition-all ${
+              className={`p-4 sm:p-6 rounded-lg border-2 transition-all ${
                 selectedPlatform === platform
                   ? 'border-teal-600 bg-teal-50 shadow-lg'
                   : 'border-gray-200 bg-white hover:border-gray-300'
               }`}
             >
               <div className="text-4xl mb-2">{platforms[platform].icon}</div>
-              <div className="font-semibold text-gray-900">{platforms[platform].name}</div>
+              <div className="font-semibold text-sm sm:text-base text-gray-900">{platforms[platform].name}</div>
             </button>
           ))}
         </div>
 
         {/* Installation Steps */}
-        <div className="bg-white rounded-lg shadow-xl p-8 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">
+        <div className="bg-white rounded-lg shadow-xl p-4 sm:p-8 mb-8">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
               Installing on {currentPlatform.name}
             </h2>
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-3">
               {currentPlatform.videoUrl && (
                 <a
                   href={currentPlatform.videoUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-teal-600 hover:text-teal-700"
+                  className="inline-flex min-h-[44px] items-center gap-2 text-sm text-teal-600 hover:text-teal-700"
                 >
                   <Play className="w-5 h-5" />
                   <span>2-min Video</span>
@@ -413,7 +413,7 @@ const InstallPage: React.FC = () => {
                   href={currentPlatform.demoUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-teal-600 hover:text-teal-700"
+                  className="inline-flex min-h-[44px] items-center gap-2 text-sm text-teal-600 hover:text-teal-700"
                 >
                   <ExternalLink className="w-5 h-5" />
                   <span>Live Demo</span>
@@ -424,19 +424,20 @@ const InstallPage: React.FC = () => {
 
           <div className="space-y-8">
             {currentPlatform.steps.map((step, index) => (
-              <div key={index} className="border-l-4 border-teal-500 pl-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">
+              <div key={index} className="border-l-4 border-teal-500 pl-4 sm:pl-6">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">
                   {step.title}
                 </h3>
                 
                 {step.code && (
-                  <div className="bg-gray-900 rounded-lg p-4 mb-4 relative">
+                  <div className="bg-gray-900 rounded-lg p-3 sm:p-4 pr-14 mb-4 relative">
                     <pre className="text-sm text-gray-100 overflow-x-auto">
                       <code>{step.code}</code>
                     </pre>
                     <button
                       onClick={() => handleCopy(step.code!, index)}
-                      className="absolute top-4 right-4 p-2 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors"
+                      className="absolute top-2 right-2 p-2 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors"
+                      aria-label={`Copy code for ${step.title}`}
                     >
                       {copied === `step-${index}` ? (
                         <Check className="w-5 h-5" />

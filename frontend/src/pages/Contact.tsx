@@ -28,13 +28,16 @@ export const Contact: React.FC = () => {
     }
     setLoading(true)
     try {
+      const sourceContext = '\n\n---\nContact Source: Public website contact form\nUser Stage: Prospect (not signed in)'
       const res = await apiClient.submitContact({
         name: name.trim().slice(0, LIMITS.name),
         email: email.trim().slice(0, LIMITS.email),
         phone: phone.trim() ? phone.trim().slice(0, LIMITS.phone) : undefined,
         company: company.trim() ? company.trim().slice(0, LIMITS.company) : undefined,
-        subject: subject.trim() ? subject.trim().slice(0, LIMITS.subject) : undefined,
-        message: message.trim().slice(0, LIMITS.message),
+        subject: subject.trim()
+          ? `[Prospect] ${subject.trim()}`.slice(0, LIMITS.subject)
+          : '[Prospect] General inquiry',
+        message: `${message.trim().slice(0, LIMITS.message)}${sourceContext}`,
       })
       if (res.success) {
         setSuccess(true)

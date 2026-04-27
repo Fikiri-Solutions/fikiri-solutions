@@ -18,6 +18,30 @@ class TestStripeWebhookHandler(unittest.TestCase):
         mock_h.assert_called_once()
 
     @patch("core.stripe_webhooks.stripe")
+    def test_handle_event_routes_checkout_async_success(self, mock_stripe):
+        from core.stripe_webhooks import StripeWebhookHandler
+
+        handler = StripeWebhookHandler()
+        with patch.object(handler, "handle_checkout_async_payment_succeeded", return_value={"status": "success"}) as mock_h:
+            event = {"type": "checkout.session.async_payment_succeeded", "data": {"object": {}}}
+            result = handler.handle_event(event)
+
+        self.assertEqual(result.get("status"), "success")
+        mock_h.assert_called_once()
+
+    @patch("core.stripe_webhooks.stripe")
+    def test_handle_event_routes_checkout_async_failed(self, mock_stripe):
+        from core.stripe_webhooks import StripeWebhookHandler
+
+        handler = StripeWebhookHandler()
+        with patch.object(handler, "handle_checkout_async_payment_failed", return_value={"status": "success"}) as mock_h:
+            event = {"type": "checkout.session.async_payment_failed", "data": {"object": {}}}
+            result = handler.handle_event(event)
+
+        self.assertEqual(result.get("status"), "success")
+        mock_h.assert_called_once()
+
+    @patch("core.stripe_webhooks.stripe")
     def test_handle_event_unknown_type(self, mock_stripe):
         from core.stripe_webhooks import StripeWebhookHandler
 
@@ -142,6 +166,28 @@ class TestStripeWebhookHandler(unittest.TestCase):
         handler = StripeWebhookHandler()
         result = handler.verify_webhook_signature(b"payload", "Stripe-Signature: x")
         self.assertIsNone(result)
+
+    @patch("core.stripe_webhooks.stripe")
+    def test_checkout_async_payment_succeeded_updates_subscription(self, mock_stripe):
+        from core.stripe_webhooks import StripeWebhookHandler
+        handler = StripeWebhookHandler()
+        with patch.object(handler, "_update_user_subscription") as mock_update, patch.object(handler, "_track_checkout_event") as mock_track:
+            session = {"id": "cs_1", "customer": "cus_1", "subscription": "sub_1"}
+            result = handler.handle_checkout_async_payment_succeeded(session)
+        self.assertEqual(result.get("status"), "success")
+        mock_update.assert_called_once_with("sub_1", "cus_1", "active")
+        mock_track.assert_called_once()
+
+    @patch("core.stripe_webhooks.stripe")
+    def test_checkout_async_payment_failed_marks_past_due(self, mock_stripe):
+        from core.stripe_webhooks import StripeWebhookHandler
+        handler = StripeWebhookHandler()
+        with patch.object(handler, "_update_user_subscription") as mock_update, patch.object(handler, "_track_checkout_event") as mock_track:
+            session = {"id": "cs_2", "customer": "cus_2", "subscription": "sub_2"}
+            result = handler.handle_checkout_async_payment_failed(session)
+        self.assertEqual(result.get("status"), "success")
+        mock_update.assert_called_once_with("sub_2", "cus_2", "past_due")
+        mock_track.assert_called_once()
 
 
 if __name__ == "__main__":
