@@ -72,7 +72,7 @@ pip install -r requirements.txt
 redis-server
 
 # Start backend server (database initializes on first run)
-python app.py
+PORT=5000 FLASK_ENV=development python app.py
 ```
 
 ### 4. Frontend Setup
@@ -90,9 +90,9 @@ npm run dev
 
 ### 5. Verify Installation
 
-- **Frontend**: http://localhost:5173 (Vite default)
-- **Backend**: http://localhost:8081
-- **API**: http://localhost:8081/api
+- **Frontend**: http://localhost:5174
+- **Backend**: http://localhost:5000
+- **API**: http://localhost:5000/api
 
 ## 🛠️ Development Workflow
 
@@ -272,7 +272,7 @@ python -m pdb app.py
 
 ```bash
 # Start with debug mode
-npm run dev:debug
+npm run dev
 
 # Use React DevTools browser extension
 # Use VS Code debugger for TypeScript
@@ -332,7 +332,7 @@ git push origin main
 
 ### Documentation
 
-- [API Documentation](http://localhost:8081/api/docs)
+- [API Documentation](./docs/PUBLIC_API_DOCUMENTATION.md)
 - [Component Library](http://localhost:3000/storybook)
 - [Architecture Overview](./docs/SYSTEM_ARCHITECTURE.md)
 
@@ -349,11 +349,11 @@ git push origin main
 
 1. **Port already in use**:
    ```bash
-   # Kill process on port 3000
-   lsof -ti:3000 | xargs kill -9
+   # Kill process on port 5174 (frontend)
+   lsof -ti:5174 | xargs kill -9
    
-   # Kill process on port 8081
-   lsof -ti:8081 | xargs kill -9
+   # Kill process on port 5000 (backend)
+   lsof -ti:5000 | xargs kill -9
    ```
 
 2. **Redis connection failed**:

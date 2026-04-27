@@ -89,9 +89,9 @@ fetch('https://api.fikirisolutions.com/api/webhooks/leads/capture', {
    - Add a Custom HTML block to any page
    - Paste the SDK code above
 
-**WordPress Plugin** (Planned - Coming Soon)
-- Native plugin with admin dashboard
-- Shortcodes: `[fikiri_chatbot]`, `[fikiri_lead_capture]`
+**WordPress Plugin** (Available in repo)
+- See `integrations/wordpress/fikiri-plugin.php`
+- Includes plugin settings + shortcode support
 
 ### SquareSpace
 
@@ -160,9 +160,9 @@ fetch('https://api.fikirisolutions.com/api/webhooks/leads/capture', {
    )
    ```
 
-**Replit Package** (Planned - Coming Soon)
-- Python package: `pip install fikiri-replit`
-- Helper functions and examples
+**Replit Examples** (Available in repo)
+- See `integrations/replit/README.md`
+- Includes Flask/FastAPI/basic integration examples
 
 ### Custom HTML Site
 

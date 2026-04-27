@@ -12,9 +12,9 @@
 
 **Prefer:**
 - ✅ HttpOnly, Secure, SameSite=None cookies for refresh tokens/session
-- ✅ In-memory (not localStorage) for short-lived access tokens in SPAs
+- ✅ Transitional: current frontend stores access/refresh tokens in localStorage; plan is to move fully to in-memory access tokens with cookie-only refresh/session
 - ✅ Cookies ride with credentials: 'include'
-- ✅ In-memory access tokens avoid XSS persistence
+- ✅ In-memory access tokens (target state) avoid XSS persistence
 - ✅ PKCE for OAuth (ready for implementation)
 - ✅ Refresh rotation + server session invalidation on rotate failure
 

@@ -22,7 +22,6 @@ Quick reference for project documentation. Root-level: [`README.md`](../README.m
 |-----|-------------|
 | [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md) | System architecture overview |
 | [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) | Database schema reference |
-| [CRITICAL_INTEGRATIONS_PLAN.md](CRITICAL_INTEGRATIONS_PLAN.md) | Integration priority matrix |
 | [CAPACITY_AND_SCALING_SUMMARY.md](CAPACITY_AND_SCALING_SUMMARY.md) | Capacity and scaling summary |
 | [SCHEMA_STRATEGY_LLM_DATA.md](SCHEMA_STRATEGY_LLM_DATA.md) | Schema strategy for LLM-related data |
 
@@ -78,7 +77,6 @@ Quick reference for project documentation. Root-level: [`README.md`](../README.m
 | [UPTIME_MONITORING_SETUP.md](UPTIME_MONITORING_SETUP.md) | Uptime monitoring |
 | [monitoring-metrics.md](monitoring-metrics.md) | Prometheus metrics config |
 | [DISASTER_RECOVERY_CHECKLIST.md](DISASTER_RECOVERY_CHECKLIST.md) | Disaster recovery procedures |
-| [PRODUCTION_READINESS_CHECKLIST.md](PRODUCTION_READINESS_CHECKLIST.md) | Production deployment checklist |
 | [FINANCIAL_MODEL_AND_RATE_LIMITING.md](FINANCIAL_MODEL_AND_RATE_LIMITING.md) | Pricing, cost, rate limiting, capacity |
 | [AUTOMATION_RELIABILITY.md](AUTOMATION_RELIABILITY.md) | Automation reliability |
 | [BACKGROUND_JOBS_ARCHITECTURE.md](BACKGROUND_JOBS_ARCHITECTURE.md) | Background jobs architecture |
@@ -87,7 +85,6 @@ Quick reference for project documentation. Root-level: [`README.md`](../README.m
 | [LAUNCH_CRITICAL_FIXES.md](LAUNCH_CRITICAL_FIXES.md) | Launch-critical fixes |
 | [LAUNCH_SAFE_REMAINING.md](LAUNCH_SAFE_REMAINING.md) | Post-launch safe remaining work |
 | [OPERATIONAL_SAFEGUARDS.md](OPERATIONAL_SAFEGUARDS.md) | Operational safeguards |
-| [PRODUCTION_RELEASE_NOTES.md](PRODUCTION_RELEASE_NOTES.md) | Production release notes |
 | [SLOs.md](SLOs.md) | Service level objectives |
 | [STAGING_AND_PROVIDER_READINESS.md](STAGING_AND_PROVIDER_READINESS.md) | Staging and provider readiness |
 | [WORKFLOW_DIAGNOSTIC_PLAYBOOK.md](WORKFLOW_DIAGNOSTIC_PLAYBOOK.md) | Workflow diagnostics playbook |

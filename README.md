@@ -13,15 +13,15 @@ We help small and large businesses save money through automation. Gmail and Outl
 
 2. **Start the backend:**
    ```bash
-   python app.py
+   PORT=5000 FLASK_ENV=development python app.py
    ```
-   Backend runs at `http://localhost:8081` by default (set `PORT` or `FLASK_RUN_PORT` to override). Database initializes on first run.
+   Recommended local backend is `http://localhost:5000` (frontend proxy target). Database initializes on first run.
 
 3. **Start the frontend (separate terminal):**
    ```bash
    cd frontend && npm install && npm run dev
    ```
-   Frontend runs at `http://localhost:5173` (Vite). Use the web UI to sign up, connect Gmail/Outlook, and use the dashboard.
+   Frontend runs at `http://localhost:5174` (Vite). Use the web UI to sign up, connect Gmail/Outlook, and use the dashboard.
 
 4. **Optional – Google OAuth for Gmail:**  
    Follow [Google OAuth Setup](docs/GOOGLE_OAUTH_SETUP.md) and set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` in `.env`.
@@ -73,8 +73,8 @@ Fikiri/
 
 ## 🛠️ Commands
 
-- **Backend:** `python app.py` — starts API (and SocketIO if configured) on port 8081.
-- **Frontend:** `cd frontend && npm run dev` — Vite dev server (default 5173).
+- **Backend:** `PORT=5000 FLASK_ENV=development python app.py` — recommended local API startup.
+- **Frontend:** `cd frontend && npm run dev` — Vite dev server on port 5174.
 - **Tests:** `pytest tests/ -v` (backend); `cd frontend && npm run test` (frontend).
 - **Optional CLI:** `python main_minimal.py setup` / `status` / `config` for Gmail auth and status.
 
