@@ -102,6 +102,8 @@ data/vector_db/
 frontend/playwright-report/
 frontend/test-results/
 frontend/coverage/
+frontend/dev-dist/
+frontend/lhr-*.report.html
 
 # Local / CI artifacts (not source)
 artifacts/
@@ -115,3 +117,5 @@ frontend/node_modules/
 
 # Cursor / local agent skill trees (optional copies; remove this line to track in git)
 .agents/
+.claude/
+.continue/
