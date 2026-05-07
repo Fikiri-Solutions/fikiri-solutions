@@ -46,9 +46,12 @@ def resolve_flask_limiter_storage_uri() -> str:
     Storage URI for Flask-Limiter (shared with limits library).
     Prefer Redis when REDIS_URL resolves and a client can connect; else memory://.
 
-    In development/test, default to memory:// so a bad or unreachable REDIS_URL (DNS/auth)
-    cannot 500 every request via Flask-Limiter's before_request. Opt into Redis in dev with
-    FLASK_LIMITER_USE_REDIS=1. Force memory in any environment with FIKIRI_LIMITER_MEMORY=1.
+    In ``test``, default to memory:// unless FLASK_LIMITER_USE_REDIS=1 so unit tests
+    do not require Redis. In ``development``, prefer Redis when it pings OK (avoids
+    limits MemoryStorage + threading.Timer, which can break under Sentry's threading
+    integration with RuntimeError: threads can only be started once).
+
+    Force memory in any environment with FIKIRI_LIMITER_MEMORY=1.
     """
     if os.getenv("FIKIRI_LIMITER_MEMORY", "").strip().lower() in ("1", "true", "yes"):
         return "memory://"
@@ -58,7 +61,7 @@ def resolve_flask_limiter_storage_uri() -> str:
         "true",
         "yes",
     )
-    if env in ("development", "test") and not use_redis_explicit:
+    if env == "test" and not use_redis_explicit:
         return "memory://"
     try:
         try:

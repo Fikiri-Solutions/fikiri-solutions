@@ -2043,6 +2043,27 @@ class DatabaseOptimizer:
                     self.connection_pool.putconn(conn)
                 except Exception as pool_error:
                     logger.debug("Failed to return PostgreSQL connection to pool: %s", pool_error)
+
+    def probe_database_for_health(self, max_wait_seconds: float = 2.0) -> None:
+        """
+        Lightweight DB check for load balancers and /api/health.
+
+        ``get_connection`` uses a 30s SQLite busy timeout so normal queries can wait
+        for writers; health probes should not hold gevent/async workers that long.
+        Raises on failure (caller marks DB disconnected).
+        """
+        if self.db_type == "postgresql" and self.connection_pool:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT 1")
+            return
+        busy_ms = max(int(max_wait_seconds * 1000), 100)
+        conn = sqlite3.connect(self.db_path, timeout=max_wait_seconds, check_same_thread=False)
+        try:
+            conn.execute(f"PRAGMA busy_timeout={busy_ms}")
+            conn.execute("SELECT 1")
+        finally:
+            conn.close()
     
     def encrypt_sensitive_data(self, data: str) -> str:
         """Encrypt sensitive data using Fernet encryption"""

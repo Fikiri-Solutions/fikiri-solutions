@@ -568,7 +568,7 @@ def setup_routes(app):
         redis_status = 'unknown'
         try:
             from core.database_optimization import db_optimizer
-            db_optimizer.execute_query('SELECT 1', fetch=False)
+            db_optimizer.probe_database_for_health()
             db_status = 'connected'
         except Exception:
             db_status = 'disconnected'

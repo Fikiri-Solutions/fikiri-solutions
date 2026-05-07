@@ -132,6 +132,57 @@ class MinimalAIEmailAssistant:
         if not self.is_enabled():
             return self._fallback_classification(email_content, subject)
 
+        try:
+            prompt = f"""
+            Classify this email into one of these categories:
+            - lead_inquiry: Someone interested in services/products
+            - support_request: Technical help or issue
+            - general_info: General information request
+            - complaint: Complaint or negative feedback
+            - spam: Spam or irrelevant content
+
+            Email Subject: {subject}
+            Email Content: {email_content[:500]}
+
+            Respond with JSON format:
+            {{
+                "intent": "category",
+                "confidence": 0.0-1.0,
+                "urgency": "low|medium|high",
+                "suggested_action": "action_to_take"
+            }}
+            """
+
+            result = self.router.process(
+                input_data=prompt,
+                intent="classification",
+                output_schema=EmailClassificationSchema,
+                context=self._llm_context(operation="email_classification", subject=subject),
+            )
+
+            if result.get("success") and result.get("validated"):
+                try:
+                    parsed_result = json.loads(result.get("content") or "{}")
+                    self._track_ai_usage("classify_intent", True, result.get("tokens_used", 0))
+
+                    if parsed_result.get("intent") == "lead_inquiry" and self.crm_service:
+                        self._auto_capture_lead(email_content, subject)
+
+                    logger.info("✅ Email classified as: %s via LLM router", parsed_result.get("intent"))
+                    return parsed_result
+                except json.JSONDecodeError:
+                    logger.warning("Failed to parse classification as JSON, using fallback")
+                    return self._fallback_classification(email_content, subject)
+            err_msg = result.get("error") or "Schema validation failed or empty error"
+            logger.error("❌ AI classification failed: %s", err_msg)
+            self._track_ai_usage("classify_intent", False)
+            return self._fallback_classification(email_content, subject)
+
+        except Exception as e:
+            logger.error("❌ AI classification failed: %s", e)
+            self._track_ai_usage("classify_intent", False)
+            return self._fallback_classification(email_content, subject)
+
     def analyze_incoming_email(
         self,
         *,
@@ -244,62 +295,7 @@ class MinimalAIEmailAssistant:
             body=safe_body,
             crm_lead_data=safe_crm,
         )
-        
-        try:
-            prompt = f"""
-            Classify this email into one of these categories:
-            - lead_inquiry: Someone interested in services/products
-            - support_request: Technical help or issue
-            - general_info: General information request
-            - complaint: Complaint or negative feedback
-            - spam: Spam or irrelevant content
-            
-            Email Subject: {subject}
-            Email Content: {email_content[:500]}
-            
-            Respond with JSON format:
-            {{
-                "intent": "category",
-                "confidence": 0.0-1.0,
-                "urgency": "low|medium|high",
-                "suggested_action": "action_to_take"
-            }}
-            """
-            
-            # Use LLM router (required by rulepack)
-            result = self.router.process(
-                input_data=prompt,
-                intent='classification',
-                output_schema=EmailClassificationSchema,
-                context=self._llm_context(operation='email_classification', subject=subject),
-            )
-            
-            if result['success'] and result.get('validated'):
-                try:
-                    parsed_result = json.loads(result['content'])
-                    # Track usage
-                    self._track_ai_usage("classify_intent", True, result.get('tokens_used', 0))
-                    
-                    # Auto-lead capture for lead inquiries
-                    if parsed_result.get("intent") == "lead_inquiry" and self.crm_service:
-                        self._auto_capture_lead(email_content, subject)
-                    
-                    logger.info(f"✅ Email classified as: {parsed_result.get('intent')} via LLM router")
-                    return parsed_result
-                except json.JSONDecodeError:
-                    logger.warning("Failed to parse classification as JSON, using fallback")
-                    return self._fallback_classification(email_content, subject)
-            else:
-                err_msg = result.get('error') or 'Schema validation failed or empty error'
-                logger.error(f"❌ AI classification failed: {err_msg}")
-                self._track_ai_usage("classify_intent", False)
-                return self._fallback_classification(email_content, subject)
-            
-        except Exception as e:
-            logger.error(f"❌ AI classification failed: {e}")
-            self._track_ai_usage("classify_intent", False)
-            return self._fallback_classification(email_content, subject)
-    
+
     def _auto_capture_lead(self, email_content: str, subject: str):
         """Automatically capture lead information."""
         try:
