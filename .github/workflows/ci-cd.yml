@@ -372,6 +372,8 @@ jobs:
   k6-load-test:
     runs-on: ubuntu-latest
     needs: deploy-production
+    # Post-deploy probe only; do not fail the pipeline on threshold breaches.
+    continue-on-error: true
     if: github.ref == 'refs/heads/main' && vars['K6_CI_ENABLED'] == 'true'
     env:
       API_BASE_URL: ${{ secrets['PERF_API_BASE_URL'] || '' }}

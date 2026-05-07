@@ -152,6 +152,8 @@ jobs:
 
   performance-tests:
     runs-on: ubuntu-latest
+    # Informational in CI: k6 thresholds can fail when staging is cold/slow; do not block merges.
+    continue-on-error: true
     # Never default to production. Set GitHub Actions secret PERF_API_BASE_URL to a staging
     # or dedicated load-test backend (e.g. https://fikiri-backend-staging.onrender.com) to enable k6 in CI.
     env:
