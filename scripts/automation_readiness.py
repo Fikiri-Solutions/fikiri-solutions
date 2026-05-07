@@ -81,6 +81,8 @@ SERVICE_INTEGRATIONS = {
     "security": [],
 }
 
+AI_EVAL_REQUIRED_SERVICES = {"chatbot", "mailbox_automation"}
+
 
 def _iter_files(base_dirs: Iterable[str]) -> Iterable[Path]:
     for base in base_dirs:
@@ -172,6 +174,19 @@ def _run_pytest_stability(runs: int, use_full_backend: bool = False) -> Tuple[Li
         results.append(ok)
         outputs.append(out)
     return results, outputs
+
+
+def _run_ai_eval_gate() -> Tuple[bool, str]:
+    """Run inbound email triage launch-gate eval and return pass/fail with output."""
+    cmd = ["python3", "scripts/run_email_triage_eval.py"]
+    proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
+    output = (proc.stdout or "") + (proc.stderr or "")
+    if proc.returncode != 0:
+        return False, output
+    for line in output.splitlines():
+        if "Launch gates passed:" in line:
+            return line.strip().lower().endswith("true"), output
+    return False, output
 
 
 def _check_observability(targets: List[str]) -> bool:
@@ -328,10 +343,16 @@ def _provider_contract_results() -> Dict[str, Dict[str, object]]:
     return results
 
 
-def _gate_status(tests_ok: bool, guardrails_ok: bool, integration_ok: bool, observable_ok: bool) -> str:
+def _gate_status(
+    tests_ok: bool,
+    guardrails_ok: bool,
+    integration_ok: bool,
+    observable_ok: bool,
+    ai_eval_ok: bool = True,
+) -> str:
     if not tests_ok or not guardrails_ok:
         return "NOT READY"
-    if integration_ok and observable_ok:
+    if integration_ok and observable_ok and ai_eval_ok:
         return "SELLABLE"
     return "BETA"
 
@@ -354,7 +375,14 @@ def _why_provider_missing(missing: List[str], integration_health: Dict[str, str]
     return " ".join(hints) if hints else "Check env and run contract tests."
 
 
-def _sellability_reason(service: str, status: str, integration_health: Dict[str, str], integrations: List[str], observability: bool) -> str:
+def _sellability_reason(
+    service: str,
+    status: str,
+    integration_health: Dict[str, str],
+    integrations: List[str],
+    observability: bool,
+    ai_eval_ok: bool,
+) -> str:
     """One-line reason for BETA/NOT READY (e.g. 'BETA until Gmail/Outlook tokens + contract tests')."""
     if status == "SELLABLE":
         return ""
@@ -366,8 +394,10 @@ def _sellability_reason(service: str, status: str, integration_health: Dict[str,
         if missing:
             reasons.append(f"{'/'.join(missing)} configured")
         reasons.append("contract tests")
+    if service in AI_EVAL_REQUIRED_SERVICES and not ai_eval_ok:
+        reasons.append("AI launch-gate eval")
     if not reasons:
-        return "tests or guardrails failing"
+        return " until tests or guardrails failing"
     return " until " + " + ".join(reasons)
 
 
@@ -378,6 +408,7 @@ def _print_summary(
     integration_health: Dict[str, str],
     observability: Dict[str, bool],
     provider_contract: Dict[str, Dict[str, object]],
+    ai_eval_ok: bool,
     why_beta: Optional[Dict[str, str]] = None,
 ) -> None:
     """Print human-readable per-service table and sellability lines."""
@@ -404,7 +435,14 @@ def _print_summary(
     print("\n--- Sellability ---")
     for service, integrations in SERVICE_INTEGRATIONS.items():
         status = services.get(service, "?")
-        reason = _sellability_reason(service, status, integration_health, integrations, observability.get(service, False))
+        reason = _sellability_reason(
+            service,
+            status,
+            integration_health,
+            integrations,
+            observability.get(service, False),
+            ai_eval_ok,
+        )
         line = f"  {service} = {status}{reason}"
         print(line)
     if why_beta:
@@ -419,6 +457,7 @@ def main() -> int:
     parser.add_argument("--runs", type=int, default=3, help="Number of test runs for stability")
     parser.add_argument("--full-backend", action="store_true", help="Run full backend suite (pytest -m 'not contract and not integration') instead of revenue subset")
     parser.add_argument("--summary", action="store_true", help="Print human-readable per-service table and sellability lines")
+    parser.add_argument("--skip-ai-eval", action="store_true", help="Skip AI launch-gate evaluation run")
     args = parser.parse_args()
 
     env_loaded = _load_dotenv()
@@ -468,6 +507,15 @@ def main() -> int:
     if frontend_violations:
         notes.append("Forbidden pattern: hardcoded localhost URLs in frontend")
 
+    ai_eval_output = None
+    ai_eval_ok = True
+    if not args.skip_ai_eval:
+        ai_eval_ok, ai_eval_output = _run_ai_eval_gate()
+        if ai_eval_ok:
+            notes.append("AI launch-gate eval pass")
+        else:
+            notes.append("AI launch-gate eval failed")
+
     # Guardrails: treat as OK if revenue tests stable + no forbidden patterns
     guardrails_ok = tests_stable and forbidden_ok
 
@@ -484,13 +532,23 @@ def main() -> int:
                     provider_ok = False
             integration_ok = integration_ok and provider_ok
         observable_ok = observability.get(service, False)
-        status = _gate_status(tests_stable, guardrails_ok, integration_ok, observable_ok)
+        service_ai_eval_ok = ai_eval_ok if service in AI_EVAL_REQUIRED_SERVICES else True
+        status = _gate_status(
+            tests_stable,
+            guardrails_ok,
+            integration_ok,
+            observable_ok,
+            ai_eval_ok=service_ai_eval_ok,
+        )
         services[service] = status
 
     # Explain why each BETA service is not SELLABLE (for JSON and summary)
     why_beta = {}
     for svc, integrations in SERVICE_INTEGRATIONS.items():
         if services.get(svc) != "BETA":
+            continue
+        if svc in AI_EVAL_REQUIRED_SERVICES and not ai_eval_ok:
+            why_beta[svc] = "AI launch-gate eval failed; fix offline metrics before sellable status."
             continue
         missing = [n for n in (integrations or []) if integration_health.get(n) != "connected"]
         if missing:
@@ -502,6 +560,7 @@ def main() -> int:
         _print_summary(
             services, tests_stable, guardrails_ok,
             integration_health, observability, provider_contract,
+            ai_eval_ok=ai_eval_ok,
             why_beta=why_beta or None,
         )
 
@@ -528,6 +587,12 @@ def main() -> int:
             "integration_health": integration_health,
             "providers": provider_contract,
             "observability": observability,
+            "ai_eval": {
+                "required_services": sorted(AI_EVAL_REQUIRED_SERVICES),
+                "skipped": bool(args.skip_ai_eval),
+                "passed": ai_eval_ok if not args.skip_ai_eval else None,
+                "output": ai_eval_output,
+            },
         },
     }
 

@@ -67,6 +67,7 @@ This runs:
 - **(A)** Pytest: `tests -m "not contract and not integration"` (or revenue subset with `--revenue-only`).
 - **(B)** Forbidden-patterns scan (OpenAI, prints, frontend URLs).
 - **(C)** Provider health (env + optional DB tokens).
+- **(D)** AI launch-gate eval for inbound email triage (`scripts/run_email_triage_eval.py`) for AI services.
 
 Then prints per service:
 
@@ -84,6 +85,12 @@ And a **sellability table**, e.g.:
 - Billing = BETA until Stripe keys + webhook contract tests  
 
 Exit codes: `0` = all SELLABLE; `1` = at least one BETA; `2` = at least one NOT READY.
+
+Run AI gate directly:
+
+```bash
+python3 scripts/run_email_triage_eval.py
+```
 
 ---
 

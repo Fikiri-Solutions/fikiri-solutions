@@ -1,0 +1,14 @@
+{
+  "dataset_id": "email-triage-v1",
+  "created_at": "2026-05-07T00:00:00Z",
+  "owner": "ai-engineering",
+  "cadence": "daily-offline",
+  "description": "Baseline launch-gate dataset for inbound email triage.",
+  "record_count": 20,
+  "schema_version": "1.0",
+  "notes": [
+    "This starter set is a seed baseline and should be replaced by tenant-sampled labeled data.",
+    "Adversarial and drift sets are tracked separately in subsequent versions."
+  ]
+}
+
