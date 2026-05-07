@@ -144,10 +144,10 @@ describe('Automations page', () => {
     renderWithQuery(<Automations />)
 
     expect(await screen.findByRole('heading', { name: 'Workflow Automations' })).toBeInTheDocument()
-    expect(await screen.findByRole('heading', { name: 'Gmail → CRM' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Inbound email → CRM' })).toBeInTheDocument()
     expect(await screen.findByText(/Q: 2 · R: 1 · ✓ 12 · ✗ 1/)).toBeInTheDocument()
     expect(await screen.findByText(/92% success/)).toBeInTheDocument()
-    expect(await screen.findByText('Partial (depends on configuration)')).toBeInTheDocument()
+    expect(await screen.findByText(/Partial · needs Slack/)).toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: 'Recent executions' })).toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: 'Suggested automations' })).toBeInTheDocument()
     const guided = await screen.findByRole('link', { name: /Capture leads from email/i })
