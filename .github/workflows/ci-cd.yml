@@ -71,8 +71,6 @@ jobs:
   # Backend Tests and Build
   backend:
     runs-on: ubuntu-latest
-    env:
-      FERNET_KEY: "dKxuXPyNhHB-eRv-rPD_EYz0S088dRI6NOrlXO5eV_I="
     defaults:
       run:
         working-directory: ./
@@ -91,6 +89,10 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Set CI Fernet key
+      run: |
+        echo "FERNET_KEY=$(python3 -c 'import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())')" >> "$GITHUB_ENV"
     
     - name: Setup Python
       uses: actions/setup-python@v4
@@ -175,7 +177,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [frontend, backend]
     env:
-      LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN || '' }}
+      LHCI_GITHUB_APP_TOKEN: ${{ secrets['LHCI_GITHUB_APP_TOKEN'] || '' }}
     
     steps:
     - name: Checkout code
@@ -209,8 +211,8 @@ jobs:
     if: github.ref == 'refs/heads/main'
     environment: production
     env:
-      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME || '' }}
-      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD || '' }}
+      DOCKER_USERNAME: ${{ secrets['DOCKER_USERNAME'] || '' }}
+      DOCKER_PASSWORD: ${{ secrets['DOCKER_PASSWORD'] || '' }}
     
     steps:
     - name: Checkout code
@@ -244,9 +246,9 @@ jobs:
     if: github.ref == 'refs/heads/develop'
     environment: staging
     env:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN || '' }}
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID || '' }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID || '' }}
+      VERCEL_TOKEN: ${{ secrets['VERCEL_TOKEN'] || '' }}
+      VERCEL_ORG_ID: ${{ secrets['VERCEL_ORG_ID'] || '' }}
+      VERCEL_PROJECT_ID: ${{ secrets['VERCEL_PROJECT_ID'] || '' }}
     
     steps:
     - name: Checkout code
@@ -255,8 +257,8 @@ jobs:
     - name: Deploy to Render (Staging)
       if: github.ref == 'refs/heads/develop'
       env:
-        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY || '' }}
-        RENDER_STAGING_SERVICE_ID: ${{ secrets.RENDER_STAGING_SERVICE_ID || '' }}
+        RENDER_API_KEY: ${{ secrets['RENDER_API_KEY'] || '' }}
+        RENDER_STAGING_SERVICE_ID: ${{ secrets['RENDER_STAGING_SERVICE_ID'] || '' }}
       run: |
         if [ -n "$RENDER_API_KEY" ] && [ -n "$RENDER_STAGING_SERVICE_ID" ]; then
           curl -sS -X POST "https://api.render.com/v1/services/$RENDER_STAGING_SERVICE_ID/deploys" \
@@ -269,18 +271,20 @@ jobs:
     # --prod deploys that project's production URL (not the same as app production).
     - name: Deploy to Vercel (Staging)
       if: github.ref == 'refs/heads/develop'
-      uses: amondnet/vercel-action@v25
-      with:
-        vercel-token: ${{ env.VERCEL_TOKEN }}
-        vercel-org-id: ${{ env.VERCEL_ORG_ID }}
-        vercel-project-id: ${{ env.VERCEL_PROJECT_ID }}
-        working-directory: ./frontend
-        vercel-args: '--prod'
+      run: |
+        if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ]; then
+          npm install -g vercel@latest
+          cd frontend
+          vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
+          vercel deploy --prod --yes --token "$VERCEL_TOKEN"
+        else
+          echo "Skipping Vercel deploy (missing VERCEL_TOKEN/VERCEL_ORG_ID/VERCEL_PROJECT_ID)"
+        fi
     
     - name: Health check (staging API)
       if: github.ref == 'refs/heads/develop'
       env:
-        RENDER_STAGING_URL: ${{ secrets.RENDER_STAGING_URL || '' }}
+        RENDER_STAGING_URL: ${{ secrets['RENDER_STAGING_URL'] || '' }}
       run: |
         if [ -n "$RENDER_STAGING_URL" ]; then
           sleep 60
@@ -294,9 +298,9 @@ jobs:
     if: github.ref == 'refs/heads/main'
     environment: production
     env:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN || '' }}
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID || '' }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID || '' }}
+      VERCEL_TOKEN: ${{ secrets['VERCEL_TOKEN'] || '' }}
+      VERCEL_ORG_ID: ${{ secrets['VERCEL_ORG_ID'] || '' }}
+      VERCEL_PROJECT_ID: ${{ secrets['VERCEL_PROJECT_ID'] || '' }}
     
     steps:
     - name: Checkout code
@@ -305,8 +309,8 @@ jobs:
     - name: Deploy to Render (Production)
       if: github.ref == 'refs/heads/main'
       env:
-        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY || '' }}
-        RENDER_PRODUCTION_SERVICE_ID: ${{ secrets.RENDER_PRODUCTION_SERVICE_ID || '' }}
+        RENDER_API_KEY: ${{ secrets['RENDER_API_KEY'] || '' }}
+        RENDER_PRODUCTION_SERVICE_ID: ${{ secrets['RENDER_PRODUCTION_SERVICE_ID'] || '' }}
       run: |
         if [ -n "$RENDER_API_KEY" ] && [ -n "$RENDER_PRODUCTION_SERVICE_ID" ]; then
           curl -sS -X POST "https://api.render.com/v1/services/$RENDER_PRODUCTION_SERVICE_ID/deploys" \
@@ -317,19 +321,21 @@ jobs:
     
     - name: Deploy to Vercel (Production)
       if: github.ref == 'refs/heads/main'
-      uses: amondnet/vercel-action@v25
-      with:
-        vercel-token: ${{ env.VERCEL_TOKEN }}
-        vercel-org-id: ${{ env.VERCEL_ORG_ID }}
-        vercel-project-id: ${{ env.VERCEL_PROJECT_ID }}
-        working-directory: ./frontend
-        vercel-args: '--prod'
+      run: |
+        if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ]; then
+          npm install -g vercel@latest
+          cd frontend
+          vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
+          vercel deploy --prod --yes --token "$VERCEL_TOKEN"
+        else
+          echo "Skipping Vercel deploy (missing VERCEL_TOKEN/VERCEL_ORG_ID/VERCEL_PROJECT_ID)"
+        fi
     
     - name: API health, migrations, cache (production)
       if: github.ref == 'refs/heads/main'
       env:
-        PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL || '' }}
-        BACKEND_URL: ${{ secrets.BACKEND_URL || '' }}
+        PRODUCTION_BASE_URL: ${{ secrets['PRODUCTION_BASE_URL'] || '' }}
+        BACKEND_URL: ${{ secrets['BACKEND_URL'] || '' }}
       run: |
         BASE="${PRODUCTION_BASE_URL:-$BACKEND_URL}"
         if [ -z "$BASE" ]; then
@@ -344,8 +350,8 @@ jobs:
     - name: Smoke tests (frontend + backend URLs)
       if: github.ref == 'refs/heads/main'
       env:
-        BACKEND_URL: ${{ secrets.BACKEND_URL || '' }}
-        FRONTEND_URL: ${{ secrets.FRONTEND_URL || '' }}
+        BACKEND_URL: ${{ secrets['BACKEND_URL'] || '' }}
+        FRONTEND_URL: ${{ secrets['FRONTEND_URL'] || '' }}
       run: |
         if [ -n "$BACKEND_URL" ] && [ -n "$FRONTEND_URL" ]; then
           sleep 30
@@ -356,7 +362,7 @@ jobs:
     - name: Notify deployment success
       if: always() && github.event_name != 'pull_request'
       env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}
+        SLACK_WEBHOOK_URL: ${{ secrets['SLACK_WEBHOOK_URL'] || '' }}
       run: |
         if [ -n "$SLACK_WEBHOOK_URL" ]; then
           curl -sS -X POST -H 'Content-type: application/json' \
@@ -368,9 +374,9 @@ jobs:
   k6-load-test:
     runs-on: ubuntu-latest
     needs: deploy-production
-    if: github.ref == 'refs/heads/main' && vars.K6_CI_ENABLED == 'true'
+    if: github.ref == 'refs/heads/main' && vars['K6_CI_ENABLED'] == 'true'
     env:
-      API_BASE_URL: ${{ secrets.PERF_API_BASE_URL || '' }}
+      API_BASE_URL: ${{ secrets['PERF_API_BASE_URL'] || '' }}
     
     steps:
     - uses: actions/checkout@v4
@@ -404,8 +410,8 @@ jobs:
     
     - name: Rollback Render deployment
       env:
-        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY || '' }}
-        RENDER_PRODUCTION_SERVICE_ID: ${{ secrets.RENDER_PRODUCTION_SERVICE_ID || '' }}
+        RENDER_API_KEY: ${{ secrets['RENDER_API_KEY'] || '' }}
+        RENDER_PRODUCTION_SERVICE_ID: ${{ secrets['RENDER_PRODUCTION_SERVICE_ID'] || '' }}
         DEPLOY_ID: ${{ github.event.inputs.deploy_id }}
       run: |
         if [ -n "$RENDER_API_KEY" ] && [ -n "$RENDER_PRODUCTION_SERVICE_ID" ] && [ -n "$DEPLOY_ID" ]; then
@@ -418,7 +424,7 @@ jobs:
     - name: Rollback Vercel deployment
       if: github.event.inputs.vercel_deployment_id != ''
       env:
-        VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN || '' }}
+        VERCEL_TOKEN: ${{ secrets['VERCEL_TOKEN'] || '' }}
         VERCEL_DEPLOYMENT_ID: ${{ github.event.inputs.vercel_deployment_id }}
       run: |
         if [ -n "$VERCEL_TOKEN" ]; then
@@ -429,7 +435,7 @@ jobs:
     - name: Notify rollback
       if: always() && github.event_name == 'workflow_dispatch'
       env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}
+        SLACK_WEBHOOK_URL: ${{ secrets['SLACK_WEBHOOK_URL'] || '' }}
       run: |
         if [ -n "$SLACK_WEBHOOK_URL" ]; then
           curl -sS -X POST -H 'Content-type: application/json' \
