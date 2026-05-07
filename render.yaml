@@ -16,8 +16,9 @@ services:
         value: production
       - key: SECRET_KEY
         generateValue: true
+      # Set in Render dashboard: Supabase Postgres URI (Session pooler or direct :5432), not SUPABASE_URL.
       - key: DATABASE_URL
-        value: sqlite:///data/fikiri.db
+        sync: false
       - key: REDIS_URL
         sync: false
       - key: WEB_CONCURRENCY

@@ -38,8 +38,9 @@ def allow_request_user_id_fallback() -> bool:
 
 def _validate_active_user(user_id: int) -> bool:
     try:
+        active = db_optimizer.sql_cast_int_eq_one("is_active")
         rows = db_optimizer.execute_query(
-            "SELECT id FROM users WHERE id = ? AND is_active = 1 LIMIT 1",
+            f"SELECT id FROM users WHERE id = ? AND {active} LIMIT 1",
             (user_id,),
         )
         return bool(rows)

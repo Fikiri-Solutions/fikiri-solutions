@@ -71,6 +71,7 @@ numpy<2.0
 
 # Database and Caching
 SQLAlchemy>=2.0.0
+psycopg2-binary>=2.9.9
 redis>=4.0.0
 psutil>=5.9.0
 

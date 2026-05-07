@@ -1104,7 +1104,8 @@ class AutomationEngine:
                 params.append(rule_id)
             
             if slug:
-                query += " AND json_extract(ar.action_parameters, '$.slug') = ?"
+                slug_expr = db_optimizer.json_field_expr("ar.action_parameters", "$.slug")
+                query += f" AND {slug_expr} = ?"
                 params.append(slug)
             
             query += " ORDER BY ae.executed_at DESC LIMIT ?"

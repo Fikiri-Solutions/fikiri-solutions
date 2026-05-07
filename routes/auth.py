@@ -384,9 +384,10 @@ def api_resend_email_verification():
         if not user_id:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
 
+        active = db_optimizer.sql_cast_int_eq_one("is_active")
         user_rows = db_optimizer.execute_query(
-            "SELECT id, email, name, email_verified FROM users WHERE id = ? AND is_active = 1",
-            (user_id,)
+            f"SELECT id, email, name, email_verified FROM users WHERE id = ? AND {active}",
+            (user_id,),
         )
         if not user_rows:
             return create_error_response("User not found", 404, 'USER_NOT_FOUND')
@@ -470,8 +471,8 @@ def api_reset_password():
     
     # Find user with this reset token
     user_data = db_optimizer.execute_query(
-        "SELECT id, email, metadata FROM users WHERE json_extract(metadata, '$.reset_token') = ? AND is_active = 1",
-        (token,)
+        f"SELECT id, email, metadata FROM users WHERE {db_optimizer.json_field_expr('metadata', '$.reset_token')} = ? AND is_active",
+        (token,),
     )
     
     if not user_data:
@@ -570,8 +571,9 @@ def refresh_token():
         user_id = payload["user_id"]
         user_data = None
         try:
+            active = db_optimizer.sql_cast_int_eq_one("is_active")
             user_rows = db_optimizer.execute_query(
-                "SELECT id, email, name, role FROM users WHERE id = ? AND is_active = 1",
+                f"SELECT id, email, name, role FROM users WHERE id = ? AND {active}",
                 (user_id,),
             )
             if user_rows:

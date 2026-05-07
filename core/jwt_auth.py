@@ -99,12 +99,24 @@ class JWTAuthManager:
             
             # Add device_id column if it doesn't exist (schema migration)
             try:
-                # Check if device_id column already exists
-                existing_columns = db_optimizer.execute_query("""
-                    PRAGMA table_info(refresh_tokens)
-                """)
-                column_names = [col[1] for col in existing_columns] if existing_columns else []
-                
+                if db_optimizer.db_type == "postgresql":
+                    cols = db_optimizer.execute_query(
+                        """
+                        SELECT column_name FROM information_schema.columns
+                        WHERE table_schema = 'public' AND table_name = 'refresh_tokens'
+                        ORDER BY ordinal_position
+                        """
+                    )
+                    column_names = [
+                        (c.get("column_name") if isinstance(c, dict) else c[0])
+                        for c in (cols or [])
+                    ]
+                else:
+                    existing_columns = db_optimizer.execute_query(
+                        "PRAGMA table_info(refresh_tokens)"
+                    )
+                    column_names = [col[1] for col in existing_columns] if existing_columns else []
+
                 if "device_id" not in column_names:
                     db_optimizer.execute_query("""
                         ALTER TABLE refresh_tokens ADD COLUMN device_id TEXT
@@ -253,8 +265,9 @@ class JWTAuthManager:
             
             # Check if user still exists and is active
             # Rulepack compliance: specific columns, not SELECT *
+            active = db_optimizer.sql_cast_int_eq_one("is_active")
             user_data = db_optimizer.execute_query(
-                "SELECT id, email, name, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE id = ? AND is_active = 1",
+                f"SELECT id, email, name, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE id = ? AND {active}",
                 (payload['user_id'],)
             )
             
@@ -295,13 +308,13 @@ class JWTAuthManager:
         try:
             # Hash the refresh token
             token_hash = self._hash_token(refresh_token)
-            
-            # Find refresh token in database
-            token_data = db_optimizer.execute_query("""
+            exp_ok = db_optimizer.sql_timestamp_gt_now("rt.expires_at")
+            u_active = db_optimizer.sql_cast_int_eq_one("u.is_active")
+            token_data = db_optimizer.execute_query(f"""
                 SELECT rt.*, u.* FROM refresh_tokens rt
                 JOIN users u ON rt.user_id = u.id
-                WHERE rt.token_hash = ? AND rt.is_revoked = FALSE 
-                AND datetime(rt.expires_at) > datetime('now') AND u.is_active = 1
+                WHERE rt.token_hash = ? AND rt.is_revoked = FALSE
+                AND {exp_ok} AND {u_active}
             """, (token_hash,))
             
             if not token_data:
@@ -473,9 +486,10 @@ class JWTAuthManager:
     def cleanup_expired_tokens(self):
         """Clean up expired refresh tokens"""
         try:
-            db_optimizer.execute_query("""
-                DELETE FROM refresh_tokens 
-                WHERE datetime(expires_at) < datetime('now') OR is_revoked = TRUE
+            expired = db_optimizer.sql_timestamp_lt_now("expires_at")
+            db_optimizer.execute_query(f"""
+                DELETE FROM refresh_tokens
+                WHERE ({expired}) OR is_revoked = TRUE
             """, fetch=False)
             
             logger.info("✅ Expired tokens cleaned up")

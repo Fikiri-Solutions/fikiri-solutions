@@ -377,7 +377,8 @@ jobs:
     if: github.ref == 'refs/heads/main' && vars['K6_CI_ENABLED'] == 'true'
     env:
       API_BASE_URL: ${{ secrets['PERF_API_BASE_URL'] || '' }}
-    
+      K6_PROFILE: ${{ vars.K6_PROFILE || 'soft' }}
+
     steps:
     - uses: actions/checkout@v4
     

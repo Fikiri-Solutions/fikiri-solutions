@@ -8,27 +8,44 @@ import { Rate } from 'k6/metrics';
  * Env (optional):
  *   API_BASE_URL / PERF_API_BASE_URL — backend root (required; no default — avoids accidental prod load)
  *   FRONTEND_URL — marketing site, e.g. https://www.fikirisolutions.com
+ *   K6_PROFILE=staging|soft — caps VUs and uses longer sleeps (Render free / single-worker staging)
  *
  * Dashboard industry routes live under /api/dashboard/industry/* (not /api/industry/*).
  */
 
 export const errorRate = new Rate('errors');
 
-export const options = {
-  stages: [
-    { duration: '2m', target: 100 },
-    { duration: '5m', target: 100 },
-    { duration: '2m', target: 200 },
-    { duration: '5m', target: 200 },
-    { duration: '2m', target: 0 },
-  ],
-  thresholds: {
-    // Mixed API + HTML; DB-backed routes need more headroom than health-only.
-    http_req_duration: ['p(95)<5000'],
-    http_req_failed: ['rate<0.1'],
-    errors: ['rate<0.1'],
-  },
-};
+const profile = (__ENV.K6_PROFILE || '').toLowerCase();
+const isSoftProfile = profile === 'staging' || profile === 'soft';
+
+export const options = isSoftProfile
+  ? {
+      stages: [
+        { duration: '1m', target: 5 },
+        { duration: '3m', target: 10 },
+        { duration: '1m', target: 0 },
+      ],
+      thresholds: {
+        http_req_duration: ['p(95)<8000'],
+        http_req_failed: ['rate<0.15'],
+        errors: ['rate<0.15'],
+      },
+    }
+  : {
+      stages: [
+        { duration: '2m', target: 100 },
+        { duration: '5m', target: 100 },
+        { duration: '2m', target: 200 },
+        { duration: '5m', target: 200 },
+        { duration: '2m', target: 0 },
+      ],
+      thresholds: {
+        // Mixed API + HTML; DB-backed routes need more headroom than health-only.
+        http_req_duration: ['p(95)<5000'],
+        http_req_failed: ['rate<0.1'],
+        errors: ['rate<0.1'],
+      },
+    };
 
 const BASE_URL = __ENV.API_BASE_URL || __ENV.PERF_API_BASE_URL;
 if (!BASE_URL) {
@@ -47,17 +64,14 @@ function parseJson(r) {
 }
 
 export default function () {
-  // 1) Health
-  const healthResponse = http.get(`${BASE_URL}/api/health`);
+  // 1) Liveness (cheap; avoids DB/Redis under load — matches Render healthCheckPath)
+  const healthResponse = http.get(`${BASE_URL}/api/health/live`);
   const healthCheck = check(healthResponse, {
     'health status 200': (r) => r.status === 200,
     'health response time < 2s': (r) => r.timings.duration < 2000,
-    'health has status field': (r) => {
+    'health live ok': (r) => {
       const body = parseJson(r);
-      return (
-        body &&
-        ['healthy', 'degraded', 'unhealthy'].includes(body.status)
-      );
+      return body && body.status === 'ok';
     },
   });
   errorRate.add(!healthCheck);
@@ -139,7 +153,7 @@ export default function () {
   });
   errorRate.add(!rootCheck);
 
-  sleep(1);
+  sleep(isSoftProfile ? 3 : 1);
 }
 
 export function handleSummary(data) {

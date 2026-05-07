@@ -227,12 +227,16 @@ class SecureSessionManager:
             
             # Fallback to database
             # Rulepack compliance: specific columns, not SELECT *
-            db_data = db_optimizer.execute_query("""
-                SELECT id, session_id, user_id, ip_address, user_agent, created_at, last_accessed, expires_at, is_active, metadata 
-                FROM secure_sessions 
-                WHERE session_id = ? AND is_active = TRUE 
-                AND datetime(expires_at) > datetime('now')
-            """, (session_id,))
+            exp_ok = db_optimizer.sql_timestamp_gt_now("expires_at")
+            db_data = db_optimizer.execute_query(
+                f"""
+                SELECT id, session_id, user_id, ip_address, user_agent, created_at, last_accessed, expires_at, is_active, metadata
+                FROM secure_sessions
+                WHERE session_id = ? AND is_active = TRUE
+                AND {exp_ok}
+                """,
+                (session_id,),
+            )
             
             if db_data:
                 session_record = db_data[0]
@@ -282,14 +286,18 @@ class SecureSessionManager:
             
             # Update database metadata
             if 'user_data' in updates:
-                db_optimizer.execute_query("""
-                    UPDATE secure_sessions 
-                    SET metadata = ?, last_accessed = datetime('now')
+                db_optimizer.execute_query(
+                    """
+                    UPDATE secure_sessions
+                    SET metadata = ?, last_accessed = CURRENT_TIMESTAMP
                     WHERE session_id = ?
-                """, (
-                    json_dumps_user_payload({'user_data': updates['user_data']}),
-                    session_id
-                ), fetch=False)
+                    """,
+                    (
+                        json_dumps_user_payload({"user_data": updates["user_data"]}),
+                        session_id,
+                    ),
+                    fetch=False,
+                )
             
             return True
             
@@ -370,11 +378,15 @@ class SecureSessionManager:
     def _update_session_access(self, session_id: str):
         """Update session last accessed time in database"""
         try:
-            db_optimizer.execute_query("""
-                UPDATE secure_sessions 
-                SET last_accessed = datetime('now')
+            db_optimizer.execute_query(
+                """
+                UPDATE secure_sessions
+                SET last_accessed = CURRENT_TIMESTAMP
                 WHERE session_id = ?
-            """, (session_id,), fetch=False)
+                """,
+                (session_id,),
+                fetch=False,
+            )
         except Exception as e:
             logger.error(f"❌ Session access update failed: {e}")
     
@@ -387,11 +399,15 @@ class SecureSessionManager:
                 logger.debug("Redis session TTL handles expiration cleanup")
             
             # Clean database
-            db_optimizer.execute_query("""
-                UPDATE secure_sessions 
-                SET is_active = FALSE 
-                WHERE datetime(expires_at) < datetime('now')
-            """, fetch=False)
+            expired = db_optimizer.sql_timestamp_lt_now("expires_at")
+            db_optimizer.execute_query(
+                f"""
+                UPDATE secure_sessions
+                SET is_active = FALSE
+                WHERE {expired}
+                """,
+                fetch=False,
+            )
             
             logger.info("✅ Expired sessions cleaned up")
             
@@ -401,13 +417,16 @@ class SecureSessionManager:
     def get_session_stats(self) -> Dict[str, Any]:
         """Get session statistics"""
         try:
-            stats = db_optimizer.execute_query("""
-                SELECT 
+            exp_ok = db_optimizer.sql_timestamp_gt_now("expires_at")
+            stats = db_optimizer.execute_query(
+                f"""
+                SELECT
                     COUNT(*) as total_sessions,
                     COUNT(CASE WHEN is_active = TRUE THEN 1 END) as active_sessions,
-                    COUNT(CASE WHEN datetime(expires_at) > datetime('now') THEN 1 END) as valid_sessions
+                    COUNT(CASE WHEN {exp_ok} THEN 1 END) as valid_sessions
                 FROM secure_sessions
-            """)
+                """
+            )
             
             if stats:
                 return stats[0]

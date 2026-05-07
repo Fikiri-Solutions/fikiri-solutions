@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Building2, TrendingUp, Settings, CheckCircle, Loader2 } from 'lucide-react';
 import { useToast } from './Toast';
 import { useAuth } from '../contexts/AuthContext';
@@ -34,103 +34,114 @@ export const IndustryAutomation: React.FC = () => {
   const [toolsUsed, setToolsUsed] = useState<any[]>([]);
   const { addToast } = useToast();
   const { user } = useAuth();
-
-  useEffect(() => {
-    fetchIndustryPrompts();
-    fetchPricingTiers();
-    fetchClientAnalytics();
-  }, [user?.id]);
-
-  const fetchIndustryPrompts = async () => {
-    setIsLoadingPrompts(true);
-    try {
-      const promptsData = await apiClient.getIndustryPrompts();
-      setPrompts(promptsData);
-    } catch (error) {
-      addToast({ 
-        type: 'error', 
-        title: 'Load Failed', 
-        message: 'Failed to load industry prompts. Using fallback data.' 
-      });
-      setPrompts({
-        real_estate: {
-          industry: 'real_estate',
-          tone: 'professional',
-          focus_areas: ['property listings', 'client consultations', 'market analysis', 'showings scheduling'],
-          tools: ['calendar', 'crm', 'property_api', 'market_data'],
-          pricing_tier: 'business'
-        },
-        enterprise_solutions: {
-          industry: 'enterprise_solutions',
-          tone: 'professional',
-          focus_areas: ['custom workflows', 'multi-industry support', 'advanced analytics', 'white-label options'],
-          tools: ['custom_api', 'white_label', 'dedicated_support', 'advanced_analytics'],
-          pricing_tier: 'enterprise'
-        }
-      })
-    } finally {
-      setIsLoadingPrompts(false);
-    }
-  };
-
-  const fetchPricingTiers = async () => {
-    setIsLoadingTiers(true);
-    try {
-      const pricing = await apiClient.getIndustryPricingTiers();
-      setPricingTiers(pricing);
-    } catch (error) {
-      addToast({ 
-        type: 'error', 
-        title: 'Load Failed', 
-        message: 'Failed to load pricing tiers. Using fallback data.' 
-      });
-      // Set fallback data
-      setPricingTiers({
-        starter: {
-          name: 'Starter',
-          price: 49,
-          responses_limit: 200,
-          features: ['Basic AI responses', 'Email automation', 'Simple CRM', '500 emails/month']
-        }
-      })
-    } finally {
-      setIsLoadingTiers(false);
-    }
-  };
-
-  const fetchClientAnalytics = async () => {
-    setIsLoadingAnalytics(true);
-    try {
-      const usage = await apiClient.getIndustryUsage(getUserId());
-      setUsageMetrics(usage as IndustryUsageMetrics);
-    } catch (error) {
-      addToast({ 
-        type: 'error', 
-        title: 'Load Failed', 
-        message: 'Failed to load analytics. Using fallback data.' 
-      });
-      // Set fallback data
-      setUsageMetrics({
-        tier: 'starter',
-        responses: 0,
-        tool_calls: 0,
-        tokens: 0,
-        monthly_cost: 29
-      })
-    } finally {
-      setIsLoadingAnalytics(false);
-    }
-  };
+  const loadGeneration = useRef(0);
 
   const getUserId = (): number => {
-    // Try to get user ID from auth context first
     if (user?.id) {
       return user.id;
     }
-    // Fallback to localStorage
     const stored = localStorage.getItem('fikiri-user-id');
-    return stored ? Number(stored) : 1; // Default to 1 if not found
+    return stored ? Number(stored) : 1;
   };
+
+  const FALLBACK_PROMPTS: Record<string, IndustryPromptConfig> = {
+    real_estate: {
+      industry: 'real_estate',
+      tone: 'professional',
+      focus_areas: ['property listings', 'client consultations', 'market analysis', 'showings scheduling'],
+      tools: ['calendar', 'crm', 'property_api', 'market_data'],
+      pricing_tier: 'business',
+    },
+    enterprise_solutions: {
+      industry: 'enterprise_solutions',
+      tone: 'professional',
+      focus_areas: ['custom workflows', 'multi-industry support', 'advanced analytics', 'white-label options'],
+      tools: ['custom_api', 'white_label', 'dedicated_support', 'advanced_analytics'],
+      pricing_tier: 'enterprise',
+    },
+  };
+
+  const FALLBACK_PRICING: Record<string, PricingTier> = {
+    starter: {
+      name: 'Starter',
+      price: 49,
+      responses_limit: 200,
+      features: ['Basic AI responses', 'Email automation', 'Simple CRM', '500 emails/month'],
+    },
+  };
+
+  const FALLBACK_USAGE: UsageMetrics = {
+    tier: 'starter',
+    responses: 0,
+    tool_calls: 0,
+    tokens: 0,
+    monthly_cost: 29,
+  };
+
+  useEffect(() => {
+    const gen = ++loadGeneration.current;
+    let cancelled = false;
+
+    setIsLoadingPrompts(true);
+    setIsLoadingTiers(true);
+    setIsLoadingAnalytics(true);
+
+    (async () => {
+      const userId = getUserId();
+      const settled = await Promise.allSettled([
+        apiClient.getIndustryPrompts(),
+        apiClient.getIndustryPricingTiers(),
+        apiClient.getIndustryUsage(userId),
+      ]);
+
+      if (cancelled || gen !== loadGeneration.current) {
+        return;
+      }
+
+      const [promptsResult, pricingResult, usageResult] = settled;
+
+      if (promptsResult.status === 'fulfilled') {
+        setPrompts(promptsResult.value);
+      } else {
+        addToast({
+          type: 'error',
+          title: 'Load Failed',
+          message: 'Failed to load industry prompts. Using fallback data.',
+        });
+        setPrompts(FALLBACK_PROMPTS);
+      }
+
+      if (pricingResult.status === 'fulfilled') {
+        setPricingTiers(pricingResult.value);
+      } else {
+        addToast({
+          type: 'error',
+          title: 'Load Failed',
+          message: 'Failed to load pricing tiers. Using fallback data.',
+        });
+        setPricingTiers(FALLBACK_PRICING);
+      }
+
+      if (usageResult.status === 'fulfilled') {
+        setUsageMetrics(usageResult.value as IndustryUsageMetrics);
+      } else {
+        addToast({
+          type: 'error',
+          title: 'Load Failed',
+          message: 'Failed to load analytics. Using fallback data.',
+        });
+        setUsageMetrics(FALLBACK_USAGE);
+      }
+
+      setIsLoadingPrompts(false);
+      setIsLoadingTiers(false);
+      setIsLoadingAnalytics(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, addToast]);
 
   const handleIndustryChat = async () => {
     if (!message.trim()) {

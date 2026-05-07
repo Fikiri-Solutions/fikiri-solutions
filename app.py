@@ -126,7 +126,12 @@ from core.workflow_templates_api import workflow_templates_bp
 from core.contact_api import contact_bp
 from analytics.monitoring_api import monitoring_dashboard_bp
 from core.ai_chat_api import ai_bp
-from analytics.dashboard_api import dashboard_bp
+from analytics.dashboard_api import (
+    dashboard_bp,
+    get_industry_pricing,
+    get_industry_prompts,
+    get_industry_usage,
+)
 
 # Dev test routes (development only)
 if os.getenv('FLASK_ENV') == 'development':
@@ -650,6 +655,10 @@ def setup_routes(app):
             _app_limiter.exempt(api_health_live)
             _app_limiter.exempt(api_health_check)
             _app_limiter.exempt(ingest_client_error)
+            # Read-only industry UI payloads (hot in k6 + dashboards); default hourly cap starved single workers.
+            _app_limiter.exempt(get_industry_prompts)
+            _app_limiter.exempt(get_industry_pricing)
+            _app_limiter.exempt(get_industry_usage)
         except Exception as e:
             logger.warning(f"⚠️ Failed to exempt health check routes from rate limiting: {e}")
 

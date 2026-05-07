@@ -8,6 +8,7 @@ import json
 import time
 import logging
 import os
+import re
 import threading
 from typing import Dict, List, Any, Optional, Tuple, Union
 from dataclasses import dataclass
@@ -31,7 +32,27 @@ except ImportError:
     POSTGRES_AVAILABLE = False
     psycopg2 = None
 
+from core.postgres_compat import (
+    PostgresBootstrapCursor,
+    adapt_qmark_params_to_psycopg2,
+    is_postgresql_dsn,
+    translate_sqlite_ddl_to_postgres,
+    should_translate_sqlite_ddl,
+)
+
 logger = logging.getLogger(__name__)
+
+
+def _production_requires_postgres_uri() -> bool:
+    """Production must use PostgreSQL (e.g. Supabase) unless explicitly overridden."""
+    if os.getenv("FLASK_ENV", "").lower() != "production":
+        return False
+    return os.getenv("FIKIRI_ALLOW_SQLITE_PRODUCTION", "").strip().lower() not in (
+        "1",
+        "true",
+        "yes",
+    )
+
 
 def safe_json(obj):
     """Convert unsupported types to JSON-friendly values."""
@@ -84,33 +105,84 @@ class DatabaseOptimizer:
     """Database optimization and performance monitoring with enterprise features"""
     
     def __init__(self, db_path: str = None, db_type: str = "sqlite"):
-        # Use persistent storage on Render, fallback to local for development
+        self.query_metrics: List[QueryMetrics] = []
+        self.max_metrics = 10000
+        self.lock = threading.Lock()
+        self._ready = False
+        self.connection_pool = None
+        self._postgres_dsn: Optional[str] = None
+
+        dsn = (os.getenv("DATABASE_URL") or "").strip()
+        force_sqlite = os.getenv("FIKIRI_FORCE_SQLITE", "").strip().lower() in ("1", "true", "yes")
+
+        if dsn and is_postgresql_dsn(dsn) and not force_sqlite and POSTGRES_AVAILABLE:
+            self.db_type = "postgresql"
+            self.db_path = dsn.split("@", 1)[-1] if "@" in dsn else "postgresql"
+            self._postgres_dsn = dsn
+            try:
+                mx = int(os.getenv("FIKIRI_POSTGRES_POOL_MAX", "12"))
+            except ValueError:
+                mx = 12
+            try:
+                self.connection_pool = psycopg2.pool.ThreadedConnectionPool(
+                    1, max(2, mx), dsn
+                )
+                logger.info(
+                    "Primary database: PostgreSQL via DATABASE_URL "
+                    "(use Supabase *Postgres* URI from Dashboard → Database → Connection string)"
+                )
+            except Exception as e:
+                logger.exception("PostgreSQL pool init failed; falling back to SQLite: %s", e)
+                self.db_type = "sqlite"
+                self._postgres_dsn = None
+                self.connection_pool = None
+            else:
+                self._initialize_database()
+                self._ready = True
+                return
+
+        if dsn and is_postgresql_dsn(dsn) and not POSTGRES_AVAILABLE:
+            logger.error(
+                "DATABASE_URL is PostgreSQL but psycopg2 is not installed; "
+                "add psycopg2-binary to requirements or unset DATABASE_URL. Using SQLite."
+            )
+
+        if _production_requires_postgres_uri():
+            if not dsn or not is_postgresql_dsn(dsn):
+                raise RuntimeError(
+                    "FLASK_ENV=production requires DATABASE_URL to be a PostgreSQL URI "
+                    "(Supabase: Project Settings → Database → Connection string / pooler). "
+                    "Set FIKIRI_ALLOW_SQLITE_PRODUCTION=1 only for emergency SQLite."
+                )
+            if force_sqlite:
+                raise RuntimeError(
+                    "FLASK_ENV=production cannot use FIKIRI_FORCE_SQLITE unless "
+                    "FIKIRI_ALLOW_SQLITE_PRODUCTION=1."
+                )
+            if not POSTGRES_AVAILABLE:
+                raise RuntimeError(
+                    "FLASK_ENV=production requires psycopg2-binary when DATABASE_URL is PostgreSQL."
+                )
+            if self.connection_pool is None:
+                raise RuntimeError(
+                    "FLASK_ENV=production: PostgreSQL pool failed to initialize; "
+                    "refusing SQLite fallback. Fix DATABASE_URL, SSL, or network."
+                )
+
+        # SQLite (default): file on disk or Render persistent disk
+        self.db_type = "sqlite"
         if db_path is None:
             if os.path.exists("/opt/render/project/data"):
                 db_path = "/opt/render/project/data/fikiri.db"
             else:
                 db_path = "data/fikiri.db"
-        
-        # Ensure the directory exists
+
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self.db_path = db_path
-        self.db_type = db_type.lower()
-        self.query_metrics: List[QueryMetrics] = []
-        self.max_metrics = 10000
-        self.lock = threading.Lock()
-        
-        # Initialize ready flag to prevent race conditions
-        self._ready = False
-        
-        # Check database integrity on startup
+
         self._check_and_repair_database()
-        
-        # Initialize database schema
         self._initialize_database()
         self._ready = True
-        
-        # Connection pooling for PostgreSQL
-        self.connection_pool = None
     
     def _check_and_repair_database(self):
         """Check database integrity and repair if corrupted"""
@@ -201,6 +273,17 @@ class DatabaseOptimizer:
     
     def _initialize_database(self):
         """Initialize database with optimized schema"""
+        if self.db_type == "postgresql":
+            with self.get_connection() as conn:
+                wrapped = PostgresBootstrapCursor(conn.cursor())
+                self._create_optimized_tables(wrapped)
+                self._create_indexes(wrapped)
+                self._create_metrics_table(wrapped)
+                self._run_migrations(wrapped)
+                conn.commit()
+            logger.info("PostgreSQL schema bootstrap complete (SQLite DDL translated + PRAGMA shim)")
+            return
+
         with self.get_connection() as conn:
             cursor = conn.cursor()
             
@@ -2032,17 +2115,24 @@ class DatabaseOptimizer:
             logger.error(f"Database connection failed after {retries} attempts: {last_error}")
             raise last_error or sqlite3.DatabaseError("Connection failed")
         finally:
-            # Ensure connection is closed for SQLite (PostgreSQL connections are returned to pool)
-            if conn and self.db_type != "postgresql":
+            if conn and self.db_type == "postgresql" and self.connection_pool:
                 try:
-                    conn.close()
-                except Exception as close_error:
-                    logger.debug("Failed to close SQLite connection: %s", close_error)
-            elif conn and self.db_type == "postgresql" and self.connection_pool:
+                    conn.commit()
+                except Exception as commit_err:
+                    logger.debug("Postgres commit on release: %s", commit_err)
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
                 try:
                     self.connection_pool.putconn(conn)
                 except Exception as pool_error:
                     logger.debug("Failed to return PostgreSQL connection to pool: %s", pool_error)
+            elif conn and self.db_type != "postgresql":
+                try:
+                    conn.close()
+                except Exception as close_error:
+                    logger.debug("Failed to close SQLite connection: %s", close_error)
 
     def probe_database_for_health(self, max_wait_seconds: float = 2.0) -> None:
         """
@@ -2064,7 +2154,32 @@ class DatabaseOptimizer:
             conn.execute("SELECT 1")
         finally:
             conn.close()
-    
+
+    def sql_cast_int_eq_one(self, column_expr: str) -> str:
+        """
+        Portable active/valid predicate: SQLite stores 0/1; PostgreSQL uses BOOLEAN.
+        ``boolean = 1`` is invalid in Postgres; CAST works for both.
+        """
+        return f"(CAST({column_expr} AS INTEGER) = 1)"
+
+    def sql_timestamp_gt_now(self, column_expr: str) -> str:
+        if self.db_type == "postgresql":
+            return f"({column_expr} > CURRENT_TIMESTAMP)"
+        return f"(datetime({column_expr}) > datetime('now'))"
+
+    def sql_timestamp_lt_now(self, column_expr: str) -> str:
+        if self.db_type == "postgresql":
+            return f"({column_expr} < CURRENT_TIMESTAMP)"
+        return f"(datetime({column_expr}) < datetime('now'))"
+
+    def sql_false_literal(self) -> str:
+        """Literal for UPDATE ... SET flag = ... (BOOLEAN vs INTEGER)."""
+        return "FALSE" if self.db_type == "postgresql" else "0"
+
+    def sql_true_literal(self) -> str:
+        """Literal for UPDATE ... SET truthy flag = ... (BOOLEAN vs INTEGER)."""
+        return "TRUE" if self.db_type == "postgresql" else "1"
+
     def encrypt_sensitive_data(self, data: str) -> str:
         """Encrypt sensitive data using Fernet encryption"""
         if not self.cipher:
@@ -2121,40 +2236,61 @@ class DatabaseOptimizer:
                 params = tuple(converted_params)
             
             with self.get_connection() as conn:
-                cursor = conn.cursor()
-                
-                if params:
-                    cursor.execute(query, params)
+                q_strip = query.strip()
+                q_upper = q_strip.upper()
+                is_select_like = q_upper.startswith(("SELECT", "PRAGMA", "WITH"))
+
+                if self.db_type == "postgresql":
+                    from psycopg2.extras import RealDictCursor
+
+                    raw = query.strip()
+                    if should_translate_sqlite_ddl(raw):
+                        q_pg = adapt_qmark_params_to_psycopg2(
+                            translate_sqlite_ddl_to_postgres(query)
+                        )
+                    else:
+                        q_pg = adapt_qmark_params_to_psycopg2(query)
+                    cursor = conn.cursor(cursor_factory=RealDictCursor)
+                    if params:
+                        cursor.execute(q_pg, params)
+                    else:
+                        cursor.execute(q_pg)
                 else:
-                    cursor.execute(query)
-                
+                    cursor = conn.cursor()
+                    if params:
+                        cursor.execute(query, params)
+                    else:
+                        cursor.execute(query)
+
                 if fetch:
-                    if query.strip().upper().startswith(('SELECT', 'PRAGMA')):
+                    if is_select_like:
                         result = cursor.fetchall()
-                        # Convert sqlite3.Row objects to dictionaries for JSON compatibility
                         if result and isinstance(result[0], sqlite3.Row):
                             result = [dict(row) for row in result]
                     else:
                         result = cursor.rowcount
                 else:
                     result = cursor.rowcount
-                
+
                 conn.commit()
                 
                 execution_time = time.time() - start_time
                 
                 # Record metrics only if ready
                 if self._ready:
-                    # Calculate rows_affected properly
-                    if fetch and query.strip().upper().startswith(('SELECT', 'PRAGMA')):
-                        # For SELECT queries, rows_affected is the number of rows returned
+                    if fetch and is_select_like:
                         rows_affected = len(result) if isinstance(result, list) else (1 if result else 0)
                     else:
-                        # For INSERT/UPDATE/DELETE, use rowcount
-                        rows_affected = cursor.rowcount if hasattr(cursor, 'rowcount') else 0
-                    
-                    self._record_query_metrics(query, execution_time, rows_affected, True, 
-                                             user_id=user_id, endpoint=endpoint)
+                        rows_affected = cursor.rowcount if hasattr(cursor, "rowcount") else 0
+
+                    self._record_query_metrics(
+                        query,
+                        execution_time,
+                        rows_affected,
+                        True,
+                        user_id=user_id,
+                        endpoint=endpoint,
+                    )
                 
                 return result
                 
@@ -2169,6 +2305,24 @@ class DatabaseOptimizer:
 
     def execute_insert_returning_id(self, query: str, params: Tuple = None) -> Optional[int]:
         """Run INSERT on a single connection and return lastrowid (SQLite). Best-effort for Postgres."""
+        if self.db_type == "postgresql":
+            from psycopg2.extras import RealDictCursor
+
+            q_pg = adapt_qmark_params_to_psycopg2(query)
+            if "RETURNING" not in q_pg.upper():
+                q_pg = q_pg.rstrip().rstrip(";") + " RETURNING id"
+            with self.get_connection() as conn:
+                cur = conn.cursor(cursor_factory=RealDictCursor)
+                if params:
+                    cur.execute(q_pg, params)
+                else:
+                    cur.execute(q_pg)
+                row = cur.fetchone()
+                conn.commit()
+                if row and row.get("id") is not None:
+                    return int(row["id"])
+            return None
+
         with self.get_connection() as conn:
             cursor = conn.cursor()
             if params:
@@ -2231,42 +2385,66 @@ class DatabaseOptimizer:
         
         # Persist metrics to database using direct connection to avoid recursion
         try:
-            import sqlite3
             import json
-            conn = sqlite3.connect(self.db_path, timeout=30.0, check_same_thread=False)
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute("PRAGMA busy_timeout=30000")
-            cursor = conn.cursor()
-            
-            # Serialize complex data types
+
             serialized_error = error
             if isinstance(error, (list, dict)):
                 serialized_error = json.dumps(error)
-            
+
             serialized_user_id = user_id
             if isinstance(user_id, (list, dict)):
                 serialized_user_id = json.dumps(user_id)
-            
+
             serialized_endpoint = endpoint
             if isinstance(endpoint, (list, dict)):
                 serialized_endpoint = json.dumps(endpoint)
-            
-            cursor.execute("""
-                INSERT INTO query_performance_log 
-                (query_hash, query_text, execution_time, rows_affected, success, error_message, user_id, endpoint)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                query_hash,
-                query[:500],  # Truncate for storage
-                execution_time,
-                rows_affected,
-                success,
-                serialized_error,
-                serialized_user_id,
-                serialized_endpoint
-            ))
-            conn.commit()
-            conn.close()
+
+            if self.db_type == "postgresql":
+                self.execute_query(
+                    """
+                    INSERT INTO query_performance_log
+                    (query_hash, query_text, execution_time, rows_affected, success, error_message, user_id, endpoint)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        query_hash,
+                        query[:500],
+                        execution_time,
+                        rows_affected,
+                        success,
+                        serialized_error,
+                        serialized_user_id,
+                        serialized_endpoint,
+                    ),
+                    fetch=False,
+                )
+            else:
+                import sqlite3
+
+                conn = sqlite3.connect(self.db_path, timeout=30.0, check_same_thread=False)
+                conn.execute("PRAGMA journal_mode=WAL")
+                conn.execute("PRAGMA busy_timeout=30000")
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    INSERT INTO query_performance_log
+                    (query_hash, query_text, execution_time, rows_affected, success, error_message, user_id, endpoint)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        query_hash,
+                        query[:500],
+                        execution_time,
+                        rows_affected,
+                        success,
+                        serialized_error,
+                        serialized_user_id,
+                        serialized_endpoint,
+                    ),
+                )
+                conn.commit()
+                conn.close()
         except Exception as e:
             logger.warning(f"Failed to persist query metrics: {e}")
     
@@ -2308,8 +2486,16 @@ class DatabaseOptimizer:
     
     def optimize_database(self) -> Dict[str, Any]:
         """Run database optimization tasks with improved size query"""
-        optimization_results = {}
-        
+        optimization_results: Dict[str, Any] = {}
+
+        if self.db_type == "postgresql":
+            with self.get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("ANALYZE")
+            optimization_results["analyze"] = "Completed"
+            optimization_results["note"] = "VACUUM/sqlite_master skipped on PostgreSQL"
+            return optimization_results
+
         with self.get_connection() as conn:
             cursor = conn.cursor()
             
@@ -2507,12 +2693,41 @@ class DatabaseOptimizer:
     def table_exists(self, table_name: str) -> bool:
         """Check if a table exists in the database"""
         try:
-            q = f"SELECT name FROM sqlite_master WHERE type='table' AND name=?;"
+            if self.db_type == "postgresql":
+                res = self.execute_query(
+                    """
+                    SELECT EXISTS (
+                      SELECT 1 FROM information_schema.tables
+                      WHERE table_schema = 'public' AND table_name = ?
+                    ) AS e
+                    """,
+                    (table_name.lower(),),
+                )
+                if not res:
+                    return False
+                row = res[0]
+                if isinstance(row, dict):
+                    v = row.get("e")
+                    return bool(v)
+                return bool(row[0])
+            q = "SELECT name FROM sqlite_master WHERE type='table' AND name=?;"
             res = self.execute_query(q, (table_name,))
             return bool(res)
         except Exception as e:
             logger.warning(f"Could not check if table {table_name} exists: {e}")
             return False
+
+    def json_field_expr(self, column: str, dotted_path: str) -> str:
+        """Portable JSON field read (SQLite json_extract vs PostgreSQL ::jsonb)."""
+        key = (dotted_path or "").strip()
+        if key.startswith("$."):
+            key = key[2:]
+        if not key or not re.match(r"^[a-zA-Z0-9_]+$", key):
+            raise ValueError("json_field_expr supports simple $.identifier paths only")
+        if self.db_type == "postgresql":
+            return f"({column}::jsonb->>'{key}')"
+        esc = (dotted_path or "").replace("'", "''")
+        return f"json_extract({column}, '{esc}')"
 
 # Global database optimizer instance
 db_optimizer = DatabaseOptimizer()

@@ -5,7 +5,9 @@ Provides /api/dashboard/metrics endpoint for frontend dashboard data
 
 import json
 import logging
-from typing import Dict, Any, List, Optional
+import threading
+import time
+from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
 
@@ -17,6 +19,11 @@ from core.billing_manager import FikiriBillingManager
 
 logger = logging.getLogger(__name__)
 billing_manager = FikiriBillingManager()
+
+# Short TTL cache: pricing tiers rarely change; k6 + dashboards hit this path heavily on single workers.
+_industry_pricing_cache: Optional[Tuple[float, Dict[str, Any]]] = None
+_industry_pricing_lock = threading.Lock()
+_INDUSTRY_PRICING_CACHE_TTL_SEC = 60.0
 
 # Align dashboard lead counts with CRM active list (withdrawn leads retained in DB)
 _LEADS_ACTIVE_FILTER = " AND (withdrawn_at IS NULL)"
@@ -774,6 +781,12 @@ def get_industry_prompts():
 @handle_api_errors
 def get_industry_pricing():
     """Get pricing tiers for industry automation UI."""
+    global _industry_pricing_cache
+    now = time.monotonic()
+    with _industry_pricing_lock:
+        cached = _industry_pricing_cache
+        if cached is not None and (now - cached[0]) < _INDUSTRY_PRICING_CACHE_TTL_SEC:
+            return create_success_response({"pricing_tiers": cached[1]}, "Industry pricing retrieved")
     try:
         tiers = billing_manager.get_pricing_tiers()
         pricing = {}
@@ -785,6 +798,8 @@ def get_industry_pricing():
                 "responses_limit": limits.get('ai_responses', 0),
                 "features": tier_data.get('features', []),
             }
+        with _industry_pricing_lock:
+            _industry_pricing_cache = (time.monotonic(), pricing)
         return create_success_response({"pricing_tiers": pricing}, "Industry pricing retrieved")
     except Exception as e:
         logger.error("Industry pricing error: %s", e)

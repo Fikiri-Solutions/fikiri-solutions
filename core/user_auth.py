@@ -168,29 +168,45 @@ class UserAuthManager:
                 salt = secrets.token_hex(self.salt_length)
                 logger.warning(f"Generated new salt for user {email}")
             
-            # Create user record - we need to get the lastrowid, so let's do this manually
+            insert_sql = """
+                INSERT INTO users
+                   (email, name, password_hash, business_name, business_email,
+                    industry, team_size, metadata, role, is_active, email_verified,
+                    onboarding_completed, onboarding_step)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+            insert_params = (
+                email,
+                name,
+                password_hash,
+                business_name,
+                business_email,
+                industry,
+                team_size,
+                json.dumps({"salt": str(salt)}),
+                "user",
+                True,
+                False,
+                False,
+                1,
+            )
             try:
-                with db_optimizer.get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        """INSERT INTO users 
-                           (email, name, password_hash, business_name, business_email, 
-                            industry, team_size, metadata, role, is_active, email_verified, 
-                            onboarding_completed, onboarding_step) 
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (email, name, password_hash, business_name, business_email,
-                         industry, team_size, json.dumps({'salt': str(salt)}), 'user', True, False, False, 1)
-                    )
-                    user_id = cursor.lastrowid
-                    conn.commit()
+                user_id = db_optimizer.execute_insert_returning_id(insert_sql, insert_params)
             except Exception as e:
-                logger.error(f"Error inserting user: {e}")
+                logger.error("Error inserting user: %s", e)
                 raise
-            
+            if not user_id:
+                logger.error("Insert user returned no id (check Postgres RETURNING)")
+                return {
+                    "success": False,
+                    "error": "Failed to create user account",
+                    "error_code": "CREATE_USER_ERROR",
+                }
+
             # Get the created user (rulepack compliance: specific columns, not SELECT *)
             user_data = db_optimizer.execute_query(
                 "SELECT id, email, name, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE id = ?",
-                (user_id,)
+                (user_id,),
             )[0]
             
             logger.info(f"User created successfully: {email}")
@@ -214,9 +230,10 @@ class UserAuthManager:
         """Authenticate user login"""
         try:
             # Get user data (rulepack compliance: specific columns, including password_hash for auth)
+            active = db_optimizer.sql_cast_int_eq_one("is_active")
             user_data = db_optimizer.execute_query(
-                "SELECT id, email, name, password_hash, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE email = ? AND is_active = 1",
-                (email,)
+                f"SELECT id, email, name, password_hash, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE email = ? AND {active}",
+                (email,),
             )
             
             if not user_data:
@@ -328,12 +345,14 @@ class UserAuthManager:
     def validate_session(self, session_id: str) -> Optional[UserProfile]:
         """Validate session and return user profile"""
         try:
+            valid = db_optimizer.sql_cast_int_eq_one("s.is_valid")
+            exp_ok = db_optimizer.sql_timestamp_gt_now("s.expires_at")
             session_data = db_optimizer.execute_query(
-                """SELECT s.*, u.* FROM user_sessions s
+                f"""SELECT s.*, u.* FROM user_sessions s
                    JOIN users u ON s.user_id = u.id
-                   WHERE s.session_id = ? AND s.is_valid = 1 
-                   AND datetime(s.expires_at) > datetime('now')""",
-                (session_id,)
+                   WHERE s.session_id = ? AND {valid}
+                   AND {exp_ok}""",
+                (session_id,),
             )
             
             if not session_data:
@@ -349,10 +368,11 @@ class UserAuthManager:
     def revoke_session(self, session_id: str) -> bool:
         """Revoke a user session"""
         try:
+            false_lit = db_optimizer.sql_false_literal()
             db_optimizer.execute_query(
-                "UPDATE user_sessions SET is_valid = 0 WHERE session_id = ?",
+                f"UPDATE user_sessions SET is_valid = {false_lit} WHERE session_id = ?",
                 (session_id,),
-                fetch=False
+                fetch=False,
             )
             return True
         except Exception as e:
@@ -362,10 +382,11 @@ class UserAuthManager:
     def revoke_all_user_sessions(self, user_id: int) -> bool:
         """Revoke all sessions for a user"""
         try:
+            false_lit = db_optimizer.sql_false_literal()
             db_optimizer.execute_query(
-                "UPDATE user_sessions SET is_valid = 0 WHERE user_id = ?",
+                f"UPDATE user_sessions SET is_valid = {false_lit} WHERE user_id = ?",
                 (user_id,),
-                fetch=False
+                fetch=False,
             )
             return True
         except Exception as e:
@@ -375,10 +396,11 @@ class UserAuthManager:
     def deactivate_user(self, user_id: int) -> Dict[str, Any]:
         """Soft-delete user: set is_active=0 and revoke all sessions."""
         try:
+            false_lit = db_optimizer.sql_false_literal()
             db_optimizer.execute_query(
-                "UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                f"UPDATE users SET is_active = {false_lit}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (user_id,),
-                fetch=False
+                fetch=False,
             )
             self.revoke_all_user_sessions(user_id)
             try:
@@ -397,9 +419,10 @@ class UserAuthManager:
         try:
             metadata_updates = updates.pop('metadata_updates', None)
             if metadata_updates is not None:
+                active = db_optimizer.sql_cast_int_eq_one("is_active")
                 row = db_optimizer.execute_query(
-                    "SELECT metadata FROM users WHERE id = ? AND is_active = 1",
-                    (user_id,)
+                    f"SELECT metadata FROM users WHERE id = ? AND {active}",
+                    (user_id,),
                 )
                 meta = json.loads((row[0].get('metadata') or '{}') if row else '{}')
                 meta.update(metadata_updates)
@@ -452,9 +475,10 @@ class UserAuthManager:
         """Request password reset for user"""
         try:
             # Check if user exists
+            active = db_optimizer.sql_cast_int_eq_one("is_active")
             user_data = db_optimizer.execute_query(
-                "SELECT id, email, name FROM users WHERE email = ? AND is_active = 1",
-                (email,)
+                f"SELECT id, email, name FROM users WHERE email = ? AND {active}",
+                (email,),
             )
             
             if not user_data:
@@ -509,9 +533,10 @@ class UserAuthManager:
         a verification email.
         """
         try:
+            active = db_optimizer.sql_cast_int_eq_one("is_active")
             user_rows = db_optimizer.execute_query(
-                "SELECT id, metadata FROM users WHERE id = ? AND is_active = 1",
-                (user_id,)
+                f"SELECT id, metadata FROM users WHERE id = ? AND {active}",
+                (user_id,),
             )
             if not user_rows:
                 return {
@@ -580,14 +605,15 @@ class UserAuthManager:
 
             # Token is stored in metadata; validate token first via SQL.
             # Note: we validate expiry in Python after fetching metadata.
+            field = db_optimizer.json_field_expr("metadata", "$.email_verification_token")
             user_rows = db_optimizer.execute_query(
-                """
+                f"""
                 SELECT id, email, name, role, onboarding_completed, onboarding_step, email_verified, metadata
                 FROM users
-                WHERE json_extract(metadata, '$.email_verification_token') = ?
-                  AND is_active = 1
+                WHERE {field} = ?
+                  AND is_active
                 """,
-                (token,)
+                (token,),
             )
 
             if not user_rows:
@@ -636,14 +662,16 @@ class UserAuthManager:
             updated_metadata.pop('email_verification_token', None)
             updated_metadata.pop('email_verification_expires', None)
 
+            active = db_optimizer.sql_cast_int_eq_one("is_active")
+            ev = db_optimizer.sql_true_literal()
             db_optimizer.execute_query(
-                """
+                f"""
                 UPDATE users
-                SET email_verified = 1, metadata = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ? AND is_active = 1
+                SET email_verified = {ev}, metadata = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND {active}
                 """,
                 (json.dumps(updated_metadata), user_id),
-                fetch=False
+                fetch=False,
             )
 
             updated_user = self.get_user_by_id(user_id)
@@ -827,9 +855,11 @@ class UserAuthManager:
     def cleanup_expired_sessions(self) -> int:
         """Clean up expired sessions"""
         try:
+            false_lit = db_optimizer.sql_false_literal()
+            expired = db_optimizer.sql_timestamp_lt_now("expires_at")
             result = db_optimizer.execute_query(
-                "UPDATE user_sessions SET is_valid = 0 WHERE datetime(expires_at) < datetime('now')",
-                fetch=False
+                f"UPDATE user_sessions SET is_valid = {false_lit} WHERE {expired}",
+                fetch=False,
             )
             return result
         except Exception as e:

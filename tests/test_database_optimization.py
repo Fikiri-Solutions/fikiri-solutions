@@ -10,7 +10,13 @@ from unittest.mock import patch
 os.environ.setdefault("FLASK_ENV", "test")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.database_optimization import safe_json, safe_json_serialize, QueryMetrics, IndexInfo
+from core.database_optimization import (
+    safe_json,
+    safe_json_serialize,
+    QueryMetrics,
+    IndexInfo,
+    _production_requires_postgres_uri,
+)
 
 
 class TestDatabaseOptimizationHelpers:
@@ -77,3 +83,12 @@ class TestDatabaseOptimizationHelpers:
         )
         assert i.table_name == "users"
         assert i.unique is True
+
+    def test_production_requires_postgres_uri_respects_override(self, monkeypatch):
+        monkeypatch.setenv("FLASK_ENV", "production")
+        monkeypatch.delenv("FIKIRI_ALLOW_SQLITE_PRODUCTION", raising=False)
+        assert _production_requires_postgres_uri() is True
+        monkeypatch.setenv("FIKIRI_ALLOW_SQLITE_PRODUCTION", "1")
+        assert _production_requires_postgres_uri() is False
+        monkeypatch.setenv("FLASK_ENV", "test")
+        assert _production_requires_postgres_uri() is False

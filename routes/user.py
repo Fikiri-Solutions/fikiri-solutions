@@ -45,9 +45,10 @@ def get_user_profile():
         
         # Get user profile directly from database
         # Rulepack compliance: specific columns, not SELECT *
+        active = db_optimizer.sql_cast_int_eq_one("is_active")
         user_data_db = db_optimizer.execute_query(
-            "SELECT id, email, name, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE id = ? AND is_active = 1",
-            (user_id,)
+            f"SELECT id, email, name, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE id = ? AND {active}",
+            (user_id,),
         )
         
         if not user_data_db:
@@ -331,10 +332,11 @@ def update_onboarding_step():
             return create_error_response("Invalid step number", 400, 'INVALID_STEP')
 
         # Update onboarding step
-        query = """
-            UPDATE users 
+        active = db_optimizer.sql_cast_int_eq_one("is_active")
+        query = f"""
+            UPDATE users
             SET onboarding_step = ?, onboarding_completed = ?
-            WHERE id = ? AND is_active = 1
+            WHERE id = ? AND {active}
         """
         
         onboarding_completed = step >= 4
