@@ -16,13 +16,15 @@ describe('dashboardNav', () => {
     expect(isDashboardNavItemActive('/industry', '/analytics')).toBe(true)
   })
 
-  it('getMobileBottomNavItems swaps analytics for onboarding when setup incomplete', () => {
+  it('getMobileBottomNavItems uses billing when setup complete; prepends onboarding when incomplete', () => {
     const done = getMobileBottomNavItems({ onboarding_completed: true })
-    expect(done.map((i) => i.href)).toContain('/analytics')
+    expect(done.map((i) => i.href)).toContain('/billing')
     expect(done.map((i) => i.href)).not.toContain('/onboarding')
+    expect(done.map((i) => i.href)).not.toContain('/analytics')
 
     const pending = getMobileBottomNavItems({ onboarding_completed: false })
     expect(pending.map((i) => i.href)).toContain('/onboarding')
+    expect(pending.map((i) => i.href)).not.toContain('/billing')
     expect(pending.map((i) => i.href)).not.toContain('/analytics')
     expect(pending).toHaveLength(6)
   })
@@ -39,8 +41,9 @@ describe('dashboardNav', () => {
     const undefinedUser = getMobileBottomNavItems(undefined)
     expect(nullUser).toHaveLength(6)
     expect(undefinedUser.map((i) => i.href)).toEqual(nullUser.map((i) => i.href))
-    expect(nullUser.map((i) => i.href)).toContain('/analytics')
+    expect(nullUser.map((i) => i.href)).toContain('/billing')
     expect(nullUser.map((i) => i.href)).not.toContain('/onboarding')
+    expect(nullUser.map((i) => i.href)).not.toContain('/analytics')
   })
 
   it('sidebar nav items have unique hrefs', () => {
