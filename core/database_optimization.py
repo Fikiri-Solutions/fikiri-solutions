@@ -982,7 +982,7 @@ class DatabaseOptimizer:
 
         # Backfill schema for existing DBs (dev envs may already have this table)
         cursor.execute("PRAGMA table_info(customer_contact_submissions)")
-        columns = [r['name'] for r in cursor.fetchall()]
+        columns = [row[1] for row in cursor.fetchall()]
         if 'payload_json' not in columns:
             cursor.execute("ALTER TABLE customer_contact_submissions ADD COLUMN payload_json TEXT")
         if 'payload_truncated' not in columns:
@@ -1025,7 +1025,7 @@ class DatabaseOptimizer:
         """)
 
         cursor.execute("PRAGMA table_info(customer_form_intake_submissions)")
-        _form_intake_cols = [r["name"] for r in cursor.fetchall()]
+        _form_intake_cols = [row[1] for row in cursor.fetchall()]
         if "client_submission_id" not in _form_intake_cols:
             cursor.execute(
                 "ALTER TABLE customer_form_intake_submissions ADD COLUMN client_submission_id TEXT"
@@ -1118,7 +1118,7 @@ class DatabaseOptimizer:
 
         # Backfill for existing DBs missing columns (best-effort).
         cursor.execute("PRAGMA table_info(customer_appointment_intake_submissions)")
-        cols = [r['name'] for r in cursor.fetchall()]
+        cols = [row[1] for row in cursor.fetchall()]
         # These columns are intentionally safe to backfill with ALTER TABLE.
         if 'payload_truncated' not in cols:
             cursor.execute("ALTER TABLE customer_appointment_intake_submissions ADD COLUMN payload_truncated BOOLEAN DEFAULT 0")
