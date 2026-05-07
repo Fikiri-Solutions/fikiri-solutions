@@ -15,6 +15,35 @@ from core.database_optimization import db_optimizer
 
 logger = logging.getLogger(__name__)
 
+# PBKDF2 is CPU-heavy; under Gunicorn+gevent it must not run on the main greenlet or the hub
+# stalls (slow signup, health checks, and other requests appear wedged).
+_PBKDF2_ITERATIONS = 100_000
+
+
+def _pbkdf2_hex_sync(password: str, salt: str) -> str:
+    """Derive hex digest (runs in worker thread when gevent threadpool is used)."""
+    return hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt.encode("utf-8"),
+        _PBKDF2_ITERATIONS,
+    ).hex()
+
+
+def _derive_password_hash_hex(password: str, salt: str) -> str:
+    """PBKDF2 with optional gevent threadpool offload for production workers."""
+    try:
+        from gevent import get_hub
+
+        hub = get_hub()
+        threadpool = getattr(hub, "threadpool", None)
+        if threadpool is not None:
+            return threadpool.apply(_pbkdf2_hex_sync, (password, salt))
+    except Exception:
+        pass
+    return _pbkdf2_hex_sync(password, salt)
+
+
 @dataclass
 class UserProfile:
     """User profile data structure"""
@@ -69,16 +98,9 @@ class UserAuthManager:
         """Hash password with salt using PBKDF2"""
         if salt is None:
             salt = secrets.token_hex(self.salt_length)
-        
-        # Use PBKDF2 with SHA-256
-        password_hash = hashlib.pbkdf2_hmac(
-            'sha256',
-            password.encode('utf-8'),
-            salt.encode('utf-8'),
-            100000  # 100,000 iterations
-        )
-        
-        return password_hash.hex(), salt
+
+        digest_hex = _derive_password_hash_hex(password, salt)
+        return digest_hex, salt
     
     def _verify_password(self, password: str, stored_hash: str, salt: str) -> bool:
         """Verify password safely, handling serialization edge cases."""

@@ -179,7 +179,14 @@ def api_signup():
         # Soft by default: warning only. Strict mode can block signups.
         if email_is_valid and "@" in email_raw:
             domain = email_raw.split("@", 1)[1].strip()
+            _mx_t0 = time.monotonic()
             mx_result = check_email_domain_has_mx_for_signup(domain)
+            logger.info(
+                "Signup MX lookup domain=%s reason=%s ms=%.0f",
+                domain,
+                mx_result.get("reason"),
+                (time.monotonic() - _mx_t0) * 1000,
+            )
             if mx_result.get("has_mx") is False:
                 validation_warnings.append({
                     "code": "SUSPICIOUS_EMAIL_DOMAIN",
