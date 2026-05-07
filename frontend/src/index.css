@@ -163,11 +163,30 @@ html {
   h1, h2, h3, h4, h5, h6 {
     @apply text-gray-900 dark:text-gray-100;
     transition: color 0.3s ease;
+    overflow-wrap: anywhere;
   }
   
   p, span, div {
     @apply text-gray-700 dark:text-gray-300;
     transition: color 0.3s ease;
+    overflow-wrap: anywhere;
+  }
+
+  li, label {
+    overflow-wrap: anywhere;
+  }
+
+  /* Keep text visually balanced when windows are resized (desktop + mobile). */
+  @supports (text-wrap: balance) {
+    h1, h2, h3 {
+      text-wrap: balance;
+    }
+  }
+
+  @supports (text-wrap: pretty) {
+    p, li {
+      text-wrap: pretty;
+    }
   }
   
   /* Default link styling - Fikiri brand colors as subtle accents */

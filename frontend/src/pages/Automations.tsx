@@ -46,13 +46,15 @@ type AutomationPreset = {
   actionType: string
   defaultConfig: Record<string, any>
   configFields: ConfigField[]
+  /** Static UX note when marketing copy exceeds what the engine integrates. */
+  honestyNote?: string
 }
 
 const automationPresets: AutomationPreset[] = [
   {
-    id: 'gmail_crm',
-    name: 'Gmail → CRM',
-    description: 'Convert new inbound emails into CRM leads automatically.',
+    id: 'inbound_crm_sync',
+    name: 'Inbound email → CRM',
+    description: 'When email matches your rules, upsert or enrich the CRM lead (stage/tags).',
     icon: Mail,
     triggerType: 'email_received',
     actionType: 'update_crm_field',
@@ -65,17 +67,18 @@ const automationPresets: AutomationPreset[] = [
         options: [
           { value: 'new', label: 'New' },
           { value: 'contacted', label: 'Contacted' },
+          { value: 'replied', label: 'Replied' },
           { value: 'qualified', label: 'Qualified' },
-          { value: 'booked', label: 'Booked' }
+          { value: 'closed', label: 'Closed' }
         ],
-        helper: 'Stage to create the lead in'
+        helper: 'Must match CRM stages (see CRM page)'
       }
     ]
   },
   {
     id: 'lead_scoring',
     name: 'Lead Scoring',
-    description: 'Score leads using AI classifications and prioritise outreach.',
+    description: 'On new leads, update CRM fields when conditions match (lead score is computed by the CRM scorer).',
     icon: Activity,
     triggerType: 'lead_created',
     actionType: 'update_crm_field',
@@ -114,23 +117,30 @@ const automationPresets: AutomationPreset[] = [
   {
     id: 'email_sheets',
     name: 'Send Leads to Your Tools',
-    description: 'Automatically send new leads and emails to your favorite apps like Slack, Google Sheets, or your own system. No coding required.',
+    description: 'POST lead/email payload to any HTTPS URL (bring your own Zapier, Sheets script, Airtable webhook, etc.).',
     icon: Table,
     triggerType: 'email_received',
     actionType: 'trigger_webhook',
     defaultConfig: { destination: 'Google Sheets', sheet_url: '' },
+    honestyNote:
+      'Webhook only: there is no native Google Sheets or Airtable connector in this preset—only a signed or plain HTTP POST.',
     configFields: [
       {
         key: 'destination',
         label: 'Where to send data',
         type: 'select',
         options: [
-          { value: 'Google Sheets', label: 'Google Sheets' },
-          { value: 'Airtable', label: 'Airtable' }
+          { value: 'Google Sheets', label: 'Google Sheets (via webhook you configure)' },
+          { value: 'Airtable', label: 'Airtable (via webhook you configure)' }
         ],
-        helper: 'Choose where you want your leads sent'
+        helper: 'Label for your notes; delivery is always the webhook URL below'
       },
-      { key: 'sheet_url', label: 'Your webhook URL', type: 'text', helper: 'Paste the webhook URL from your app (we\'ll help you find it)' }
+      {
+        key: 'sheet_url',
+        label: 'Webhook URL',
+        type: 'text',
+        helper: 'Must be reachable from the Fikiri backend (HTTPS)'
+      }
     ]
   },
   {
@@ -362,12 +372,17 @@ export const Automations: React.FC = () => {
     gcTime: 30 * 60 * 1000, // 30 minutes
   })
 
-  const { data: capabilities = [] } = useQuery({
+  const {
+    data: capabilities = [],
+    isError: capabilitiesQueryError,
+    isFetched: capabilitiesFetched
+  } = useQuery({
     queryKey: ['automation-capabilities'],
     queryFn: () => apiClient.getAutomationCapabilities(),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   })
+  const capabilitiesReady = capabilitiesFetched && !capabilitiesQueryError && capabilities.length > 0
 
   const { data: triggerConditionMeta } = useQuery({
     queryKey: ['automation-trigger-condition-metadata'],
@@ -414,11 +429,23 @@ export const Automations: React.FC = () => {
 
   const testPresetMutation = useMutation({
     mutationFn: (presetId: string) => apiClient.runAutomationPreset(presetId),
-    onSuccess: (payload: { correlation_id?: string } | undefined, presetId) => {
+    onSuccess: (payload: { success?: boolean; correlation_id?: string; data?: { correlation_id?: string }; error?: string; message?: string } | undefined, presetId) => {
+      if (payload && typeof payload === 'object' && payload.success === false) {
+        addToast({
+          type: 'error',
+          title: 'Preset did not complete',
+          message: payload.error || payload.message || 'Check logs and configuration'
+        })
+        return
+      }
+      const fromData = payload?.data?.correlation_id
+      const fromRoot = payload?.correlation_id
       const cid =
-        typeof payload?.correlation_id === 'string' && payload.correlation_id
-          ? payload.correlation_id
-          : null
+        typeof fromData === 'string' && fromData
+          ? fromData
+          : typeof fromRoot === 'string' && fromRoot
+            ? fromRoot
+            : null
       if (cid) {
         setLastCorrelationId(cid)
         setTracePreview(null)
@@ -657,31 +684,31 @@ export const Automations: React.FC = () => {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between">
         <div className="min-w-0">
-          <p className="text-sm uppercase tracking-wide text-brand-text/60 dark:text-gray-400">Automation Studio</p>
-          <h1 className="text-2xl font-bold text-brand-text dark:text-white mt-0.5">Workflow Automations</h1>
-          <p className="mt-1.5 text-sm text-brand-text/70 dark:text-gray-300 max-w-xl">
+          <p className="text-sm uppercase tracking-wide text-brand-text/60 dark:text-gray-400 break-words">Automation Studio</p>
+          <h1 className="text-2xl font-bold text-brand-text dark:text-white mt-0.5 leading-tight break-words">Workflow Automations</h1>
+          <p className="mt-1.5 text-sm text-brand-text/70 dark:text-gray-300 max-w-2xl break-words">
             Start with a guided setup for common outcomes, or use Automation studio for every preset, filters, and integrations.
           </p>
         </div>
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <div className="rounded-xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 shadow-sm">
-            <div className="flex items-center gap-2.5">
-              <Shield className="h-4 w-4 text-brand-primary" />
-              <div>
-                <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400">Safety</p>
-                <p className="text-sm font-semibold text-brand-text dark:text-white">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full 2xl:w-auto 2xl:max-w-[560px]">
+          <div className="rounded-xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 shadow-sm min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <Shield className="h-4 w-4 text-brand-primary flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400 break-words">Safety</p>
+                <p className="text-sm font-semibold text-brand-text dark:text-white break-words">
                   {safetyStatus?.automation_enabled ? 'Enabled' : 'Disabled'} · {safetyStatus?.safety_level ?? 'normal'}
                 </p>
               </div>
             </div>
           </div>
-          <div className="rounded-xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 shadow-sm min-w-[180px]">
+          <div className="rounded-xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-2.5 shadow-sm min-w-0">
             <div className="flex items-center gap-2.5">
               <BarChart3 className="h-4 w-4 text-brand-primary flex-shrink-0" />
               <div className="min-w-0">
-                <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400">Queue health</p>
+                <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400 break-words">Queue health</p>
                 {metricsLoading ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin text-brand-text/50 mt-0.5" />
                 ) : automationMetrics ? (
@@ -762,9 +789,12 @@ export const Automations: React.FC = () => {
             const Icon = preset.icon
             const rule = findRuleForPreset(rules, preset.id)
             const isActive = rule?.status === 'active'
-            const capability = capabilityByAction[preset.actionType] ?? 'implemented'
+            const capability = capabilitiesReady
+              ? capabilityByAction[preset.actionType] ?? 'implemented'
+              : 'unknown'
             const isStub = capability === 'stub'
             const isPartial = capability === 'partial'
+            const isCapabilityUnknown = capability === 'unknown'
             const presetLogs = logsByPreset[preset.id] || []
             const lastLog = presetLogs[0]
             const statusKey = lastLog?.status || 'idle'
@@ -773,29 +803,49 @@ export const Automations: React.FC = () => {
             const isTesting = testPresetMutation.isPending && testPresetMutation.variables === preset.id
             return (
               <div key={preset.id} className="rounded-xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm flex flex-col gap-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2.5 min-w-0">
                     <div className="p-1.5 rounded-lg bg-brand-accent/20 flex-shrink-0">
                       <Icon className="h-4 w-4 text-brand-primary" />
                     </div>
                     <div className="min-w-0">
-                      <h3 className="text-base font-semibold text-brand-text dark:text-white">{preset.name}</h3>
-                      <p className="text-xs text-brand-text/70 dark:text-gray-400 line-clamp-2">{preset.description}</p>
-                      {isStub && (
-                        <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400">
-                          Not implemented yet
+                      <h3 className="text-base font-semibold text-brand-text dark:text-white leading-snug break-words">{preset.name}</h3>
+                      <p className="text-xs text-brand-text/70 dark:text-gray-400 leading-snug break-words">{preset.description}</p>
+                      {preset.honestyNote && (
+                        <p className="text-[11px] text-brand-text/55 dark:text-gray-500 mt-1 leading-snug break-words">{preset.honestyNote}</p>
+                      )}
+                      {isCapabilityUnknown && (
+                        <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium bg-brand-text/10 text-brand-text/70 dark:text-gray-400 break-words">
+                          Could not load capability status — refresh after signing in
                         </span>
                       )}
-                      {isPartial && !isStub && (
-                        <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-500/15 text-blue-600 dark:text-blue-400">
-                          Partial (depends on configuration)
+                      {isStub && capabilitiesReady && (
+                        <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 break-words">
+                          Coming soon (engine returns 501 if executed)
+                        </span>
+                      )}
+                      {isPartial && !isStub && capabilitiesReady && (
+                        <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-500/15 text-blue-600 dark:text-blue-400 break-words">
+                          Partial · needs Slack / Twilio / templates where applicable
                         </span>
                       )}
                     </div>
                   </div>
-                                   <button
-                    onClick={() => handleToggle(preset, !isActive)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${isActive ? 'bg-brand-primary' : 'bg-brand-text/30'}`}
+                  <button
+                    type="button"
+                    aria-disabled={isStub && capabilitiesReady && !isActive}
+                    title={
+                      isStub && capabilitiesReady && !isActive
+                        ? 'Cannot activate — this action is not implemented on the server yet'
+                        : undefined
+                    }
+                    onClick={() => {
+                      if (isStub && capabilitiesReady && !isActive) return
+                      handleToggle(preset, !isActive)
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition shrink-0 ${
+                      isActive ? 'bg-brand-primary' : 'bg-brand-text/30'
+                    } ${isStub && capabilitiesReady && !isActive ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-gray-300 transition ${isActive ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
@@ -857,8 +907,8 @@ export const Automations: React.FC = () => {
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-wide text-brand-text/50 dark:text-gray-400">Last run</p>
-                      <p className="text-xs font-medium text-brand-text dark:text-white truncate">{formatAbsoluteTimestamp(lastLog?.executed_at)}</p>
-                      <p className="text-xs text-brand-text/60 dark:text-gray-400 truncate" title={lastMessage || undefined}>
+                      <p className="text-xs font-medium text-brand-text dark:text-white break-words">{formatAbsoluteTimestamp(lastLog?.executed_at)}</p>
+                      <p className="text-xs text-brand-text/60 dark:text-gray-400 break-words" title={lastMessage || undefined}>
                         {lastMessage ? lastMessage : lastLog ? 'Preset executed via backend' : 'No executions yet'}
                       </p>
                     </div>
@@ -869,8 +919,8 @@ export const Automations: React.FC = () => {
                   {presetLogs.length > 0 && (
                     <div className="mt-2 space-y-0.5 max-h-16 overflow-y-auto pr-1 text-xs text-brand-text/70 dark:text-gray-300">
                       {presetLogs.slice(0, 3).map(log => (
-                        <div key={log.execution_id} className="flex items-center justify-between">
-                          <span className="truncate">{log.action_result?.summary || log.action_result?.message || log.status}</span>
+                        <div key={log.execution_id} className="flex items-center justify-between gap-2">
+                          <span className="truncate min-w-0">{log.action_result?.summary || log.action_result?.message || log.status}</span>
                           <span>{formatRelativeTimestamp(log.executed_at)}</span>
                         </div>
                       ))}
@@ -881,19 +931,34 @@ export const Automations: React.FC = () => {
                 <div className="flex items-center justify-between border-t border-brand-text/10 dark:border-gray-700 pt-3 gap-2">
                   <div className="flex items-center gap-2 flex-wrap">
                     <button
+                      type="button"
                       onClick={() => handleTestPreset(preset.id)}
-                      disabled={isTesting}
+                      disabled={isTesting || (isStub && capabilitiesReady)}
                       className={`text-xs font-medium inline-flex items-center gap-1.5 ${
-                        isTesting ? 'text-brand-text/50 dark:text-gray-500 cursor-not-allowed' : 'text-brand-primary hover:text-brand-secondary'
-                      } ${isStub ? 'opacity-75' : ''}`}
-                      title={isStub ? 'Run Test will return "Not implemented" until this action is built' : undefined}
+                        isTesting || (isStub && capabilitiesReady)
+                          ? 'text-brand-text/50 dark:text-gray-500 cursor-not-allowed'
+                          : 'text-brand-primary hover:text-brand-secondary'
+                      }`}
+                      title={
+                        isStub && capabilitiesReady
+                          ? 'Not available — action is stub on the server'
+                          : isPartial && preset.actionType === 'send_notification'
+                            ? 'Requires slack_webhook_url on the rule or SLACK_WEBHOOK_URL in the environment'
+                            : undefined
+                      }
                     >
                       <PlayCircle className="h-3.5 w-3.5" />
                       {isTesting ? 'Testing…' : 'Run Test'}
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleToggle(preset, true)}
-                      className="text-xs font-medium text-brand-primary hover:text-brand-secondary inline-flex items-center gap-1.5"
+                      disabled={isStub && capabilitiesReady}
+                      className={`text-xs font-medium inline-flex items-center gap-1.5 ${
+                        isStub && capabilitiesReady
+                          ? 'text-brand-text/40 cursor-not-allowed'
+                          : 'text-brand-primary hover:text-brand-secondary'
+                      }`}
                     >
                       <Zap className="h-3.5 w-3.5" />
                       Save & Activate
@@ -909,11 +974,11 @@ export const Automations: React.FC = () => {
 
       <div className="rounded-xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
         <div className="flex items-center justify-between mb-3 gap-3">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
             <History className="h-4 w-4 text-brand-primary" />
-            <div>
-              <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400">Automation activity</p>
-              <h2 className="text-lg font-semibold text-brand-text dark:text-white">Recent executions</h2>
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400 break-words">Automation activity</p>
+              <h2 className="text-lg font-semibold text-brand-text dark:text-white break-words">Recent executions</h2>
             </div>
           </div>
           {logsLoading && (
@@ -937,7 +1002,7 @@ export const Automations: React.FC = () => {
                       <StatusIcon className="h-3.5 w-3.5" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold text-brand-text dark:text-white">{log.rule_name}</p>
+                      <p className="text-xs font-semibold text-brand-text dark:text-white break-words">{log.rule_name}</p>
                       <p className="text-xs text-brand-text/70 dark:text-gray-300 mt-0.5 line-clamp-2">
                         {log.action_result?.message || log.action_result?.summary || log.error_message || 'Automation completed successfully'}
                       </p>
@@ -955,18 +1020,18 @@ export const Automations: React.FC = () => {
 
       {suggestions && suggestions.length > 0 && (
         <div className="rounded-xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
-          <div className="flex items-center gap-2.5 mb-3">
+          <div className="flex items-center gap-2.5 mb-3 min-w-0">
             <GitBranch className="h-4 w-4 text-brand-primary" />
-            <div>
-              <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400">AI recommendations</p>
-              <h2 className="text-lg font-semibold text-brand-text dark:text-white">Suggested automations</h2>
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400 break-words">AI recommendations</p>
+              <h2 className="text-lg font-semibold text-brand-text dark:text-white break-words">Suggested automations</h2>
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {suggestions.map((suggestion: any, idx: number) => (
               <div key={idx} className="rounded-lg border border-brand-text/10 dark:border-gray-700 p-3 text-sm text-brand-text/80 dark:text-gray-300">
-                <p className="font-semibold text-brand-text dark:text-white text-sm">{suggestion.title || suggestion.name || 'Automation suggestion'}</p>
-                <p className="mt-0.5 text-xs">{suggestion.description || suggestion.reason || 'Optimize this workflow for better response times.'}</p>
+                <p className="font-semibold text-brand-text dark:text-white text-sm break-words">{suggestion.title || suggestion.name || 'Automation suggestion'}</p>
+                <p className="mt-0.5 text-xs break-words">{suggestion.description || suggestion.reason || 'Optimize this workflow for better response times.'}</p>
               </div>
             ))}
           </div>

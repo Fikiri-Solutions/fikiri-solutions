@@ -40,6 +40,9 @@ try:
     import stripe
     STRIPE_AVAILABLE = True
 except ImportError:
+    # Keep a module-level symbol so tests can patch `core.billing_api.stripe`
+    # even when Stripe is not installed in the runtime.
+    stripe = None
     STRIPE_AVAILABLE = False
 
 # Import timeout utilities and circuit breaker

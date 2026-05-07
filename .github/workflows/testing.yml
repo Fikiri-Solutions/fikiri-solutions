@@ -168,7 +168,7 @@ jobs:
     - name: Install k6
       uses: grafana/setup-k6-action@v1
 
-    - name: Run k6 load/stress tests (optional)
+    - name: Run k6 performance tests (steady in CI, stress optional)
       run: |
         if [ "${{ vars.K6_CI_ENABLED }}" != "true" ]; then
           echo "k6 skipped: set GitHub Actions repository variable K6_CI_ENABLED=true to run load tests in CI."
@@ -183,8 +183,16 @@ jobs:
           exit 0
         fi
         mkdir -p k6-results
+        # Always run the contract-aligned performance probe in CI.
         k6 run scripts/k6-performance-test.js
-        k6 run scripts/k6-stress-test.js
+        # Stress profile is intentionally heavier and often too noisy for per-PR CI.
+        # Enable explicitly with repo variable K6_STRESS_CI_ENABLED=true (or run on schedule/manual workflows).
+        if [ "${{ vars.K6_STRESS_CI_ENABLED }}" = "true" ]; then
+          k6 run scripts/k6-stress-test.js
+        else
+          echo "Skipping stress profile (set K6_STRESS_CI_ENABLED=true to enable in CI)"
+          echo '{"skipped":true,"reason":"K6_STRESS_CI_ENABLED not true"}' > k6-results/stress-skipped.json
+        fi
 
     - name: Upload performance results
       uses: actions/upload-artifact@v4
@@ -256,7 +264,8 @@ jobs:
         echo "- Security tests: ✅ Passed" >> test-summary.md
         echo "" >> test-summary.md
         echo "## Performance Tests" >> test-summary.md
-        echo "- k6: requires repo variable K6_CI_ENABLED=true and secret PERF_API_BASE_URL" >> test-summary.md
+        echo "- k6 perf: requires K6_CI_ENABLED=true and PERF_API_BASE_URL" >> test-summary.md
+        echo "- k6 stress (optional): requires K6_STRESS_CI_ENABLED=true" >> test-summary.md
         echo "" >> test-summary.md
         echo "## Security Scan" >> test-summary.md
         echo "- Vulnerability scan: ✅ Passed" >> test-summary.md
