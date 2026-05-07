@@ -1380,21 +1380,16 @@ def analyze_email():
             if not ai_assistant.is_enabled():
                 return create_error_response("AI assistant is not available", 503, 'AI_UNAVAILABLE')
             
-            # Classify email intent
-            classification = ai_assistant.classify_email_intent(content, subject)
-
-            # AI summary + contact extraction
-            summary = ai_assistant.summarize_email(content, subject)
-            contact_info = ai_assistant.extract_contact_info(content)
-
-            analysis = {
-                'intent': classification.get('intent', 'general_info') if classification else 'general_info',
-                'urgency': classification.get('urgency', 'medium') if classification else 'medium',
-                'suggested_action': classification.get('suggested_action', 'Review and respond') if classification else 'Review and respond',
-                'summary': summary,
-                'confidence': classification.get('confidence', 0.8) if classification else 0.8,
-                'contact_info': contact_info
-            }
+            analysis = ai_assistant.analyze_incoming_email(
+                sender_email=from_email,
+                sender_name=from_email,
+                subject=subject,
+                body=content,
+                thread_history=data.get("thread_history") if isinstance(data.get("thread_history"), list) else [],
+                crm_lead_data=data.get("crm_lead_data") if isinstance(data.get("crm_lead_data"), dict) else {},
+                business_context=data.get("business_context") if isinstance(data.get("business_context"), dict) else None,
+                user_id=user_id,
+            )
             ai_budget_guardrails.record_ai_usage(user_id, 1)
             
             return create_success_response(analysis, 'Email analyzed successfully')
@@ -3156,8 +3151,11 @@ def test_automation_preset():
                     correlation_id=correlation_id,
                 )
 
+        # Backward compat: API accepts preset_id gmail_crm (alias → inbound_crm_sync).
+        preset_key = {'gmail_crm': 'inbound_crm_sync'}.get(preset, preset)
+
         preset_map = {
-            'gmail_crm': {
+            'inbound_crm_sync': {
                 'trigger': TriggerType.EMAIL_RECEIVED,
                 'data': {'sender_email': 'lead@example.com', 'subject': 'Interested in services', 'text': 'Hi, I need help'}
             },
@@ -3179,7 +3177,7 @@ def test_automation_preset():
             }
         }
         
-        mapping = preset_map.get(preset)
+        mapping = preset_map.get(preset_key)
         if not mapping:
             return create_error_response("Unknown preset", 400, 'UNKNOWN_PRESET')
         

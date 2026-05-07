@@ -15,7 +15,7 @@ from functools import wraps
 
 from core.api_key_manager import api_key_manager
 from core.ai_budget_guardrails import ai_budget_guardrails
-from core.minimal_vector_search import get_vector_search
+from core.vector_search import get_vector_search
 from core.smart_faq_system import get_smart_faq
 from core.knowledge_base_system import get_knowledge_base
 from core.context_aware_responses import get_context_system

@@ -45,7 +45,15 @@ def test_mailbox_flow_idempotent_and_logged():
 
     idem = _Idem()
 
+    wf_ret = {
+        "success": True,
+        "correlation_id": "rev-wf",
+        "lead_capture": {"success": True, "data": {"lead_id": 123}},
+        "automation": {"success": True},
+    }
+
     with patch("email_automation.actions.idempotency_manager", idem), \
+         patch("email_automation.pipeline.run_inbound_email_workflow", return_value=wf_ret), \
          patch("email_automation.pipeline.automation_safety_manager") as mock_safety, \
          patch("email_automation.pipeline.db_optimizer") as mock_db, \
          patch("email_automation.pipeline.enhanced_crm_service") as mock_crm, \

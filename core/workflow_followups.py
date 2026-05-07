@@ -1,6 +1,5 @@
 """Workflow follow-up scheduling and execution."""
 
-import base64
 import json
 import logging
 import hashlib
@@ -146,31 +145,10 @@ def _send_sms(user_id: int, lead_id: Optional[int], to_phone: str, message: str)
 
 
 def _send_email(user_id: int, to_email: str, subject: str, body: str) -> Dict[str, Any]:
-    try:
-        from integrations.gmail.gmail_client import gmail_client
+    """Send follow-up mail as the Gmail-connected user via shared Gmail client."""
+    from integrations.gmail.gmail_client import gmail_client
 
-        try:
-            gmail_service = gmail_client.get_gmail_service_for_user(user_id)
-        except RuntimeError as e:
-            logger.warning("Gmail token missing user_id=%s: %s", user_id, e)
-            return {"success": False, "error": "Gmail connection required"}
-        message = {
-            'raw': base64.urlsafe_b64encode(
-                f"To: {to_email}\r\n"
-                f"Subject: {subject}\r\n"
-                f"Content-Type: text/plain; charset=UTF-8\r\n"
-                f"\r\n"
-                f"{body}".encode('utf-8')
-            ).decode('utf-8')
-        }
-        sent_message = gmail_service.users().messages().send(
-            userId='me', body=message
-        ).execute()
-        logger.info("Sent follow-up email user_id=%s message_id=%s", user_id, sent_message.get("id"))
-        return {"success": True, "message_id": sent_message.get("id"), "thread_id": sent_message.get("threadId")}
-    except Exception as e:
-        logger.error("Follow-up email send failed user_id=%s error=%s", user_id, e)
-        return {"success": False, "error": str(e)}
+    return gmail_client.send_plain_text_as_user(user_id, to_email, subject, body)
 
 
 def execute_due_follow_ups(user_id: int, now_iso: Optional[str] = None) -> Dict[str, Any]:

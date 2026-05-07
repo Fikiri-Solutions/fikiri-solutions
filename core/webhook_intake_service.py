@@ -11,7 +11,7 @@ from datetime import datetime
 import hashlib
 import hmac
 from flask import request, jsonify
-from core.minimal_config import get_config
+from core.config import get_config
 from core.database_optimization import db_optimizer
 from core.idempotency_manager import idempotency_manager, generate_deterministic_key
 from core.lead_scoring_service import get_lead_scoring_service

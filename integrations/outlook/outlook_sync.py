@@ -189,6 +189,22 @@ def sync_outlook_emails(user_id: int, limit: int = 50, days: int = 30) -> Dict[s
         
         # Store emails in database
         emails_synced = 0
+        mailbox_automation_enabled = os.getenv(
+            "MAILBOX_AUTOMATION_ENABLED", ""
+        ).lower() in {"1", "true", "yes"}
+        outlook_actions = None
+        if mailbox_automation_enabled:
+            try:
+                from email_automation.actions import MinimalEmailActions
+                from email_automation.ai_assistant import MinimalAIEmailAssistant
+
+                outlook_actions = MinimalEmailActions(
+                    services={"ai_assistant": MinimalAIEmailAssistant()}
+                )
+            except Exception as oa_err:
+                logger.warning("Outlook mailbox automation init failed: %s", oa_err)
+                mailbox_automation_enabled = False
+
         for msg in messages:
             try:
                 email_id = msg.get('id')
@@ -237,20 +253,64 @@ def sync_outlook_emails(user_id: int, limit: int = 50, days: int = 30) -> Dict[s
                 ), fetch=False)
                 
                 emails_synced += 1
-                
-                # Trigger automation for EMAIL_RECEIVED
-                from services.automation_engine import automation_engine, TriggerType
-                automation_engine.execute_automation_rules(
-                    TriggerType.EMAIL_RECEIVED,
-                    {
-                        'email_id': email_id,
-                        'sender_email': sender_email,
-                        'subject': subject,
-                        'text': body_preview,
-                    },
-                    user_id,
-                    automation_source="outlook_sync",
-                )
+
+                try:
+                    ow_rows = db_optimizer.execute_query(
+                        "SELECT id FROM synced_emails WHERE user_id = ? AND external_id = ? AND provider = 'outlook' ORDER BY id DESC LIMIT 1",
+                        (user_id, email_id),
+                    )
+                    sid_out = int(ow_rows[0]["id"]) if ow_rows else None
+                except Exception:
+                    sid_out = None
+
+                try:
+                    owner_rows = db_optimizer.execute_query(
+                        "SELECT email FROM users WHERE id = ? LIMIT 1", (user_id,)
+                    )
+                    owner_email = (
+                        (owner_rows[0].get("email") or "").strip().lower()
+                        if owner_rows
+                        else None
+                    ) or None
+                except Exception:
+                    owner_email = None
+
+                try:
+                    from email_automation.pipeline import (
+                        build_parsed_email_for_pipeline,
+                        orchestrate_incoming,
+                    )
+                    from core.request_correlation import get_or_create_correlation_id
+
+                    body_text_out = body_content or body_preview or ""
+                    parsed_ow = build_parsed_email_for_pipeline(
+                        message_id=str(email_id or ""),
+                        subject=subject or "",
+                        from_header=sender,
+                        body_text=body_text_out,
+                        snippet=body_preview or "",
+                    )
+                    corr_body = {
+                        "provider": "outlook",
+                        "message_id": email_id,
+                        "user_id": user_id,
+                    }
+                    correlation_id = get_or_create_correlation_id(None, corr_body)
+                    orchestrate_incoming(
+                        parsed_ow,
+                        user_id=user_id,
+                        actions=outlook_actions,
+                        correlation_id=correlation_id,
+                        synced_email_row_id=sid_out,
+                        external_message_id=str(email_id),
+                        mailbox_owner_email=owner_email,
+                        provider="outlook",
+                        run_mailbox_ai=bool(
+                            mailbox_automation_enabled and outlook_actions
+                        ),
+                    )
+                except Exception as auto_exc:
+                    logger.warning("Outlook inbound pipeline failed: %s", auto_exc)
                 
             except Exception as e:
                 logger.warning(f"Failed to store email {msg.get('id')}: {e}")

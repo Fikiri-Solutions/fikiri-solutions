@@ -80,7 +80,7 @@ export default function () {
     const preset = http.post(
       `${BASE_URL}/api/automation/test/preset`,
       JSON.stringify({
-        preset_id: 'gmail_crm',
+        preset_id: 'inbound_crm_sync',
         user_id: Number(AUTOMATION_USER_ID),
       }),
       { headers: JSON_HEADERS }

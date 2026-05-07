@@ -5,11 +5,13 @@ Production-grade Gmail API client with automatic token handling
 Based on proven patterns from real-world applications
 """
 
+import base64
 import os
 import time
 import json
 import logging
 from datetime import datetime, timedelta
+from email.message import EmailMessage
 from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
@@ -196,6 +198,56 @@ class GmailClient:
         except Exception as e:
             logger.error(f"❌ Failed to create Gmail service for user {user_id}: {e}")
             raise RuntimeError(f"Gmail service creation failed: {str(e)}")
+
+    def send_plain_text_as_user(
+        self, user_id: int, to_email: str, subject: str, body: str
+    ) -> Dict[str, Any]:
+        """
+        Send a UTF-8 plain-text mail via users.messages.send (mailbox identity).
+        Builds a proper MIME message so headers and charset are RFC-correct.
+
+        Returns:
+            dict with keys: success (bool), optional message_id, thread_id,
+            optional error str, channel: "gmail".
+        """
+        to_email = (to_email or "").replace("\r", "").replace("\n", "").replace("\x00", "").strip()
+        if not to_email or "@" not in to_email:
+            return {
+                "success": False,
+                "error": "Invalid recipient email",
+                "channel": "gmail",
+            }
+        subject = (subject or "").replace("\r", "").replace("\n", "").replace("\x00", "")
+        body = body or ""
+        try:
+            gmail_service = self.get_gmail_service_for_user(user_id)
+            msg = EmailMessage()
+            msg["To"] = to_email
+            msg["Subject"] = subject
+            msg.set_content(body)
+            mime_bytes = msg.as_bytes()
+            raw = base64.urlsafe_b64encode(mime_bytes).decode("ascii")
+            sent_message = gmail_service.users().messages().send(
+                userId="me", body={"raw": raw}
+            ).execute()
+            logger.info(
+                "Gmail plain-text send ok user_id=%s message_id=%s",
+                user_id,
+                sent_message.get("id"),
+            )
+            return {
+                "success": True,
+                "message_id": sent_message.get("id"),
+                "thread_id": sent_message.get("threadId"),
+                "channel": "gmail",
+            }
+        except RuntimeError as exc:
+            logger.warning("Gmail send user_id=%s: %s", user_id, exc)
+            return {"success": False, "error": str(exc), "channel": "gmail"}
+        except Exception as exc:
+            logger.error("Gmail plain-text send failed user_id=%s: %s", user_id, exc)
+            return {"success": False, "error": str(exc), "channel": "gmail"}
+
 
 # Global client instance
 gmail_client = GmailClient()

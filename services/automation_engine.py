@@ -6,7 +6,7 @@ Handles automated email responses, lead management, and workflow automation
 import json
 import logging
 import os
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
@@ -25,8 +25,15 @@ from core.automation_trigger_conditions import (
     trigger_condition_metadata,
     validate_if_group_structure,
 )
-from crm.service import enhanced_crm_service
 from email_automation.parser import MinimalEmailParser
+from services.automation_actions.crm_action import (
+    CrmActionHandler,
+    INBOUND_CRM_SYNC_SLUG,
+    is_inbound_crm_sync_slug,
+)
+from services.automation_actions.email_action import EmailActionHandler
+from services.automation_actions.sms_action import SmsActionHandler
+from services.automation_actions.webhook_action import WebhookActionHandler
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +82,7 @@ class ActionCapability(Enum):
 
 # Per-action capability: do not fake success for STUB; return 501 from API.
 ACTION_CAPABILITIES: Dict[ActionType, ActionCapability] = {
-    ActionType.SEND_EMAIL: ActionCapability.STUB,
+    ActionType.SEND_EMAIL: ActionCapability.IMPLEMENTED,
     ActionType.UPDATE_LEAD_STAGE: ActionCapability.IMPLEMENTED,
     ActionType.ADD_LEAD_ACTIVITY: ActionCapability.IMPLEMENTED,
     ActionType.APPLY_LABEL: ActionCapability.STUB,
@@ -92,8 +99,15 @@ ACTION_CAPABILITIES: Dict[ActionType, ActionCapability] = {
     ActionType.ASSIGN_TEAM_MEMBER: ActionCapability.IMPLEMENTED,
 }
 
+def _is_inbound_crm_sync_slug(slug: Any) -> bool:
+    """Backward-compatible shim for tests/callers."""
+    return is_inbound_crm_sync_slug(slug)
+
+
 _ACTION_CAPABILITY_DESCRIPTIONS: Dict[ActionType, str] = {
-    ActionType.SEND_EMAIL: "Gmail send not integrated; use stub.",
+    ActionType.SEND_EMAIL:
+        "Sends outbound email via Gmail OAuth when connected; "
+        "otherwise SendGrid/SMTP (FROM_EMAIL) when configured.",
     ActionType.APPLY_LABEL: "Gmail label API not integrated.",
     ActionType.ARCHIVE_EMAIL: "Gmail archive API not integrated.",
     ActionType.CREATE_TASK: "Task system not integrated.",
@@ -138,6 +152,10 @@ class AutomationEngine:
     """Automation engine for rule-based workflows"""
     
     def __init__(self):
+        self.crm_action_handler = CrmActionHandler(logger)
+        self.email_action_handler = EmailActionHandler(logger)
+        self.sms_action_handler = SmsActionHandler(logger)
+        self.webhook_action_handler = WebhookActionHandler(logger)
         self.trigger_handlers = {
             TriggerType.EMAIL_RECEIVED: self._handle_email_received_trigger,
             TriggerType.EMAIL_SENT: self._handle_email_sent_trigger,
@@ -148,9 +166,9 @@ class AutomationEngine:
         }
         
         self.action_handlers = {
-            ActionType.SEND_EMAIL: self._execute_send_email,
-            ActionType.UPDATE_LEAD_STAGE: self._execute_update_lead_stage,
-            ActionType.ADD_LEAD_ACTIVITY: self._execute_add_lead_activity,
+            ActionType.SEND_EMAIL: self.email_action_handler.execute_send_email,
+            ActionType.UPDATE_LEAD_STAGE: self.crm_action_handler.execute_update_lead_stage,
+            ActionType.ADD_LEAD_ACTIVITY: self.crm_action_handler.execute_add_lead_activity,
             ActionType.APPLY_LABEL: self._execute_apply_label,
             ActionType.ARCHIVE_EMAIL: self._execute_archive_email,
             ActionType.CREATE_TASK: self._execute_create_task,
@@ -158,10 +176,10 @@ class AutomationEngine:
             # Advanced workflow action handlers
             ActionType.SCHEDULE_FOLLOW_UP: self._execute_schedule_follow_up,
             ActionType.CREATE_CALENDAR_EVENT: self._execute_create_calendar_event,
-            ActionType.UPDATE_CRM_FIELD: self._execute_update_crm_field,
-            ActionType.TRIGGER_WEBHOOK: self._execute_trigger_webhook,
+            ActionType.UPDATE_CRM_FIELD: self.crm_action_handler.execute_update_crm_field,
+            ActionType.TRIGGER_WEBHOOK: self.webhook_action_handler.execute_trigger_webhook,
             ActionType.GENERATE_DOCUMENT: self._execute_generate_document,
-            ActionType.SEND_SMS: self._execute_send_sms,
+            ActionType.SEND_SMS: self.sms_action_handler.execute_send_sms,
             ActionType.CREATE_INVOICE: self._execute_create_invoice,
             ActionType.ASSIGN_TEAM_MEMBER: self._execute_assign_team_member
         }
@@ -484,7 +502,8 @@ class AutomationEngine:
                        action_type, action_parameters, status, created_at, updated_at,
                        last_executed, execution_count, success_count, error_count
                        FROM automation_rules
-                       WHERE user_id = ? AND trigger_type = ? AND status = ?""",
+                       WHERE user_id = ? AND trigger_type = ? AND status = ?
+                       ORDER BY datetime(created_at) ASC, id ASC""",
                     (user_id, trigger_type.value, AutomationStatus.ACTIVE.value),
                 )
 
@@ -503,6 +522,7 @@ class AutomationEngine:
                     execution_result = self._execute_rule(rule, trigger_data)
 
                     if execution_result["success"]:
+                        self._merge_lead_id_into_trigger(trigger_data, execution_result)
                         executed_rules.append(
                             {
                                 "rule_id": rule.id,
@@ -836,7 +856,9 @@ class AutomationEngine:
             if get_automation_run_id():
                 record_automation_step_started(user_id, rule, trigger_data)
             try:
-                result = action_handler(rule.action_parameters, trigger_data, user_id)
+                handler_trigger = dict(trigger_data or {})
+                handler_trigger["_automation_rule_id"] = rule.id
+                result = action_handler(rule.action_parameters, handler_trigger, user_id)
                 self._update_rule_stats(rule.id, result["success"])
                 self._log_execution(rule.id, user_id, trigger_data, result)
                 if get_automation_run_id():
@@ -856,76 +878,85 @@ class AutomationEngine:
                 record_automation_step_finished(user_id, rule, trigger_data, err_res)
             return err_res
     
-    def _execute_send_email(self, parameters: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Execute send email action. Stub: Gmail send not integrated."""
-        if ACTION_CAPABILITIES.get(ActionType.SEND_EMAIL) == ActionCapability.STUB:
-            return {
-                "success": False,
-                "error": "Send email is not yet implemented; Gmail send API not integrated.",
-                "error_code": "NOT_IMPLEMENTED",
-            }
+    def _merge_lead_id_into_trigger(
+        self, trigger_data: Dict[str, Any], execution_result: Dict[str, Any]
+    ) -> None:
+        """Allow later rules in the same run (e.g. SCHEDULE_FOLLOW_UP) to see lead_id from CRM actions."""
+        lead_id = self._lead_id_from_action_result(execution_result)
+        if lead_id is None:
+            return
+        trigger_data["lead_id"] = lead_id
+
+    def _lead_id_from_action_result(self, execution_result: Dict[str, Any]) -> Optional[int]:
+        if not execution_result.get("success"):
+            return None
+        data = execution_result.get("data")
+        if not isinstance(data, dict):
+            return None
+        lid = data.get("lead_id")
+        if lid is None:
+            lead_obj = data.get("lead")
+            if isinstance(lead_obj, dict):
+                lid = lead_obj.get("id")
+        if lid is None:
+            return None
         try:
-            template = parameters.get('template', 'default')
-            delay_minutes = parameters.get('delay_minutes', 0)
-            logger.info(f"Sending email using template: {template}")
-            return {
-                'success': True,
-                'data': {
-                    'action': 'email_sent',
-                    'template': template,
-                    'delay_minutes': delay_minutes,
-                    'recipient': trigger_data.get('sender_email', 'unknown')
-                }
-            }
-        except Exception as e:
-            return {'success': False, 'error': str(e)}
+            return int(lid)
+        except (TypeError, ValueError):
+            return None
+
+    def _parse_email_address(self, raw: Optional[str]) -> str:
+        """Backward-compatible wrapper for tests/callers."""
+        return self.email_action_handler.parse_email_address(raw)
+
+    def _sanitize_email_subject(self, subject: str) -> str:
+        """Backward-compatible wrapper for tests/callers."""
+        return self.email_action_handler.sanitize_email_subject(subject)
+
+    def _send_email_idempotency_key(
+        self,
+        user_id: int,
+        rule_id: int,
+        to_email: str,
+        subject: str,
+        body: str,
+        trigger_data: Dict[str, Any],
+    ) -> str:
+        """Backward-compatible wrapper for tests/callers."""
+        return self.email_action_handler.send_email_idempotency_key(
+            user_id=user_id,
+            rule_id=rule_id,
+            to_email=to_email,
+            subject=subject,
+            body=body,
+            trigger_data=trigger_data,
+        )
+
+    def _execute_send_email(
+        self, parameters: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int
+    ) -> Dict[str, Any]:
+        """Backward-compatible wrapper for tests/callers."""
+        return self.email_action_handler.execute_send_email(
+            parameters=parameters,
+            trigger_data=trigger_data,
+            user_id=user_id,
+        )
     
     def _execute_update_lead_stage(self, parameters: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Execute update lead stage action"""
-        try:
-            new_stage = parameters.get('stage')
-            lead_id = trigger_data.get('lead_id')
-            
-            if not lead_id or not new_stage:
-                return {
-                    'success': False,
-                    'error': 'Missing lead_id or stage parameter'
-                }
-            
-            # Update lead stage using CRM service
-            result = enhanced_crm_service.update_lead(lead_id, user_id, {'stage': new_stage})
-            
-            return result
-            
-        except Exception as e:
-            return {
-                'success': False,
-                'error': str(e)
-            }
+        """Backward-compatible wrapper for tests/callers."""
+        return self.crm_action_handler.execute_update_lead_stage(
+            parameters=parameters,
+            trigger_data=trigger_data,
+            user_id=user_id,
+        )
     
     def _execute_add_lead_activity(self, parameters: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Execute add lead activity action"""
-        try:
-            activity_type = parameters.get('activity_type', 'note_added')
-            description = parameters.get('description', 'Automated activity')
-            lead_id = trigger_data.get('lead_id')
-            
-            if not lead_id:
-                return {
-                    'success': False,
-                    'error': 'Missing lead_id parameter'
-                }
-            
-            # Add activity using CRM service
-            result = enhanced_crm_service.add_lead_activity(lead_id, user_id, activity_type, description)
-            
-            return result
-            
-        except Exception as e:
-            return {
-                'success': False,
-                'error': str(e)
-            }
+        """Backward-compatible wrapper for tests/callers."""
+        return self.crm_action_handler.execute_add_lead_activity(
+            parameters=parameters,
+            trigger_data=trigger_data,
+            user_id=user_id,
+        )
     
     def _execute_apply_label(self, parameters: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
         """Execute apply label action. Stub: Gmail label API not integrated."""
@@ -1212,169 +1243,31 @@ class AutomationEngine:
             return {'success': False, 'error': str(e)}
     
     def _execute_update_crm_field(self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Update a CRM field. Handles lead_scoring preset: set stage when score >= min_score."""
-        try:
-            if action_data.get('slug') == 'lead_scoring':
-                lead_id = trigger_data.get('lead_id') or action_data.get('lead_id')
-                if not lead_id:
-                    return {'success': False, 'error': 'lead_id required for lead_scoring'}
-                row = db_optimizer.execute_query(
-                    "SELECT id, score FROM leads WHERE id = ? AND user_id = ?",
-                    (lead_id, user_id)
-                )
-                if not row:
-                    return {'success': False, 'error': 'Lead not found'}
-                score = row[0].get('score') or 0
-                min_score = int(action_data.get('min_score', 60)) if action_data.get('min_score') is not None else 60
-                if score >= min_score:
-                    target_stage = action_data.get('target_stage', 'qualified')
-                    db_optimizer.execute_query(
-                        "UPDATE leads SET stage = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?",
-                        (target_stage, lead_id, user_id),
-                        fetch=False
-                    )
-                    enhanced_crm_service.add_lead_activity(
-                        lead_id, user_id, 'note_added',
-                        f"Lead scored {score} (≥{min_score}); stage set to {target_stage}"
-                    )
-                return {
-                    'success': True,
-                    'data': {'lead_id': lead_id, 'score': score, 'min_score': min_score}
-                }
-
-            # Gmail → CRM preset: create or update lead from inbound email (matches core.automation_engine)
-            if trigger_data.get('sender_email') and not action_data.get('lead_id'):
-                sender_email = (trigger_data.get('sender_email') or '').strip()
-                if not sender_email:
-                    return {'success': False, 'error': 'sender_email required for email → CRM'}
-                sender_name = trigger_data.get('sender_name') or sender_email.split('@')[0]
-                target_stage = action_data.get('target_stage', 'new')
-                existing = db_optimizer.execute_query(
-                    "SELECT id FROM leads WHERE user_id = ? AND lower(email) = lower(?)",
-                    (user_id, sender_email),
-                )
-                if existing:
-                    lead_id = existing[0]['id']
-                    if target_stage:
-                        db_optimizer.execute_query(
-                            "UPDATE leads SET stage = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?",
-                            (target_stage, lead_id, user_id),
-                            fetch=False,
-                        )
-                    enhanced_crm_service.add_lead_activity(
-                        lead_id,
-                        user_id,
-                        'note_added',
-                        f"Gmail → CRM: stage set to {target_stage}",
-                    )
-                    return {
-                        'success': True,
-                        'data': {
-                            'lead_id': lead_id,
-                            'action': 'lead_updated',
-                            'message': f'Lead updated to {target_stage} stage',
-                        },
-                    }
-                lead_result = enhanced_crm_service.create_lead(
-                    user_id,
-                    {
-                        'email': sender_email,
-                        'name': sender_name,
-                        'source': 'gmail',
-                        'stage': target_stage,
-                        'correlation_id': trigger_data.get('correlation_id'),
-                    },
-                )
-                if lead_result.get('success'):
-                    new_id = lead_result['data']['lead_id']
-                    return {
-                        'success': True,
-                        'data': {
-                            'lead_id': new_id,
-                            'action': 'lead_created',
-                            'message': f'Lead created in {target_stage} stage',
-                        },
-                    }
-                return {'success': False, 'error': lead_result.get('error', 'Failed to create lead')}
-
-            lead_id = action_data.get('lead_id') or trigger_data.get('lead_id')
-            field_name = action_data.get('field_name')
-            field_value = action_data.get('field_value')
-            if not lead_id or not field_name:
-                return {'success': False, 'error': 'Missing lead_id or field_name'}
-            db_optimizer.execute_query(
-                """UPDATE leads SET {} = ? WHERE id = ? AND user_id = ?""".format(field_name),
-                (field_value, lead_id, user_id),
-                fetch=False
-            )
-            logger.info("Updated CRM field %s for lead %s", field_name, lead_id)
-            return {'success': True}
-        except Exception as e:
-            logger.error("Error updating CRM field: %s", e)
-            return {'success': False, 'error': str(e)}
+        """Backward-compatible wrapper for tests/callers."""
+        return self.crm_action_handler.execute_update_crm_field(
+            action_data=action_data,
+            trigger_data=trigger_data,
+            user_id=user_id,
+        )
     
     def _execute_trigger_webhook(self, parameters: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """Trigger a webhook via HTTP POST with timeout, retries, and optional signature."""
-        try:
-            webhook_url = (parameters.get('webhook_url') or parameters.get('sheet_url') or '').strip()
-            if not webhook_url:
-                return {'success': False, 'error': 'Missing webhook_url', 'error_code': 'MISSING_URL'}
-            payload = dict(parameters.get('payload', {}))
-            payload['user_id'] = user_id
-            payload['timestamp'] = datetime.now().isoformat()
-            payload.setdefault('event', trigger_data.get('event_type', 'automation_triggered'))
-            for k, v in trigger_data.items():
-                if k not in payload:
-                    payload[k] = v
-
-            secret = parameters.get('webhook_secret')
-            body_bytes = json.dumps(payload, sort_keys=True).encode()
-            headers = {'Content-Type': 'application/json'}
-            if secret:
-                import hmac
-                import hashlib
-                sig = hmac.new(secret.encode() if isinstance(secret, str) else secret, body_bytes, hashlib.sha256).hexdigest()
-                headers['X-Fikiri-Signature'] = f'sha256={sig}'
-
-            timeout_sec = min(30, max(5, int(parameters.get('timeout_seconds', 10))))
-            max_attempts = max(1, min(3, int(parameters.get('max_retries', 2)) + 1))
-
-            last_error = None
-            for attempt in range(max_attempts):
-                try:
-                    import requests
-                    response = requests.post(
-                        webhook_url,
-                        data=body_bytes,
-                        headers=headers,
-                        timeout=timeout_sec,
-                    )
-                    response.raise_for_status()
-                    logger.info("Webhook delivered to %s status=%s", webhook_url[:80], response.status_code)
-                    return {
-                        'success': True,
-                        'data': {'webhook_url': webhook_url, 'status_code': response.status_code},
-                    }
-                except Exception as e:
-                    last_error = e
-                    if attempt < max_attempts - 1:
-                        import time
-                        time.sleep(0.5 * (2 ** attempt))
-            logger.warning("Webhook failed after %s attempts to %s: %s", max_attempts, webhook_url[:80], last_error)
-            return {
-                'success': False,
-                'error': str(last_error),
-                'error_code': 'WEBHOOK_DELIVERY_FAILED',
-            }
-        except Exception as e:
-            logger.error("Error triggering webhook: %s", e)
-            return {'success': False, 'error': str(e), 'error_code': 'WEBHOOK_ERROR'}
+        """Backward-compatible wrapper for tests/callers."""
+        return self.webhook_action_handler.execute_trigger_webhook(
+            parameters=parameters,
+            trigger_data=trigger_data,
+            user_id=user_id,
+        )
     
-    def _execute_generate_document(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+    def _execute_generate_document(
+        self,
+        action_data: Dict[str, Any],
+        trigger_data: Dict[str, Any],
+        user_id: int,
+    ) -> Dict[str, Any]:
         """Generate a document"""
         try:
             template_id = action_data.get('template_id')
-            lead_id = action_data.get('lead_id')
+            lead_id = action_data.get('lead_id') or trigger_data.get('lead_id')
             variables = action_data.get('variables', {})
             
             # Import document templates system
@@ -1384,7 +1277,11 @@ class AutomationEngine:
             document = doc_templates.generate_document(template_id, variables, user_id)
             
             logger.info(f"Generated document {document.id} for lead {lead_id}")
-            return {'success': True, 'document_id': document.id}
+            return {
+                'success': True,
+                'document_id': document.id,
+                'data': {'document_id': document.id, 'lead_id': lead_id},
+            }
             
         except Exception as e:
             logger.error(f"Error generating document: {e}")
@@ -1393,95 +1290,22 @@ class AutomationEngine:
     def _execute_send_sms(
         self, action_data: Dict[str, Any], trigger_data: Dict[str, Any], user_id: int
     ) -> Dict[str, Any]:
-        """Send SMS via Twilio when configured; requires lead_id and leads.metadata.sms_consent."""
-        try:
-            from core.sms_consent import lead_row_allows_sms, lead_sms_destination_matches
-
-            lead_id = action_data.get("lead_id") or trigger_data.get("lead_id")
-            phone_number = action_data.get("phone_number")
-            message = action_data.get("message", "")
-            if not lead_id:
-                return {
-                    "success": False,
-                    "error": "lead_id required for SMS (consent is verified per lead)",
-                    "error_code": "SMS_LEAD_REQUIRED",
-                }
-            if not message:
-                return {"success": False, "error": "message required"}
-            row = db_optimizer.execute_query(
-                "SELECT id, phone, metadata FROM leads WHERE id = ? AND user_id = ?",
-                (lead_id, user_id),
-            )
-            if not row:
-                return {"success": False, "error": "Lead not found", "error_code": "LEAD_NOT_FOUND"}
-            lead = row[0]
-            ok, reason = lead_row_allows_sms(lead)
-            if not ok:
-                return {
-                    "success": False,
-                    "error": reason,
-                    "error_code": "SMS_CONSENT_REQUIRED",
-                }
-            lead_phone = lead.get("phone") or ""
-            if not str(lead_phone).strip():
-                return {"success": False, "error": "Lead has no phone number"}
-            if not lead_sms_destination_matches(lead_phone, phone_number):
-                return {
-                    "success": False,
-                    "error": "phone_number does not match lead phone (consent applies to lead record only)",
-                    "error_code": "SMS_PHONE_MISMATCH",
-                }
-            to = str(lead_phone).strip()
-            if not to.startswith("+"):
-                digits = "".join(c for c in to if c.isdigit())
-                to = (
-                    ("+" + digits)
-                    if len(digits) == 11 and digits.startswith("1")
-                    else ("+1" + digits)
-                    if len(digits) == 10
-                    else ("+" + digits)
-                )
-            status = "skipped"
-            error_msg = None
-            account_sid = os.getenv("TWILIO_ACCOUNT_SID")
-            auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-            messaging_sid = os.getenv("TWILIO_MESSAGING_SERVICE_SID")
-            if account_sid and auth_token and messaging_sid:
-                try:
-                    from twilio.rest import Client
-
-                    client = Client(account_sid, auth_token)
-                    msg = client.messages.create(
-                        messaging_service_sid=messaging_sid,
-                        body=message,
-                        to=to,
-                    )
-                    logger.info("Twilio SMS sent to %s sid=%s", to, msg.sid)
-                    status = "sent"
-                except Exception as e:
-                    status = "failed"
-                    error_msg = str(e)
-                    logger.exception("Twilio SMS error to %s", to)
-            else:
-                logger.info("SMS (no Twilio): to=%s body=%s", to, message[:50])
-            try:
-                db_optimizer.execute_query(
-                    """INSERT INTO sms_messages (user_id, lead_id, phone_number, message, status, sent_at)
-                       VALUES (?, ?, ?, ?, ?, ?)""",
-                    (user_id, lead_id, to, message, status, datetime.now().isoformat()),
-                    fetch=False,
-                )
-            except Exception:
-                pass
-            return {"success": status == "sent", "error": error_msg}
-        except Exception as e:
-            logger.error("Error sending SMS: %s", e)
-            return {"success": False, "error": str(e)}
+        """Backward-compatible wrapper for tests/callers."""
+        return self.sms_action_handler.execute_send_sms(
+            action_data=action_data,
+            trigger_data=trigger_data,
+            user_id=user_id,
+        )
     
-    def _execute_create_invoice(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+    def _execute_create_invoice(
+        self,
+        action_data: Dict[str, Any],
+        trigger_data: Dict[str, Any],
+        user_id: int,
+    ) -> Dict[str, Any]:
         """Create an invoice"""
         try:
-            lead_id = action_data.get('lead_id')
+            lead_id = action_data.get('lead_id') or trigger_data.get('lead_id')
             amount = action_data.get('amount', 0)
             description = action_data.get('description', '')
             due_date = action_data.get('due_date')
@@ -1496,16 +1320,25 @@ class AutomationEngine:
             )
             
             logger.info(f"Created invoice {invoice_id} for lead {lead_id}")
-            return {'success': True, 'invoice_id': invoice_id}
+            return {
+                'success': True,
+                'invoice_id': invoice_id,
+                'data': {'invoice_id': invoice_id, 'lead_id': lead_id},
+            }
             
         except Exception as e:
             logger.error(f"Error creating invoice: {e}")
             return {'success': False, 'error': str(e)}
     
-    def _execute_assign_team_member(self, action_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+    def _execute_assign_team_member(
+        self,
+        action_data: Dict[str, Any],
+        trigger_data: Dict[str, Any],
+        user_id: int,
+    ) -> Dict[str, Any]:
         """Assign team member to lead"""
         try:
-            lead_id = action_data.get('lead_id')
+            lead_id = action_data.get('lead_id') or trigger_data.get('lead_id')
             team_member_id = action_data.get('team_member_id')
             assignment_type = action_data.get('assignment_type', 'owner')
             
@@ -1517,7 +1350,7 @@ class AutomationEngine:
             )
             
             logger.info(f"Assigned team member {team_member_id} to lead {lead_id}")
-            return {'success': True}
+            return {'success': True, 'data': {'lead_id': lead_id}}
             
         except Exception as e:
             logger.error(f"Error assigning team member: {e}")

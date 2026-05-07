@@ -15,7 +15,7 @@ from abc import ABC, abstractmethod
 from core.smart_faq_system import get_smart_faq
 from core.knowledge_base_system import get_knowledge_base
 from core.context_aware_responses import get_context_system
-from core.minimal_config import get_config
+from core.config import get_config
 
 logger = logging.getLogger(__name__)
 

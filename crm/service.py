@@ -5,6 +5,8 @@ Manages leads, contacts, and activities with automatic Gmail integration
 
 import json
 import logging
+import re
+from email.utils import parseaddr
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, asdict, is_dataclass
 from datetime import datetime, timedelta, timezone
@@ -877,6 +879,133 @@ class EnhancedCRMService:
         except Exception as e:
             logger.warning(f"Failed to compute lead activity metrics: {e}")
         return 0, None
+
+    def upsert_lead_from_inbound_email(
+        self,
+        user_id: int,
+        *,
+        sender_header: str,
+        subject: str,
+        provider: str,
+        correlation_id: str,
+        mailbox_owner_email: Optional[str] = None,
+        default_source: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Deterministic backbone for Email → Lead before automation rules run.
+
+        - Parses a single From address; skips obviously automated senders.
+        - Case-insensitive upsert on (user_id, email).
+        - New leads run through create_lead (LEAD_CREATED automations + CRM events).
+        - Existing leads get last_contact bumped, a short activity note, and rescore.
+        """
+        try:
+            corr = str(correlation_id or uuid4())
+            _, addr = parseaddr(sender_header or "")
+            email = (addr or "").strip().lower()
+            if not email or "@" not in email or "," in email:
+                return {
+                    "success": True,
+                    "skipped": True,
+                    "reason": "unparseable_sender",
+                    "correlation_id": corr,
+                }
+
+            local = email.split("@", 1)[0].lower()
+            if local in {
+                "noreply",
+                "no-reply",
+                "donotreply",
+                "do-not-reply",
+                "mailer-daemon",
+                "postmaster",
+            } or local.startswith("noreply"):
+                return {
+                    "success": True,
+                    "skipped": True,
+                    "reason": "automated_sender",
+                    "correlation_id": corr,
+                }
+
+            if mailbox_owner_email and email == (mailbox_owner_email or "").strip().lower():
+                return {
+                    "success": True,
+                    "skipped": True,
+                    "reason": "self_sender",
+                    "correlation_id": corr,
+                }
+
+            display_name = ((sender_header or "").split("<")[0]).strip().strip('"').strip()
+            if not display_name or display_name.lower() == email:
+                display_name = email.split("@")[0]
+
+            source = (default_source or provider or "inbound").strip() or "inbound"
+            subject_hint = (subject or "").replace("\r", " ").replace("\n", " ").strip()
+            subject_hint = re.sub(r"\s+", " ", subject_hint)[:400]
+
+            rows = db_optimizer.execute_query(
+                "SELECT id FROM leads WHERE user_id = ? AND lower(email) = lower(?) AND withdrawn_at IS NULL LIMIT 1",
+                (user_id, email),
+            )
+            if rows:
+                lead_id = int(rows[0]["id"])
+                db_optimizer.execute_query(
+                    "UPDATE leads SET last_contact = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP "
+                    "WHERE id = ? AND user_id = ?",
+                    (lead_id, user_id),
+                    fetch=False,
+                )
+                self._add_lead_activity(
+                    lead_id,
+                    "note_added",
+                    f"Inbound ({provider}): {subject_hint}"
+                    + ("" if subject_hint else " — (no subject)"),
+                )
+                record_crm_event(
+                    user_id=user_id,
+                    event_type="lead.inbound_touch",
+                    entity_type="lead",
+                    entity_id=lead_id,
+                    payload={"provider": provider, "subject_preview": subject_hint[:200]},
+                    correlation_id=corr,
+                )
+                self.recalculate_lead_score(lead_id, user_id)
+                return {
+                    "success": True,
+                    "skipped": False,
+                    "created": False,
+                    "data": {"lead_id": lead_id, "correlation_id": corr},
+                }
+
+            create_res = self.create_lead(
+                user_id,
+                {
+                    "email": email,
+                    "name": display_name,
+                    "source": source,
+                    "stage": "new",
+                    "correlation_id": corr,
+                },
+            )
+            if not create_res.get("success"):
+                return create_res
+
+            return {
+                "success": True,
+                "skipped": False,
+                "created": True,
+                "data": {
+                    "lead_id": create_res["data"]["lead_id"],
+                    "correlation_id": corr,
+                },
+            }
+        except Exception as e:
+            logger.error("upsert_lead_from_inbound_email failed: %s", e)
+            return {
+                "success": False,
+                "error": str(e),
+                "error_code": "INBOUND_LEAD_UPSERT_FAILED",
+            }
 
     def recalculate_lead_score(self, lead_id: int, user_id: int) -> Dict[str, Any]:
         lead_data = db_optimizer.execute_query(

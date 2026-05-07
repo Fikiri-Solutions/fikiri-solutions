@@ -75,13 +75,13 @@ logger.info("Starting Fikiri API environment: %s", os.getenv("FLASK_ENV", "produ
 
 # Core imports
 from core.flask_secret import resolve_flask_secret_key
-from core.minimal_config import get_config
+from core.config import get_config
 from email_automation.parser import MinimalEmailParser
 from integrations.gmail.utils import MinimalGmailService
 from email_automation.actions import MinimalEmailActions
 from email_automation.ai_assistant import MinimalAIEmailAssistant
-from core.minimal_ml_scoring import MinimalMLScoring
-from core.minimal_vector_search import MinimalVectorSearch
+from core.ml_scoring import MinimalMLScoring
+from core.vector_search import MinimalVectorSearch
 from core.feature_flags import get_feature_flags
 from email_automation.service_manager import EmailServiceManager
 

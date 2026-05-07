@@ -4,6 +4,22 @@
 
 Use this on **one workflow end-to-end** per engagement. Resist scope creep in the room; capture “other fires” in a parking lot.
 
+### Works for any business infrastructure
+
+The checklist below uses words like **lead**, **CRM**, and **inbound** because they are familiar—not because every business is a sales funnel. Translate freely:
+
+| If they sound like… | Treat “lead” as… | “First response” might mean… |
+|---------------------|------------------|------------------------------|
+| Dispatch, freight, logistics | A **load / lane / opportunity** from a board, broker feed, or partner log | First human triage of that row (fit, margin, risk) |
+| Trades, property services | A **job** or **ticket** (call-in, portal, property manager email) | Booking the visit or quoting |
+| Retail / wholesale | A **replenishment decision**, **special order**, or **vendor deal** | Approving buy, price change, or pickup slot |
+| Clinic, wellness, professional office | An **appointment request** or **referral packet** | Confirmation + intake completed |
+| Restaurant, venue, events | A **booking**, **catering lead**, or **event hold** | Deposit + calendar lock |
+
+**System of record** might be a CRM—but it might be a **dispatch board, TMS, POS, EHR, spreadsheet, or group chat**. Your job is to find **where truth lives today**, not to force a tool category.
+
+**Regional context (optional):** In **Florida**—especially **South Florida**—you will see dense mixes of **tourism & hospitality**, **real estate & property management**, **marine & logistics**, **construction & remodeling**, **home services** (HVAC, pools, impact glass), **health & aesthetics**, and **import/export light manufacturing**. Use local examples in conversation; keep the **same diagnostic skeleton** for all of them.
+
 ---
 
 ## Part A — Reusable diagnostic checklist (copy every time)
@@ -12,9 +28,9 @@ Use this on **one workflow end-to-end** per engagement. Resist scope creep in th
 
 | ☐ | Task |
 |---|------|
-| ☐ | Confirm **one** target workflow name (e.g. “new lead → first human response → CRM → follow-up #1”). |
+| ☐ | Confirm **one** target workflow name (e.g. “new lead → first human response → CRM → follow-up #1”, or “posted load → match → negotiate → assign driver”). |
 | ☐ | Confirm attendees: **decision-maker** + **person who actually does the work** (not optional). |
-| ☐ | Ask them to have **real examples** ready: 2–3 recent leads/inquiries (screenshots or forwarded emails OK if allowed). |
+| ☐ | Ask them to have **real examples** ready: 2–3 recent **items that moved through this workflow** (inquiries, loads, jobs, tickets—screenshots, forwarded emails, or portal exports OK if allowed). |
 | ☐ | Note their **busy season** / weekly rhythm (affects response-time expectations). |
 
 ### Opening (2 min) — set the frame
@@ -24,27 +40,35 @@ Use this on **one workflow end-to-end** per engagement. Resist scope creep in th
 | ☐ | “We’re not here to ‘automate everything.’ We’re mapping **where time leaks** and **where the process breaks**, then we decide what to fix first.” |
 | ☐ | “Today we stick to **one workflow**. Other ideas go on a parking lot list.” |
 
-### Section 1 — Lead intake (money in)
+### Section 1 — Intake (where work or revenue enters)
 
 | ☐ | Question | Capture answer |
 |---|----------|----------------|
-| ☐ | Where do new leads/inquiries **actually** arrive? (email, form, DMs, phone, referrals, portals) | Channels: |
-| ☐ | Volume: rough **per week** in normal season? | # / week |
-| ☐ | After entry, where does the **first record** live? (inbox only, spreadsheet, CRM, paper) | First home: |
-| ☐ | Is anything **auto-logged**, or is it always manual? | Auto / manual: |
+| ☐ | Where do **new opportunities** actually appear? (email, forms, DMs, phone, walk-in, **partner/broker portals**, **load boards**, vendor catalogs, EDI/API, referrals) | Channels / feeds: |
+| ☐ | Volume: rough **per week** in normal season? (count **discrete opportunities**: calls, rows, RFQs, loads—whatever matches their workflow) | # / week |
+| ☐ | After entry, where does the **first record** live? (inbox, spreadsheet, CRM/TMS, dispatch sheet, paper, WhatsApp thread) | First home: |
+| ☐ | Is anything **auto-logged**, or is it always manual copy-paste? | Auto / manual: |
 
-**Red flags:** multiple inboxes nobody owns; “we check Instagram when we can”; portal leads only live in email notifications.
+**Matchmaking / margin workflows (e.g. dispatch, wholesale, staffing):** also ask:
+
+| ☐ | Question | Capture answer |
+|---|----------|----------------|
+| ☐ | Where does **supply** come from vs **demand**? (e.g. broker logs vs driver pool; inventory vs buyers) | Supply / demand: |
+| ☐ | What defines a **good match**—lane, equipment, price band, credit, timing? Who decides? | Match rules: |
+| ☐ | Where does **negotiation** happen (phone, email, app)—and what’s written down after? | Negotiation + record: |
+
+**Red flags:** multiple inboxes nobody owns; “we check Instagram when we can”; portal rows only live in email notifications; **pricing agreed verbally** with no durable record.
 
 ### Section 2 — Routing & ownership
 
 | ☐ | Question | Capture answer |
 |---|----------|----------------|
-| ☐ | **Who** is responsible for first response? Name/role. | Owner: |
+| ☐ | **Who** is responsible for first touch on a new item? Name/role. | Owner: |
 | ☐ | What happens if that person is **busy / OOO / sick**? | Backup: |
-| ☐ | How do you decide **who** gets which lead? (round-robin, territory, seniority, “whoever sees it first”) | Rule (honest): |
-| ☐ | Is there a **single queue** or competing channels? | Queue model: |
+| ☐ | How do you decide **who** gets which item? (round-robin, territory, seniority, equipment type, **lane**, “whoever sees it first”) | Rule (honest): |
+| ☐ | Is there a **single queue** or competing channels (e.g. phone bids vs portal vs partner feed)? | Queue model: |
 
-**Red flags:** “it depends”; “whoever is free”; no backup; leads assigned by **speed of checking phone** instead of rules.
+**Red flags:** “it depends”; “whoever is free”; no backup; work assigned by **speed of checking phone** instead of rules; **split screens** (board in one tab, rates in another, negotiation in text).
 
 ### Section 3 — Timing & SLA (real world)
 
@@ -61,22 +85,22 @@ Use this on **one workflow end-to-end** per engagement. Resist scope creep in th
 
 | ☐ | Question | Capture answer |
 |---|----------|----------------|
-| ☐ | What makes a lead **qualified vs not**? Written criteria or gut? | Criteria: |
-| ☐ | What triggers **next step** (call booked, quote, site visit, nurture)? | Triggers: |
-| ☐ | Where do **exceptions** go (VIP, partner referral, angry customer)? | Exceptions: |
+| ☐ | What makes an item **go / no-go**? (fit for service, acceptable margin, equipment, credit, schedule window) Written criteria or gut? | Criteria: |
+| ☐ | What triggers **next step** (book, quote, assign carrier, send contract, nurture)? | Triggers: |
+| ☐ | Where do **exceptions** go (VIP, partner referral, angry customer, **overage loads**, **after-hours**)? | Exceptions: |
 
-**Red flags:** “we just know”; different reps decide differently; VIP bypass breaks the queue.
+**Red flags:** “we just know”; different people decide differently; VIP bypass breaks the queue; **margin math only in someone’s head**.
 
 ### Section 5 — Tools & system of record
 
 | ☐ | Question | Capture answer |
 |---|----------|----------------|
-| ☐ | **CRM** (or substitute): what is the official record? | Tool: |
-| ☐ | Duplicates: common? How resolved today? | Dedupe reality: |
-| ☐ | What lives only in **heads**, sticky notes, or personal inboxes? | Tribal knowledge: |
-| ☐ | Integrations: forms → CRM, email → CRM, calendar sync? | Connected / brittle: |
+| ☐ | **Official record** for this workflow: CRM, TMS/dispatch, POS, EHR, job system—or **“no single place”**? | Tool: |
+| ☐ | Duplicates / conflicting rows: common? How resolved today? | Dedupe reality: |
+| ☐ | What lives only in **heads**, sticky notes, personal inboxes, or **driver group chats**? | Tribal knowledge: |
+| ☐ | Integrations: forms → system, email → system, portal → sheet, calendar sync, API—what’s **connected vs brittle**? | Connected / brittle: |
 
-**Red flags:** “we use notes”; CRM empty until “later”; same customer in three places with different spellings.
+**Red flags:** “we use notes”; system empty until “later”; same customer/job/load in three places with different spellings; **price agreed in SMS** not reflected on the board.
 
 ### Section 6 — Follow-up & scheduling
 
@@ -91,17 +115,18 @@ Use this on **one workflow end-to-end** per engagement. Resist scope creep in th
 
 | ☐ | Question | Capture answer |
 |---|----------|----------------|
-| ☐ | How many **new leads** last month (ballpark)? | # |
-| ☐ | Conversion to **next step**—known or guessed? | % or “unknown” |
-| ☐ | Where would they **look** to see pipeline health? | Report / nowhere: |
+| ☐ | How many **new items** through this workflow last month (ballpark)? | # |
+| ☐ | Conversion to **next step** (won job, covered load, booked appointment)—known or guessed? | % or “unknown” |
+| ☐ | Margin / yield: do they know **average $ per unit** or **gross per lane** after negotiation—or only revenue? | Unit economics: |
+| ☐ | Where would they **look** to see pipeline or dispatch health? | Report / nowhere: |
 
-**Red flags:** “we kinda know”; no single report everyone trusts.
+**Red flags:** “we kinda know”; no single report everyone trusts; **busy but broke** (volume without margin visibility).
 
 ### Section 8 — Failure modes (where it breaks)
 
 | ☐ | Prompt | Notes |
 |---|--------|------|
-| ☐ | “Tell me about the last time a lead **fell through the cracks**.” | |
+| ☐ | “Tell me about the last time an opportunity **fell through the cracks**—missed call, missed row, bad handoff, wrong price.” | |
 | ☐ | “What part of this process do you **dread**?” | |
 | ☐ | “If you left for a week, what would **definitely** break?” | |
 
@@ -115,7 +140,7 @@ Capture **yes/no or short notes**:
 | ☐ | Brand / tone (can’t sound robotic; local voice) | |
 | ☐ | Languages (English-only vs bilingual staff/customers) | |
 | ☐ | Payment sensitivity (deposits, quotes, collections) | |
-| ☐ | Who can approve **changing** how leads are handled? | |
+| ☐ | Who can approve **changing** how this workflow runs (rules, rates, assignments)? | |
 
 ### Close — parking lot & next step
 
@@ -134,12 +159,12 @@ Use internally after the call—don’t turn it into a math exam for the client.
 
 | Signal | Why it matters |
 |--------|----------------|
-| **Repetition** | Same steps daily/weekly → automation ROI |
-| **Delay** | Queue time → lost revenue, especially in speed-sensitive niches |
-| **Human error** | Missed handoffs, wrong assignee → trust + revenue risk |
+| **Repetition** | Same steps daily/weekly → automation ROI (includes **screen-scrape / copy-paste between portals**) |
+| **Delay** | Queue time → lost revenue, especially in speed-sensitive niches (**loads, bids, same-day service**) |
+| **Human error** | Missed handoffs, wrong assignee, **wrong rate or lane** → trust + revenue risk |
 | **Variance** | Wildly different outcomes by rep/day → process debt |
 
-Optional **1–5** self-ratings (you fill after call): data cleanliness, ownership clarity, tool fit, measurability, change readiness. Feeds your Automation scorecard narrative.
+Optional **1–5** self-ratings (you fill after call): data cleanliness, ownership clarity, tool fit (any category), measurability, change readiness. Feeds your Automation scorecard narrative.
 
 ---
 
@@ -160,17 +185,17 @@ Use a **full-page database** in Notion (or inline on a “Sales / Diagnostics”
 
 | # | Property name | Type | Options / notes |
 |---|----------------|------|------------------|
-| 1 | **Name** | Title | Format: `Client — workflow` (e.g. `Smith Realty — Lead → first appt`). |
+| 1 | **Name** | Title | Format: `Client — workflow` (e.g. `Smith Realty — Inquiry → first appt`, `Acme Dispatch — Board → negotiate → assign`). |
 | 2 | **Status** | Select | `Lead` · `Scheduled` · `In progress` · `Scored` · `Proposal sent` · `Won` · `Lost` · `Nurture` |
 | 3 | **Session date** | Date | Date only or datetime; use for weekly views. |
-| 4 | **Industry** | Select | Starter set (edit freely): `Real estate` · `Home services` · `Professional services` · `Retail / local` · `Healthcare` · `Construction` · `Agency` · `Other` |
+| 4 | **Industry** | Select | Starter set (edit freely): `Real estate` · `Property management` · `Home services` · `Construction / trades` · `Transportation / logistics` · `Marine` · `Hospitality / tourism` · `Retail / wholesale` · `Professional services` · `Healthcare` · `Beauty / wellness` · `Agency` · `Other` |
 | 5 | **Workflow one-liner** | Text | Single-thread scope; must match “one workflow” rule. |
-| 6 | **Channels** | Multi-select | `Email` · `Web form` · `Phone` · `SMS` · `DM / social` · `Portal (e.g. Zillow)` · `Referral` · `Walk-in` · `Other` |
+| 6 | **Channels** | Multi-select | `Email` · `Web form` · `Phone` · `SMS` · `DM / social` · `Partner portal` · `Load / job board` · `API / file feed` · `Walk-in` · `Referral` · `Other` |
 | 7 | **Volume / week** | Number | Integer; rough inbound count for this workflow. |
 | 8 | **First response time** | Text | Median + worst case (e.g. “2 hrs typical, 2 days worst”). |
 | 9 | **Owner + backup** | Text | Named owner + gap when OOO. |
 | 10 | **CRM health** | Select | `Clean` · `Messy` · `Unknown` · `No CRM` |
-| 11 | **CRM tool** | Text | e.g. HubSpot, Sheets, “inbox only.” |
+| 11 | **CRM tool** | Text | e.g. HubSpot, TMS, dispatch sheet, POS, Sheets, “inbox only.” |
 | 12 | **Top failure story** | Text | Narrative; quote-style OK. |
 | 13 | **Repetition score** | Number | Internal **1–5** (repeatability / automation fit). |
 | 14 | **Delay score** | Number | Internal **1–5** (cost of waiting / queue). |
@@ -220,11 +245,11 @@ Default new rows from the form to **Status** = `Lead` or `Scheduled` via a **dat
 1. Business name, your name, email, phone  
 2. Industry, team size, location(s)  
 3. **One workflow** we’re diagnosing (single sentence)  
-4. Where leads come from (checkboxes + “other”)  
-5. Approx leads per week (range dropdown)  
+4. Where opportunities come from (checkboxes + “other”—include portals/boards if relevant)  
+5. Approx volume per week for **this** workflow (range dropdown)  
 6. Who owns first response? Backup if absent? (short text)  
 7. How fast is first response usually? (range + worst case)  
-8. CRM / where records live  
+8. Where records live for this process (“CRM” optional—sheet/TMS OK)  
 9. Biggest failure in last 90 days (paragraph)  
 10. What would break if you were gone a week? (paragraph)  
 11. Compliance or tone constraints? (paragraph, optional)  
@@ -234,9 +259,15 @@ Default new rows from the form to **Status** = `Lead` or `Scheduled` via a **dat
 
 ---
 
-## Part D — Nuance SMB SaaS often overlooks
+## Part D — Nuance SMB operators often overlook
 
 Use these to ask **better** questions and to avoid proposing tools that die on the vine.
+
+### 0. Not every business is “inbound marketing → CRM”
+
+- **Operations-first:** Revenue comes from **matching supply and demand** (freight, crews, inventory, appointment slots)—optimize for **speed-to-commit**, **margin**, and **proof of agreement**, not just faster email.
+- **Chat / voice / field:** Truth may live in **WhatsApp, SMS, or dispatch radio culture**—design handoffs that respect how teams actually coordinate.
+- **Regulated or insured:** Logging incidents, DOT-style documentation, or chain-of-custody may matter as much as “response time.”
 
 ### 1. Power & politics
 
@@ -246,10 +277,11 @@ Use these to ask **better** questions and to avoid proposing tools that die on t
 
 ### 2. Operational reality
 
-- **Seasonality:** Baselines for “response time” must use **peak season** if that’s when money is made.  
+- **Seasonality:** Baselines for “response time” must use **peak season** if that’s when money is made (tourism, storm-driven trades, harvest windows, year-end real estate).  
 - **Partial attention:** SMB owners answer between jobs; async beats “always-on dashboard.”  
 - **Single point of failure:** One person holds Zapier, passwords, vendor logins—document **bus factor** in risk.  
-- **Tool sprawl without admin:** They have five logins and zero IT—prefer **fewer moving parts** over best-of-breed.
+- **Tool sprawl without admin:** They have five logins and zero IT—prefer **fewer moving parts** over best-of-breed.  
+- **External feeds you don’t control:** Load boards, **OTA** extranet, vendor portals—automation may mean **alerts, normalization, and audit trail**, not “replace the source.”
 
 ### 3. Customer behavior
 
@@ -261,13 +293,14 @@ Use these to ask **better** questions and to avoid proposing tools that die on t
 
 - **Cash flow sensitivity:** Big upfront vs phased payments changes close rate; align milestone billing to their rhythm.  
 - **“Free tool” gravity:** They’ll tolerate Google Sheets longer than another subscription—meet them where the truth actually is, then migrate.  
-- **Chargeback on ROI:** They need **one number they believe** (leads lost/week, hours on follow-up)—your diagnostic should aim for that.
+- **Chargeback on ROI:** They need **one number they believe** (e.g. opportunities lost/week, hours on follow-up, **margin lost to slow bids**)—your diagnostic should aim for that.
 
 ### 5. Legal & reputation (lightweight, not enterprise)
 
 - **Texting compliance (TCPA-style awareness):** Consent, opt-out, who owns the number—don’t automate SMS blasts without clarity.  
 - **Email domain reputation:** Cold automation can hurt deliverability; diagnostic should note **who** sends mail (personal vs domain).  
-- **Licensed trades / referrals:** Some industries have rules about who can respond and how fast claims must be logged.
+- **Licensed trades / referrals:** Some industries have rules about who can respond and how fast claims must be logged.  
+- **Transport / carrier ops:** Broker–carrier agreements, insurance, and **rate confirmation** habits vary—never assume “just API it” without understanding **who is liable** when the record is wrong.
 
 ### 6. What “done” means in SMB
 
@@ -292,8 +325,10 @@ Use these to ask **better** questions and to avoid proposing tools that die on t
 
 ## Part F — One-page “map” template (fill during call)
 
+**Classic inbound (services, professional, light retail):**
+
 ```
-ENTRY: [channels]
+ENTRY: [channels / feeds]
    ↓
 FIRST HOME: [inbox / CRM / sheet / head]
    ↓
@@ -303,17 +338,37 @@ RESPONSE: [median time]   VARIANCE: [best/worst]
    ↓
 QUALIFY / ROUTE: [rules or gut]
    ↓
-CRM RECORD: [clean/messy]   DEDUPE: [how]
+RECORD: [system of truth]   DEDUPE / CONFLICTS: [how]
    ↓
 FOLLOW-UP CADENCE: [steps]
    ↓
 SCHEDULE / NEXT ACTION: [tool or chaos]
    ↓
-REPORTING: [where truth lives]
+REPORTING: [where truth lives]   UNIT ECONOMICS: [known?]
    ↓
 BREAKS: [top 3 failure modes]
 ```
 
+**Matchmaking / dispatch-style (same sections, different labels):**
+
+```
+FEEDS: [portal / board / broker / partner / internal list]
+   ↓
+TRIAGE: [who scans, how often, mobile vs desk]
+   ↓
+MATCH + MARGIN: [fit rules, target buy/sell, who approves spread]
+   ↓
+NEGOTIATION + LOCK: [where price is agreed, what document confirms]
+   ↓
+ASSIGN / EXECUTE: [driver, crew, vendor, slot]
+   ↓
+RECORD: [dispatch sheet / TMS / CRM / chat + journal]
+   ↓
+SETTLE / EXCEPTIONS: [detention, layover, no-show, rework]
+   ↓
+BREAKS: [top 3: speed, margin leak, handoff]
+```
+
 ---
 
-**Version:** 1.0 — aligns with `docs/IMPLEMENTATION_PROPOSAL_TEMPLATE.md` (Package 1 deliverables).
+**Version:** 1.1 — broader than CRM-centric intake; aligns with `docs/IMPLEMENTATION_PROPOSAL_TEMPLATE.md` (Package 1 deliverables).

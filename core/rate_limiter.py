@@ -88,6 +88,14 @@ class EnhancedRateLimiter:
             'gmail_sync': RateLimit('gmail_sync', RateLimitType.USER, 10, 3600, 'Gmail sync per user'),
             'onboarding': RateLimit('onboarding', RateLimitType.USER, 20, 3600, 'Onboarding operations per user'),
             'crm_csv_import': RateLimit('crm_csv_import', RateLimitType.USER, 30, 3600, '', 'CRM CSV imports per user per hour'),
+            'public_intake': RateLimit(
+                'public_intake',
+                RateLimitType.IP,
+                10,
+                3600,
+                '',
+                'Public consultation intake form per IP per hour',
+            ),
         }
         self._connect_redis()
         self._initialize_tables()
@@ -600,6 +608,12 @@ def check_login_rate_limit(ip_address: str) -> RateLimitResult:
 def check_signup_rate_limit(ip_address: str) -> RateLimitResult:
     """Check signup rate limit"""
     return enhanced_rate_limiter.check_rate_limit('signup_attempts', ip_address, ip_address)
+
+
+def check_public_intake_rate_limit(ip_address: str) -> RateLimitResult:
+    """Public consultation intake: bounded submissions per IP per hour."""
+    rid = (ip_address or "").strip() or "unknown"
+    return enhanced_rate_limiter.check_rate_limit("public_intake", rid, rid)
 
 def check_email_send_rate_limit(user_id: int) -> RateLimitResult:
     """Check email sending rate limit"""

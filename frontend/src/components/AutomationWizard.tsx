@@ -3,6 +3,10 @@ import { Sparkles, Zap, CheckCircle, X, Lightbulb } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from './Toast'
 import { apiClient } from '../services/apiClient'
+import {
+  INBOUND_CRM_SYNC_PRESET_ID,
+  isInboundCrmSyncSlug,
+} from '../lib/automationInboundCrmPayload'
 
 interface RecommendedAutomation {
   presetId: string
@@ -19,8 +23,8 @@ const getRecommendations = (industry: string = ''): RecommendedAutomation[] => {
   // Base recommendations for everyone
   const base: RecommendedAutomation[] = [
     {
-      presetId: 'gmail_crm',
-      name: 'Gmail → CRM',
+      presetId: INBOUND_CRM_SYNC_PRESET_ID,
+      name: 'Inbound email → CRM',
       description: 'Automatically convert emails into CRM leads',
       reason: 'Essential for capturing leads from your inbox',
       priority: 'high'
@@ -172,9 +176,16 @@ export const AutomationWizard: React.FC<AutomationWizardProps> = ({ onComplete, 
       // Create rules for selected presets
       const promises = Array.from(selected).map(async (presetId) => {
         // Check if rule already exists
-        const existing = existingRules.find((r: any) => 
-          r.action_parameters?.slug === presetId || r.name === presetId
-        )
+        const existing = existingRules.find((r: any) => {
+          if (presetId === INBOUND_CRM_SYNC_PRESET_ID) {
+            return (
+              isInboundCrmSyncSlug(r.action_parameters?.slug) ||
+              r.name === 'Gmail → CRM' ||
+              r.name === 'Inbound email → CRM'
+            )
+          }
+          return r.action_parameters?.slug === presetId || r.name === presetId
+        })
         
         if (existing) {
           // Activate existing rule
@@ -190,17 +201,17 @@ export const AutomationWizard: React.FC<AutomationWizardProps> = ({ onComplete, 
         const ruleData: any = {
           name: preset.name,
           description: preset.description,
-          trigger_type: presetId === 'gmail_crm' ? 'email_received' : 
+          trigger_type: presetId === INBOUND_CRM_SYNC_PRESET_ID ? 'email_received' : 
                        presetId === 'lead_scoring' ? 'lead_created' :
                        presetId === 'calendar_followups' ? 'lead_stage_changed' : 'email_received',
-          action_type: presetId === 'gmail_crm' ? 'update_crm_field' :
+          action_type: presetId === INBOUND_CRM_SYNC_PRESET_ID ? 'update_crm_field' :
                       presetId === 'lead_scoring' ? 'update_crm_field' :
                       presetId === 'calendar_followups' ? 'schedule_follow_up' : 'update_crm_field',
           status: 'active',
           trigger_conditions: { slug: presetId },
           action_parameters: {
             slug: presetId,
-            ...(presetId === 'gmail_crm' ? { target_stage: 'new' } : {}),
+            ...(presetId === INBOUND_CRM_SYNC_PRESET_ID ? { target_stage: 'new' } : {}),
             ...(presetId === 'lead_scoring' ? { min_score: 6 } : {}),
             ...(presetId === 'calendar_followups' ? { delay_hours: 24 } : {})
           }

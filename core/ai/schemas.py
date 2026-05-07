@@ -51,6 +51,49 @@ LeadAnalysisSchema = {
     },
 }
 
+BusinessEmailAnalysisSchema = {
+    "type": "object",
+    "required": [
+        "schema_version",
+        "intent",
+        "urgency",
+        "business_value",
+        "confidence",
+        "summary",
+        "recommended_action",
+        "tone",
+        "crm_updates",
+        "suggested_reply",
+        "should_auto_send",
+        "needs_human_review",
+        "reason_for_recommendation",
+    ],
+    "properties": {
+        "schema_version": {"type": "string"},
+        "intent": {"type": "string"},
+        "urgency": {"type": "string"},
+        "business_value": {"type": "string"},
+        "confidence": {"type": "number"},
+        "summary": {"type": "string"},
+        "recommended_action": {"type": "string"},
+        "tone": {"type": "string"},
+        "crm_updates": {
+            "type": "object",
+            "required": ["stage", "tags", "follow_up_needed", "priority"],
+            "properties": {
+                "stage": {"type": "string"},
+                "tags": {"type": "array", "items": {"type": "string"}},
+                "follow_up_needed": {"type": "boolean"},
+                "priority": {"type": "string"},
+            },
+        },
+        "suggested_reply": {"type": "string"},
+        "should_auto_send": {"type": "boolean"},
+        "needs_human_review": {"type": "boolean"},
+        "reason_for_recommendation": {"type": "string"},
+    },
+}
+
 # ---------------------------------------------------------------------------
 # LLM context builder (standard shape for LLMRouter.process(..., context=...))
 # ---------------------------------------------------------------------------

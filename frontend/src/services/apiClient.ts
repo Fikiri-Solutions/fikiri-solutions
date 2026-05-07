@@ -653,8 +653,13 @@ class ApiClient {
       enabled: enabled,
       settings: settings
     })
+    const body = response.data
+    if (body?.success === false) {
+      const errMsg = body.error || body.message || 'Failed to save service'
+      throw new Error(errMsg)
+    }
     // API returns { success: true, data: {...}, message: "..." }
-    return response.data?.data || response.data
+    return body?.data ?? body
   }
 
   async updateService(serviceId: string, updates: { enabled?: boolean; settings?: any }): Promise<any> {
@@ -800,17 +805,26 @@ class ApiClient {
     return response.data
   }
 
-  async testAIAssistant(): Promise<AIResponse> {
+  async testAIAssistant(): Promise<
+    AIResponse & { success?: boolean; message?: string; error_code?: string }
+  > {
     const response = await this.client.post('/test/ai-assistant', {
       content: 'Hi, I need help with your services.',
       sender: 'Test User',
       subject: 'Test Subject'
     })
-    // Handle both response formats: direct AIResponse or wrapped in { success, data, message }
-    if (response.data.data) {
-      return response.data.data
+    const root = response.data
+    const inner = root?.data
+    // /api/test/* uses HTTP 200 + top-level `success`; merge so callers see both envelope and body.
+    if (inner && typeof inner === 'object') {
+      return {
+        ...inner,
+        success: root.success,
+        message: root.message,
+        error_code: root.error_code
+      }
     }
-    return response.data
+    return root
   }
 
   async testMLScoring(): Promise<any> {
@@ -1142,7 +1156,16 @@ class ApiClient {
       { preset_id: presetId, correlation_id: correlationId },
       { headers: { 'X-Correlation-ID': correlationId } }
     )
-    return response.data
+    const body = response.data
+    if (body && typeof body === 'object' && body.success === false) {
+      const err = new Error(body.error || body.message || 'Preset test failed')
+      ;(err as { response?: { status: number; data: unknown } }).response = {
+        status: response.status,
+        data: body
+      }
+      throw err
+    }
+    return body
   }
 
   async getGmailConnectionStatus(): Promise<GmailConnectionStatus> {
@@ -1675,6 +1698,40 @@ class ApiClient {
     message: string
   }): Promise<{ success: boolean; message?: string; error?: string }> {
     const response = await this.client.post('/contact', payload, {
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    })
+    return response.data
+  }
+
+  /**
+   * Public consultation intake → CRM (when FIKIRI_INTAKE_LEAD_OWNER_USER_ID is set) + notification email.
+   * Field names match POST /api/intake (see core/consultation_intake_service.py).
+   */
+  async submitConsultationIntake(payload: {
+    leave_blank?: string
+    business_name: string
+    contact_name: string
+    email: string
+    phone?: string
+    website?: string
+    location?: string
+    industry?: string
+    source?: string
+    business_size?: string
+    monthly_revenue_range?: string
+    weekly_volume?: string
+    current_tools?: string
+    workflow_focus?: string
+    input_summary?: string
+    decision_bottleneck?: string
+    execution_process?: string
+    follow_up_process?: string
+    money_impact?: string
+    main_pain?: string
+    automation_opportunity?: string
+    fixed_looks_like?: string
+  }): Promise<{ success: boolean; message?: string; error?: string; error_code?: string }> {
+    const response = await this.client.post('/intake', payload, {
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
     })
     return response.data

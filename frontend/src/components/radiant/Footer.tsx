@@ -21,11 +21,11 @@ function CallToAction() {
         <p className="mt-6 text-3xl font-medium tracking-tight text-foreground sm:text-5xl">
           Ready to grow?
           <br />
-          Start your 7-day free trial today.
+          Start your 7-day free trial.
         </p>
       </hgroup>
       <p className="mx-auto mt-6 max-w-sm text-sm text-muted-foreground">
-        Connect your tools, automate workflows, save money, and let AI help you close more deals.
+        Connect your tools, automate follow-up, and close more business with less manual work.
       </p>
       <div className="mt-6">
         <Button to="/signup" className="w-full sm:w-auto">

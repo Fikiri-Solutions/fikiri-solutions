@@ -25,6 +25,8 @@ from email_automation.email_event_log import record_email_event
 from core.automation_safety import automation_safety_manager
 from core.database_optimization import db_optimizer
 from crm.service import enhanced_crm_service
+from services.email_capture_workflow import run_inbound_email_workflow
+from core.ai.policies import evaluate_email_action_policy
 
 __all__ = [
     "MinimalEmailParser",
@@ -35,9 +37,35 @@ __all__ = [
     "parse_message",
     "process_incoming",
     "orchestrate_incoming",
+    "build_parsed_email_for_pipeline",
 ]
 
 logger = logging.getLogger(__name__)
+
+
+def build_parsed_email_for_pipeline(
+    *,
+    message_id: str,
+    subject: str,
+    from_header: str,
+    body_text: str,
+    snippet: str = "",
+    thread_id: str = "",
+    labels: Optional[list] = None,
+) -> Dict[str, Any]:
+    """Canonical parsed shape for ``orchestrate_incoming`` / ``MinimalEmailParser`` (headers lowercased)."""
+    return {
+        "message_id": message_id or "",
+        "thread_id": thread_id or "",
+        "headers": {
+            "from": from_header or "",
+            "subject": subject or "",
+        },
+        "body": {"text": body_text or "", "html": ""},
+        "snippet": snippet or "",
+        "labels": labels if isinstance(labels, list) else [],
+        "attachments": [],
+    }
 
 # Import trace context
 try:
@@ -118,16 +146,121 @@ def _resolve_lead_id(user_id: int, sender_email: str) -> Optional[int]:
     return None
 
 
+def _load_thread_history(
+    user_id: int,
+    *,
+    thread_id: Optional[str],
+    sender_email: str,
+    limit: int = 5,
+) -> list:
+    if not thread_id:
+        return []
+    try:
+        rows = db_optimizer.execute_query(
+            """
+            SELECT sender, subject, SUBSTR(COALESCE(body, ''), 1, 500) AS body_preview, date
+            FROM synced_emails
+            WHERE user_id = ? AND thread_id = ?
+            ORDER BY date DESC
+            LIMIT ?
+            """,
+            (user_id, thread_id, limit),
+        )
+        if rows:
+            return [dict(r) for r in rows]
+    except Exception:
+        pass
+    if not sender_email:
+        return []
+    try:
+        rows = db_optimizer.execute_query(
+            """
+            SELECT sender, subject, SUBSTR(COALESCE(body, ''), 1, 500) AS body_preview, date
+            FROM synced_emails
+            WHERE user_id = ? AND lower(sender) LIKE lower(?)
+            ORDER BY date DESC
+            LIMIT ?
+            """,
+            (user_id, f"%{sender_email}%", limit),
+        )
+        return [dict(r) for r in (rows or [])]
+    except Exception:
+        return []
+
+
+def _load_crm_context(user_id: int, lead_id: Optional[int], sender_email: str) -> Dict[str, Any]:
+    if lead_id:
+        try:
+            row = enhanced_crm_service.get_lead(lead_id, user_id)
+            if row:
+                return dict(row)
+        except Exception:
+            pass
+    if not sender_email:
+        return {}
+    try:
+        rows = db_optimizer.execute_query(
+            """
+            SELECT id, email, name, company, stage, score, tags, metadata
+            FROM leads
+            WHERE user_id = ? AND lower(email) = lower(?) AND withdrawn_at IS NULL
+            LIMIT 1
+            """,
+            (user_id, sender_email),
+        )
+        if rows:
+            return dict(rows[0])
+    except Exception:
+        pass
+    return {}
+
+
+def _apply_crm_recommendations(
+    *,
+    user_id: int,
+    lead_id: Optional[int],
+    analysis: Dict[str, Any],
+    correlation_id: str,
+) -> None:
+    if not lead_id:
+        return
+    crm_updates = analysis.get("crm_updates")
+    if not isinstance(crm_updates, dict):
+        return
+    update_payload = {
+        "stage": crm_updates.get("stage"),
+        "tags": crm_updates.get("tags"),
+        "metadata": {
+            "email_ai_priority": crm_updates.get("priority"),
+            "email_follow_up_needed": bool(crm_updates.get("follow_up_needed")),
+            "email_ai_intent": analysis.get("intent"),
+            "correlation_id": correlation_id,
+        },
+        "correlation_id": correlation_id,
+    }
+    try:
+        enhanced_crm_service.update_lead(lead_id, user_id, update_payload)
+    except Exception as e:
+        logger.warning("Failed to apply CRM recommendations: %s", e)
+
+
 def orchestrate_incoming(
     parsed: dict,
     user_id: int,
     actions: MinimalEmailActions = None,
     trace_id: str = None,
     correlation_id: Optional[str] = None,
+    *,
+    synced_email_row_id: Optional[int] = None,
+    external_message_id: Optional[str] = None,
+    provider: str = "gmail",
+    mailbox_owner_email: Optional[str] = None,
+    run_mailbox_ai: bool = True,
 ) -> dict:
     """
-    Full mailbox automation:
-    parse -> classify -> decide action -> draft response -> execute action -> log to CRM
+    Inbound mailbox path (unified):
+    run_inbound_email_workflow (lead + EMAIL_RECEIVED automations), then optionally
+    classify -> decide action -> execute (Gmail-oriented handlers when AI enabled).
     """
     if TRACE_CONTEXT_AVAILABLE:
         if trace_id:
@@ -161,10 +294,51 @@ def orchestrate_incoming(
     msg_id = parsed.get("message_id") or ""
     thread_id = parsed.get("thread_id")
 
+    inbound_workflow: Dict[str, Any]
+    try:
+        inbound_workflow = run_inbound_email_workflow(
+            user_id,
+            synced_email_row_id=synced_email_row_id,
+            external_message_id=(external_message_id or msg_id or ""),
+            sender_header=from_header or "",
+            subject=subject or "",
+            body_text=body_text,
+            provider=provider,
+            correlation_id=corr,
+            mailbox_owner_email=mailbox_owner_email,
+        )
+    except Exception as exc:
+        logger.warning("run_inbound_email_workflow failed in orchestrate_incoming: %s", exc)
+        inbound_workflow = {
+            "success": False,
+            "correlation_id": corr,
+            "lead_capture": {},
+            "automation": {},
+            "error": str(exc),
+        }
+
+    wf_lc = inbound_workflow.get("lead_capture") if isinstance(inbound_workflow, dict) else {}
+    if isinstance(wf_lc, dict) and wf_lc.get("success"):
+        wf_data = wf_lc.get("data")
+        if isinstance(wf_data, dict) and wf_data.get("lead_id") is not None:
+            try:
+                lead_id = int(wf_data["lead_id"])
+            except (TypeError, ValueError):
+                pass
+
+    if not run_mailbox_ai:
+        return {
+            "success": True,
+            "parsed": parsed,
+            "inbound_workflow": inbound_workflow,
+            "correlation_id": corr,
+            "mailbox_ai_skipped": True,
+        }
+
     record_email_event(
         user_id,
         "email.parsed",
-        provider="gmail",
+        provider=provider,
         message_id=msg_id or None,
         thread_id=thread_id,
         lead_id=lead_id,
@@ -175,48 +349,88 @@ def orchestrate_incoming(
     )
 
     ai_assistant = actions.services.get("ai_assistant") or MinimalAIEmailAssistant()
+    thread_history = _load_thread_history(
+        user_id,
+        thread_id=thread_id,
+        sender_email=sender_email,
+    )
+    crm_context = _load_crm_context(user_id, lead_id, sender_email)
+    business_context = ai_assistant._load_business_context()
     try:
-        classification = ai_assistant.classify_email_intent(body_text, subject)
+        analysis = ai_assistant.analyze_incoming_email(
+            sender_email=sender_email,
+            sender_name=from_header,
+            subject=subject,
+            body=body_text,
+            thread_history=thread_history,
+            crm_lead_data=crm_context,
+            business_context=business_context,
+            correlation_id=corr,
+            user_id=user_id,
+        )
     except Exception as exc:
-        logger.warning("Email classification failed: %s", exc)
+        logger.warning("Email analysis failed: %s", exc)
         record_email_event(
             user_id,
             "email.failed",
-            provider="gmail",
+            provider=provider,
             message_id=msg_id or None,
             thread_id=thread_id,
             lead_id=lead_id,
             correlation_id=corr,
-            payload={"stage": "classification"},
+            payload={"stage": "analysis"},
             status="failed",
             error_message=str(exc)[:2000],
             source="email_automation.pipeline",
         )
         return {
             "success": False,
-            "error": "classification_failed",
+            "error": "analysis_failed",
             "parsed": parsed,
+            "inbound_workflow": inbound_workflow,
             "correlation_id": corr,
         }
 
-    action_type = _determine_action(classification)
-    class_payload = classification if isinstance(classification, dict) else {}
+    analysis_payload = analysis if isinstance(analysis, dict) else {}
+    policy_result = evaluate_email_action_policy(analysis_payload)
+    action_type = policy_result.get("recommended_action_type", "auto_reply")
+    _apply_crm_recommendations(
+        user_id=user_id,
+        lead_id=lead_id,
+        analysis=analysis_payload,
+        correlation_id=corr,
+    )
 
     record_email_event(
         user_id,
-        "email.classified",
-        provider="gmail",
+        "email.analyzed",
+        provider=provider,
         message_id=msg_id or None,
         thread_id=thread_id,
         lead_id=lead_id,
         correlation_id=corr,
         payload={
-            "intent": class_payload.get("intent"),
-            "confidence": class_payload.get("confidence"),
-            "urgency": class_payload.get("urgency"),
-            "classification_type": type(classification).__name__
-            if not isinstance(classification, dict)
-            else None,
+            "intent": analysis_payload.get("intent"),
+            "confidence": analysis_payload.get("confidence"),
+            "urgency": analysis_payload.get("urgency"),
+            "business_value": analysis_payload.get("business_value"),
+        },
+        status="applied",
+        source="email_automation.pipeline",
+    )
+
+    record_email_event(
+        user_id,
+        "email.classified",
+        provider=provider,
+        message_id=msg_id or None,
+        thread_id=thread_id,
+        lead_id=lead_id,
+        correlation_id=corr,
+        payload={
+            "intent": analysis_payload.get("intent"),
+            "confidence": analysis_payload.get("confidence"),
+            "urgency": analysis_payload.get("urgency"),
         },
         status="applied",
         source="email_automation.pipeline",
@@ -225,15 +439,94 @@ def orchestrate_incoming(
     record_email_event(
         user_id,
         "ai.action_recommended",
-        provider="gmail",
+        provider=provider,
         message_id=msg_id or None,
         thread_id=thread_id,
         lead_id=lead_id,
         correlation_id=corr,
-        payload={"action_type": action_type, "intent": class_payload.get("intent")},
+        payload={
+            "action_type": action_type,
+            "intent": analysis_payload.get("intent"),
+            "execution_mode": policy_result.get("execution_mode"),
+        },
         status="applied",
         source="email_automation.pipeline",
     )
+    record_email_event(
+        user_id,
+        "ai.action.recommended",
+        provider=provider,
+        message_id=msg_id or None,
+        thread_id=thread_id,
+        lead_id=lead_id,
+        correlation_id=corr,
+        payload={
+            "action_type": action_type,
+            "intent": analysis_payload.get("intent"),
+            "execution_mode": policy_result.get("execution_mode"),
+        },
+        status="applied",
+        source="email_automation.pipeline",
+    )
+    record_email_event(
+        user_id,
+        "ai.policy.evaluated",
+        provider=provider,
+        message_id=msg_id or None,
+        thread_id=thread_id,
+        lead_id=lead_id,
+        correlation_id=corr,
+        payload={
+            "schema_version": analysis_payload.get("schema_version"),
+            "intent": policy_result.get("intent"),
+            "execution_mode": policy_result.get("execution_mode"),
+            "should_auto_send": policy_result.get("should_auto_send"),
+            "requires_human_review": policy_result.get("requires_human_review"),
+            "reason": policy_result.get("reason"),
+        },
+        status="applied",
+        source="email_automation.pipeline",
+    )
+
+    should_auto_send = bool(policy_result.get("should_auto_send"))
+    needs_human_review = bool(policy_result.get("requires_human_review"))
+    suggested_reply = analysis_payload.get("suggested_reply")
+    if suggested_reply:
+        record_email_event(
+            user_id,
+            "email.reply_drafted",
+            provider=provider,
+            message_id=msg_id or None,
+            thread_id=thread_id,
+            lead_id=lead_id,
+            correlation_id=corr,
+            payload={
+                "preview": str(suggested_reply)[:500],
+                "needs_human_review": needs_human_review,
+            },
+            status="applied",
+            source="email_automation.pipeline",
+        )
+
+    if not should_auto_send or needs_human_review:
+        return {
+            "success": True,
+            "parsed": parsed,
+            "classification": analysis_payload,
+            "analysis": analysis_payload,
+            "action": {
+                "success": True,
+                "action": "draft_only",
+                "details": {
+                    "should_auto_send": should_auto_send,
+                    "needs_human_review": needs_human_review,
+                    "reason_for_recommendation": policy_result.get("reason"),
+                    "execution_mode": policy_result.get("execution_mode"),
+                },
+            },
+            "inbound_workflow": inbound_workflow,
+            "correlation_id": corr,
+        }
 
     safety = automation_safety_manager.check_rate_limits(
         user_id=user_id,
@@ -244,7 +537,7 @@ def orchestrate_incoming(
         record_email_event(
             user_id,
             "ai.action_cancelled",
-            provider="gmail",
+            provider=provider,
             message_id=msg_id or None,
             thread_id=thread_id,
             lead_id=lead_id,
@@ -259,7 +552,9 @@ def orchestrate_incoming(
             "error": "automation_blocked",
             "details": safety if isinstance(safety, dict) else {"raw": str(safety)},
             "parsed": parsed,
-            "classification": classification,
+            "classification": analysis_payload,
+            "analysis": analysis_payload,
+            "inbound_workflow": inbound_workflow,
             "correlation_id": corr,
         }
 
@@ -272,7 +567,7 @@ def orchestrate_incoming(
         record_email_event(
             user_id,
             "email.failed",
-            provider="gmail",
+            provider=provider,
             message_id=msg_id or None,
             thread_id=thread_id,
             lead_id=lead_id,
@@ -286,7 +581,9 @@ def orchestrate_incoming(
             "success": False,
             "error": "process_email_failed",
             "parsed": parsed,
-            "classification": classification,
+            "classification": analysis_payload,
+            "analysis": analysis_payload,
+            "inbound_workflow": inbound_workflow,
             "correlation_id": corr,
         }
 
@@ -297,7 +594,7 @@ def orchestrate_incoming(
         record_email_event(
             user_id,
             "email.failed",
-            provider="gmail",
+            provider=provider,
             message_id=msg_id or None,
             thread_id=thread_id,
             lead_id=lead_id,
@@ -311,7 +608,9 @@ def orchestrate_incoming(
             "success": False,
             "error": "invalid_action_result",
             "parsed": parsed,
-            "classification": classification,
+            "classification": analysis_payload,
+            "analysis": analysis_payload,
+            "inbound_workflow": inbound_workflow,
             "correlation_id": corr,
         }
 
@@ -332,7 +631,7 @@ def orchestrate_incoming(
                     f"Mailbox automation: {action_type}",
                     metadata={
                         "message_id": parsed.get("message_id"),
-                        "intent": class_payload.get("intent"),
+                        "intent": analysis_payload.get("intent"),
                         "action": action_type,
                         "success": action_result.get("success")
                     }
@@ -344,7 +643,7 @@ def orchestrate_incoming(
         record_email_event(
             user_id,
             "ai.action_executed",
-            provider="gmail",
+            provider=provider,
             message_id=msg_id or None,
             thread_id=thread_id,
             lead_id=lead_id,
@@ -363,7 +662,7 @@ def orchestrate_incoming(
         record_email_event(
             user_id,
             "email.failed",
-            provider="gmail",
+            provider=provider,
             message_id=msg_id or None,
             thread_id=thread_id,
             lead_id=lead_id,
@@ -380,7 +679,9 @@ def orchestrate_incoming(
     return {
         "success": action_result.get("success", True),
         "parsed": parsed,
-        "classification": classification,
+        "classification": analysis_payload,
+        "analysis": analysis_payload,
         "action": action_result,
+        "inbound_workflow": inbound_workflow,
         "correlation_id": corr,
     }

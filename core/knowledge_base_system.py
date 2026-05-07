@@ -14,7 +14,7 @@ import uuid
 import hashlib
 from pathlib import Path
 
-from core.minimal_config import get_config
+from core.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ def _coerce_metadata_user_id(raw: Any) -> Optional[int]:
 
 def _get_vector_search():
     """Lazy import to avoid circular import and heavy startup (sentence_transformers/Pinecone)."""
-    from core.minimal_vector_search import get_vector_search
+    from core.vector_search import get_vector_search
     return get_vector_search()
 
 class DocumentType(Enum):

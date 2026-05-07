@@ -502,17 +502,14 @@ class GmailSyncJobManager:
             leads_identified = 0
             mailbox_automation_enabled = os.getenv("MAILBOX_AUTOMATION_ENABLED", "").lower() in {"1", "true", "yes"}
             actions = None
-            parser = None
             if mailbox_automation_enabled:
                 try:
                     from email_automation.actions import MinimalEmailActions
                     from email_automation.ai_assistant import MinimalAIEmailAssistant
-                    from email_automation.parser import MinimalEmailParser
                     actions = MinimalEmailActions(services={
                         "gmail": service,
                         "ai_assistant": MinimalAIEmailAssistant()
                     })
-                    parser = MinimalEmailParser()
                 except Exception as init_error:
                     logger.warning("Mailbox automation init failed: %s", init_error)
                     mailbox_automation_enabled = False
@@ -545,35 +542,61 @@ class GmailSyncJobManager:
                         except Exception as ev_err:
                             logger.debug("email.received event skipped: %s", ev_err)
 
-                        if mailbox_automation_enabled and parser and actions:
-                            try:
-                                from email_automation.pipeline import orchestrate_incoming
-                                from core.trace_context import get_trace_id
-                                parsed = parser.parse_message(message)
-                                trace_id = get_trace_id() if 'core.trace_context' in sys.modules else None
-                                orchestrate_incoming(parsed, user_id=user_id, actions=actions, trace_id=trace_id)
-                            except Exception as automation_error:
-                                logger.warning("Mailbox automation failed for message %s: %s", message.get("id"), automation_error)
-                        
-                        # Trigger automation: EMAIL_RECEIVED
                         try:
-                            from services.automation_engine import automation_engine, TriggerType
-                            sender_email = message.get('from', '')
-                            subject = message.get('subject', '')
-                            body_text = message.get('body', '') or message.get('snippet', '')
-                            automation_engine.execute_automation_rules(
-                                TriggerType.EMAIL_RECEIVED,
-                                {
-                                    'email_id': email_id,
-                                    'sender_email': sender_email,
-                                    'subject': subject,
-                                    'text': body_text,
-                                },
-                                user_id,
-                                automation_source="gmail_sync",
+                            owner_rows = db_optimizer.execute_query(
+                                "SELECT email FROM users WHERE id = ? LIMIT 1", (user_id,)
                             )
-                        except Exception as auto_error:
-                            logger.warning(f"Automation trigger failed: {auto_error}")
+                            owner_email = (
+                                (owner_rows[0].get("email") or "").strip().lower()
+                                if owner_rows
+                                else None
+                            ) or None
+                        except Exception:
+                            owner_email = None
+
+                        # Unified: orchestrate_incoming always runs inbound capture + automations;
+                        # classify/process runs only when MAILBOX_AUTOMATION_ENABLED.
+                        try:
+                            from email_automation.parser import MinimalEmailParser
+                            from email_automation.pipeline import orchestrate_incoming
+                            from core.request_correlation import get_or_create_correlation_id
+                            from core.trace_context import get_trace_id
+
+                            parsed_msg = MinimalEmailParser().parse_message(message)
+                            corr_body = {
+                                "message_id": message.get("id"),
+                                "provider": "gmail",
+                                "user_id": user_id,
+                            }
+                            correlation_id = get_or_create_correlation_id(
+                                None, corr_body
+                            )
+                            trace_id = (
+                                get_trace_id()
+                                if mailbox_automation_enabled
+                                and "core.trace_context" in sys.modules
+                                else None
+                            )
+                            orchestrate_incoming(
+                                parsed_msg,
+                                user_id=user_id,
+                                actions=actions if mailbox_automation_enabled and actions else None,
+                                trace_id=trace_id,
+                                correlation_id=correlation_id,
+                                synced_email_row_id=sid,
+                                external_message_id=str(message.get("id") or email_id or ""),
+                                mailbox_owner_email=owner_email,
+                                provider="gmail",
+                                run_mailbox_ai=bool(
+                                    mailbox_automation_enabled and actions
+                                ),
+                            )
+                        except Exception as automation_error:
+                            logger.warning(
+                                "Inbound pipeline failed for message %s: %s",
+                                message.get("id"),
+                                automation_error,
+                            )
                     
                     # Extract and store contacts
                     contacts = self._extract_contacts(message)

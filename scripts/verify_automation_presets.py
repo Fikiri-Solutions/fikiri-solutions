@@ -32,7 +32,7 @@ TEST_PASSWORD = os.getenv('TEST_PASSWORD', 'Admin123!')
 
 # Preset IDs to test
 PRESETS = [
-    'gmail_crm',
+    'inbound_crm_sync',
     'lead_scoring',
     'slack_digest',
     'email_sheets',

@@ -14,10 +14,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from core.ai.llm_router import LLMRouter
-from core.ai.schemas import EmailClassificationSchema
+from core.ai.schemas import EmailClassificationSchema, BusinessEmailAnalysisSchema
 from core.domain.schemas import normalize_extracted_contact
 
 logger = logging.getLogger(__name__)
+EMAIL_ANALYSIS_SCHEMA_VERSION = "2026-05-email-analysis-v1"
 
 # Contact extraction: keep local until Phase 2 (ExtractedContact in core/domain/schemas.py)
 CONTACT_SCHEMA = {
@@ -33,6 +34,14 @@ CONTACT_SCHEMA = {
         "timeline": {"type": "string"},
     },
 }
+
+
+def _clean_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
 class MinimalAIEmailAssistant:
     """Minimal AI email assistant with production enhancements."""
     
@@ -122,6 +131,119 @@ class MinimalAIEmailAssistant:
         """Classify email intent using AI with enhanced tracking."""
         if not self.is_enabled():
             return self._fallback_classification(email_content, subject)
+
+    def analyze_incoming_email(
+        self,
+        *,
+        sender_email: str,
+        sender_name: str,
+        subject: str,
+        body: str,
+        thread_history: Optional[List[Dict[str, Any]]] = None,
+        crm_lead_data: Optional[Dict[str, Any]] = None,
+        business_context: Optional[Dict[str, Any]] = None,
+        correlation_id: Optional[str] = None,
+        user_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Analyze inbound email with business context and return a structured, validated payload.
+        """
+        safe_subject = _clean_text(subject)
+        safe_body = _clean_text(body)
+        safe_sender_email = _clean_text(sender_email)
+        safe_sender_name = _clean_text(sender_name)
+        safe_thread = thread_history if isinstance(thread_history, list) else []
+        safe_crm = crm_lead_data if isinstance(crm_lead_data, dict) else {}
+        safe_business = business_context if isinstance(business_context, dict) else self._load_business_context()
+
+        if not self.is_enabled():
+            return self._fallback_business_analysis(
+                sender_email=safe_sender_email,
+                sender_name=safe_sender_name,
+                subject=safe_subject,
+                body=safe_body,
+                crm_lead_data=safe_crm,
+            )
+
+        prompt = f"""
+        Analyze this inbound business email and return JSON only.
+
+        BUSINESS PROFILE:
+        {json.dumps(safe_business, default=str)}
+
+        SENDER:
+        {json.dumps({"email": safe_sender_email, "name": safe_sender_name}, default=str)}
+
+        EMAIL:
+        {json.dumps({"subject": safe_subject, "body": safe_body}, default=str)}
+
+        THREAD HISTORY (latest first, may be empty):
+        {json.dumps(safe_thread[:5], default=str)}
+
+        CRM LEAD CONTEXT (may be empty):
+        {json.dumps(safe_crm, default=str)}
+
+        Evaluate:
+        - intent
+        - urgency
+        - business value
+        - sender context
+        - thread/cadence
+        - tone/diction
+        - jargon/keywords
+        - recommended next action
+        - CRM updates
+        - suggested reply
+
+        Return object fields:
+        - schema_version (string, use {EMAIL_ANALYSIS_SCHEMA_VERSION})
+        - intent (string)
+        - urgency (string)
+        - business_value (string)
+        - confidence (number 0-1)
+        - summary (string)
+        - recommended_action (string)
+        - tone (string)
+        - crm_updates (object: stage, tags, follow_up_needed, priority)
+        - suggested_reply (string)
+        - should_auto_send (boolean)
+        - needs_human_review (boolean)
+        - reason_for_recommendation (string)
+
+        Safety rules:
+        - Default should_auto_send to false.
+        - Any complaint, escalation, legal/financial risk, or confidence below 0.7 must set needs_human_review=true.
+        - If you cannot infer safely, set needs_human_review=true and explain why.
+        """
+        try:
+            result = self.router.process(
+                input_data=prompt,
+                intent="classification",
+                output_schema=BusinessEmailAnalysisSchema,
+                context=self._llm_context(
+                    operation="business_email_analysis",
+                    correlation_id=correlation_id or str(uuid.uuid4()),
+                    user_id=user_id,
+                    sender_email=safe_sender_email,
+                    subject=safe_subject,
+                ),
+            )
+            if result.get("success") and result.get("validated"):
+                try:
+                    parsed = json.loads(result.get("content") or "{}")
+                    return self._normalize_business_analysis(parsed)
+                except json.JSONDecodeError:
+                    logger.warning("Business email analysis JSON parse failed; using fallback")
+        except Exception as e:
+            logger.error("Business email analysis failed: %s", e)
+
+        return self._fallback_business_analysis(
+            sender_email=safe_sender_email,
+            sender_name=safe_sender_name,
+            subject=safe_subject,
+            body=safe_body,
+            crm_lead_data=safe_crm,
+        )
         
         try:
             prompt = f"""
@@ -562,6 +684,85 @@ Fikiri Solutions Team"""
         if not email_content:
             return ""
         return email_content[:200] + "..." if len(email_content) > 200 else email_content
+
+    def _normalize_business_analysis(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(data, dict):
+            return self._fallback_business_analysis()
+        crm_updates = data.get("crm_updates") if isinstance(data.get("crm_updates"), dict) else {}
+        tags = crm_updates.get("tags")
+        if not isinstance(tags, list):
+            tags = []
+        norm = {
+            "schema_version": _clean_text(data.get("schema_version")) or EMAIL_ANALYSIS_SCHEMA_VERSION,
+            "intent": _clean_text(data.get("intent")) or "general_info",
+            "urgency": _clean_text(data.get("urgency")) or "medium",
+            "business_value": _clean_text(data.get("business_value")) or "low",
+            "confidence": float(data.get("confidence") or 0.0),
+            "summary": _clean_text(data.get("summary")),
+            "recommended_action": _clean_text(data.get("recommended_action")) or "review_and_draft_reply",
+            "tone": _clean_text(data.get("tone")) or "neutral",
+            "crm_updates": {
+                "stage": _clean_text(crm_updates.get("stage")) or "contacted",
+                "tags": [str(t) for t in tags if str(t).strip()],
+                "follow_up_needed": bool(crm_updates.get("follow_up_needed")),
+                "priority": _clean_text(crm_updates.get("priority")) or "medium",
+            },
+            "suggested_reply": _clean_text(data.get("suggested_reply")),
+            "should_auto_send": bool(data.get("should_auto_send")),
+            "needs_human_review": bool(data.get("needs_human_review")),
+            "reason_for_recommendation": _clean_text(data.get("reason_for_recommendation")),
+        }
+        if norm["confidence"] < 0.7:
+            norm["needs_human_review"] = True
+            norm["should_auto_send"] = False
+            if not norm["reason_for_recommendation"]:
+                norm["reason_for_recommendation"] = "Low confidence analysis requires approval."
+        if norm["intent"] in {"complaint", "escalation"}:
+            norm["needs_human_review"] = True
+            norm["should_auto_send"] = False
+        if norm["should_auto_send"] and norm["needs_human_review"]:
+            norm["should_auto_send"] = False
+        return norm
+
+    def _fallback_business_analysis(
+        self,
+        *,
+        sender_email: str = "",
+        sender_name: str = "",
+        subject: str = "",
+        body: str = "",
+        crm_lead_data: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        base_class = self._fallback_classification(body or subject, subject)
+        intent = _clean_text(base_class.get("intent")) or "general_info"
+        urgency = _clean_text(base_class.get("urgency")) or "medium"
+        confidence = float(base_class.get("confidence") or 0.55)
+        follow_up_needed = intent in {"lead_inquiry", "support_request", "complaint"}
+        stage = "qualified" if intent == "lead_inquiry" else "replied"
+        tags = ["email_inbound", intent]
+        if crm_lead_data and crm_lead_data.get("id"):
+            tags.append("existing_lead")
+        suggested_reply = self._fallback_response(sender_name or "there", subject or "your message")
+        return {
+            "schema_version": EMAIL_ANALYSIS_SCHEMA_VERSION,
+            "intent": intent,
+            "urgency": urgency,
+            "business_value": "medium" if intent == "lead_inquiry" else "low",
+            "confidence": confidence,
+            "summary": self._fallback_summary(body or subject),
+            "recommended_action": _clean_text(base_class.get("suggested_action")) or "review_and_draft_reply",
+            "tone": "neutral",
+            "crm_updates": {
+                "stage": stage,
+                "tags": tags,
+                "follow_up_needed": follow_up_needed,
+                "priority": urgency,
+            },
+            "suggested_reply": suggested_reply,
+            "should_auto_send": False,
+            "needs_human_review": True,
+            "reason_for_recommendation": "Safe default: draft reply and require human approval before sending.",
+        }
     
 def create_ai_assistant(api_key: Optional[str] = None, services: Dict[str, Any] = None) -> MinimalAIEmailAssistant:
     """Create and return an AI assistant instance."""

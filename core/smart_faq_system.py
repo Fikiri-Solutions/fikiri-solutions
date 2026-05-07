@@ -14,7 +14,7 @@ import uuid
 from difflib import SequenceMatcher
 import math
 
-from core.minimal_config import get_config
+from core.config import get_config
 
 logger = logging.getLogger(__name__)
 

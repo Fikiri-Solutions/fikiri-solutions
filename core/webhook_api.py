@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
 from core.webhook_intake_service import get_webhook_service
-from core.minimal_config import get_config
+from core.config import get_config
 from core.appointments_service import AppointmentsService
 from core.database_optimization import db_optimizer
 from core.request_correlation import get_or_create_correlation_id

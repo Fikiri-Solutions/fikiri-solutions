@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { Users, Mail, Phone, Building, Calendar, Star, Filter, Search, Plus, Activity, Zap, Download, Upload, GitBranch } from 'lucide-react'
+import { Users, Mail, Phone, Building, Calendar, Star, Filter, Search, Plus, Activity, Download, Upload, GitBranch } from 'lucide-react'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { apiClient, LeadData } from '../services/apiClient'
 import { EmptyState } from '../components/EmptyState'
@@ -8,12 +8,22 @@ import { FeatureStatus, getFeatureStatus } from '../components/FeatureStatus'
 import { useToast } from '../components/Toast'
 import { LeadTraceModal } from '../components/LeadTraceModal'
 
+/** Must match canonical stages in `crm/service.py` (`lead_stages`). */
 const pipelineStages = [
-  { id: 'new', title: 'New Leads', accent: 'border-blue-200 bg-blue-50 dark:bg-blue-900/30', helper: 'Synced from Gmail & forms' },
-  { id: 'contacted', title: 'Contacted', accent: 'border-amber-200 bg-amber-50 dark:bg-amber-900/30', helper: 'Awaiting replies' },
-  { id: 'qualified', title: 'Qualified', accent: 'border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20', helper: 'Ready for meetings' },
-  { id: 'booked', title: 'Booked', accent: 'border-purple-200 bg-purple-50 dark:bg-purple-900/30', helper: 'Won deals' }
+  { id: 'new', title: 'New', accent: 'border-blue-200 bg-blue-50 dark:bg-blue-900/30', helper: 'Manual, forms, automations' },
+  { id: 'contacted', title: 'Contacted', accent: 'border-amber-200 bg-amber-50 dark:bg-amber-900/30', helper: 'Outreach started' },
+  { id: 'replied', title: 'Replied', accent: 'border-cyan-200 bg-cyan-50 dark:bg-cyan-900/25', helper: 'Two-way conversation' },
+  { id: 'qualified', title: 'Qualified', accent: 'border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20', helper: 'Fit confirmed' },
+  { id: 'closed', title: 'Closed', accent: 'border-purple-200 bg-purple-50 dark:bg-purple-900/30', helper: 'Won or closed' }
 ] as const
+
+function pipelineColumnForStage(stage: string | undefined): string {
+  const s = (stage || 'new').toLowerCase()
+  if (s === 'booked' || s === 'converted') return 'closed'
+  const allowed = new Set(pipelineStages.map(p => p.id))
+  if (allowed.has(s as (typeof pipelineStages)[number]['id'])) return s
+  return 'new'
+}
 
 export const CRM: React.FC = () => {
   const [leads, setLeads] = useState<LeadData[]>([])
@@ -161,18 +171,15 @@ export const CRM: React.FC = () => {
     }
   }
 
-  // Optimized: O(n) single pass instead of O(n²) nested loops
+  // Optimized: O(n) single pass; maps legacy stages (e.g. booked) into canonical columns.
   const groupLeadsByStage = (items: LeadData[]) => {
     const grouped: Record<string, LeadData[]> = {}
-    // Initialize all stages
     pipelineStages.forEach(stage => {
       grouped[stage.id] = []
     })
-    // Single pass through items - O(n)
     items.forEach(lead => {
-      if (grouped[lead.stage]) {
-        grouped[lead.stage].push(lead)
-      }
+      const col = pipelineColumnForStage(lead.stage)
+      if (grouped[col]) grouped[col].push(lead)
     })
     return grouped
   }
@@ -245,6 +252,10 @@ export const CRM: React.FC = () => {
         return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
       case 'contacted':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+      case 'replied':
+        return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300'
+      case 'closed':
+      case 'booked':
       case 'converted':
         return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
       default:
@@ -423,17 +434,14 @@ export const CRM: React.FC = () => {
           <div>
             <h3 className="text-xl font-semibold text-brand-text dark:text-white">Pipeline board</h3>
             <p className="text-sm text-brand-text/70 dark:text-gray-400">
-              Drag leads across stages. Gmail sync automatically feeds the "New" column.
+              Stages match the CRM API (<code className="text-xs">new → contacted → replied → qualified → closed</code>
+              ). Inbox leads appear after you connect email and run sync or automations.
             </p>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-brand-text/70 dark:text-gray-300">
-            <Zap className="h-4 w-4 text-brand-accent" />
-            Auto-sync enabled
           </div>
         </div>
 
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
             {pipelineStages.map((stage) => (
               <Droppable droppableId={stage.id} key={stage.id}>
                 {(provided, snapshot) => (
@@ -547,10 +555,11 @@ export const CRM: React.FC = () => {
                 onChange={(e) => setFilterStage(e.target.value)}
               >
                 <option value="all">All Stages</option>
-                <option value="new">New</option>
-                <option value="qualified">Qualified</option>
-                <option value="contacted">Contacted</option>
-                <option value="converted">Converted</option>
+                {pipelineStages.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.title}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

@@ -34,6 +34,7 @@ import { Layout } from './components/Layout'
 import { UsageAnalytics } from './pages/UsageAnalytics'
 import { About } from './pages/About'
 import { Contact } from './pages/Contact'
+import { Intake } from './pages/Intake'
 import { InternalContact } from './pages/InternalContact'
 import { PrivacySettings } from './components/PrivacySettings'
 import LandingPage from './pages/LandingPage'
@@ -110,6 +111,7 @@ function App() {
                           <Route path="/industries/medical" element={<MedicalLanding />} />
                           <Route path="/about" element={<About />} />
                           <Route path="/contact" element={<Contact />} />
+                          <Route path="/intake" element={<Intake />} />
                           <Route path="/install" element={<InstallPage />} />
                           <Route path="/sms-opt-in" element={<SmsOptIn />} />
                           <Route path="/terms" element={<TermsOfService />} />

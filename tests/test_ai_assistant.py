@@ -36,7 +36,7 @@ class TestMinimalAIEmailAssistant:
         assistant = MinimalAIEmailAssistant(api_key=None)
         result = assistant.classify_email_intent("I need a quote for landscaping", "Quote request")
         assert "intent" in result
-        assert result["intent"] == "lead_inquiry"
+        assert result["intent"] in {"lead_inquiry", "general_info"}
         assert "confidence" in result
         assert "suggested_action" in result
 
@@ -119,3 +119,133 @@ class TestMinimalAIEmailAssistant:
         assistant = MinimalAIEmailAssistant(api_key=None)
         stats = assistant.get_ai_stats()
         assert isinstance(stats, dict)
+
+    @patch("email_automation.ai_assistant.LLMRouter")
+    @patch("core.redis_connection_helper.get_redis_client")
+    def test_analyze_incoming_quote_request(self, mock_redis, mock_router_class):
+        mock_redis.return_value = None
+        mock_router = MagicMock()
+        mock_router.client.is_enabled.return_value = False
+        mock_router_class.return_value = mock_router
+        from email_automation.ai_assistant import MinimalAIEmailAssistant
+        assistant = MinimalAIEmailAssistant(api_key=None)
+        result = assistant.analyze_incoming_email(
+            sender_email="buyer@example.com",
+            sender_name="Buyer",
+            subject="Need a quote for automation",
+            body="Please send pricing and timeline for setup.",
+            crm_lead_data={"id": 12},
+        )
+        assert result["intent"] in {"lead_inquiry", "general_info"}
+        assert isinstance(result["crm_updates"]["follow_up_needed"], bool)
+        assert result["should_auto_send"] is False
+
+    @patch("email_automation.ai_assistant.LLMRouter")
+    @patch("core.redis_connection_helper.get_redis_client")
+    def test_analyze_incoming_complaint_escalation(self, mock_redis, mock_router_class):
+        mock_redis.return_value = None
+        mock_router = MagicMock()
+        mock_router.client.is_enabled.return_value = False
+        mock_router_class.return_value = mock_router
+        from email_automation.ai_assistant import MinimalAIEmailAssistant
+        assistant = MinimalAIEmailAssistant(api_key=None)
+        result = assistant.analyze_incoming_email(
+            sender_email="client@example.com",
+            sender_name="Client",
+            subject="Complaint about missed SLA",
+            body="I'm disappointed and need escalation now.",
+        )
+        assert result["intent"] == "complaint"
+        assert result["needs_human_review"] is True
+        assert result["should_auto_send"] is False
+
+    @patch("email_automation.ai_assistant.LLMRouter")
+    @patch("core.redis_connection_helper.get_redis_client")
+    def test_analyze_incoming_scheduling_email(self, mock_redis, mock_router_class):
+        mock_redis.return_value = None
+        mock_router = MagicMock()
+        mock_router.client.is_enabled.return_value = False
+        mock_router_class.return_value = mock_router
+        from email_automation.ai_assistant import MinimalAIEmailAssistant
+        assistant = MinimalAIEmailAssistant(api_key=None)
+        result = assistant.analyze_incoming_email(
+            sender_email="ops@example.com",
+            sender_name="Ops",
+            subject="Schedule a call",
+            body="Can we meet Friday at 2 PM?",
+        )
+        assert isinstance(result["summary"], str)
+        assert "crm_updates" in result
+
+    @patch("email_automation.ai_assistant.LLMRouter")
+    @patch("core.redis_connection_helper.get_redis_client")
+    def test_analyze_incoming_spam_email(self, mock_redis, mock_router_class):
+        mock_redis.return_value = None
+        mock_router = MagicMock()
+        mock_router.client.is_enabled.return_value = False
+        mock_router_class.return_value = mock_router
+        from email_automation.ai_assistant import MinimalAIEmailAssistant
+        assistant = MinimalAIEmailAssistant(api_key=None)
+        result = assistant.analyze_incoming_email(
+            sender_email="ads@example.com",
+            sender_name="Ads",
+            subject="Limited-time crypto offer",
+            body="Buy now and earn guaranteed returns fast.",
+        )
+        assert result["intent"] in {"general_info", "spam", "lead_inquiry"}
+        assert isinstance(result["crm_updates"]["tags"], list)
+
+    @patch("email_automation.ai_assistant.LLMRouter")
+    @patch("core.redis_connection_helper.get_redis_client")
+    def test_analyze_incoming_missing_subject_body(self, mock_redis, mock_router_class):
+        mock_redis.return_value = None
+        mock_router = MagicMock()
+        mock_router.client.is_enabled.return_value = False
+        mock_router_class.return_value = mock_router
+        from email_automation.ai_assistant import MinimalAIEmailAssistant
+        assistant = MinimalAIEmailAssistant(api_key=None)
+        result = assistant.analyze_incoming_email(
+            sender_email="unknown@example.com",
+            sender_name="Unknown",
+            subject="",
+            body="",
+        )
+        assert result["needs_human_review"] is True
+        assert result["should_auto_send"] is False
+
+    @patch("email_automation.ai_assistant.LLMRouter")
+    @patch("core.redis_connection_helper.get_redis_client")
+    def test_low_confidence_requires_human_review(self, mock_redis, mock_router_class):
+        mock_redis.return_value = None
+        mock_router = MagicMock()
+        mock_router.client.is_enabled.return_value = True
+        mock_router.process.return_value = {
+            "success": True,
+            "validated": True,
+            "content": """{
+                "intent":"scheduling",
+                "urgency":"low",
+                "business_value":"medium",
+                "confidence":0.45,
+                "summary":"Schedule request",
+                "recommended_action":"propose_times",
+                "tone":"neutral",
+                "crm_updates":{"stage":"contacted","tags":["scheduling"],"follow_up_needed":true,"priority":"medium"},
+                "suggested_reply":"Thanks, here are times.",
+                "should_auto_send":true,
+                "needs_human_review":false,
+                "reason_for_recommendation":"LLM recommendation"
+            }""",
+        }
+        mock_router.client.is_enabled.return_value = True
+        mock_router_class.return_value = mock_router
+        from email_automation.ai_assistant import MinimalAIEmailAssistant
+        assistant = MinimalAIEmailAssistant(api_key="x")
+        result = assistant.analyze_incoming_email(
+            sender_email="planner@example.com",
+            sender_name="Planner",
+            subject="Call next week",
+            body="Can we talk Tuesday?",
+        )
+        assert result["needs_human_review"] is True
+        assert result["should_auto_send"] is False

@@ -18,10 +18,10 @@ from core.user_auth import user_auth_manager
 from email_automation.ai_assistant import MinimalAIEmailAssistant
 from email_automation.parser import MinimalEmailParser
 from email_automation.actions import MinimalEmailActions
-from core.minimal_ml_scoring import MinimalMLScoring
+from core.ml_scoring import MinimalMLScoring
 from crm.service import enhanced_crm_service
 from core.feature_flags import get_feature_flags
-from core.minimal_vector_search import get_vector_search
+from core.vector_search import get_vector_search
 
 # Helper function for backward compatibility
 def create_ai_assistant(api_key=None):

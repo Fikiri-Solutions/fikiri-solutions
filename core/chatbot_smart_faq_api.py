@@ -14,7 +14,7 @@ from core.smart_faq_system import get_smart_faq, FAQCategory
 from core.knowledge_base_system import get_knowledge_base, DocumentType
 from core.context_aware_responses import get_context_system, MessageType
 from core.multi_channel_support import get_multi_channel_system, ChannelType
-from core.minimal_vector_search import MinimalVectorSearch, get_vector_search as _get_vector_search
+from core.vector_search import MinimalVectorSearch, get_vector_search as _get_vector_search
 from core.api_validation import handle_api_errors, create_error_response
 from core.public_chatbot_api import require_api_key
 from core.chatbot_auth import require_api_key_or_jwt
@@ -39,9 +39,9 @@ knowledge_base = get_knowledge_base()
 context_system = get_context_system()
 multi_channel = get_multi_channel_system()
 
-# Lazy-load vector search via singleton in minimal_vector_search (shared with KB layer)
+# Lazy-load vector search via singleton in core.vector_search (shared with KB layer)
 def get_vector_search() -> MinimalVectorSearch:
-    """Return shared vector search singleton. Prefer app.services if set; else use minimal_vector_search.get_vector_search()."""
+    """Return shared vector search singleton. Prefer app.services if set; else use core.vector_search.get_vector_search()."""
     try:
         import sys
         if 'app' in sys.modules:

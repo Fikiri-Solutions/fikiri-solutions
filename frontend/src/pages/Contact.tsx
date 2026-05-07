@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { RadiantLayout, Container, Gradient, AnimatedBackground } from '../components/radiant'
 import { Button } from '../components/radiant/Button'
 import { apiClient } from '../services/apiClient'
@@ -70,8 +71,15 @@ export const Contact: React.FC = () => {
               <h1 className="text-4xl font-bold text-foreground mb-2 sm:text-5xl">
                 Contact us
               </h1>
-              <p className="text-lg text-muted-foreground mb-8">
+              <p className="text-lg text-muted-foreground mb-2">
                 Questions, feedback, or a demo? We’ll get back to you soon.
+              </p>
+              <p className="text-sm text-muted-foreground mb-8">
+                Booking a consultation? Complete the{' '}
+                <Link to="/intake" className="text-brand-primary font-medium hover:underline">
+                  consultation intake
+                </Link>{' '}
+                first (about 10–15 minutes) so we can focus the session on your workflow.
               </p>
 
               {success && (

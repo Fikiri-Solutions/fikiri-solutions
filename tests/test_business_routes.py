@@ -734,9 +734,25 @@ class TestBusinessRoutes(unittest.TestCase):
         with patch("email_automation.ai_assistant.MinimalAIEmailAssistant") as mock_ai:
             instance = mock_ai.return_value
             instance.is_enabled.return_value = True
-            instance.classify_email_intent.return_value = {"intent": "inquiry", "urgency": "low", "suggested_action": "reply"}
-            instance.summarize_email.return_value = "Summary"
-            instance.extract_contact_info.return_value = {"email": "a@example.com"}
+            instance.analyze_incoming_email.return_value = {
+                "intent": "inquiry",
+                "urgency": "low",
+                "business_value": "medium",
+                "confidence": 0.88,
+                "summary": "Summary",
+                "recommended_action": "reply",
+                "tone": "neutral",
+                "crm_updates": {
+                    "stage": "contacted",
+                    "tags": ["inquiry"],
+                    "follow_up_needed": True,
+                    "priority": "medium",
+                },
+                "suggested_reply": "Thanks for your message.",
+                "should_auto_send": False,
+                "needs_human_review": True,
+                "reason_for_recommendation": "Safe default requires review.",
+            }
             response = self.client.post(
                 "/api/ai/analyze-email",
                 json={"content": "Hello", "subject": "Hi"},
@@ -975,7 +991,7 @@ class TestBusinessRoutes(unittest.TestCase):
         mock_engine.execute_automation_rules.return_value = {"success": True, "data": {"ok": True}}
         response = self.client.post(
             "/api/automation/test/preset",
-            json={"preset_id": "gmail_crm", "correlation_id": "preset-trace-1"},
+            json={"preset_id": "inbound_crm_sync", "correlation_id": "preset-trace-1"},
             content_type="application/json",
             headers={"X-Correlation-ID": "preset-trace-1"},
         )
@@ -986,6 +1002,21 @@ class TestBusinessRoutes(unittest.TestCase):
         args = mock_engine.execute_automation_rules.call_args[0]
         trigger_data = args[1]
         self.assertEqual(trigger_data.get("correlation_id"), "preset-trace-1")
+
+    @patch("routes.business.automation_engine")
+    @patch("routes.business.get_current_user_id", return_value=1)
+    def test_automation_test_preset_legacy_gmail_crm_alias(
+        self, mock_user_id, mock_engine
+    ):
+        mock_engine.execute_automation_rules.return_value = {"success": True, "data": {}}
+        response = self.client.post(
+            "/api/automation/test/preset",
+            json={"preset_id": "gmail_crm"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        trig = mock_engine.execute_automation_rules.call_args[0][1]
+        self.assertEqual(trig.get("sender_email"), "lead@example.com")
 
 
 if __name__ == "__main__":

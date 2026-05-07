@@ -20,7 +20,7 @@ except ImportError:
     redis = None
 
 try:
-    from core.minimal_config import get_config
+    from core.config import get_config
     CONFIG_AVAILABLE = True
 except ImportError:
     CONFIG_AVAILABLE = False

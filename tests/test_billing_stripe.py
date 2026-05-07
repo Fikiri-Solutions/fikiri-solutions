@@ -152,15 +152,15 @@ class TestBillingAPI(unittest.TestCase):
     @patch("core.jwt_auth.get_jwt_manager")
     @patch("core.billing_api.get_user_email")
     @patch("core.billing_api.get_stripe_customer_id")
-    @patch("core.billing_api.stripe")
+    @patch("stripe.SetupIntent.create")
     def test_setup_intent_invalid_payment_types_falls_back_to_card(
-        self, mock_stripe, mock_get_customer_id, mock_get_email, mock_jwt_manager
+        self, mock_create, mock_get_customer_id, mock_get_email, mock_jwt_manager
     ):
         mock_jwt_manager.return_value.verify_access_token.return_value = {"user_id": 1}
         mock_get_email.return_value = "samepassive.co@gmail.com"
         mock_get_customer_id.return_value = "cus_123"
         secret_field = "client_" + "se" + "cret"
-        mock_stripe.SetupIntent.create.return_value = MagicMock(**{secret_field: "seti_client_token", "id": "seti_123"})
+        mock_create.return_value = MagicMock(**{secret_field: "seti_client_token", "id": "seti_123"})
 
         response = self.client.post(
             "/api/billing/setup-intent",
@@ -170,7 +170,7 @@ class TestBillingAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.get_json() or {}
         self.assertTrue(payload.get("success"))
-        _, kwargs = mock_stripe.SetupIntent.create.call_args
+        _, kwargs = mock_create.call_args
         self.assertEqual(kwargs.get("payment_method_types"), ["card"])
 
     @patch.dict(os.environ, {"ENABLE_TEST_ACCESS_CODES": "true", "ADMIN_USER_IDS": "1"}, clear=False)

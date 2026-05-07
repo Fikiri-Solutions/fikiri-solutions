@@ -34,7 +34,25 @@ class TestRecordEmailEvent(unittest.TestCase):
         record_email_event(1, "email.failed", status="failed", source="test")
 
 
+_STUB_INBOUND_WORKFLOW_RETURN = {
+    "success": True,
+    "correlation_id": "wf-stub",
+    "lead_capture": {"success": True, "data": {"lead_id": 777}},
+    "automation": {"success": True},
+}
+
+
 class TestPipelineEmailEvents(unittest.TestCase):
+    def setUp(self):
+        self._wf_patch = patch(
+            "email_automation.pipeline.run_inbound_email_workflow",
+            return_value=dict(_STUB_INBOUND_WORKFLOW_RETURN),
+        )
+        self._wf_patch.start()
+
+    def tearDown(self):
+        self._wf_patch.stop()
+
     @patch("email_automation.pipeline.enhanced_crm_service")
     @patch("email_automation.pipeline.db_optimizer")
     @patch("email_automation.pipeline.record_email_event")
@@ -61,19 +79,40 @@ class TestPipelineEmailEvents(unittest.TestCase):
 
         with patch.object(
             actions.services["ai_assistant"],
-            "classify_email_intent",
-            return_value={"intent": "lead_inquiry", "confidence": 0.9},
+            "_load_business_context",
+            return_value={"company_name": "Fikiri"},
+        ), patch.object(
+            actions.services["ai_assistant"],
+            "analyze_incoming_email",
+            return_value={
+                "intent": "lead_inquiry",
+                "confidence": 0.9,
+                "urgency": "high",
+                "business_value": "high",
+                "recommended_action": "send_quote",
+                "tone": "professional",
+                "crm_updates": {"stage": "qualified", "tags": ["lead"], "follow_up_needed": True, "priority": "high"},
+                "suggested_reply": "Draft reply",
+                "should_auto_send": False,
+                "needs_human_review": True,
+                "reason_for_recommendation": "Manual review required.",
+                "summary": "summary",
+            },
         ):
             out = orchestrate_incoming(
                 parsed, user_id=5, actions=actions, correlation_id="corr-test"
             )
 
-        self.assertFalse(out.get("success"))
+        self.assertTrue(out.get("success"))
         types = [c[0][1] for c in mock_record.call_args_list]
         self.assertIn("email.parsed", types)
+        self.assertIn("email.analyzed", types)
         self.assertIn("email.classified", types)
         self.assertIn("ai.action_recommended", types)
-        self.assertIn("ai.action_cancelled", types)
+        self.assertIn("ai.action.recommended", types)
+        self.assertIn("ai.policy.evaluated", types)
+        self.assertIn("email.reply_drafted", types)
+        self.assertNotIn("ai.action_cancelled", types)
 
     @patch("email_automation.pipeline.enhanced_crm_service")
     @patch("email_automation.pipeline.db_optimizer")
@@ -100,13 +139,17 @@ class TestPipelineEmailEvents(unittest.TestCase):
         )
         with patch.object(
             actions.services["ai_assistant"],
-            "classify_email_intent",
+            "_load_business_context",
+            return_value={"company_name": "Fikiri"},
+        ), patch.object(
+            actions.services["ai_assistant"],
+            "analyze_incoming_email",
             side_effect=RuntimeError("llm down"),
         ):
             out = orchestrate_incoming(parsed, user_id=5, actions=actions)
 
         self.assertFalse(out.get("success"))
-        self.assertEqual(out.get("error"), "classification_failed")
+        self.assertEqual(out.get("error"), "analysis_failed")
         types = [c[0][1] for c in mock_record.call_args_list]
         self.assertIn("email.parsed", types)
         self.assertIn("email.failed", types)
@@ -136,8 +179,12 @@ class TestPipelineEmailEvents(unittest.TestCase):
         )
         with patch.object(
             actions.services["ai_assistant"],
-            "classify_email_intent",
-            return_value=["not", "a", "dict"],
+            "_load_business_context",
+            return_value={"company_name": "Fikiri"},
+        ), patch.object(
+            actions.services["ai_assistant"],
+            "analyze_incoming_email",
+            return_value={"not": "a dict payload"},
         ), patch.object(actions, "process_email", return_value={"success": True, "action": "mark_read"}):
             out = orchestrate_incoming(parsed, user_id=5, actions=actions)
 
@@ -170,8 +217,25 @@ class TestPipelineEmailEvents(unittest.TestCase):
         )
         with patch.object(
             actions.services["ai_assistant"],
-            "classify_email_intent",
-            return_value={"intent": "lead_inquiry"},
+            "_load_business_context",
+            return_value={"company_name": "Fikiri"},
+        ), patch.object(
+            actions.services["ai_assistant"],
+            "analyze_incoming_email",
+            return_value={
+                "intent": "lead_inquiry",
+                "confidence": 0.9,
+                "urgency": "high",
+                "business_value": "high",
+                "recommended_action": "send_quote",
+                "tone": "professional",
+                "crm_updates": {"stage": "qualified", "tags": ["lead"], "follow_up_needed": True, "priority": "high"},
+                "suggested_reply": "Draft reply",
+                "should_auto_send": True,
+                "needs_human_review": False,
+                "reason_for_recommendation": "Safe to auto send.",
+                "summary": "summary",
+            },
         ), patch.object(
             actions, "process_email", side_effect=RuntimeError("handler boom")
         ):
@@ -206,8 +270,25 @@ class TestPipelineEmailEvents(unittest.TestCase):
         )
         with patch.object(
             actions.services["ai_assistant"],
-            "classify_email_intent",
-            return_value={"intent": "lead_inquiry"},
+            "_load_business_context",
+            return_value={"company_name": "Fikiri"},
+        ), patch.object(
+            actions.services["ai_assistant"],
+            "analyze_incoming_email",
+            return_value={
+                "intent": "lead_inquiry",
+                "confidence": 0.9,
+                "urgency": "high",
+                "business_value": "high",
+                "recommended_action": "send_quote",
+                "tone": "professional",
+                "crm_updates": {"stage": "qualified", "tags": ["lead"], "follow_up_needed": True, "priority": "high"},
+                "suggested_reply": "Draft reply",
+                "should_auto_send": True,
+                "needs_human_review": False,
+                "reason_for_recommendation": "Safe to auto send.",
+                "summary": "summary",
+            },
         ), patch.object(actions, "process_email", return_value=None):
             out = orchestrate_incoming(parsed, user_id=5, actions=actions)
 

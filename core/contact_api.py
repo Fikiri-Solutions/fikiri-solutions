@@ -1,6 +1,8 @@
 """
 Contact API - Public form submissions to info@fikirisolutions.com
 UTF-8, strict text limits to keep cost and abuse low.
+
+Consultation intake: POST /api/intake delegates to ``core.consultation_intake_service`` (CRM + email + backup row).
 """
 
 import logging
@@ -10,6 +12,13 @@ import json
 from flask import Blueprint, request, jsonify
 from core.database_optimization import db_optimizer
 from core.email_branding import wrap_html_email_body
+from core.request_correlation import get_or_create_correlation_id
+from core.rate_limiter import check_public_intake_rate_limit
+from core.consultation_intake_service import (
+    parse_intake_body,
+    process_public_intake,
+    validate_email as validate_intake_email,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -193,3 +202,76 @@ def submit_contact():
     if not sent:
         return jsonify({"success": False, "error": "Unable to send message. Please try again later."}), 503
     return jsonify({"success": True, "message": "Thank you. We will get back to you soon."}), 200
+
+
+@contact_bp.route("/intake", methods=["POST"])
+def submit_consultation_intake():
+    """
+    Public consultation intake — HTTP boundary only. Domain logic lives in
+    ``core.consultation_intake_service`` (CRM + email + backup persistence).
+    """
+    ct = request.content_type or ""
+    if "application/json" not in ct:
+        return jsonify({"success": False, "error": "JSON body required"}), 400
+
+    data = request.get_json(silent=True) or {}
+    p = parse_intake_body(data)
+
+    # Honeypot (bots): pretend success, do not persist.
+    if p.get("leave_blank"):
+        return jsonify(
+            {
+                "success": True,
+                "message": "Thank you. We received your intake and will follow up shortly.",
+            }
+        ), 200
+
+    rl = check_public_intake_rate_limit(request.remote_addr or "")
+    if not rl.allowed:
+        return jsonify(
+            {
+                "success": False,
+                "error": "Too many submissions. Please try again later.",
+                "error_code": "RATE_LIMIT_EXCEEDED",
+                "retry_after": rl.retry_after,
+            }
+        ), 429
+
+    if not p.get("business_name"):
+        return jsonify({"success": False, "error": "Business name is required"}), 400
+    if not p.get("contact_name"):
+        return jsonify({"success": False, "error": "Contact name is required"}), 400
+    if not validate_intake_email(p.get("email") or ""):
+        return jsonify({"success": False, "error": "Valid email is required"}), 400
+
+    correlation_id = get_or_create_correlation_id(request, data)
+    outcome = process_public_intake(
+        p=p,
+        correlation_id=correlation_id,
+        send_notification_email=_send_contact_email,
+        contact_to_email=CONTACT_TO_EMAIL,
+        contact_from_email=CONTACT_FROM_EMAIL,
+        request_ip=request.remote_addr,
+        user_agent=request.headers.get("User-Agent"),
+    )
+
+    if not outcome.crm_ok and not outcome.email_sent:
+        return jsonify(
+            {
+                "success": False,
+                "error": "Unable to submit intake right now. Please try again later or email us.",
+            }
+        ), 503
+
+    if outcome.email_failed_after_crm:
+        logger.warning(
+            "Consultation intake: CRM saved but notification email failed for correlation_id=%s",
+            correlation_id,
+        )
+
+    return jsonify(
+        {
+            "success": True,
+            "message": "Thank you. We received your intake and will use it to prepare for your conversation.",
+        }
+    ), 200

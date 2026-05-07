@@ -302,10 +302,14 @@ export const Services: React.FC = () => {
       case 'crm':
         return (
           <div className="space-y-4">
+            <p className="text-xs text-amber-800 dark:text-amber-200/90 rounded-md bg-amber-500/10 border border-amber-500/25 px-2 py-1.5">
+              Partial · These switches are saved but <strong className="font-medium">not read by CRM or email workers</strong> in this
+              codebase yet — they will not enable or disable ingestion by themselves.
+            </p>
             <div className="flex items-center justify-between">
               <div>
                 <label className="text-sm font-medium text-brand-text dark:text-gray-300">Auto Lead Creation</label>
-                <p className="text-xs text-brand-text/60 dark:text-gray-400">Automatically create leads from incoming emails</p>
+                <p className="text-xs text-brand-text/60 dark:text-gray-400">Preference only (requires Gmail/integration path)</p>
               </div>
               <button
                 onClick={() => updateServiceSettings(service.id, 'autoLeadCreation', !service.settings.autoLeadCreation)}
@@ -321,7 +325,7 @@ export const Services: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <label className="text-sm font-medium text-brand-text dark:text-gray-300">Lead Scoring</label>
-                <p className="text-xs text-brand-text/60 dark:text-gray-400">Automatically score leads based on email content</p>
+                <p className="text-xs text-brand-text/60 dark:text-gray-400">Preference only (CRM scores via LeadScoringService)</p>
               </div>
               <button
                 onClick={() => updateServiceSettings(service.id, 'leadScoring', !service.settings.leadScoring)}
@@ -337,7 +341,7 @@ export const Services: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <label className="text-sm font-medium text-brand-text dark:text-gray-300">Follow-up Reminders</label>
-                <p className="text-xs text-brand-text/60 dark:text-gray-400">Send reminders for follow-up actions</p>
+                <p className="text-xs text-brand-text/60 dark:text-gray-400">Preference only (automations handle follow-ups)</p>
               </div>
               <button
                 onClick={() => updateServiceSettings(service.id, 'followUpReminders', !service.settings.followUpReminders)}
@@ -356,10 +360,14 @@ export const Services: React.FC = () => {
       case 'email-parser':
         return (
           <div className="space-y-4">
+            <p className="text-xs text-brand-text/70 dark:text-gray-400 rounded-md border border-brand-text/15 px-2 py-1.5">
+              These toggles are stored for your account; the live parser pipeline is validated with <strong className="font-medium">Test
+              Service</strong> (<code className="text-[10px]">POST /api/test/email-parser</code>).
+            </p>
             <div className="flex items-center justify-between">
               <div>
                 <label className="text-sm font-medium text-brand-text dark:text-gray-300">Extract Contacts</label>
-                <p className="text-xs text-brand-text/60 dark:text-gray-400">Automatically extract contact information from emails</p>
+                <p className="text-xs text-brand-text/60 dark:text-gray-400">Stored preference (not enforced globally yet)</p>
               </div>
               <button
                 onClick={() => updateServiceSettings(service.id, 'extractContacts', !service.settings.extractContacts)}
@@ -410,6 +418,11 @@ export const Services: React.FC = () => {
       case 'ml-scoring':
         return (
           <div className="space-y-4">
+            <p className="text-xs text-blue-800 dark:text-blue-200/90 rounded-md bg-blue-500/10 border border-blue-500/25 px-2 py-1.5">
+              Partial · Live scoring uses the server&apos;s <code className="text-[10px]">MinimalMLScoring</code> diagnostics. Model
+              dropdowns are <strong className="font-medium">not wired</strong> into that engine — they are placeholders for future
+              tuning.
+            </p>
             <div>
               <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Scoring Model</label>
               <select
@@ -462,12 +475,20 @@ export const Services: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 dark:bg-amber-500/15 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
+        <strong className="font-semibold">Honest scope:</strong>{' '}
+        Toggles and settings here are stored per user via <code className="text-xs">POST /api/services</code>.
+        They are <em>preferences</em> — Gmail sync, CRM lead creation, parsing, and scoring are driven by integrations
+        and server jobs unless noted on each card. Use <strong>Test Service</strong> to verify live behavior (
+        <code className="text-xs">/api/test/*</code> uses HTTP&nbsp;200 with a <code className="text-xs">success</code>{' '}
+        field — the UI treats <code className="text-xs">success: false</code> as failure).
+      </div>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-brand-text dark:text-white">🚀 Strategic Service Dashboard</h1>
           <p className="mt-1 text-sm text-brand-text/70 dark:text-gray-400">
-            Test and configure all core Fikiri Solutions services with strategic feature flags
+            Test integrations and persist UI preferences — confirm with “Test Service” instead of assuming toggles enforce behavior.
           </p>
         </div>
         <div className="flex space-x-3">

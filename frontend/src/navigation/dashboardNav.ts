@@ -28,10 +28,10 @@ export type DashboardNavItem = {
 const DASHBOARD_NAV_BASE: DashboardNavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Inbox', href: '/inbox', icon: Mail },
+  { name: 'CRM', href: '/crm', icon: Users },
+  { name: 'Automations', href: '/automations', icon: Zap },
   { name: 'Integrations', href: '/integrations/gmail', icon: PlugZap },
   { name: 'Services', href: '/services', icon: Settings },
-  { name: 'Automations', href: '/automations', icon: Zap },
-  { name: 'CRM', href: '/crm', icon: Users },
   { name: 'AI Assistant', href: '/ai', icon: Brain },
   { name: 'Import center', href: '/import-center', icon: Package },
   { name: 'Chatbot Builder', href: '/ai/chatbot-builder', icon: BookOpen },
@@ -57,20 +57,20 @@ export function getDashboardSidebarNav(
  */
 const MOBILE_BOTTOM_HREFS_DEFAULT = [
   '/dashboard',
-  '/services',
-  '/integrations/gmail',
+  '/inbox',
   '/crm',
-  '/ai',
-  '/analytics',
+  '/automations',
+  '/integrations/gmail',
+  '/billing',
 ] as const
 
 const MOBILE_BOTTOM_HREFS_ONBOARDING = [
   '/onboarding',
   '/dashboard',
-  '/services',
-  '/integrations/gmail',
+  '/inbox',
   '/crm',
-  '/ai',
+  '/automations',
+  '/integrations/gmail',
 ] as const
 
 /** Active state for sidebar and mobile tab bar (nested routes share parent highlight). */

@@ -56,14 +56,20 @@ class TestAIEmailAnalysis(unittest.TestCase):
     def test_analyze_email_success(self, mock_ai, mock_get_user):
         mock_get_user.return_value = 1
         mock_ai.return_value.is_enabled.return_value = True
-        mock_ai.return_value.classify_email_intent.return_value = {
+        mock_ai.return_value.analyze_incoming_email.return_value = {
             'intent': 'general_info',
             'urgency': 'low',
-            'suggested_action': 'Review',
-            'confidence': 0.9
+            'business_value': 'low',
+            'confidence': 0.9,
+            'summary': 'Summary',
+            'recommended_action': 'review',
+            'tone': 'neutral',
+            'crm_updates': {'stage': 'replied', 'tags': ['inbound'], 'follow_up_needed': False, 'priority': 'low'},
+            'suggested_reply': 'Thanks for reaching out.',
+            'should_auto_send': False,
+            'needs_human_review': True,
+            'reason_for_recommendation': 'Default safety posture.'
         }
-        mock_ai.return_value.summarize_email.return_value = "Summary"
-        mock_ai.return_value.extract_contact_info.return_value = {"email": "a@example.com"}
 
         response = self.client.post('/api/ai/analyze-email', json={
             'content': 'hello world',

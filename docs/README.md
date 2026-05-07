@@ -94,6 +94,7 @@ Quick reference for project documentation. Root-level: [`README.md`](../README.m
 | Doc | Description |
 |-----|-------------|
 | [SECURITY_ASSESSMENT.md](SECURITY_ASSESSMENT.md) | Security assessment report |
+| [SECURITY_COST_CONTROL_PLAYBOOK.md](SECURITY_COST_CONTROL_PLAYBOOK.md) | Low-cost CASA pre-lab security workflow (OAuth scope) |
 | [AUTHENTICATION_DEBUG_GUIDE.md](AUTHENTICATION_DEBUG_GUIDE.md) | Auth debugging guide |
 | [TROUBLESHOOTING_GUIDE.md](TROUBLESHOOTING_GUIDE.md) | General troubleshooting |
 | [WEBHOOK_SECURITY.md](WEBHOOK_SECURITY.md) | Webhook security |

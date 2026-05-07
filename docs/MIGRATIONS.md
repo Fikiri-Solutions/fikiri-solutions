@@ -61,7 +61,7 @@ alembic init alembic
 Update to use your database URL:
 
 ```python
-from core.minimal_config import get_config
+from core.config import get_config
 
 config = context.config
 db_url = get_config().get('DATABASE_URL') or os.getenv('DATABASE_URL', 'sqlite:///data/fikiri.db')

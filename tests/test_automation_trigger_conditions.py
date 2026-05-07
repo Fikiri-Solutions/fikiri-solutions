@@ -176,7 +176,7 @@ class TestEngineTriggerIntegration(unittest.TestCase):
                             },
                         },
                         action_type=ActionType.UPDATE_CRM_FIELD,
-                        action_parameters={"slug": "gmail_crm"},
+                        action_parameters={"slug": "inbound_crm_sync"},
                         status=AutomationStatus.ACTIVE,
                         created_at=datetime.now(),
                         updated_at=datetime.now(),

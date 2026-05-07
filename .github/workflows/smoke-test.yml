@@ -40,8 +40,8 @@ jobs:
     - name: Set up environment variables
       run: |
         cp env.template .env 2>/dev/null || true
-        echo "JWT_SECRET_KEY=xbppiUtMLEy-edconosX09sfeaeGwMhmhCxFabteQtw" >> .env
-        echo "FERNET_KEY=2HJ-fbPvowR0BFd7MR2nXO4REdtRtBoz4Bb-HFTl4aU=" >> .env
+        echo "JWT_SECRET_KEY=$(openssl rand -hex 32)" >> .env
+        echo "FERNET_KEY=$(python3 -c 'import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())')" >> .env
         echo "REDIS_URL=redis://localhost:6379/0" >> .env
         echo "FLASK_ENV=development" >> .env
         echo "PORT=5000" >> .env

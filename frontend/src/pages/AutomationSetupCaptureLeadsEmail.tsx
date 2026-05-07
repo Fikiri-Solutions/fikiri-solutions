@@ -14,10 +14,11 @@ import {
 import { apiClient, AutomationRule } from '../services/apiClient'
 import { useToast } from '../components/Toast'
 import {
-  buildGmailCrmActionParameters,
-  buildGmailCrmTriggerConditions,
-  GMAIL_CRM_PRESET_ID,
-} from '../lib/automationGmailCrmPayload'
+  buildInboundCrmSyncActionParameters,
+  buildInboundCrmSyncTriggerConditions,
+  INBOUND_CRM_SYNC_PRESET_ID,
+  isInboundCrmSyncSlug,
+} from '../lib/automationInboundCrmPayload'
 
 const PIPELINE_STAGES = [
   { value: 'new', label: 'New' },
@@ -28,9 +29,12 @@ const PIPELINE_STAGES = [
 
 const STEP_COUNT = 5
 
-function findGmailCrmRule(rules: AutomationRule[]): AutomationRule | undefined {
+function findInboundCrmSyncRule(rules: AutomationRule[]): AutomationRule | undefined {
   return rules.find(
-    r => r.action_parameters?.slug === GMAIL_CRM_PRESET_ID || r.name === GMAIL_CRM_PRESET_ID
+    r =>
+      isInboundCrmSyncSlug(r.action_parameters?.slug) ||
+      r.name === 'Gmail → CRM' ||
+      r.name === 'Inbound email → CRM'
   )
 }
 
@@ -63,7 +67,7 @@ export const AutomationSetupCaptureLeadsEmail: React.FC = () => {
   const inboxReady = Boolean(gmailStatus?.connected || outlookStatus?.connected)
   const loadingPrereqs = gmailLoading || outlookLoading
 
-  const existingRule = useMemo(() => findGmailCrmRule(rules), [rules])
+  const existingRule = useMemo(() => findInboundCrmSyncRule(rules), [rules])
 
   useEffect(() => {
     if (!existingRule || rulesLoading) return
@@ -86,8 +90,8 @@ export const AutomationSetupCaptureLeadsEmail: React.FC = () => {
   const saveMutation = useMutation({
     mutationFn: async () => {
       const opts = { targetStage, senderEmailEndsWith: senderFilter.trim() || undefined }
-      const trigger_conditions = buildGmailCrmTriggerConditions(opts)
-      const action_parameters = buildGmailCrmActionParameters(opts)
+      const trigger_conditions = buildInboundCrmSyncTriggerConditions(opts)
+      const action_parameters = buildInboundCrmSyncActionParameters(opts)
       if (existingRule) {
         return apiClient.updateAutomationRule(existingRule.id, {
           status: 'active',
@@ -96,7 +100,7 @@ export const AutomationSetupCaptureLeadsEmail: React.FC = () => {
         })
       }
       return apiClient.createAutomationRule({
-        name: 'Gmail → CRM',
+        name: 'Inbound email → CRM',
         description: 'Convert new inbound emails into CRM leads automatically.',
         trigger_type: 'email_received',
         trigger_conditions: trigger_conditions as Record<string, any>,
@@ -116,7 +120,7 @@ export const AutomationSetupCaptureLeadsEmail: React.FC = () => {
   })
 
   const testMutation = useMutation({
-    mutationFn: () => apiClient.runAutomationPreset(GMAIL_CRM_PRESET_ID),
+    mutationFn: () => apiClient.runAutomationPreset(INBOUND_CRM_SYNC_PRESET_ID),
     onSuccess: () => {
       addToast({ type: 'success', title: 'Sample test run', message: 'Check the Automations page for execution logs.' })
     },

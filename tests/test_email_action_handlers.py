@@ -18,6 +18,9 @@ from services.email_action_handlers import (
     EmailAction,
     get_email_action_handler,
 )
+from services.automation_actions.email_action import (
+    EmailActionHandler as AutomationEmailActionHandler,
+)
 
 
 class _Token:
@@ -170,3 +173,70 @@ class TestEmailActionHandlers(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAutomationEmailActionHandler(unittest.TestCase):
+    def setUp(self):
+        self.handler = AutomationEmailActionHandler(logger=MagicMock())
+
+    @patch("services.automation_actions.email_action.gmail_client")
+    @patch("services.automation_actions.email_action.send_plain_text_transactional")
+    @patch("services.automation_actions.email_action.automation_safety_manager")
+    def test_gmail_send_path(self, mock_safety, mock_txn, mock_gmail):
+        mock_safety.check_rate_limits.return_value = {"allowed": True}
+        mock_gmail.send_plain_text_as_user.return_value = {
+            "success": True,
+            "channel": "gmail",
+            "message_id": "gm_1",
+        }
+        mock_txn.return_value = {"success": False}
+
+        out = self.handler.execute_send_email(
+            {"subject": "Hi", "body": "Body"},
+            {"sender_email": "Lead <lead@example.com>", "_automation_rule_id": 1},
+            42,
+        )
+
+        self.assertTrue(out.get("success"), msg=out)
+        mock_gmail.send_plain_text_as_user.assert_called_once()
+        mock_txn.assert_not_called()
+        mock_safety.log_automation_action.assert_called_once()
+
+    @patch("services.automation_actions.email_action.gmail_client")
+    @patch("services.automation_actions.email_action.send_plain_text_transactional")
+    @patch("services.automation_actions.email_action.automation_safety_manager")
+    def test_fallback_transactional_path(self, mock_safety, mock_txn, mock_gmail):
+        mock_safety.check_rate_limits.return_value = {"allowed": True}
+        mock_gmail.send_plain_text_as_user.return_value = {
+            "success": False,
+            "error": "gmail unavailable",
+        }
+        mock_txn.return_value = {"success": True, "channel": "smtp"}
+
+        out = self.handler.execute_send_email(
+            {"subject": "Hi", "body": "Body"},
+            {"sender_email": "lead@example.com", "_automation_rule_id": 2},
+            99,
+        )
+
+        self.assertTrue(out.get("success"), msg=out)
+        mock_txn.assert_called_once()
+        mock_safety.log_automation_action.assert_called_once()
+
+    @patch("services.automation_actions.email_action.automation_safety_manager")
+    @patch("services.automation_actions.email_action.db_optimizer")
+    def test_delayed_send_safety_blocked(self, mock_db, mock_safety):
+        mock_db.execute_query.return_value = [{"email": "lead@example.com"}]
+        mock_safety.check_rate_limits.return_value = {
+            "allowed": False,
+            "message": "Global automation kill-switch is enabled",
+        }
+
+        out = self.handler.execute_send_email(
+            {"delay_minutes": 5, "body": "Later"},
+            {"lead_id": 4, "sender_email": "lead@example.com"},
+            1,
+        )
+
+        self.assertFalse(out.get("success"))
+        self.assertEqual(out.get("error_code"), "AUTOMATION_BLOCKED")

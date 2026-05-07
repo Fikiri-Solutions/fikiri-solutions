@@ -55,9 +55,9 @@ export const FeatureStatus: React.FC<FeatureStatusProps> = ({ status, className 
 export const getFeatureStatus = (feature: string): FeatureStatus => {
   const statusMap: Record<string, FeatureStatus> = {
     'ai-assistant': 'beta', // Working but needs API key configuration
-    'crm': 'beta', // Working but some endpoints may be unstable
+    'crm': 'live', // Canonical CRM API (leads, pipeline, import/export, events)
     'email-parser': 'beta', // Working but needs Gmail authentication
-    'automation': 'beta', // Working but needs full configuration
+    'automation': 'beta', // Capability flags + queue; some actions partial/stub
     'feature-flags': 'live', // Fully working
     'auth': 'beta', // Working but needs OAuth setup
     'analytics': 'coming-soon', // Not fully implemented
