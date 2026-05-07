@@ -2030,27 +2030,6 @@ class DatabaseOptimizer:
             WHERE ar.status = 'active'
         """)
     
-    def _initialize_postgres_pool(self):
-        """Initialize PostgreSQL connection pool"""
-        if not POSTGRES_AVAILABLE:
-            logger.warning("PostgreSQL not available")
-            return
-        
-        try:
-            self.connection_pool = psycopg2.pool.SimpleConnectionPool(
-                minconn=1,
-                maxconn=5,
-                host=os.getenv('POSTGRES_HOST', 'localhost'),
-                port=os.getenv('POSTGRES_PORT', 5432),
-                database=os.getenv('POSTGRES_DB', 'fikiri'),
-                user=os.getenv('POSTGRES_USER', 'postgres'),
-                password=os.getenv('POSTGRES_PASSWORD', '')
-            )
-            logger.info("✅ PostgreSQL connection pool initialized")
-        except Exception as e:
-            logger.error(f"❌ PostgreSQL pool initialization failed: {e}")
-            self.connection_pool = None
-    
     @contextmanager
     def get_connection(self, retries=3):
         """Get database connection with retry logic"""
@@ -2716,6 +2695,47 @@ class DatabaseOptimizer:
         except Exception as e:
             logger.warning(f"Could not check if table {table_name} exists: {e}")
             return False
+
+    def list_table_columns(self, table_name: str):
+        """
+        Ordered column names for a table. Used instead of PRAGMA on PostgreSQL
+        (PRAGMA is SQLite-only).
+        """
+        ident = "".join(c for c in (table_name or "") if c.isalnum() or c == "_")
+        if not ident:
+            return []
+        try:
+            if self.db_type == "postgresql":
+                rows = self.execute_query(
+                    """
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = ?
+                    ORDER BY ordinal_position
+                    """,
+                    (ident.lower(),),
+                )
+                names = []
+                for row in rows or []:
+                    if isinstance(row, dict):
+                        c = row.get("column_name")
+                    else:
+                        c = row[0]
+                    if c:
+                        names.append(str(c))
+                return names
+            rows = self.execute_query(f"PRAGMA table_info({ident})", fetch=True)
+            names = []
+            for row in rows or []:
+                if isinstance(row, dict):
+                    n = row.get("name")
+                else:
+                    n = row[1]
+                if n:
+                    names.append(str(n))
+            return names
+        except Exception as e:
+            logger.warning("list_table_columns failed for %s: %s", ident, e)
+            return []
 
     def json_field_expr(self, column: str, dotted_path: str) -> str:
         """Portable JSON field read (SQLite json_extract vs PostgreSQL ::jsonb)."""

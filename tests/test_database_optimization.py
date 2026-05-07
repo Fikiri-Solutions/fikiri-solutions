@@ -7,6 +7,8 @@ import os
 import sys
 from unittest.mock import patch
 
+import pytest
+
 os.environ.setdefault("FLASK_ENV", "test")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -16,6 +18,7 @@ from core.database_optimization import (
     QueryMetrics,
     IndexInfo,
     _production_requires_postgres_uri,
+    db_optimizer,
 )
 
 
@@ -92,3 +95,10 @@ class TestDatabaseOptimizationHelpers:
         assert _production_requires_postgres_uri() is False
         monkeypatch.setenv("FLASK_ENV", "test")
         assert _production_requires_postgres_uri() is False
+
+    def test_list_table_columns_users_includes_email(self):
+        if db_optimizer.db_type != "sqlite":
+            pytest.skip("requires default test sqlite schema")
+        cols = db_optimizer.list_table_columns("users")
+        assert isinstance(cols, list)
+        assert "email" in cols

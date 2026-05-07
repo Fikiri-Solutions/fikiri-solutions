@@ -93,10 +93,7 @@ class APIKeyManager:
             
             # Migration: Add allowed_origins column if it doesn't exist
             try:
-                info = db_optimizer.execute_query(
-                    "PRAGMA table_info(api_keys)", fetch=True
-                )
-                columns = [r.get("name") for r in (info or []) if isinstance(r, dict)]
+                columns = db_optimizer.list_table_columns("api_keys")
                 if "allowed_origins" not in columns:
                     db_optimizer.execute_query("""
                         ALTER TABLE api_keys ADD COLUMN allowed_origins TEXT
