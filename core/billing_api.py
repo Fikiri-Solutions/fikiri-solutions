@@ -935,7 +935,7 @@ def create_setup_intent():
         if not user_email:
             return jsonify({'success': False, 'error': 'User not found'}), 404
         
-        if not STRIPE_AVAILABLE:
+        if stripe is None:
             return jsonify({
                 'success': False,
                 'error': 'Stripe is not configured on this server.',
@@ -993,7 +993,7 @@ def create_setup_checkout_session():
         if not user_email:
             return jsonify({'success': False, 'error': 'User not found'}), 404
 
-        if not STRIPE_AVAILABLE:
+        if stripe is None:
             return jsonify({
                 'success': False,
                 'error': 'Stripe is not configured on this server.',

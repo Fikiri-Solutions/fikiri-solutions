@@ -17,6 +17,9 @@ requests>=2.31.0
 # Twilio (SMS / Verify)
 twilio>=9.0.0
 
+# Billing
+stripe>=11.0.0
+
 # JWT for Apple iCloud Integration
 PyJWT>=2.9.0
 
