@@ -42,7 +42,7 @@ const Signup: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   
-  const { signup, getRedirectPath, user } = useAuth();
+  const { signup, user } = useAuth();
   const { trackSignup } = useUserActivityTracking();
   const navigate = useNavigate();
 
@@ -144,7 +144,14 @@ const Signup: React.FC = () => {
       const result = await signup(
         formData.email,
         formData.password,
-        `${formData.firstName} ${formData.lastName}`
+        `${formData.firstName} ${formData.lastName}`,
+        {
+          businessName: formData.company.trim(),
+          businessEmail: formData.email.trim(),
+          termsAccepted: formData.agreeToTerms,
+          privacyConsent: formData.agreeToTerms,
+          marketingConsent: formData.subscribeNewsletter,
+        },
       );
       
       if (result.success) {
@@ -166,9 +173,7 @@ const Signup: React.FC = () => {
           }
         }
         
-        // Get the appropriate redirect path based on user state
-        const redirectPath = getRedirectPath();
-        navigate(redirectPath);
+        navigate(result.redirectPath ?? '/onboarding');
       } else {
         setErrors({ submit: result.error || 'Failed to create account. Please try again.' });
       }

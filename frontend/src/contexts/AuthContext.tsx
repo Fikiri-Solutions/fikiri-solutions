@@ -38,9 +38,25 @@ export interface OnboardingData {
   marketingConsent: boolean
 }
 
+/** Optional fields when signing up from the /signup page (bypasses onboarding draft). */
+export interface SignupExtras {
+  businessName?: string
+  businessEmail?: string
+  industry?: string
+  teamSize?: string
+  termsAccepted?: boolean
+  privacyConsent?: boolean
+  marketingConsent?: boolean
+}
+
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string; user?: User }>
-  signup: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>
+  signup: (
+    email: string,
+    password: string,
+    name: string,
+    extras?: SignupExtras,
+  ) => Promise<{ success: boolean; error?: string; redirectPath?: string }>
   logout: () => void
   updateUser: (user: User) => void
   setOnboardingData: (data: OnboardingData) => void
@@ -513,31 +529,53 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }
 
-  const signup = async (email: string, password: string, name: string): Promise<{ success: boolean; error?: string }> => {
+  const signup = async (
+    email: string,
+    password: string,
+    name: string,
+    extras?: SignupExtras,
+  ): Promise<{ success: boolean; error?: string; redirectPath?: string }> => {
     try {
       const onboardingData = authState.onboardingData
       const signupData = {
         email,
         password,
         name,
-        business_name: onboardingData?.businessName || '',
-        business_email: onboardingData?.businessEmail || email,
-        industry: onboardingData?.industry || '',
-        team_size: onboardingData?.teamSize || '',
-        privacy_consent: onboardingData?.privacyConsent || false,
-        terms_accepted: onboardingData?.termsAccepted || false,
-        marketing_consent: onboardingData?.marketingConsent || false
+        business_name: extras?.businessName ?? onboardingData?.businessName ?? '',
+        business_email: extras?.businessEmail ?? onboardingData?.businessEmail ?? email,
+        industry: extras?.industry ?? onboardingData?.industry ?? '',
+        team_size: extras?.teamSize ?? onboardingData?.teamSize ?? '',
+        privacy_consent: extras?.privacyConsent ?? onboardingData?.privacyConsent ?? false,
+        terms_accepted: extras?.termsAccepted ?? onboardingData?.termsAccepted ?? false,
+        marketing_consent: extras?.marketingConsent ?? onboardingData?.marketingConsent ?? false,
       }
 
       const data = await apiClient.signup(signupData)
 
       if (data.success) {
-        const user = data.data?.user
+        const rawUser = data.data?.user
         const tokens = data.data?.tokens as
           | { access_token?: string; refresh_token?: string }
           | undefined
 
-        // Store user data and tokens (only in browser)
+        if (!rawUser || typeof rawUser.id !== 'number') {
+          return {
+            success: false,
+            error: 'Invalid server response after signup. Please contact support.',
+          }
+        }
+
+        const user: User = {
+          ...rawUser,
+          is_active: rawUser.is_active ?? true,
+          email_verified: rawUser.email_verified ?? false,
+          created_at: rawUser.created_at ?? new Date().toISOString(),
+          onboarding_completed: rawUser.onboarding_completed ?? false,
+          onboarding_step: rawUser.onboarding_step ?? 1,
+        }
+
+        const redirectPath = user.onboarding_completed ? '/dashboard' : '/onboarding'
+
         if (typeof window !== 'undefined') {
           localStorage.setItem('fikiri-user', JSON.stringify(user))
           localStorage.setItem('fikiri-user-id', user.id.toString())
@@ -548,28 +586,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             localStorage.setItem('fikiri-refresh-token', tokens.refresh_token)
           }
         }
-        
-        // Clear onboarding data as it's now in the user account
+
         clearOnboardingData()
-        
-        setAuthState(prev => ({
+
+        setAuthState((prev) => ({
           ...prev,
           user,
           isAuthenticated: true,
-          onboardingData: null
+          onboardingData: null,
         }))
 
-        return { success: true }
-      } else {
-        return { 
-          success: false, 
-          error: data.error || 'Signup failed' 
-        }
+        return { success: true, redirectPath }
+      }
+      return {
+        success: false,
+        error: data.error || 'Signup failed',
       }
     } catch (error: any) {
       // Axios rejects on 4xx/5xx; backend messages live on error.response.data (same as login()).
       if (import.meta.env.DEV) {
         console.error('❌ [AuthContext] signup() error:', error?.response?.data ?? error?.message)
+      }
+      if (error?.response?.status === 400 && error?.response?.data?.code === 'USER_EXISTS') {
+        return {
+          success: false,
+          error: 'An account with this email already exists. Try signing in instead.',
+        }
       }
       if (error?.response?.status === 429) {
         const retryAfter = error.response?.data?.retry_after

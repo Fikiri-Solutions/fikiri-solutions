@@ -232,4 +232,41 @@ describe('AuthContext', () => {
     expect(localStorage.getItem('fikiri-user')).toBeNull()
     expect(mockNavigate).toHaveBeenCalledWith('/')
   })
+
+  it('should return redirectPath /onboarding after successful signup (not stale getRedirectPath)', async () => {
+    vi.mocked(apiClient.signup).mockResolvedValueOnce({
+      success: true,
+      data: {
+        user: {
+          id: 99,
+          email: 'newuser@example.com',
+          name: 'New User',
+          role: 'user',
+          email_verified: false,
+          onboarding_completed: false,
+          onboarding_step: 1,
+        },
+        tokens: {
+          access_token: 'at',
+          refresh_token: 'rt',
+        },
+        session_id: 'sid',
+      },
+    } as any)
+
+    const { result } = renderHook(() => useAuth(), { wrapper })
+
+    await act(async () => {
+      const out = await result.current.signup('newuser@example.com', 'Password123!', 'New User', {
+        businessName: 'Acme',
+        termsAccepted: true,
+        privacyConsent: true,
+      })
+      expect(out.success).toBe(true)
+      expect(out.redirectPath).toBe('/onboarding')
+    })
+
+    expect(localStorage.getItem('fikiri-token')).toBe('at')
+    expect(result.current.isAuthenticated).toBe(true)
+  })
 })
