@@ -16,11 +16,14 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      FERNET_KEY: "dKxuXPyNhHB-eRv-rPD_EYz0S088dRI6NOrlXO5eV_I="
-    
+
     steps:
     - uses: actions/checkout@v4
+
+    # Ephemeral Fernet key for CI only (never commit static secrets; satisfies secret scanners).
+    - name: Set CI Fernet key
+      run: |
+        echo "FERNET_KEY=$(python3 -c 'import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())')" >> "$GITHUB_ENV"
     
     - name: Setup Python
       uses: actions/setup-python@v4
@@ -46,6 +49,10 @@ jobs:
     - name: Run tests
       run: |
         pytest tests/ -m "not contract and not integration" -v --cov=core --cov=app --cov-report=xml
+
+    - name: Run AI launch-gate evaluation
+      run: |
+        python3 scripts/run_email_triage_eval.py
     
     - name: Upload coverage reports
       uses: codecov/codecov-action@v3

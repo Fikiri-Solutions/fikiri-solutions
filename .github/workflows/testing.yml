@@ -46,11 +46,14 @@ jobs:
   backend-tests:
     runs-on: ubuntu-latest
     env:
-      FERNET_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
       FLASK_ENV: test
     
     steps:
     - uses: actions/checkout@v4
+
+    - name: Set CI Fernet key
+      run: |
+        echo "FERNET_KEY=$(python3 -c 'import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())')" >> "$GITHUB_ENV"
     
     - name: Setup Python
       uses: actions/setup-python@v4
@@ -66,6 +69,9 @@ jobs:
     
     - name: Run unit tests (excluding integration)
       run: pytest tests/ -m "not contract and not integration" -v --ignore=tests/integration/ --cov=core --cov=app --cov-report=xml --cov-report=html
+
+    - name: Run AI launch-gate evaluation
+      run: python3 scripts/run_email_triage_eval.py
     
     - name: Run security tests (bandit)
       run: bandit -r core/ app.py -f json -o bandit-report.json || true
@@ -149,7 +155,7 @@ jobs:
     # Never default to production. Set GitHub Actions secret PERF_API_BASE_URL to a staging
     # or dedicated load-test backend (e.g. https://fikiri-backend-staging.onrender.com) to enable k6 in CI.
     env:
-      API_BASE_URL: ${{ secrets.PERF_API_BASE_URL || '' }}
+      API_BASE_URL: ${{ secrets.PERF_API_BASE_URL }}
 
     steps:
     - uses: actions/checkout@v4
