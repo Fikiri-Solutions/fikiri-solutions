@@ -738,7 +738,8 @@ class EmailJobManager:
             html_part = MIMEText(content, 'html')
             msg.attach(html_part)
 
-            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+            smtp_timeout = int(os.getenv("SMTP_TIMEOUT_SECONDS", "45"))
+            with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=smtp_timeout) as server:
                 server.starttls()
                 server.login(self.smtp_username, self.smtp_password)
                 server.send_message(msg)

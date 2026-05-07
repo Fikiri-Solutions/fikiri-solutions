@@ -8,8 +8,10 @@ We use DNS MX lookup as a lightweight signal that a domain can receive email.
 from __future__ import annotations
 
 import json
-import time
 import logging
+import os
+import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from typing import Any, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -26,6 +28,9 @@ except Exception:  # pragma: no cover
 
 _in_memory_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 _CACHE_TTL_SECONDS = int(10 * 60)  # 10 minutes
+
+# Isolated thread pool so dnspython cannot block the Gevent worker greenlet indefinitely (Render /prod).
+_MX_EXECUTOR = ThreadPoolExecutor(max_workers=3, thread_name_prefix="fikiri_mx")
 
 
 def _normalize_domain(domain: str) -> Optional[str]:
@@ -162,3 +167,42 @@ def check_email_domain_has_mx(
         _set_cached(normalized, result)
         return result
 
+
+def check_email_domain_has_mx_for_signup(domain: str) -> Dict[str, Any]:
+    """
+    MX heuristic for /auth/signup with a hard wall-clock bound.
+
+    dnspython uses blocking sockets; under Gunicorn+gevent a stuck resolver can wedge the
+    only worker for minutes. ThreadPoolExecutor.result(timeout=...) caps wall time regardless.
+
+    Set FIKIRI_SIGNUP_SKIP_MX_LOOKUP=1 to disable lookup entirely (fastest path).
+    """
+    if os.getenv("FIKIRI_SIGNUP_SKIP_MX_LOOKUP", "").strip().lower() in ("1", "true", "yes"):
+        return {
+            "domain": domain,
+            "has_mx": None,
+            "mx_records": 0,
+            "reason": "SKIPPED_BY_ENV",
+        }
+
+    wall = float(os.getenv("FIKIRI_SIGNUP_MX_WALL_SECONDS", "2.5"))
+    inner_timeout = min(1.5, max(0.3, wall * 0.6))
+    fut = _MX_EXECUTOR.submit(check_email_domain_has_mx, domain, inner_timeout)
+    try:
+        return fut.result(timeout=wall)
+    except FuturesTimeout:
+        logger.warning("MX lookup wall-clock timeout domain=%s wall=%ss", domain, wall)
+        return {
+            "domain": domain,
+            "has_mx": None,
+            "mx_records": 0,
+            "reason": "WALL_TIMEOUT",
+        }
+    except Exception as e:
+        logger.warning("MX lookup delegate failed domain=%s: %s", domain, e)
+        return {
+            "domain": domain,
+            "has_mx": None,
+            "mx_records": 0,
+            "reason": f"THREAD_ERROR:{type(e).__name__}",
+        }

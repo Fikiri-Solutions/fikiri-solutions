@@ -96,7 +96,7 @@ class TestAuthRoutes(unittest.TestCase):
     @patch('routes.auth.log_security_event')
     @patch('routes.auth.secure_session_manager')
     @patch('routes.auth.get_jwt_manager')
-    @patch('routes.auth.check_email_domain_has_mx')
+    @patch('routes.auth.check_email_domain_has_mx_for_signup')
     @patch('routes.auth.user_auth_manager')
     def test_signup_success(
         self,

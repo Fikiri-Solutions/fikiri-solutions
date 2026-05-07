@@ -500,6 +500,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return { success: false, error: `Too many login attempts. Please wait ${minutes} minute${minutes !== 1 ? 's' : ''} and try again.` }
       }
       
+      const msg = String(error?.message || '')
+      if (error?.code === 'ECONNABORTED' || msg.toLowerCase().includes('timeout')) {
+        return {
+          success: false,
+          error:
+            'The server took too long to respond. Please wait a moment and try again. If this keeps happening, try another network or contact support.',
+        }
+      }
       const errorMessage = error?.response?.data?.error || error?.message || 'Network error. Please try again.'
       return { success: false, error: errorMessage }
     }
@@ -569,6 +577,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return {
           success: false,
           error: `Too many signup attempts from this network. Please wait ${minutes} minute${minutes !== 1 ? 's' : ''} and try again.`,
+        }
+      }
+      const msg = String(error?.message || '')
+      if (error?.code === 'ECONNABORTED' || msg.toLowerCase().includes('timeout')) {
+        return {
+          success: false,
+          error:
+            'Account creation is taking longer than usual (the server may be busy). Please wait a minute and try again — do not submit twice.',
         }
       }
       const errorMessage =

@@ -77,12 +77,19 @@ class EnhancedRateLimiter:
     def __init__(self):
         self.redis_client = None
         self.key_prefix = "fikiri:rate_limit:"
+        _signup_hourly = int(os.getenv("FIKIRI_SIGNUP_ATTEMPTS_PER_HOUR", "15"))
         self.default_limits = {
             'api_global': RateLimit('api_global', RateLimitType.GLOBAL, 1000, 3600, 'API global limit'),
             'api_user': RateLimit('api_user', RateLimitType.USER, 100, 3600, 'API per user limit'),
             'api_ip': RateLimit('api_ip', RateLimitType.IP, 200, 3600, 'API per IP limit'),
             'login_attempts': RateLimit('login_attempts', RateLimitType.IP, 20, 900, 'Login attempts per IP'),
-            'signup_attempts': RateLimit('signup_attempts', RateLimitType.IP, 3, 3600, 'Signup attempts per IP'),
+            'signup_attempts': RateLimit(
+                'signup_attempts',
+                RateLimitType.IP,
+                max(1, _signup_hourly),
+                3600,
+                'Signup attempts per IP',
+            ),
             'email_verification_attempts': RateLimit('email_verification_attempts', RateLimitType.IP, 10, 3600, 'Email verification resend per IP'),
             'email_send': RateLimit('email_send', RateLimitType.USER, 50, 3600, 'Email sending per user'),
             'gmail_sync': RateLimit('gmail_sync', RateLimitType.USER, 10, 3600, 'Gmail sync per user'),

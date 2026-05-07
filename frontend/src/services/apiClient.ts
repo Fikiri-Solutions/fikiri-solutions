@@ -10,6 +10,9 @@ import { CacheInvalidationManager } from '../utils/cacheInvalidation'
 // API Configuration
 const API_BASE_URL = config.apiUrl
 
+/** Auth flows (login/signup) can exceed default API timeout on cold Render / SQLite; keep under Gunicorn worker limit (~120s). */
+const AUTH_REQUEST_TIMEOUT_MS = 90000
+
 /** Single-flight refresh so concurrent 401s share one POST /auth/refresh. */
 let refreshInFlight: Promise<string | null> | null = null
 
@@ -484,12 +487,12 @@ class ApiClient {
 
   // Auth endpoints (used by AuthContext – no Bearer token required for login/signup/logout)
   async login(email: string, password: string): Promise<{ success: boolean; data?: { user?: any; access_token?: string }; error?: string }> {
-    const response = await this.client.post('/auth/login', { email, password })
+    const response = await this.client.post('/auth/login', { email, password }, { timeout: AUTH_REQUEST_TIMEOUT_MS })
     return response.data
   }
 
   async signup(signupData: Record<string, any>): Promise<{ success: boolean; data?: { user?: any; tokens?: { access_token?: string } }; error?: string }> {
-    const response = await this.client.post('/auth/signup', signupData)
+    const response = await this.client.post('/auth/signup', signupData, { timeout: AUTH_REQUEST_TIMEOUT_MS })
     return response.data
   }
 

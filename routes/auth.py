@@ -23,7 +23,7 @@ from core.api_validation import (
     create_error_response,
     validate_email,
 )
-from core.email_provider_verifier import check_email_domain_has_mx
+from core.email_provider_verifier import check_email_domain_has_mx_for_signup
 from core.rate_limiter import rate_limit
 from core.database_optimization import db_optimizer
 from core.enterprise_logging import log_security_event
@@ -149,6 +149,7 @@ def api_signup():
         return err
 
     try:
+        _sig_start = time.monotonic()
         logger.info("Signup attempt: %s", data.get("email", ""))
         required_fields = ['email', 'password', 'name']
         for field in required_fields:
@@ -178,7 +179,7 @@ def api_signup():
         # Soft by default: warning only. Strict mode can block signups.
         if email_is_valid and "@" in email_raw:
             domain = email_raw.split("@", 1)[1].strip()
-            mx_result = check_email_domain_has_mx(domain)
+            mx_result = check_email_domain_has_mx_for_signup(domain)
             if mx_result.get("has_mx") is False:
                 validation_warnings.append({
                     "code": "SUSPICIOUS_EMAIL_DOMAIN",
@@ -203,6 +204,11 @@ def api_signup():
             business_email=data.get('business_email', data['email']),
             industry=data.get('industry', ''),
             team_size=data.get('team_size', '')
+        )
+        logger.info(
+            "Signup timing after create_user ms=%.0f email=%s",
+            (time.monotonic() - _sig_start) * 1000,
+            data.get("email", ""),
         )
 
         if not user_result['success']:
@@ -307,7 +313,11 @@ def api_signup():
         except Exception as e:
             logger.warning(f"Failed to set session cookie: {e}")
         
-        logger.info(f"✅ User registration successful: {user_data['email']}")
+        logger.info(
+            "✅ User registration successful: %s total_ms=%.0f",
+            user_data["email"],
+            (time.monotonic() - _sig_start) * 1000,
+        )
         return response, status_code
 
     except Exception as e:
