@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom'
 import { Suspense, useMemo, lazy } from 'react'
 import { HelmetProvider } from 'react-helmet-async'
 import { Dashboard } from './pages/Dashboard'
@@ -68,6 +68,29 @@ const SpeedInsights = lazy(async () => {
   return { default: module.SpeedInsights }
 })
 
+/** Legacy /onboarding-flow/* → /onboarding/*; preserve query (e.g. oauth_success, redirect). */
+function LegacyOnboardingFlowRootRedirect() {
+  const location = useLocation()
+  return <Navigate to={`/onboarding${location.search}`} replace />
+}
+
+function LegacyOnboardingFlowStepRedirect() {
+  const { step } = useParams()
+  const location = useLocation()
+  return <Navigate to={`/onboarding/${step}${location.search}`} replace />
+}
+
+function LegacyOnboardingFlowSyncRedirect() {
+  const location = useLocation()
+  return <Navigate to={`/onboarding/2${location.search}`} replace />
+}
+
+/** Legacy /integrations index → /automations (preserve query: calendar OAuth errors, etc.). */
+function LegacyIntegrationsIndexRedirect() {
+  const location = useLocation()
+  return <Navigate to={`/automations${location.search}`} replace />
+}
+
 function App() {
   const features = getFeatureConfig()
   useWarmRoutes() // Warm up routes after first paint
@@ -119,9 +142,9 @@ function App() {
                           <Route path="/error" element={<ErrorPage />} />
                           
                           {/* Legacy onboarding-flow redirects */}
-                          <Route path="/onboarding-flow" element={<Navigate to="/onboarding" replace />} />
-                          <Route path="/onboarding-flow/:step" element={<Navigate to="/onboarding" replace />} />
-                          <Route path="/onboarding-flow/sync" element={<Navigate to="/onboarding/2" replace />} />
+                          <Route path="/onboarding-flow/sync" element={<LegacyOnboardingFlowSyncRedirect />} />
+                          <Route path="/onboarding-flow/:step" element={<LegacyOnboardingFlowStepRedirect />} />
+                          <Route path="/onboarding-flow" element={<LegacyOnboardingFlowRootRedirect />} />
                           
                           {/* Authentication routes */}
                           <Route path="/login" element={
@@ -233,7 +256,7 @@ function App() {
                               <Layout><ContentMigration /></Layout>
                             </ProtectedRoute>
                           } />
-                          <Route path="/integrations" element={<Navigate to="/automations" replace />} />
+                          <Route path="/integrations" element={<LegacyIntegrationsIndexRedirect />} />
                           <Route path="/integrations/gmail" element={
                             <ProtectedRoute>
                               <Layout><GmailConnect /></Layout>

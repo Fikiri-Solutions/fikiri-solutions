@@ -37,6 +37,12 @@ from core.database_optimization import db_optimizer
 
 logger = logging.getLogger(__name__)
 
+
+def _frontend_base() -> str:
+    """Canonical frontend origin for links in queued emails (staging/local vs prod)."""
+    return app_config.get_frontend_url().rstrip("/")
+
+
 # IANA example.{com,net,org} publish Null MX — SMTP accept + DSN bounce to FROM.
 # RFC 2606: *.test / *.invalid are reserved; do not attempt real delivery.
 _RESERVED_IANA_EXAMPLE_DOMAINS = frozenset({"example.com", "example.net", "example.org"})
@@ -196,7 +202,7 @@ class EmailJobManager:
                 'email': email,
                 'company_name': company_name or 'Your Company',
                 'signup_date': _utcnow_naive().isoformat(),
-                'dashboard_url': 'https://fikirisolutions.com/dashboard',
+                'dashboard_url': f'{_frontend_base()}/dashboard',
                 'support_email': 'info@fikirisolutions.com'
             }
             
@@ -228,8 +234,8 @@ class EmailJobManager:
                 'email': email,
                 'step': step,
                 'company_name': company_name or 'Your Company',
-                'next_step_url': f'https://fikirisolutions.com/onboarding/{step + 1}',
-                'dashboard_url': 'https://fikirisolutions.com/dashboard'
+                'next_step_url': f'{_frontend_base()}/onboarding/{step + 1}',
+                'dashboard_url': f'{_frontend_base()}/dashboard',
             }
             
             job = EmailJob(
@@ -258,7 +264,7 @@ class EmailJobManager:
                 'email': email,
                 'name': name or 'User',
                 'reset_token': reset_token,
-                'reset_url': f'https://fikirisolutions.com/reset-password?token={reset_token}',
+                'reset_url': f'{_frontend_base()}/reset-password?token={reset_token}',
                 'expires_in': '1 hour'
             }
             
@@ -327,7 +333,7 @@ class EmailJobManager:
                 'subject': subject,
                 'message': message,
                 'notification_type': notification_type,
-                'dashboard_url': 'https://fikirisolutions.com/dashboard'
+                'dashboard_url': f'{_frontend_base()}/dashboard',
             }
             
             job = EmailJob(
@@ -599,7 +605,7 @@ class EmailJobManager:
                 </div>
 
                 <div style="text-align: center; margin: 30px 0;">
-                    <a href="{data.get('dashboard_url', 'https://fikirisolutions.com/dashboard')}"
+                    <a href="{data.get('dashboard_url', _frontend_base() + '/dashboard')}"
                        style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
                         Get Started
                     </a>
@@ -626,7 +632,7 @@ class EmailJobManager:
                 </div>
 
                 <div style="text-align: center; margin: 30px 0;">
-                    <a href="{data.get('next_step_url', 'https://fikirisolutions.com/onboarding')}"
+                    <a href="{data.get('next_step_url', _frontend_base() + '/onboarding')}"
                        style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
                         Continue Onboarding
                     </a>
@@ -696,7 +702,7 @@ class EmailJobManager:
                 </div>
 
                 <div style="text-align: center; margin: 30px 0;">
-                    <a href="{data.get('dashboard_url', 'https://fikirisolutions.com/dashboard')}"
+                    <a href="{data.get('dashboard_url', _frontend_base() + '/dashboard')}"
                        style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
                         View Dashboard
                     </a>

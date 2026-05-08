@@ -193,7 +193,7 @@ def gmail_start():
         from flask import g
         if hasattr(g, 'session_data') and g.session_data:
             g.session_data['oauth_state'] = state
-            g.session_data['post_connect_redirect'] = request.args.get("redirect", "/onboarding-flow/2")
+            g.session_data['post_connect_redirect'] = request.args.get("redirect", "/onboarding/2")
 
         # Always persist state in DB to survive missing/cleared sessions
         from core.database_optimization import db_optimizer
@@ -201,7 +201,7 @@ def gmail_start():
             state,
             user_id,
             "gmail",
-            request.args.get("redirect", "/onboarding-flow/2"),
+            request.args.get("redirect", "/onboarding/2"),
             int(time.time()) + 600,
             metadata_json=json.dumps(
                 {"oauth_state": state, "onboarding": user_id is None, "user_id": user_id}
@@ -239,13 +239,13 @@ def gmail_callback():
         
         # Get expected state from secure session or database
         expected_state = None
-        redirect_url = "/onboarding-flow/2"
+        redirect_url = "/onboarding/2"
         stored_user_id = None
         
         from flask import g
         if hasattr(g, 'session_data') and g.session_data:
             expected_state = g.session_data.get('oauth_state')
-            redirect_url = g.session_data.get('post_connect_redirect', "/onboarding-flow/2")
+            redirect_url = g.session_data.get('post_connect_redirect', "/onboarding/2")
 
         # Fallback: check database for OAuth state if session missing/empty
         if not expected_state:
@@ -639,14 +639,14 @@ def outlook_start():
         from flask import g
         if hasattr(g, 'session_data') and g.session_data:
             g.session_data['oauth_state'] = state
-            g.session_data['post_connect_redirect'] = request.args.get("redirect", "/onboarding-flow/2")
+            g.session_data['post_connect_redirect'] = request.args.get("redirect", "/onboarding/2")
 
         from core.database_optimization import db_optimizer
         db_optimizer.upsert_oauth_state_row(
             state,
             user_id,
             "outlook",
-            request.args.get("redirect", "/onboarding-flow/2"),
+            request.args.get("redirect", "/onboarding/2"),
             int(time.time()) + 600,
             metadata_json=json.dumps(
                 {"oauth_state": state, "onboarding": user_id is None, "user_id": user_id}
@@ -703,7 +703,7 @@ def outlook_callback():
         
         state_data = state_record[0]
         user_id = state_data.get('user_id') or 0
-        redirect_url = state_data.get('redirect_url', '/onboarding-flow/2')
+        redirect_url = state_data.get('redirect_url', '/onboarding/2')
         
         # Clean up state
         db_optimizer.execute_query("DELETE FROM oauth_states WHERE state = ?", (state,), fetch=False)

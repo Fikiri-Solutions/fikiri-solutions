@@ -8,6 +8,7 @@ import os
 import secrets
 import json
 import logging
+from urllib.parse import urlencode
 from flask import Blueprint, request, jsonify, redirect, session
 from datetime import datetime, timedelta
 from typing import Dict, Any
@@ -90,17 +91,19 @@ def google_calendar_callback():
         state = request.args.get('state')
         error = request.args.get('error')
         
+        base = Config.FRONTEND_URL.rstrip("/")
+
         if error:
             logger.error(f"OAuth error: {error}")
-            return redirect(f"{Config.FRONTEND_URL.rstrip('/')}/integrations?error={error}")
+            return redirect(f"{base}/automations?{urlencode({'error': error})}")
         
         if not code or not state:
-            return redirect(f"{Config.FRONTEND_URL.rstrip('/')}/integrations?error=missing_params")
+            return redirect(f"{base}/automations?{urlencode({'error': 'missing_params'})}")
         
         # Verify state
         state_data = verify_oauth_state(state)
         if not state_data:
-            return redirect(f"{Config.FRONTEND_URL.rstrip('/')}/integrations?error=invalid_state")
+            return redirect(f"{base}/automations?{urlencode({'error': 'invalid_state'})}")
         
         user_id = state_data['user_id']
         
@@ -127,11 +130,13 @@ def google_calendar_callback():
         )
         
         redirect_url = state_data.get('redirect_url') or '/dashboard'
-        return redirect(f"{Config.FRONTEND_URL.rstrip('/')}{redirect_url}?calendar_connected=true")
+        sep = '&' if ('?' in redirect_url) else '?'
+        return redirect(f"{base}{redirect_url}{sep}calendar_connected=true")
         
     except Exception as e:
         logger.error(f"Failed to handle Google Calendar callback: {e}")
-        return redirect(f"{Config.FRONTEND_URL.rstrip('/')}/integrations?error={str(e)}")
+        fe = Config.FRONTEND_URL.rstrip("/")
+        return redirect(f"{fe}/automations?{urlencode({'error': str(e)})}")
 
 
 @integrations_bp.route("/google-calendar/status", methods=["GET"])

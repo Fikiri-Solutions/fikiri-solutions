@@ -229,7 +229,7 @@ def resume_onboarding():
                 return create_success_response({
                     'completed': False,
                     'recommended_step': step,
-                    'redirect_to': f'/onboarding?step={step}'
+                    'redirect_to': f'/onboarding/{step}',
                 }, "Resume onboarding")
         else:
             return create_error_response("User not found", 404, 'USER_NOT_FOUND')

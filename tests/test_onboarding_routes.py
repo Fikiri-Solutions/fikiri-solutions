@@ -5,7 +5,7 @@ Covers all facets:
 - POST /api/onboarding: step 1 validation (name + company required), auth, empty body.
 - GET /api/onboarding/status: completed vs not completed, step, auth.
 - GET /api/onboarding/resume: redirect_to /dashboard when completed, recommended_step and redirect_to when not, auth.
-Note: /onboarding-flow -> /onboarding redirect is frontend-only (App.tsx).
+Note: legacy /onboarding-flow/* -> /onboarding/* (preserves :step and query) is frontend-only (App.tsx).
 """
 
 import unittest
@@ -160,7 +160,7 @@ class TestOnboardingRoutes(unittest.TestCase):
         self.assertTrue(data.get('success'))
         self.assertFalse(data.get('data', {}).get('completed'))
         self.assertEqual(data.get('data', {}).get('recommended_step'), 2)
-        self.assertIn('step=2', data.get('data', {}).get('redirect_to', ''))
+        self.assertEqual(data.get('data', {}).get('redirect_to'), '/onboarding/2')
 
     @patch('core.jwt_auth.get_jwt_manager')
     def test_onboarding_resume_requires_auth(self, mock_jwt_mgr):

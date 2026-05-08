@@ -35,7 +35,7 @@ class TestIntegrationsRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
         self.assertIn('auth_url', data)
-        mock_db.execute_query.assert_called_once()
+        mock_db.upsert_oauth_state_row.assert_called_once()
 
     @patch("routes.integrations.verify_oauth_state", return_value=None)
     def test_google_calendar_callback_invalid_state(self, mock_verify):
@@ -52,6 +52,22 @@ class TestIntegrationsRoutes(unittest.TestCase):
         response = self.client.get('/api/integrations/google-calendar/callback?code=abc&state=good')
         self.assertEqual(response.status_code, 302)
         self.assertIn('calendar_connected=true', response.location)
+        mock_manager.connect.assert_called_once()
+
+    @patch(
+        "routes.integrations.verify_oauth_state",
+        return_value={"user_id": 1, "redirect_url": "/dashboard?tab=calendar"},
+    )
+    @patch("routes.integrations.google_calendar_provider")
+    @patch("routes.integrations.integration_manager")
+    @patch("routes.integrations.db_optimizer")
+    def test_google_calendar_callback_appends_param_when_redirect_has_query(
+        self, mock_db, mock_manager, mock_provider, mock_verify
+    ):
+        mock_provider.exchange_code_for_tokens.return_value = {"scope": "a b"}
+        response = self.client.get('/api/integrations/google-calendar/callback?code=abc&state=good')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("&calendar_connected=true", response.location)
         mock_manager.connect.assert_called_once()
 
     @patch("core.jwt_auth.get_jwt_manager")
