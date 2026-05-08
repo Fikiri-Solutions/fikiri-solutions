@@ -9,6 +9,7 @@ import os
 import time
 import json
 import logging
+import threading
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 
@@ -88,15 +89,23 @@ class OnboardingJobManager:
                     "message": "Sync job queued successfully"
                 }
             else:
-                # Run synchronously if RQ not available
-                logger.info(f"🔄 Running first sync synchronously for user {user_id}")
-                result = run_first_sync(user_id)
-                
+                # Never run first-sync inline on request path; use daemon thread fallback.
+                job_id = f"first_sync_fallback_{user_id}_{int(time.time())}"
+                logger.warning(
+                    "⚠️ RQ queue unavailable, launching first sync in daemon thread for user %s",
+                    user_id,
+                )
+                worker = threading.Thread(
+                    target=run_first_sync,
+                    args=(user_id,),
+                    name=f"onboarding-first-sync-{user_id}",
+                    daemon=True,
+                )
+                worker.start()
                 return {
                     "success": True,
-                    "job_id": f"sync_{user_id}_{int(time.time())}",
-                    "message": "Sync completed synchronously",
-                    "result": result
+                    "job_id": job_id,
+                    "message": "Sync job started in background fallback mode"
                 }
                 
         except Exception as e:

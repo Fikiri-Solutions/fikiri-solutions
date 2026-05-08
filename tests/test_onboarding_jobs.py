@@ -75,14 +75,14 @@ class TestOnboardingJobManager:
     @patch("core.onboarding_jobs.run_first_sync")
     @patch("core.redis_connection_helper.get_redis_client")
     @patch("core.redis_connection_helper._resolve_redis_url")
-    def test_queue_first_sync_job_no_queue_runs_sync_synchronously(self, mock_url, mock_client, mock_run):
+    def test_queue_first_sync_job_no_queue_uses_background_fallback(self, mock_url, mock_client, mock_run):
         mock_url.return_value = None
         mock_client.return_value = None
         mgr = OnboardingJobManager()
-        mock_run.return_value = {"success": True, "processed": 0, "leads_created": 0, "status": "completed"}
         result = mgr.queue_first_sync_job(user_id=1)
         assert result.get("success") is True
-        assert "sync" in result.get("job_id", "").lower() or "message" in result
+        assert "first_sync_fallback" in result.get("job_id", "")
+        assert "background fallback" in result.get("message", "").lower()
         mock_run.assert_called_once_with(1)
 
 

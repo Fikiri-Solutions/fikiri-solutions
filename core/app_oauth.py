@@ -262,7 +262,25 @@ def gmail_callback():
 
         # Get user_id from secure session, or fall back to stored user_id from OAuth state
         from core.secure_sessions import get_current_user_id
-        user_id = get_current_user_id()
+        session_user_id = get_current_user_id()
+        user_id = session_user_id
+
+        # State row is the source of truth for callback ownership.
+        # If session user drifts, bind to the state owner to avoid wrong-account token writes.
+        if (
+            session_user_id
+            and stored_user_id
+            and int(session_user_id) > 0
+            and int(stored_user_id) > 0
+            and int(session_user_id) != int(stored_user_id)
+        ):
+            logger.warning(
+                "⚠️ OAuth user mismatch for state=%s session_user_id=%s state_user_id=%s; using state owner",
+                state,
+                session_user_id,
+                stored_user_id,
+            )
+            user_id = int(stored_user_id)
         
         # If no session user_id, try to use stored user_id from OAuth state
         # Note: stored_user_id might be 0 if user wasn't logged in during OAuth start
@@ -380,6 +398,18 @@ def gmail_callback():
                 "message": "Please sign in first, then connect your Gmail account."
             }), 400
 
+        # Consume oauth state after successful identity resolution.
+        try:
+            from core.database_optimization import db_optimizer
+
+            db_optimizer.execute_query(
+                "DELETE FROM oauth_states WHERE state = ? AND provider = 'gmail'",
+                (state,),
+                fetch=False,
+            )
+        except Exception as cleanup_error:
+            logger.warning("⚠️ Failed to clean OAuth state for gmail: %s", cleanup_error)
+
         google_sub = userinfo.get("id") if userinfo else None
         if google_sub:
             merge_user_google_sub(int(user_id), str(google_sub))
@@ -427,6 +457,29 @@ def gmail_callback():
         except Exception as e:
             logger.warning(f"⚠️ Failed to queue sync job: {e}")
             job = None
+
+        # Promote onboarding progress after successful Gmail connect.
+        # Prevents users from being bounced back to step 2 on refresh.
+        try:
+            from core.database_optimization import db_optimizer
+
+            current_step_rows = db_optimizer.execute_query(
+                "SELECT onboarding_step, onboarding_completed FROM users WHERE id = ? LIMIT 1",
+                (user_id,),
+            )
+            if current_step_rows:
+                row = current_step_rows[0]
+                onboarding_completed = bool(row.get("onboarding_completed")) if isinstance(row, dict) else bool(row[1])
+                current_step = int(row.get("onboarding_step") or 0) if isinstance(row, dict) else int(row[0] or 0)
+                if (not onboarding_completed) and current_step < 3:
+                    db_optimizer.execute_query(
+                        "UPDATE users SET onboarding_step = 3, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (user_id,),
+                        fetch=False,
+                    )
+                    logger.info("✅ Advanced onboarding_step to 3 after Gmail connect for user %s", user_id)
+        except Exception as step_error:
+            logger.warning("⚠️ Could not advance onboarding step after Gmail OAuth: %s", step_error)
 
         # Clean up session state and database
         if hasattr(g, 'session_data') and g.session_data:
