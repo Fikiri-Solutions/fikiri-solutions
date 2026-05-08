@@ -49,19 +49,32 @@ async function refreshSessionAccessToken(): Promise<string | null> {
   }
 }
 
-/** Routes where a 401 must not clear tokens + hard-redirect (onboarding, verify-email, etc.). */
+/**
+ * Routes where a 401 must not wipe tokens + `window.location` redirect to /login.
+ *
+ * Covers the full first-run shell: signup/login, verify-email (link from inbox + resend),
+ * onboarding steps, password flows, PWA install, and Gmail/Outlook connect during onboarding.
+ * Draft/onboarding state in React/localStorage then survives transient 401s.
+ *
+ * Keep in sync with auth + onboarding routes in `App.tsx`.
+ */
 function shouldSuppressUnauthorizedRedirect(): boolean {
   if (typeof window === 'undefined') return false
   const p = window.location.pathname
-  return (
-    p === '/login' ||
-    p.startsWith('/signup') ||
-    p.startsWith('/onboarding') ||
-    p.startsWith('/verify-email') ||
-    p.startsWith('/forgot-password') ||
-    p.startsWith('/reset-password') ||
-    p === '/inbox'
-  )
+
+  if (p === '/login' || p === '/inbox' || p === '/install') return true
+
+  const prefixes = [
+    '/signup',
+    '/onboarding',
+    '/verify-email',
+    '/forgot-password',
+    '/reset-password',
+    '/integrations/gmail',
+    '/integrations/outlook',
+    '/automations/setup',
+  ]
+  return prefixes.some((pre) => p === pre || p.startsWith(`${pre}/`))
 }
 
 // Types for API responses
