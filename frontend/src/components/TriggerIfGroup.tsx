@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useId, useMemo } from 'react'
 import { Plus, Trash2, Filter } from 'lucide-react'
 
 export type TriggerIfConditionRow = {
@@ -63,6 +63,7 @@ type Props = {
 }
 
 export const TriggerIfGroup: React.FC<Props> = ({ triggerType, value, onChange, metadata }) => {
+  const idPrefix = useId()
   const triggerMeta = metadata?.triggers?.[triggerType]
   const fields = triggerMeta?.fields ?? []
 
@@ -129,6 +130,9 @@ export const TriggerIfGroup: React.FC<Props> = ({ triggerType, value, onChange, 
           const ops = operatorsForField(row.field, triggerType, metadata)
           const showValue = opNeedsValue(row.op)
           const isScheduled = row.field === 'scheduled_run' && (row.op === 'equals' || row.op === 'not_equals')
+          const fieldId = `${idPrefix}-condition-${index}-field`
+          const operatorId = `${idPrefix}-condition-${index}-operator`
+          const valueId = `${idPrefix}-condition-${index}-value`
 
           return (
             <div
@@ -136,8 +140,9 @@ export const TriggerIfGroup: React.FC<Props> = ({ triggerType, value, onChange, 
               className="flex flex-wrap items-end gap-2 p-2 rounded-md border border-brand-text/10 dark:border-gray-700 bg-brand-accent/5 dark:bg-gray-950/50"
             >
               <div className="min-w-[140px] flex-1">
-                <label className="text-[10px] uppercase tracking-wide text-brand-text/50 dark:text-gray-500">Field</label>
+                <label htmlFor={fieldId} className="text-[10px] uppercase tracking-wide text-brand-text/50 dark:text-gray-500">Field</label>
                 <select
+                  id={fieldId}
                   className="mt-0.5 w-full rounded-lg border border-brand-text/20 px-2 py-1.5 text-xs bg-white dark:bg-gray-900"
                   value={row.field}
                   onChange={e => onFieldChange(index, e.target.value)}
@@ -151,8 +156,9 @@ export const TriggerIfGroup: React.FC<Props> = ({ triggerType, value, onChange, 
                 </select>
               </div>
               <div className="min-w-[120px] flex-1">
-                <label className="text-[10px] uppercase tracking-wide text-brand-text/50 dark:text-gray-500">Operator</label>
+                <label htmlFor={operatorId} className="text-[10px] uppercase tracking-wide text-brand-text/50 dark:text-gray-500">Operator</label>
                 <select
+                  id={operatorId}
                   className="mt-0.5 w-full rounded-lg border border-brand-text/20 px-2 py-1.5 text-xs bg-white dark:bg-gray-900"
                   value={row.op}
                   onChange={e => onOpChange(index, e.target.value)}
@@ -166,9 +172,10 @@ export const TriggerIfGroup: React.FC<Props> = ({ triggerType, value, onChange, 
               </div>
               {showValue && (
                 <div className="min-w-[160px] flex-[2]">
-                  <label className="text-[10px] uppercase tracking-wide text-brand-text/50 dark:text-gray-500">Value</label>
+                  <label htmlFor={valueId} className="text-[10px] uppercase tracking-wide text-brand-text/50 dark:text-gray-500">Value</label>
                   {isScheduled ? (
                     <select
+                      id={valueId}
                       className="mt-0.5 w-full rounded-lg border border-brand-text/20 px-2 py-1.5 text-xs bg-white dark:bg-gray-900"
                       value={String(row.value === true || row.value === 'true' || row.value === 1)}
                       onChange={e => patchCondition(index, { value: e.target.value === 'true' })}
@@ -178,6 +185,7 @@ export const TriggerIfGroup: React.FC<Props> = ({ triggerType, value, onChange, 
                     </select>
                   ) : (
                     <input
+                      id={valueId}
                       type={triggerMeta?.numeric_fields?.includes(row.field) && ['gt', 'gte', 'lt', 'lte', 'equals', 'not_equals'].includes(row.op) ? 'number' : 'text'}
                       className="mt-0.5 w-full rounded-lg border border-brand-text/20 px-2 py-1.5 text-xs bg-white dark:bg-gray-900"
                       value={row.value === null || row.value === undefined ? '' : String(row.value)}

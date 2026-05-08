@@ -657,11 +657,12 @@ export const Automations: React.FC = () => {
     }))
   }
 
-  const renderField = (presetId: string, field: ConfigField) => {
+  const renderField = (presetId: string, field: ConfigField, fieldId: string) => {
     const value = configState[presetId]?.[field.key] ?? ''
     if (field.type === 'select') {
       return (
         <select
+          id={fieldId}
           className="w-full rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900"
           value={value}
           onChange={(e) => handleConfigChange(presetId, field.key, e.target.value)}
@@ -674,6 +675,7 @@ export const Automations: React.FC = () => {
     }
     return (
       <input
+        id={fieldId}
         type={field.type === 'number' ? 'number' : 'text'}
         className="w-full rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900"
         value={value}
@@ -880,13 +882,17 @@ export const Automations: React.FC = () => {
 
                 {preset.actionType !== 'trigger_webhook' && preset.configFields.length > 0 && (
                   <div className="space-y-2">
-                    {preset.configFields.map(field => (
-                      <div key={field.key}>
-                        <label className="text-xs font-medium text-brand-text dark:text-gray-200">{field.label}</label>
-                        {renderField(preset.id, field)}
-                        {field.helper && <p className="text-xs text-brand-text/60 dark:text-gray-400 mt-0.5">{field.helper}</p>}
-                      </div>
-                    ))}
+                    {preset.configFields.map(field => {
+                      const fieldId = `automation-${preset.id}-${field.key}`
+
+                      return (
+                        <div key={field.key}>
+                          <label htmlFor={fieldId} className="text-xs font-medium text-brand-text dark:text-gray-200">{field.label}</label>
+                          {renderField(preset.id, field, fieldId)}
+                          {field.helper && <p className="text-xs text-brand-text/60 dark:text-gray-400 mt-0.5">{field.helper}</p>}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
 

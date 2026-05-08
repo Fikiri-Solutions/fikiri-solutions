@@ -1182,14 +1182,15 @@ export const EmailInbox: React.FC = () => {
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
                 <div className="rounded-lg border border-brand-text/20 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
                   <div className="mb-4">
-                    <label className="mb-2 block text-sm font-medium text-brand-text dark:text-white">
+                    <p className="mb-2 block text-sm font-medium text-brand-text dark:text-white">
                       To: {selectedEmail.from_name || selectedEmail.from}
-                    </label>
-                    <label className="mb-2 block text-sm font-medium text-brand-text dark:text-white">
+                    </p>
+                    <p className="mb-2 block text-sm font-medium text-brand-text dark:text-white">
                       Subject: {selectedEmail.subject.startsWith('Re:') ? selectedEmail.subject : `Re: ${selectedEmail.subject}`}
-                    </label>
+                    </p>
                   </div>
                   <textarea
+                    aria-label="Reply message"
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
                     placeholder="Type your reply..."

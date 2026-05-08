@@ -273,8 +273,9 @@ export const ContentMigration: React.FC = () => {
             </p>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
               <div className="flex-1 space-y-2">
-                <label className="text-xs font-medium text-brand-text/70 dark:text-gray-400">File</label>
+                <label htmlFor="knowledge-file-upload" className="text-xs font-medium text-brand-text/70 dark:text-gray-400">File</label>
                 <input
+                  id="knowledge-file-upload"
                   type="file"
                   accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.xls,.md,.png,.jpg,.jpeg"
                   onChange={(e) => setFile(e.target.files?.[0] || null)}
@@ -451,8 +452,9 @@ export const ContentMigration: React.FC = () => {
             </p>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="text-xs font-medium text-brand-text/70 dark:text-gray-400">On duplicate emails</label>
+                <label htmlFor="contacts-duplicate-policy" className="text-xs font-medium text-brand-text/70 dark:text-gray-400">On duplicate emails</label>
                 <select
+                  id="contacts-duplicate-policy"
                   className="mt-1 w-full rounded-xl border border-brand-text/10 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                   value={onDup}
                   onChange={(e) => setOnDup(e.target.value as 'skip' | 'update' | 'merge')}
@@ -465,8 +467,9 @@ export const ContentMigration: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-brand-text/70 dark:text-gray-400">CSV file</label>
+                <label htmlFor="contacts-csv-file" className="text-xs font-medium text-brand-text/70 dark:text-gray-400">CSV file</label>
                 <input
+                  id="contacts-csv-file"
                   type="file"
                   accept=".csv"
                   onChange={(e) => setCsvFile(e.target.files?.[0] || null)}

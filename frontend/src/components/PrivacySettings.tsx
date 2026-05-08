@@ -282,11 +282,12 @@ export const PrivacySettings: React.FC = () => {
           <div className="space-y-6">
             {/* Data Retention */}
             <div>
-              <label className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-2">
+              <label htmlFor="privacy-data-retention-days" className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-2">
                 Data Retention Period
               </label>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
                 <input
+                  id="privacy-data-retention-days"
                   type="range"
                   min="30"
                   max="365"

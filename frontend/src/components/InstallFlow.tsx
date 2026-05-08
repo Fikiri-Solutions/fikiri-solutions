@@ -188,9 +188,9 @@ const InstallFlow: React.FC<InstallFlowProps> = ({ apiKey, onComplete }) => {
 
       <div className="space-y-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <p className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Step 1: Copy this code
-          </label>
+          </p>
           <div className="bg-gray-900 rounded-lg p-4 relative">
             <pre className="text-sm text-gray-100 overflow-x-auto">
               <code>{config.code}</code>
@@ -212,9 +212,9 @@ const InstallFlow: React.FC<InstallFlowProps> = ({ apiKey, onComplete }) => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <p className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Step 2: Paste it
-          </label>
+          </p>
           <div className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
             <p className="text-gray-700 dark:text-gray-300">{config.instruction}</p>
           </div>

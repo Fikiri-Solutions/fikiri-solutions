@@ -415,10 +415,11 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
           </h4>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="account-username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Username
             </label>
             <input
+              id="account-username"
               type="text"
               value={accountData.username}
               onChange={(e) => setAccountData(prev => ({ ...prev, username: e.target.value }))}
@@ -428,10 +429,11 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="account-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Email Address
             </label>
             <input
+              id="account-email"
               type="email"
               value={accountData.email}
               readOnly
@@ -442,13 +444,14 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="account-phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Phone Number
             </label>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
               {SMS_CONSENT.upfrontDisclosureShort}
             </p>
             <input
+              id="account-phone"
               type="tel"
               value={accountData.phone}
               onChange={(e) => setAccountData(prev => ({ ...prev, phone: e.target.value }))}
@@ -473,10 +476,11 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="account-timezone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Timezone
             </label>
             <select
+              id="account-timezone"
               value={accountData.timezone}
               onChange={(e) => {
                 setAccountData(prev => ({ ...prev, timezone: e.target.value }))
@@ -498,10 +502,11 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
           </h4>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="account-business-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Business Name
             </label>
             <input
+              id="account-business-name"
               type="text"
               value={accountData.businessName}
               onChange={(e) => setAccountData(prev => ({ ...prev, businessName: e.target.value }))}
@@ -511,10 +516,11 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="account-business-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Business Email
             </label>
             <input
+              id="account-business-email"
               type="email"
               value={accountData.businessEmail}
               onChange={(e) => setAccountData(prev => ({ ...prev, businessEmail: e.target.value }))}
@@ -524,10 +530,11 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="account-industry" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Industry
             </label>
             <select
+              id="account-industry"
               value={accountData.industry}
               onChange={(e) => {
                 setAccountData(prev => ({ ...prev, industry: e.target.value }))
@@ -543,10 +550,11 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="account-team-size" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Team Size
             </label>
             <select
+              id="account-team-size"
               value={accountData.teamSize}
               onChange={(e) => {
                 setAccountData(prev => ({ ...prev, teamSize: e.target.value }))
@@ -624,11 +632,12 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
           
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="account-current-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Current Password
               </label>
               <div className="relative">
                 <input
+                  id="account-current-password"
                   type={showPasswords.current ? "text" : "password"}
                   value={securitySettings.currentPassword}
                   onChange={(e) => setSecuritySettings(prev => ({ ...prev, currentPassword: e.target.value }))}
@@ -645,11 +654,12 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="account-new-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 New Password
               </label>
               <div className="relative">
                 <input
+                  id="account-new-password"
                   type={showPasswords.new ? "text" : "password"}
                   value={securitySettings.newPassword}
                   onChange={(e) => setSecuritySettings(prev => ({ ...prev, newPassword: e.target.value }))}
@@ -666,11 +676,12 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="account-confirm-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Confirm New Password
               </label>
               <div className="relative">
                 <input
+                  id="account-confirm-password"
                   type={showPasswords.confirm ? "text" : "password"}
                   value={securitySettings.confirmPassword}
                   onChange={(e) => setSecuritySettings(prev => ({ ...prev, confirmPassword: e.target.value }))}

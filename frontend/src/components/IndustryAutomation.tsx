@@ -376,10 +376,11 @@ export const IndustryAutomation: React.FC = () => {
               {/* Chat Interface */}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-2">
+                  <label htmlFor="industry-client-id" className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-2">
                     Client ID
                   </label>
                   <input
+                    id="industry-client-id"
                     type="text"
                     value={clientId}
                     onChange={(e) => setClientId(e.target.value)}
@@ -389,10 +390,11 @@ export const IndustryAutomation: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-2">
+                  <label htmlFor="industry-test-message" className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-2">
                     Test Message
                   </label>
                   <textarea
+                    id="industry-test-message"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     className="w-full px-3 py-2 border border-brand-text/20 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-brand-text dark:text-white focus:border-brand-accent dark:focus:border-brand-accent focus:ring-brand-accent dark:focus:ring-brand-accent transition-colors duration-200"

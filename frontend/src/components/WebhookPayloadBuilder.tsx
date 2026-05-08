@@ -45,6 +45,7 @@ export const WebhookPayloadBuilder: React.FC<WebhookPayloadBuilderProps> = ({
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [expandedFields, setExpandedFields] = useState<Set<string>>(new Set())
   const [customFields, setCustomFields] = useState<Array<{ key: string; value: any }>>([])
+  const getFieldId = (prefix: string, key: string) => `webhook-${prefix}-${key.replace(/[^a-zA-Z0-9_-]/g, '-')}`
 
   // Initialize with custom template if payload exists
   useEffect(() => {
@@ -270,11 +271,12 @@ export const WebhookPayloadBuilder: React.FC<WebhookPayloadBuilderProps> = ({
 
     return (
       <div key={key} className="space-y-1">
-        <label className="block text-sm font-medium text-brand-text dark:text-gray-300">
+        <label htmlFor={getFieldId('payload', fullPath)} className="block text-sm font-medium text-brand-text dark:text-gray-300">
           {key}
         </label>
         {typeof value === 'boolean' ? (
           <select
+            id={getFieldId('payload', fullPath)}
             className="w-full rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900 text-brand-text dark:text-white"
             value={String(value)}
             onChange={(e) => handleFieldChange(fullPath, e.target.value === 'true')}
@@ -284,6 +286,7 @@ export const WebhookPayloadBuilder: React.FC<WebhookPayloadBuilderProps> = ({
           </select>
         ) : typeof value === 'number' ? (
           <input
+            id={getFieldId('payload', fullPath)}
             type="number"
             className="w-full rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900 text-brand-text dark:text-white"
             value={value}
@@ -291,6 +294,7 @@ export const WebhookPayloadBuilder: React.FC<WebhookPayloadBuilderProps> = ({
           />
         ) : (
           <input
+            id={getFieldId('payload', fullPath)}
             type="text"
             className="w-full rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900 text-brand-text dark:text-white"
             value={String(value)}
@@ -309,10 +313,11 @@ export const WebhookPayloadBuilder: React.FC<WebhookPayloadBuilderProps> = ({
     <div className="space-y-6">
       {/* Webhook URL Input */}
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-brand-text dark:text-white">
+        <label htmlFor="webhook-url" className="block text-sm font-medium text-brand-text dark:text-white">
           Your App's Webhook URL <span className="text-red-500">*</span>
         </label>
         <input
+          id="webhook-url"
           type="url"
           className="w-full rounded-lg border border-brand-text/20 px-4 py-2 bg-white dark:bg-gray-900 text-brand-text dark:text-white"
           value={webhookUrl}
@@ -328,9 +333,9 @@ export const WebhookPayloadBuilder: React.FC<WebhookPayloadBuilderProps> = ({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <label className="block text-sm font-medium text-brand-text dark:text-white">
+            <p className="block text-sm font-medium text-brand-text dark:text-white">
               Choose Your App (Optional)
-            </label>
+            </p>
             <p className="text-xs text-brand-text/60 dark:text-gray-500 mt-1">
               Pick the app you want to send data to, or choose "Custom" to connect to your own system
             </p>
@@ -374,7 +379,7 @@ export const WebhookPayloadBuilder: React.FC<WebhookPayloadBuilderProps> = ({
       {showJsonEditor ? (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="block text-sm font-medium text-brand-text dark:text-white">
+            <label htmlFor="webhook-payload-json" className="block text-sm font-medium text-brand-text dark:text-white">
               Payload JSON
             </label>
             <Button
@@ -388,6 +393,7 @@ export const WebhookPayloadBuilder: React.FC<WebhookPayloadBuilderProps> = ({
             </Button>
           </div>
           <textarea
+            id="webhook-payload-json"
             className="w-full h-64 font-mono text-sm rounded-lg border border-brand-text/20 px-4 py-3 bg-gray-50 dark:bg-gray-900 text-brand-text dark:text-white"
             value={jsonEditorValue}
             onChange={(e) => handleJsonEditorChange(e.target.value)}
@@ -400,9 +406,9 @@ export const WebhookPayloadBuilder: React.FC<WebhookPayloadBuilderProps> = ({
       ) : (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <label className="block text-sm font-medium text-brand-text dark:text-white">
+            <p className="block text-sm font-medium text-brand-text dark:text-white">
               Payload Fields
-            </label>
+            </p>
             <Button
               type="button"
               variant="outline"
@@ -423,41 +429,47 @@ export const WebhookPayloadBuilder: React.FC<WebhookPayloadBuilderProps> = ({
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {selectedTemplate.fields.map((field) => (
-                  <div key={field.key} className="space-y-1">
-                    <label className="block text-sm font-medium text-brand-text dark:text-gray-300">
-                      {field.label}
-                      {field.required && <span className="text-red-500 ml-1">*</span>}
-                    </label>
-                    {field.type === 'select' && field.options ? (
-                      <select
-                        className="w-full rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900 text-brand-text dark:text-white"
-                        value={payload[field.key] || field.defaultValue || ''}
-                        onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                      >
-                        {field.options.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        type={field.type}
-                        className="w-full rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900 text-brand-text dark:text-white"
-                        value={payload[field.key] || field.defaultValue || ''}
-                        onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                        placeholder={field.placeholder}
-                        required={field.required}
-                      />
-                    )}
-                    {field.helper && (
-                      <p className="text-xs text-brand-text/60 dark:text-gray-500">
-                        {field.helper}
-                      </p>
-                    )}
-                  </div>
-                ))}
+                {selectedTemplate.fields.map((field) => {
+                  const fieldId = getFieldId('template', field.key)
+
+                  return (
+                    <div key={field.key} className="space-y-1">
+                      <label htmlFor={fieldId} className="block text-sm font-medium text-brand-text dark:text-gray-300">
+                        {field.label}
+                        {field.required && <span className="text-red-500 ml-1">*</span>}
+                      </label>
+                      {field.type === 'select' && field.options ? (
+                        <select
+                          id={fieldId}
+                          className="w-full rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900 text-brand-text dark:text-white"
+                          value={payload[field.key] || field.defaultValue || ''}
+                          onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                        >
+                          {field.options.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          id={fieldId}
+                          type={field.type}
+                          className="w-full rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900 text-brand-text dark:text-white"
+                          value={payload[field.key] || field.defaultValue || ''}
+                          onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                          placeholder={field.placeholder}
+                          required={field.required}
+                        />
+                      )}
+                      {field.helper && (
+                        <p className="text-xs text-brand-text/60 dark:text-gray-500">
+                          {field.helper}
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
               </CardContent>
             </Card>
           )}

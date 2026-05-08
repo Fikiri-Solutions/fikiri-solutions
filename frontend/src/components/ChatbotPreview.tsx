@@ -59,9 +59,9 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
         {/* Customization Options */}
         <div className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <p className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Theme
-            </label>
+            </p>
             <div className="flex gap-4">
               <button
                 onClick={() => setTheme('light')}
@@ -87,9 +87,9 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <p className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Position
-            </label>
+            </p>
             <div className="grid grid-cols-2 gap-2">
               {(['bottom-right', 'bottom-left', 'top-right', 'top-left'] as const).map((pos) => (
                 <button
@@ -108,10 +108,11 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="chatbot-title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Title
             </label>
             <input
+              id="chatbot-title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -121,11 +122,12 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="chatbot-primary-color" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Primary Color
             </label>
             <div className="flex gap-4 items-center">
               <input
+                id="chatbot-primary-color"
                 type="color"
                 value={primaryColor}
                 onChange={(e) => setPrimaryColor(e.target.value)}
@@ -144,9 +146,9 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
 
         {/* Live Preview */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <p className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Live Preview
-          </label>
+          </p>
           <div className="border-2 border-gray-200 dark:border-gray-600 rounded-lg p-6 bg-gray-50 dark:bg-gray-900/50 relative" style={{ minHeight: '400px' }}>
             {/* Simulated Chatbot */}
             <div
@@ -195,9 +197,9 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
       {/* Generated Code */}
       <div className="mt-8">
         <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <p className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Generated Code
-          </label>
+          </p>
           <button
             onClick={handleCopy}
             className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"

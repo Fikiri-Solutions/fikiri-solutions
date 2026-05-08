@@ -262,8 +262,9 @@ export const Services: React.FC = () => {
         return (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Response Tone</label>
+              <label htmlFor={`${service.id}-response-tone`} className="block text-sm font-medium text-brand-text dark:text-gray-300">Response Tone</label>
               <select
+                id={`${service.id}-response-tone`}
                 className="bg-white dark:bg-gray-800 text-brand-text dark:text-gray-100 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.responseTone}
                 onChange={(e) => updateServiceSettings(service.id, 'responseTone', e.target.value)}
@@ -275,8 +276,9 @@ export const Services: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Auto-reply Delay (minutes)</label>
+              <label htmlFor={`${service.id}-auto-reply-delay`} className="block text-sm font-medium text-brand-text dark:text-gray-300">Auto-reply Delay (minutes)</label>
               <input
+                id={`${service.id}-auto-reply-delay`}
                 type="number"
                 className="bg-white dark:bg-gray-800 text-brand-text dark:text-gray-100 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.autoReplyDelay}
@@ -286,8 +288,9 @@ export const Services: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Max Responses Per Day</label>
+              <label htmlFor={`${service.id}-max-responses-per-day`} className="block text-sm font-medium text-brand-text dark:text-gray-300">Max Responses Per Day</label>
               <input
+                id={`${service.id}-max-responses-per-day`}
                 type="number"
                 className="bg-white dark:bg-gray-800 text-brand-text dark:text-gray-100 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.maxResponsesPerDay}
@@ -308,10 +311,13 @@ export const Services: React.FC = () => {
             </p>
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-brand-text dark:text-gray-300">Auto Lead Creation</label>
+                <p className="text-sm font-medium text-brand-text dark:text-gray-300">Auto Lead Creation</p>
                 <p className="text-xs text-brand-text/60 dark:text-gray-400">Preference only (requires Gmail/integration path)</p>
               </div>
               <button
+                type="button"
+                aria-pressed={service.settings.autoLeadCreation}
+                aria-label="Toggle auto lead creation"
                 onClick={() => updateServiceSettings(service.id, 'autoLeadCreation', !service.settings.autoLeadCreation)}
                 className="ml-4"
               >
@@ -324,10 +330,13 @@ export const Services: React.FC = () => {
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-brand-text dark:text-gray-300">Lead Scoring</label>
+                <p className="text-sm font-medium text-brand-text dark:text-gray-300">Lead Scoring</p>
                 <p className="text-xs text-brand-text/60 dark:text-gray-400">Preference only (CRM scores via LeadScoringService)</p>
               </div>
               <button
+                type="button"
+                aria-pressed={service.settings.leadScoring}
+                aria-label="Toggle lead scoring"
                 onClick={() => updateServiceSettings(service.id, 'leadScoring', !service.settings.leadScoring)}
                 className="ml-4"
               >
@@ -340,10 +349,13 @@ export const Services: React.FC = () => {
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-brand-text dark:text-gray-300">Follow-up Reminders</label>
+                <p className="text-sm font-medium text-brand-text dark:text-gray-300">Follow-up Reminders</p>
                 <p className="text-xs text-brand-text/60 dark:text-gray-400">Preference only (automations handle follow-ups)</p>
               </div>
               <button
+                type="button"
+                aria-pressed={service.settings.followUpReminders}
+                aria-label="Toggle follow-up reminders"
                 onClick={() => updateServiceSettings(service.id, 'followUpReminders', !service.settings.followUpReminders)}
                 className="ml-4"
               >
@@ -366,10 +378,13 @@ export const Services: React.FC = () => {
             </p>
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-brand-text dark:text-gray-300">Extract Contacts</label>
+                <p className="text-sm font-medium text-brand-text dark:text-gray-300">Extract Contacts</p>
                 <p className="text-xs text-brand-text/60 dark:text-gray-400">Stored preference (not enforced globally yet)</p>
               </div>
               <button
+                type="button"
+                aria-pressed={service.settings.extractContacts}
+                aria-label="Toggle contact extraction"
                 onClick={() => updateServiceSettings(service.id, 'extractContacts', !service.settings.extractContacts)}
                 className="ml-4"
               >
@@ -382,10 +397,13 @@ export const Services: React.FC = () => {
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-brand-text dark:text-gray-300">Detect Urgency</label>
+                <p className="text-sm font-medium text-brand-text dark:text-gray-300">Detect Urgency</p>
                 <p className="text-xs text-brand-text/60 dark:text-gray-400">Identify urgent emails that need immediate attention</p>
               </div>
               <button
+                type="button"
+                aria-pressed={service.settings.detectUrgency}
+                aria-label="Toggle urgency detection"
                 onClick={() => updateServiceSettings(service.id, 'detectUrgency', !service.settings.detectUrgency)}
                 className="ml-4"
               >
@@ -398,10 +416,13 @@ export const Services: React.FC = () => {
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-brand-text dark:text-gray-300">Categorize Emails</label>
+                <p className="text-sm font-medium text-brand-text dark:text-gray-300">Categorize Emails</p>
                 <p className="text-xs text-brand-text/60 dark:text-gray-400">Automatically categorize emails by type</p>
               </div>
               <button
+                type="button"
+                aria-pressed={service.settings.categorizeEmails}
+                aria-label="Toggle email categorization"
                 onClick={() => updateServiceSettings(service.id, 'categorizeEmails', !service.settings.categorizeEmails)}
                 className="ml-4"
               >
@@ -424,8 +445,9 @@ export const Services: React.FC = () => {
               tuning.
             </p>
             <div>
-              <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Scoring Model</label>
+              <label htmlFor={`${service.id}-scoring-model`} className="block text-sm font-medium text-brand-text dark:text-gray-300">Scoring Model</label>
               <select
+                id={`${service.id}-scoring-model`}
                 className="bg-white dark:bg-gray-800 text-brand-text dark:text-gray-100 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.scoringModel}
                 onChange={(e) => updateServiceSettings(service.id, 'scoringModel', e.target.value)}
@@ -436,8 +458,9 @@ export const Services: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Update Frequency</label>
+              <label htmlFor={`${service.id}-update-frequency`} className="block text-sm font-medium text-brand-text dark:text-gray-300">Update Frequency</label>
               <select
+                id={`${service.id}-update-frequency`}
                 className="bg-white dark:bg-gray-800 text-brand-text dark:text-gray-100 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.updateFrequency}
                 onChange={(e) => updateServiceSettings(service.id, 'updateFrequency', e.target.value)}
@@ -449,8 +472,9 @@ export const Services: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-brand-text dark:text-gray-300">Threshold Score</label>
+              <label htmlFor={`${service.id}-threshold-score`} className="block text-sm font-medium text-brand-text dark:text-gray-300">Threshold Score</label>
               <input
+                id={`${service.id}-threshold-score`}
                 type="range"
                 min="0"
                 max="1"

@@ -101,10 +101,11 @@ export const CustomizationPanel: React.FC<CustomizationPanelProps> = ({ isOpen, 
               <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Company Branding</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="customization-company-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Company Name
                   </label>
                   <input
+                    id="customization-company-name"
                     type="text"
                     value={companyName}
                     onChange={(e) => handleCompanyNameChange(e.target.value)}
@@ -114,9 +115,9 @@ export const CustomizationPanel: React.FC<CustomizationPanelProps> = ({ isOpen, 
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <p className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Logo Upload
-                  </label>
+                  </p>
                   <div className="flex items-center space-x-3">
                     {customization.logoUrl && (
                       <img
@@ -167,11 +168,12 @@ export const CustomizationPanel: React.FC<CustomizationPanelProps> = ({ isOpen, 
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="customization-custom-color" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Custom Color
                 </label>
                 <div className="flex items-center space-x-3">
                   <input
+                    id="customization-custom-color"
                     type="color"
                     value={customColor}
                     onChange={(e) => handleColorChange(e.target.value)}

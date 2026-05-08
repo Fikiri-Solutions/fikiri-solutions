@@ -691,10 +691,11 @@ export const CRM: React.FC = () => {
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-1">
+                  <label htmlFor="new-lead-name" className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-1">
                     Name *
                   </label>
                   <input
+                    id="new-lead-name"
                     type="text"
                     className="bg-white dark:bg-gray-800 text-brand-text dark:text-white placeholder-brand-text/60 dark:placeholder-gray-400 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                     value={newLead.name}
@@ -704,10 +705,11 @@ export const CRM: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-1">
+                  <label htmlFor="new-lead-email" className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-1">
                     Email *
                   </label>
                   <input
+                    id="new-lead-email"
                     type="email"
                     className="bg-white dark:bg-gray-800 text-brand-text dark:text-white placeholder-brand-text/60 dark:placeholder-gray-400 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                     value={newLead.email}
@@ -717,10 +719,11 @@ export const CRM: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-1">
+                  <label htmlFor="new-lead-phone" className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-1">
                     Phone
                   </label>
                   <input
+                    id="new-lead-phone"
                     type="tel"
                     className="bg-white dark:bg-gray-800 text-brand-text dark:text-white placeholder-brand-text/60 dark:placeholder-gray-400 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                     value={newLead.phone}
@@ -730,10 +733,11 @@ export const CRM: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-1">
+                  <label htmlFor="new-lead-company" className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-1">
                     Company
                   </label>
                   <input
+                    id="new-lead-company"
                     type="text"
                     className="bg-white dark:bg-gray-800 text-brand-text dark:text-white placeholder-brand-text/60 dark:placeholder-gray-400 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                     value={newLead.company}
@@ -743,10 +747,11 @@ export const CRM: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-1">
+                  <label htmlFor="new-lead-source" className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-1">
                     Source
                   </label>
                   <select
+                    id="new-lead-source"
                     className="bg-white text-brand-text border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                     value={newLead.source}
                     onChange={(e) => setNewLead({...newLead, source: e.target.value})}
