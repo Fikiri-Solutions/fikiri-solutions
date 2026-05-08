@@ -49,8 +49,12 @@ const getToastStyles = (type: ToastType) => {
     borderRadius: '12px',
     padding: '16px',
     fontSize: '14px',
-    maxWidth: '420px',
-    minWidth: '320px',
+    width: '100%',
+    maxWidth: 'min(420px, calc(100vw - 2rem))',
+    minWidth: 0,
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    boxSizing: 'border-box' as const,
     boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2)',
     border: '1px solid rgba(0, 0, 0, 0.08)',
   }
@@ -84,14 +88,24 @@ const getToastStyles = (type: ToastType) => {
 }
 
 const getToastPosition = (_pathname: string): { position: 'top-right' | 'top-left' | 'top-center', containerStyle: React.CSSProperties } => {
-  // Center-ish placement so short toasts are visible and not missed.
+  // Narrow fixed column so stacked toasts stay vertically centered (not full-viewport strips).
+  const toastColumnWidth = 'min(420px, calc(100vw - 2rem))'
   return {
     position: 'top-center',
     containerStyle: {
+      position: 'fixed',
       top: '90px',
       left: '50%',
       right: 'auto',
+      bottom: 'auto',
       transform: 'translateX(-50%)',
+      width: toastColumnWidth,
+      maxWidth: '100%',
+      boxSizing: 'border-box',
+      paddingLeft: '1rem',
+      paddingRight: '1rem',
+      pointerEvents: 'none',
+      zIndex: 10000,
     },
   }
 }
@@ -137,11 +151,18 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
   return (
     <ToastContext.Provider value={{ addToast }}>
       {children}
-      <Toaster 
+      <Toaster
         position={position}
+        gutter={14}
         containerStyle={containerStyle}
         toastOptions={{
-          className: '',
+          style: {
+            background: 'transparent',
+            boxShadow: 'none',
+            padding: 0,
+            margin: 0,
+            maxWidth: 'min(420px, calc(100vw - 2rem))',
+          },
         }}
       />
     </ToastContext.Provider>
