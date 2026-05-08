@@ -90,6 +90,39 @@ OUTLOOK_SCOPES = [
     "offline_access"  # Required for refresh tokens
 ]
 
+
+def _resolve_oauth_start_user_id() -> Optional[int]:
+    """Resolve the signed-in user for OAuth start from session or Bearer JWT."""
+    try:
+        from core.secure_sessions import get_current_user_id
+
+        user_id = get_current_user_id()
+        if user_id:
+            return int(user_id)
+    except Exception as session_error:
+        logger.debug("OAuth start session identity unavailable: %s", session_error)
+
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return None
+
+    token = auth_header.split(" ", 1)[1].strip()
+    if not token:
+        return None
+
+    try:
+        from core.jwt_auth import get_jwt_manager
+
+        payload = get_jwt_manager().verify_access_token(token)
+        if isinstance(payload, dict) and "error" not in payload:
+            user_id = payload.get("user_id") or payload.get("id")
+            if user_id:
+                return int(user_id)
+    except Exception as jwt_error:
+        logger.debug("OAuth start bearer identity unavailable: %s", jwt_error)
+    return None
+
+
 def encrypt(s: str) -> str:
     """Encrypt string for storage"""
     if ENCRYPTION_ENABLED and fernet:
@@ -142,13 +175,12 @@ def merge_user_google_sub(user_id: int, google_sub: str) -> None:
 def gmail_start():
     """Start Gmail OAuth flow with CSRF protection"""
     try:
-        # Get user_id from secure session (optional for onboarding)
-        from core.secure_sessions import get_current_user_id
-        user_id = get_current_user_id()
+        # Resolve signed-in user from session cookie or Bearer token.
+        # Unauthenticated starts are allowed for legacy OAuth-login flows; persist NULL, never FK-breaking 0.
+        user_id = _resolve_oauth_start_user_id()
         
-        # Allow bypass for onboarding flow - user_id will be handled in callback
         if not user_id:
-            logger.info("🔗 OAuth start without authenticated user (onboarding flow)")
+            logger.info("🔗 OAuth start without authenticated user")
             user_id = None
 
         if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
@@ -167,7 +199,7 @@ def gmail_start():
         from core.database_optimization import db_optimizer
         db_optimizer.upsert_oauth_state_row(
             state,
-            user_id or 0,
+            user_id,
             "gmail",
             request.args.get("redirect", "/onboarding-flow/2"),
             int(time.time()) + 600,
@@ -591,11 +623,10 @@ def upsert_gmail_tokens(user_id: int, **payload):
 def outlook_start():
     """Start Outlook OAuth flow with CSRF protection"""
     try:
-        from core.secure_sessions import get_current_user_id
-        user_id = get_current_user_id()
+        user_id = _resolve_oauth_start_user_id()
         
         if not user_id:
-            logger.info("🔗 Outlook OAuth start without authenticated user (onboarding flow)")
+            logger.info("🔗 Outlook OAuth start without authenticated user")
             user_id = None
 
         if not MICROSOFT_CLIENT_ID or not MICROSOFT_CLIENT_SECRET:
@@ -613,7 +644,7 @@ def outlook_start():
         from core.database_optimization import db_optimizer
         db_optimizer.upsert_oauth_state_row(
             state,
-            user_id or 0,
+            user_id,
             "outlook",
             request.args.get("redirect", "/onboarding-flow/2"),
             int(time.time()) + 600,

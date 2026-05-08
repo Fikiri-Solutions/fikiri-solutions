@@ -57,7 +57,50 @@ class TestAppOAuth(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
         self.assertIn("state_123", data.get("url", ""))
-        mock_db.execute_query.assert_called_once()
+        mock_db.upsert_oauth_state_row.assert_called_once()
+        args = mock_db.upsert_oauth_state_row.call_args.args
+        self.assertEqual(args[0], "state_123")
+        self.assertIsNone(args[1])
+        self.assertEqual(args[2], "gmail")
+
+    def test_gmail_start_persists_bearer_user_id(self):
+        app = _create_app()
+        jwt_mgr = MagicMock()
+        jwt_mgr.verify_access_token.return_value = {"user_id": 7}
+        with patch("core.app_oauth.GOOGLE_CLIENT_ID", "client"), patch(
+            "core.app_oauth.GOOGLE_CLIENT_SECRET", "secret"
+        ), patch("core.app_oauth.secrets.token_urlsafe", return_value="state_123"), patch(
+            "core.jwt_auth.get_jwt_manager", return_value=jwt_mgr
+        ), patch("core.database_optimization.db_optimizer") as mock_db:
+            client = app.test_client()
+            resp = client.get(
+                "/api/oauth/gmail/start?redirect=/next",
+                headers={"Authorization": "Bearer access"},
+            )
+
+        self.assertEqual(resp.status_code, 200)
+        args = mock_db.upsert_oauth_state_row.call_args.args
+        self.assertEqual(args[1], 7)
+
+    def test_outlook_start_persists_bearer_user_id(self):
+        app = _create_app()
+        jwt_mgr = MagicMock()
+        jwt_mgr.verify_access_token.return_value = {"user_id": 8}
+        with patch("core.app_oauth.MICROSOFT_CLIENT_ID", "client"), patch(
+            "core.app_oauth.MICROSOFT_CLIENT_SECRET", "secret"
+        ), patch("core.app_oauth.secrets.token_urlsafe", return_value="state_456"), patch(
+            "core.jwt_auth.get_jwt_manager", return_value=jwt_mgr
+        ), patch("core.database_optimization.db_optimizer") as mock_db:
+            client = app.test_client()
+            resp = client.get(
+                "/api/oauth/outlook/start?redirect=/next",
+                headers={"Authorization": "Bearer access"},
+            )
+
+        self.assertEqual(resp.status_code, 200)
+        args = mock_db.upsert_oauth_state_row.call_args.args
+        self.assertEqual(args[1], 8)
+        self.assertEqual(args[2], "outlook")
 
     def test_gmail_callback_state_mismatch(self):
         app = _create_app()

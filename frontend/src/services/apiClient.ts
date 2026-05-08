@@ -386,11 +386,16 @@ class ApiClient {
           const userData = localStorage.getItem('fikiri-user')
           const token = localStorage.getItem('fikiri-token')
           
-          if (userData) {
+          if (token) {
+            config.headers.Authorization = `Bearer ${token}`
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[apiClient] Added auth token to ${config.method?.toUpperCase()} ${config.url}`)
+            }
+          } else if (userData) {
             try {
               const user = JSON.parse(userData)
               // Get token from separate storage or user data
-              const authToken = token || user.token || user.access_token
+              const authToken = user.token || user.access_token
               if (authToken) {
                 config.headers.Authorization = `Bearer ${authToken}`
                 if (process.env.NODE_ENV === 'development') {

@@ -2963,7 +2963,7 @@ class DatabaseOptimizer:
     def upsert_oauth_state_row(
         self,
         state: str,
-        user_id: int,
+        user_id: Optional[int],
         provider: str,
         redirect_url: Any,
         expires_at: int,
