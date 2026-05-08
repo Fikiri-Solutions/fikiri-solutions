@@ -9,6 +9,7 @@ import os
 import time
 import uuid
 import logging
+import threading
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -152,6 +153,12 @@ from routes.google_risc import google_risc_bp
 
 # Global services dictionary
 services = {}
+_startup_state = {
+    "services_ready": False,
+    "services_error": None,
+    "services_started_at": None,
+    "services_finished_at": None,
+}
 
 
 def _cors_default_base_origins():
@@ -390,12 +397,39 @@ def create_app():
                 'code': 'SOCKETIO_UNAVAILABLE'
             }), 503
     
-    # Initialize services with app reference
-    if initialize_services(app):
-        register_blueprints(app)
-        logger.info(f"✅ Flask app created - environment: {os.getenv('FLASK_ENV', 'production')}")
+    # Register routes immediately so health probes do not wait on heavy init.
+    register_blueprints(app)
+
+    def _run_service_init():
+        _startup_state["services_started_at"] = time.time()
+        try:
+            ok = initialize_services(app)
+            _startup_state["services_ready"] = bool(ok)
+            if not ok:
+                _startup_state["services_error"] = "initialize_services returned False"
+        except Exception as e:
+            _startup_state["services_ready"] = False
+            _startup_state["services_error"] = str(e)
+            logger.exception("❌ Deferred service initialization crashed: %s", e)
+        finally:
+            _startup_state["services_finished_at"] = time.time()
+
+    env = os.getenv('FLASK_ENV', 'production')
+    defer_services = (
+        os.getenv("DEFER_STARTUP_SERVICES", "1" if env == "production" else "0").strip().lower()
+        in ("1", "true", "yes")
+    )
+    if defer_services:
+        logger.info("⚡ Deferring service initialization to background thread")
+        threading.Thread(
+            target=_run_service_init,
+            name="startup-services-init",
+            daemon=True,
+        ).start()
     else:
-        logger.error("Failed to initialize services")
+        _run_service_init()
+
+    logger.info(f"✅ Flask app created - environment: {env}")
     
     return app
 
@@ -577,6 +611,24 @@ def setup_routes(app):
             'service': 'fikiri-backend',
             'timestamp': datetime.now().isoformat(),
         }), 200
+
+    @app.route('/api/health/ready')
+    def api_health_ready():
+        """Readiness with startup state visibility."""
+        services_ready = _startup_state.get("services_ready", False)
+        status = "ready" if services_ready else "starting"
+        if _startup_state.get("services_error"):
+            status = "degraded"
+        return jsonify({
+            "status": status,
+            "services_ready": services_ready,
+            "services_error": _startup_state.get("services_error"),
+            "startup": {
+                "started_at": _startup_state.get("services_started_at"),
+                "finished_at": _startup_state.get("services_finished_at"),
+            },
+            "timestamp": datetime.now().isoformat(),
+        }), 200 if status in ("ready", "starting") else 503
 
     @app.route('/api/health')
     def api_health_check():
