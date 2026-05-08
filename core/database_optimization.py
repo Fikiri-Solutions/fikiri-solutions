@@ -1071,62 +1071,6 @@ class DatabaseOptimizer:
             ON customer_lead_capture_intake_submissions (created_at)
         """)
 
-        # Appointment / booking intake (authenticated flows)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS customer_appointment_intake_submissions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                source TEXT,
-                appointment_id INTEGER,
-                customer_name TEXT,
-                customer_email TEXT,
-                customer_phone TEXT,
-                service_type TEXT,
-                requested_date TEXT,
-                requested_time TEXT,
-                timezone TEXT,
-                status TEXT NOT NULL DEFAULT 'received',  -- received, completed, rescheduled, cancelled, failed, deduplicated
-                error_message TEXT,
-                payload_json TEXT,
-                payload_truncated BOOLEAN DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (appointment_id) REFERENCES appointments (id) ON DELETE SET NULL,
-                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-            )
-        """)
-
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_customer_appointment_intake_user_id
-            ON customer_appointment_intake_submissions (user_id)
-        """)
-
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_customer_appointment_intake_appointment_id
-            ON customer_appointment_intake_submissions (appointment_id)
-        """)
-
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_customer_appointment_intake_customer_email
-            ON customer_appointment_intake_submissions (customer_email)
-        """)
-
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_customer_appointment_intake_created_at
-            ON customer_appointment_intake_submissions (created_at)
-        """)
-
-        # Backfill for existing DBs missing columns (best-effort).
-        cursor.execute("PRAGMA table_info(customer_appointment_intake_submissions)")
-        cols = [row[1] for row in cursor.fetchall()]
-        # These columns are intentionally safe to backfill with ALTER TABLE.
-        if 'payload_truncated' not in cols:
-            cursor.execute("ALTER TABLE customer_appointment_intake_submissions ADD COLUMN payload_truncated BOOLEAN DEFAULT 0")
-        if 'payload_json' not in cols:
-            cursor.execute("ALTER TABLE customer_appointment_intake_submissions ADD COLUMN payload_json TEXT")
-        if 'updated_at' not in cols:
-            cursor.execute("ALTER TABLE customer_appointment_intake_submissions ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-        
         # Data retention logs table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS data_retention_logs (
@@ -1670,6 +1614,62 @@ class DatabaseOptimizer:
                 FOREIGN KEY (contact_id) REFERENCES leads (id) ON DELETE SET NULL
             )
         """)
+
+        # Appointment / booking intake (after appointments — Postgres validates FKs at CREATE)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS customer_appointment_intake_submissions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                source TEXT,
+                appointment_id INTEGER,
+                customer_name TEXT,
+                customer_email TEXT,
+                customer_phone TEXT,
+                service_type TEXT,
+                requested_date TEXT,
+                requested_time TEXT,
+                timezone TEXT,
+                status TEXT NOT NULL DEFAULT 'received',  -- received, completed, rescheduled, cancelled, failed, deduplicated
+                error_message TEXT,
+                payload_json TEXT,
+                payload_truncated BOOLEAN DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (appointment_id) REFERENCES appointments (id) ON DELETE SET NULL,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_customer_appointment_intake_user_id
+            ON customer_appointment_intake_submissions (user_id)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_customer_appointment_intake_appointment_id
+            ON customer_appointment_intake_submissions (appointment_id)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_customer_appointment_intake_customer_email
+            ON customer_appointment_intake_submissions (customer_email)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_customer_appointment_intake_created_at
+            ON customer_appointment_intake_submissions (created_at)
+        """)
+
+        # Backfill for existing DBs missing columns (best-effort).
+        cursor.execute("PRAGMA table_info(customer_appointment_intake_submissions)")
+        cols = [row[1] for row in cursor.fetchall()]
+        # These columns are intentionally safe to backfill with ALTER TABLE.
+        if 'payload_truncated' not in cols:
+            cursor.execute("ALTER TABLE customer_appointment_intake_submissions ADD COLUMN payload_truncated BOOLEAN DEFAULT 0")
+        if 'payload_json' not in cols:
+            cursor.execute("ALTER TABLE customer_appointment_intake_submissions ADD COLUMN payload_json TEXT")
+        if 'updated_at' not in cols:
+            cursor.execute("ALTER TABLE customer_appointment_intake_submissions ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
 
         # Follow-up tasks (email follow-ups)
         cursor.execute("""
