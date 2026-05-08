@@ -73,6 +73,44 @@ class TestAuthRoutes(unittest.TestCase):
         self.assertIn('access_token', data['data'])
         self.assertIn('refresh_token', data['data'])
 
+    @patch('routes.auth.email_job_manager')
+    @patch('routes.auth.business_analytics')
+    @patch('routes.auth.log_security_event')
+    @patch('routes.auth.secure_session_manager')
+    @patch('routes.auth.user_auth_manager')
+    def test_login_session_failure_still_returns_tokens(self, mock_user_auth, mock_session_mgr,
+                                                        mock_log, mock_analytics, mock_email_jobs):
+        mock_user_auth.authenticate_user.return_value = {
+            'success': True,
+            'user': {
+                'id': 1,
+                'email': 'test@example.com',
+                'name': 'Test User',
+                'role': 'user',
+                'onboarding_completed': False,
+                'onboarding_step': 1
+            },
+            'tokens': {
+                'access_token': 'access',
+                'refresh_token': 'refresh',
+                'expires_in': 1800,
+                'token_type': 'Bearer'
+            }
+        }
+        mock_session_mgr.create_session.side_effect = RuntimeError("session db unavailable")
+
+        response = self.client.post('/api/auth/login', json={
+            'email': 'test@example.com',
+            'password': 'Password123!'
+        })
+
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data.get('success'))
+        self.assertEqual(data['data']['access_token'], 'access')
+        self.assertEqual(data['data']['refresh_token'], 'refresh')
+        self.assertNotIn('Set-Cookie', response.headers)
+
     @patch('routes.auth.user_auth_manager')
     def test_login_invalid_credentials(self, mock_user_auth):
         mock_user_auth.authenticate_user.return_value = {
@@ -151,6 +189,61 @@ class TestAuthRoutes(unittest.TestCase):
         self.assertTrue(data.get('success'))
         self.assertIn('data', data)
         self.assertIn('tokens', data['data'])
+
+    @patch('routes.auth.email_job_manager')
+    @patch('routes.auth.business_analytics')
+    @patch('routes.auth.log_security_event')
+    @patch('routes.auth.secure_session_manager')
+    @patch('routes.auth.get_jwt_manager')
+    @patch('routes.auth.check_email_domain_has_mx_for_signup')
+    @patch('routes.auth.user_auth_manager')
+    def test_signup_session_failure_still_returns_tokens(
+        self,
+        mock_user_auth,
+        mock_check_email_domain_has_mx,
+        mock_get_jwt_mgr,
+        mock_session_mgr,
+        mock_log,
+        mock_analytics,
+        mock_email_jobs,
+    ):
+        mock_user_auth.create_user.return_value = {
+            'success': True,
+            'user': {
+                'id': 2,
+                'email': 'new@example.com',
+                'name': 'New User',
+                'role': 'user'
+            }
+        }
+        mock_check_email_domain_has_mx.return_value = {
+            "domain": "example.com",
+            "has_mx": True,
+            "mx_records": 1,
+            "reason": "OK",
+        }
+        jwt_mgr = MagicMock()
+        jwt_mgr.generate_tokens.return_value = {
+            'access_token': 'access',
+            'refresh_token': 'refresh',
+            'expires_in': 1800,
+            'token_type': 'Bearer'
+        }
+        mock_get_jwt_mgr.return_value = jwt_mgr
+        mock_session_mgr.create_session.side_effect = RuntimeError("session db unavailable")
+
+        response = self.client.post('/api/auth/signup', json={
+            'email': 'new@example.com',
+            'password': 'Password123!',
+            'name': 'New User'
+        })
+
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data.get('success'))
+        self.assertEqual(data['data']['tokens']['access_token'], 'access')
+        self.assertIsNone(data['data']['session_id'])
+        self.assertNotIn('Set-Cookie', response.headers)
 
     @patch('routes.auth.email_job_manager')
     @patch('routes.auth.business_analytics')

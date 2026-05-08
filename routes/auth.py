@@ -60,6 +60,38 @@ def _parse_auth_json_body():
         return None, create_error_response("Request body cannot be empty", 400, "EMPTY_REQUEST_BODY")
     return data, None
 
+
+def _create_session_best_effort(user_data, *, stage: str):
+    """Persist secure session when available; JWT auth remains usable if this auxiliary write fails."""
+    try:
+        return secure_session_manager.create_session(
+            user_data['id'],
+            user_data,
+            request.remote_addr,
+            request.headers.get('User-Agent'),
+        )
+    except Exception as e:
+        logger.warning(
+            "Secure session creation failed during %s; continuing with token auth user_id=%s: %s",
+            stage,
+            user_data.get('id'),
+            e,
+        )
+        return None, None
+
+
+def _attach_session_cookie(response, cookie_data) -> None:
+    try:
+        if cookie_data and isinstance(cookie_data, dict):
+            # Extract cookie name and value (Flask set_cookie uses first positional arg for name)
+            cookie_name = cookie_data.pop('key', cookie_data.pop('name', 'fikiri_session'))
+            cookie_value = cookie_data.pop('value', '')
+            # Remove None values to avoid passing them to set_cookie
+            cookie_kwargs = {k: v for k, v in cookie_data.items() if v is not None}
+            response.set_cookie(cookie_name, cookie_value, **cookie_kwargs)
+    except Exception as e:
+        logger.warning(f"Failed to set session cookie: {e}")
+
 @auth_bp.route('/login', methods=['POST'])
 @handle_api_errors
 @rate_limit('login_attempts', lambda *args, **kwargs: request.remote_addr)
@@ -93,9 +125,7 @@ def api_login():
         'role': user_dict.get('role', 'user')
     }
 
-    session_id, cookie_data = secure_session_manager.create_session(
-        user_data['id'], user_data, request.remote_addr, request.headers.get('User-Agent')
-    )
+    session_id, cookie_data = _create_session_best_effort(user_data, stage="login")
 
     log_security_event("user_login", "info", {
         "user_id": user_data['id'],
@@ -128,16 +158,7 @@ def api_login():
     }
 
     response, status_code = create_success_response(response_data, "Login successful")
-    try:
-        if cookie_data and isinstance(cookie_data, dict):
-            # Extract cookie name and value (Flask set_cookie uses first positional arg for name)
-            cookie_name = cookie_data.pop('key', cookie_data.pop('name', 'fikiri_session'))
-            cookie_value = cookie_data.pop('value', '')
-            # Remove None values to avoid passing them to set_cookie
-            cookie_kwargs = {k: v for k, v in cookie_data.items() if v is not None}
-            response.set_cookie(cookie_name, cookie_value, **cookie_kwargs)
-    except Exception as e:
-        logger.warning(f"Failed to set session cookie: {e}")
+    _attach_session_cookie(response, cookie_data)
     return response, status_code
 
 @auth_bp.route('/signup', methods=['POST'])
@@ -248,12 +269,7 @@ def api_signup():
         )
 
         _sess_t0 = time.monotonic()
-        session_id, cookie_data = secure_session_manager.create_session(
-            user_data['id'],
-            user_data,
-            request.remote_addr,
-            request.headers.get('User-Agent')
-        )
+        session_id, cookie_data = _create_session_best_effort(user_data, stage="signup")
         logger.info(
             "Signup timing after create_session ms=%.0f email=%s",
             (time.monotonic() - _sess_t0) * 1000,
@@ -331,16 +347,7 @@ def api_signup():
         response, status_code = create_success_response(response_data, "Account created successfully")
         
         # Set secure session cookie safely
-        try:
-            if cookie_data and isinstance(cookie_data, dict):
-                # Extract cookie name and value (Flask set_cookie uses first positional arg for name)
-                cookie_name = cookie_data.pop('key', cookie_data.pop('name', 'fikiri_session'))
-                cookie_value = cookie_data.pop('value', '')
-                # Remove None values to avoid passing them to set_cookie
-                cookie_kwargs = {k: v for k, v in cookie_data.items() if v is not None}
-                response.set_cookie(cookie_name, cookie_value, **cookie_kwargs)
-        except Exception as e:
-            logger.warning(f"Failed to set session cookie: {e}")
+        _attach_session_cookie(response, cookie_data)
         
         logger.info(
             "✅ User registration successful: %s total_ms=%.0f",

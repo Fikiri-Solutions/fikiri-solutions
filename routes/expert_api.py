@@ -325,9 +325,10 @@ def add_question_to_kb(question_id):
     
     # Update expert response
     from core.database_optimization import db_optimizer
+    added_to_kb = db_optimizer.sql_true_literal()
     db_optimizer.execute_query(
-        """UPDATE expert_responses 
-           SET added_to_kb = 1, faq_id = ?, kb_document_id = ? 
+        f"""UPDATE expert_responses 
+           SET added_to_kb = {added_to_kb}, faq_id = ?, kb_document_id = ? 
            WHERE escalated_question_id = ? AND expert_user_id = ?""",
         (faq_id, kb_document_id, question_id, user_id),
         fetch=False

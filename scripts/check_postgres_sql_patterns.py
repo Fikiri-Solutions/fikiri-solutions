@@ -55,6 +55,10 @@ PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"INSERT\s+OR\s+REPLACE", re.I), "INSERT OR REPLACE"),
     (re.compile(r"datetime\s*\(\s*'now'"), "datetime('now'...)"),
     (re.compile(r"\bsqlite_master\b", re.I), "sqlite_master"),
+    (
+        re.compile(r"\b(?:is_active|onboarding_completed|added_to_kb)\s*=\s*[01]\b", re.I),
+        "numeric literal assigned/compared to boolean column",
+    ),
     (re.compile(r"(?<![\w])(?:SQLite|sqlite)::", re.I), "sqlite (::) qualifier"),
 )
 

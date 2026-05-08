@@ -394,7 +394,7 @@ class UserAuthManager:
             return False
 
     def deactivate_user(self, user_id: int) -> Dict[str, Any]:
-        """Soft-delete user: set is_active=0 and revoke all sessions."""
+        """Soft-delete user by marking inactive and revoking all sessions."""
         try:
             false_lit = db_optimizer.sql_false_literal()
             db_optimizer.execute_query(
