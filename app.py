@@ -4,6 +4,26 @@ Fikiri Solutions - Production-Ready Flask Application
 Enterprise-grade modular architecture with comprehensive monitoring
 """
 
+# Gevent monkey-patching must happen before anything imports ssl/socket/threading.
+# Production goes through wsgi.py which patches first; this block is a safety net
+# in case Render's dashboard Start Command still references `app:wsgi_app` directly
+# (see AGENTS.md - "Gunicorn on Render"). Without it, every HTTPS call (Google OAuth,
+# Stripe, etc.) blows up with "RecursionError: maximum recursion depth exceeded"
+# inside ssl.SSLSocket.read because flask/requests cache pre-patched primitives.
+import os as _bootstrap_os  # noqa: E402
+
+if (
+    _bootstrap_os.getenv("SOCKETIO_ASYNC_MODE", "").strip().lower() == "gevent"
+    and _bootstrap_os.getenv("FIKIRI_SKIP_GEVENT_PATCH", "").lower() not in {"1", "true", "yes"}
+):
+    try:
+        from gevent import monkey as _gevent_monkey
+
+        if not _gevent_monkey.is_module_patched("socket"):
+            _gevent_monkey.patch_all()
+    except ImportError:
+        pass
+
 import json
 import os
 import time
@@ -884,10 +904,9 @@ def register_blueprints(app):
 # Create Flask app instance
 app = create_app()
 
-# Gunicorn WSGI target: must be the Flask application object.
-# Flask-SocketIO 5.x: the SocketIO instance is NOT WSGI-callable (callable(socketio) is False), so gunicorn app:wsgi_app
-# would raise "Application object must be callable". SocketIO attaches middleware via app.wsgi_app instead.
-# Use: gunicorn -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker -w 1 --bind 0.0.0.0:$PORT app:wsgi_app
+# Flask application object imported by wsgi.py after gevent monkey-patching.
+# Flask-SocketIO 5.x: the SocketIO instance is NOT WSGI-callable (callable(socketio) is False).
+# Gunicorn/Render must use wsgi:wsgi_app so patch_all() runs before app imports HTTPS clients.
 wsgi_app = app
 
 # Dev-only routes (bypass auth/plan gating; not registered in production/staging)
