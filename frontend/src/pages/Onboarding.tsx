@@ -334,11 +334,12 @@ export const Onboarding: React.FC = () => {
 
             <div className="space-y-4">
               <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <label htmlFor="onboarding-name" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                     <User className="h-4 w-4" />
                   Your Name *
                 </label>
                 <input
+                  id="onboarding-name"
                   type="text"
                   name="name"
                   autoComplete={AUTOCOMPLETE.onboarding.name}
@@ -351,11 +352,12 @@ export const Onboarding: React.FC = () => {
               </div>
 
               <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <label htmlFor="onboarding-company" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                     <Building className="h-4 w-4" />
                   Company Name *
                 </label>
                 <input
+                  id="onboarding-company"
                   type="text"
                   name="company"
                   autoComplete={AUTOCOMPLETE.onboarding.organization}
@@ -368,10 +370,11 @@ export const Onboarding: React.FC = () => {
               </div>
 
               <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="onboarding-industry" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     Industry (Optional)
                 </label>
                 <input
+                  id="onboarding-industry"
                   type="text"
                   name="industry"
                   autoComplete={AUTOCOMPLETE.onboarding.industry}

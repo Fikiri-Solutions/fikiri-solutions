@@ -1199,8 +1199,9 @@ class ApiClient {
 
   async getGmailConnectionStatus(): Promise<GmailConnectionStatus> {
     const userId = this.getUserId()
+    const params = userId == null ? undefined : { user_id: userId }
     const response = await this.client.get('/auth/gmail/status', {
-      params: { user_id: userId ?? 1 }
+      params
     })
     // Handle both response formats: { success, data, ... } or direct data
     const statusData = response.data?.data || response.data
@@ -1220,8 +1221,9 @@ class ApiClient {
 
   async getOutlookConnectionStatus(): Promise<OutlookConnectionStatus> {
     const userId = this.getUserId()
+    const params = userId == null ? undefined : { user_id: userId }
     const response = await this.client.get('/auth/outlook/status', {
-      params: { user_id: userId ?? 1 }
+      params
     })
     return response.data?.data || response.data
   }

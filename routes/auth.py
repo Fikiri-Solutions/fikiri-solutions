@@ -28,7 +28,6 @@ from core.email_provider_verifier import check_email_domain_has_mx_for_signup
 from core.rate_limiter import rate_limit
 from core.database_optimization import db_optimizer
 from core.enterprise_logging import log_security_event
-from core.request_user_id import resolve_request_user_id
 from services.business_operations import business_analytics
 from email_automation.jobs import email_job_manager
 
@@ -91,6 +90,26 @@ def _attach_session_cookie(response, cookie_data) -> None:
             response.set_cookie(cookie_name, cookie_value, **cookie_kwargs)
     except Exception as e:
         logger.warning(f"Failed to set session cookie: {e}")
+
+
+def _current_jwt_user_id():
+    current_user = get_current_user() or {}
+    user_id = current_user.get('user_id') or current_user.get('id')
+    try:
+        return int(user_id)
+    except (TypeError, ValueError):
+        return None
+
+
+def _reject_mismatched_query_user_id(authenticated_user_id: int):
+    requested_user_id = request.args.get("user_id", type=int)
+    if requested_user_id is not None and requested_user_id != authenticated_user_id:
+        return create_error_response(
+            "Requested user does not match authenticated user",
+            403,
+            "AUTH_USER_MISMATCH",
+        )
+    return None
 
 @auth_bp.route('/login', methods=['POST'])
 @handle_api_errors
@@ -658,12 +677,16 @@ def reset_rate_limit():
 
 @auth_bp.route('/gmail/status', methods=['GET'])
 @handle_api_errors
+@jwt_required
 def api_gmail_status():
     """Get Gmail connection status for a user"""
     try:
-        user_id = resolve_request_user_id(request, allow_query=True)
+        user_id = _current_jwt_user_id()
         if not user_id:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+        mismatch = _reject_mismatched_query_user_id(user_id)
+        if mismatch:
+            return mismatch
         
         # Check Gmail token status - check gmail_tokens table (where tokens are actually stored)
         try:
@@ -776,12 +799,16 @@ def api_gmail_status():
 
 @auth_bp.route('/outlook/status', methods=['GET'])
 @handle_api_errors  
+@jwt_required
 def api_outlook_status():
     """Get Outlook connection status for a user"""
     try:
-        user_id = resolve_request_user_id(request, allow_query=True)
+        user_id = _current_jwt_user_id()
         if not user_id:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+        mismatch = _reject_mismatched_query_user_id(user_id)
+        if mismatch:
+            return mismatch
         
         # Check outlook_tokens table
         try:

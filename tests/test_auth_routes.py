@@ -559,16 +559,18 @@ class TestAuthRoutes(unittest.TestCase):
         data = json.loads(response.data)
         self.assertTrue(data.get('success'))
 
-    @patch('core.secure_sessions.get_current_user_id', return_value=None)
-    def test_gmail_status_missing_user(self, mock_get_user):
+    def test_gmail_status_missing_user(self):
         response = self.client.get('/api/auth/gmail/status')
         self.assertEqual(response.status_code, 401)
         data = json.loads(response.data)
-        self.assertEqual(data.get('code'), 'AUTHENTICATION_REQUIRED')
+        self.assertEqual(data.get('error_code'), 'MISSING_AUTH_HEADER')
 
+    @patch('core.jwt_auth.get_jwt_manager')
     @patch('routes.auth.db_optimizer')
-    @patch('core.secure_sessions.get_current_user_id', return_value=1)
-    def test_gmail_status_connected_from_db(self, mock_get_user, mock_db):
+    def test_gmail_status_connected_from_db(self, mock_db, mock_get_jwt_mgr):
+        jwt_mgr = MagicMock()
+        jwt_mgr.verify_access_token.return_value = {'user_id': 1}
+        mock_get_jwt_mgr.return_value = jwt_mgr
         mock_db.execute_query.return_value = [{
             'access_token_enc': 'enc',
             'access_token': None,
@@ -576,17 +578,73 @@ class TestAuthRoutes(unittest.TestCase):
             'scopes_json': '["scope"]',
             'updated_at': 'now'
         }]
-        response = self.client.get('/api/auth/gmail/status')
+        response = self.client.get(
+            '/api/auth/gmail/status?user_id=1',
+            headers={'Authorization': 'Bearer access'},
+        )
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
         self.assertTrue(data.get('data', {}).get('connected'))
 
-    @patch('core.secure_sessions.get_current_user_id', return_value=None)
-    def test_outlook_status_missing_user(self, mock_get_user):
+    @patch('core.jwt_auth.get_jwt_manager')
+    def test_gmail_status_rejects_mismatched_query_user(self, mock_get_jwt_mgr):
+        jwt_mgr = MagicMock()
+        jwt_mgr.verify_access_token.return_value = {'user_id': 1}
+        mock_get_jwt_mgr.return_value = jwt_mgr
+
+        response = self.client.get(
+            '/api/auth/gmail/status?user_id=2',
+            headers={'Authorization': 'Bearer access'},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        data = json.loads(response.data)
+        self.assertEqual(data.get('code'), 'AUTH_USER_MISMATCH')
+
+    def test_outlook_status_missing_user(self):
         response = self.client.get('/api/auth/outlook/status')
         self.assertEqual(response.status_code, 401)
         data = json.loads(response.data)
-        self.assertFalse(data.get('data', {}).get('connected'))
+        self.assertEqual(data.get('error_code'), 'MISSING_AUTH_HEADER')
+
+    @patch('core.jwt_auth.get_jwt_manager')
+    @patch('routes.auth.db_optimizer')
+    def test_outlook_status_connected_from_db(self, mock_db, mock_get_jwt_mgr):
+        jwt_mgr = MagicMock()
+        jwt_mgr.verify_access_token.return_value = {'user_id': 1}
+        mock_get_jwt_mgr.return_value = jwt_mgr
+        mock_db.execute_query.return_value = [{
+            'access_token_enc': 'enc',
+            'access_token': None,
+            'expiry_timestamp': str(int(time.time()) + 3600),
+            'scopes_json': '["scope"]',
+            'tenant_id': 'tenant',
+            'updated_at': 'now'
+        }]
+
+        response = self.client.get(
+            '/api/auth/outlook/status?user_id=1',
+            headers={'Authorization': 'Bearer access'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data.get('data', {}).get('connected'))
+
+    @patch('core.jwt_auth.get_jwt_manager')
+    def test_outlook_status_rejects_mismatched_query_user(self, mock_get_jwt_mgr):
+        jwt_mgr = MagicMock()
+        jwt_mgr.verify_access_token.return_value = {'user_id': 1}
+        mock_get_jwt_mgr.return_value = jwt_mgr
+
+        response = self.client.get(
+            '/api/auth/outlook/status?user_id=2',
+            headers={'Authorization': 'Bearer access'},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        data = json.loads(response.data)
+        self.assertEqual(data.get('code'), 'AUTH_USER_MISMATCH')
 
     def test_gmail_disconnect_requires_user(self):
         response = self.client.post('/api/auth/gmail/disconnect', json={})
