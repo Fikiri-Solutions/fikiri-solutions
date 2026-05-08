@@ -180,10 +180,12 @@ def api_signup():
         # Soft by default: warning only. Strict mode can block signups.
         if email_is_valid and "@" in email_raw:
             domain = email_raw.split("@", 1)[1].strip()
+            logger.info("Signup stage=mx_lookup_start email=%s domain=%s", email_raw, domain)
             _mx_t0 = time.monotonic()
             mx_result = check_email_domain_has_mx_for_signup(domain)
             logger.info(
-                "Signup MX lookup domain=%s reason=%s ms=%.0f",
+                "Signup stage=mx_lookup_done email=%s domain=%s reason=%s ms=%.0f",
+                email_raw,
                 domain,
                 mx_result.get("reason"),
                 (time.monotonic() - _mx_t0) * 1000,

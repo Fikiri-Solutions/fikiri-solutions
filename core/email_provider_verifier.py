@@ -185,7 +185,14 @@ def check_email_domain_has_mx_for_signup(domain: str) -> Dict[str, Any]:
             "reason": "SKIPPED_BY_ENV",
         }
 
-    wall = float(os.getenv("FIKIRI_SIGNUP_MX_WALL_SECONDS", "2.5"))
+    wall_raw = os.getenv("FIKIRI_SIGNUP_MX_WALL_SECONDS", "2.5")
+    try:
+        wall = float(wall_raw)
+    except ValueError:
+        logger.warning("Invalid FIKIRI_SIGNUP_MX_WALL_SECONDS=%r, falling back to 2.5", wall_raw)
+        wall = 2.5
+    # Defensive cap: never let MX validation block signup for long in production.
+    wall = min(3.0, max(0.25, wall))
     inner_timeout = min(1.5, max(0.3, wall * 0.6))
     fut = _MX_EXECUTOR.submit(check_email_domain_has_mx, domain, inner_timeout)
     try:

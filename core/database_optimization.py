@@ -2095,16 +2095,23 @@ class DatabaseOptimizer:
             raise last_error or sqlite3.DatabaseError("Connection failed")
         finally:
             if conn and self.db_type == "postgresql" and self.connection_pool:
+                discard_conn = False
                 try:
                     conn.commit()
                 except Exception as commit_err:
                     logger.debug("Postgres commit on release: %s", commit_err)
+                    discard_conn = True
                     try:
                         conn.rollback()
                     except Exception:
                         pass
                 try:
-                    self.connection_pool.putconn(conn)
+                    if getattr(conn, "closed", 0):
+                        discard_conn = True
+                except Exception:
+                    discard_conn = True
+                try:
+                    self.connection_pool.putconn(conn, close=discard_conn)
                 except Exception as pool_error:
                     logger.debug("Failed to return PostgreSQL connection to pool: %s", pool_error)
             elif conn and self.db_type != "postgresql":
@@ -2220,8 +2227,21 @@ class DatabaseOptimizer:
         except (json.JSONDecodeError, TypeError):
             return False
     
+    def _is_retryable_postgres_error(self, error: Exception) -> bool:
+        """Detect transient PostgreSQL connection/SSL failures worth one retry."""
+        msg = str(error).lower()
+        retry_markers = (
+            "ssl error: decryption failed or bad record mac",
+            "server closed the connection unexpectedly",
+            "terminating connection due to administrator command",
+            "could not receive data from server",
+            "connection already closed",
+            "connection not open",
+        )
+        return any(marker in msg for marker in retry_markers)
+
     def execute_query(self, query: str, params: Tuple = None, fetch: bool = True, 
-                     user_id: int = None, endpoint: str = None) -> Any:
+                     user_id: int = None, endpoint: str = None, _retry_depth: int = 0) -> Any:
         """Execute a query with performance monitoring and JSON validation"""
         start_time = time.time()
         
@@ -2310,6 +2330,17 @@ class DatabaseOptimizer:
             if self._ready:
                 self._record_query_metrics(query, execution_time, 0, False, str(e),
                                          user_id=user_id, endpoint=endpoint)
+            if self.db_type == "postgresql" and _retry_depth == 0 and self._is_retryable_postgres_error(e):
+                logger.warning("Retrying transient PostgreSQL error once: %s", e)
+                time.sleep(0.1)
+                return self.execute_query(
+                    query,
+                    params=params,
+                    fetch=fetch,
+                    user_id=user_id,
+                    endpoint=endpoint,
+                    _retry_depth=1,
+                )
             logger.error(f"Query execution error: {e}")
             raise
 

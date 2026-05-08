@@ -39,6 +39,7 @@ class AIBudgetGuardrails:
 
     def _init_tables(self):
         try:
+            false_lit = db_optimizer.sql_false_literal()
             db_optimizer.execute_query(
                 """
                 CREATE TABLE IF NOT EXISTS ai_budget_alerts (
@@ -55,12 +56,12 @@ class AIBudgetGuardrails:
                 fetch=False,
             )
             db_optimizer.execute_query(
-                """
+                f"""
                 CREATE TABLE IF NOT EXISTS ai_budget_approvals (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER NOT NULL,
                     month TEXT NOT NULL,
-                    approved BOOLEAN NOT NULL DEFAULT 0,
+                    approved BOOLEAN NOT NULL DEFAULT {false_lit},
                     approved_by TEXT,
                     note TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -167,9 +168,10 @@ class AIBudgetGuardrails:
             try:
                 db_optimizer.execute_query(
                     """
-                    INSERT OR IGNORE INTO ai_budget_alerts
+                    INSERT INTO ai_budget_alerts
                     (user_id, month, alert_level, estimated_cost_usd, budget_cap_usd)
                     VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT (user_id, month, alert_level) DO NOTHING
                     """,
                     (user_id, month, level, est, cap),
                     fetch=False,

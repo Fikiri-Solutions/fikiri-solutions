@@ -91,6 +91,7 @@ class IntegrationManager:
     
     def _initialize_tables(self):
         """Create integration framework tables"""
+        true_lit = db_optimizer.sql_true_literal()
         # Unified integrations table
         db_optimizer.execute_query("""
             CREATE TABLE IF NOT EXISTS integrations (
@@ -142,7 +143,7 @@ class IntegrationManager:
         """, fetch=False)
         
         # Calendar event links (maps internal entities to external events)
-        db_optimizer.execute_query("""
+        db_optimizer.execute_query(f"""
             CREATE TABLE IF NOT EXISTS calendar_event_links (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
@@ -151,7 +152,7 @@ class IntegrationManager:
                 internal_entity_id INTEGER NOT NULL,
                 external_event_id TEXT NOT NULL,
                 external_calendar_id TEXT NOT NULL,
-                is_active BOOLEAN DEFAULT 1,
+                is_active BOOLEAN DEFAULT {true_lit},
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(integration_id, external_event_id),
@@ -600,7 +601,7 @@ class IntegrationManager:
         # Step 4: Mark calendar event links as inactive (keep for history, but mark broken)
         db_optimizer.execute_query("""
             UPDATE calendar_event_links 
-            SET is_active = 0, updated_at = CURRENT_TIMESTAMP
+            SET is_active = """ + db_optimizer.sql_false_literal() + """, updated_at = CURRENT_TIMESTAMP
             WHERE integration_id = ?
         """, (integration_id,), fetch=False)
         
@@ -653,7 +654,7 @@ class IntegrationManager:
             INSERT INTO calendar_event_links
             (user_id, integration_id, internal_entity_type, internal_entity_id,
              external_event_id, external_calendar_id, is_active, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+            VALUES (?, ?, ?, ?, ?, ?, """ + db_optimizer.sql_true_literal() + """, CURRENT_TIMESTAMP)
             ON CONFLICT (user_id, internal_entity_type, internal_entity_id, integration_id)
             DO UPDATE SET
                 external_event_id = EXCLUDED.external_event_id,
@@ -672,14 +673,12 @@ class IntegrationManager:
             result = db_optimizer.execute_query("""
                 SELECT * FROM calendar_event_links
                 WHERE user_id = ? AND internal_entity_type = ? 
-                AND internal_entity_id = ? AND integration_id = ? AND is_active = 1
-            """, (user_id, internal_entity_type, internal_entity_id, integration_id))
+                AND internal_entity_id = ? AND integration_id = ? AND is_active = """ + db_optimizer.sql_true_literal(), (user_id, internal_entity_type, internal_entity_id, integration_id))
         else:
             result = db_optimizer.execute_query("""
                 SELECT * FROM calendar_event_links
                 WHERE user_id = ? AND internal_entity_type = ? 
-                AND internal_entity_id = ? AND is_active = 1
-            """, (user_id, internal_entity_type, internal_entity_id))
+                AND internal_entity_id = ? AND is_active = """ + db_optimizer.sql_true_literal(), (user_id, internal_entity_type, internal_entity_id))
         
         return result[0] if result else None
 

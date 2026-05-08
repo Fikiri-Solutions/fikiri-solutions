@@ -32,8 +32,9 @@ class APIKeyManager:
     def _initialize_tables(self):
         """Initialize database tables for API key management"""
         try:
+            true_lit = db_optimizer.sql_true_literal()
             # API keys table with tenant isolation
-            db_optimizer.execute_query("""
+            db_optimizer.execute_query(f"""
                 CREATE TABLE IF NOT EXISTS api_keys (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER NOT NULL,
@@ -46,7 +47,7 @@ class APIKeyManager:
                     allowed_origins TEXT,  -- JSON array of allowed CORS origins (null = all)
                     rate_limit_per_minute INTEGER DEFAULT 60,
                     rate_limit_per_hour INTEGER DEFAULT 1000,
-                    is_active BOOLEAN DEFAULT 1,
+                    is_active BOOLEAN DEFAULT {true_lit},
                     last_used_at TIMESTAMP,
                     expires_at TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -222,13 +223,13 @@ class APIKeyManager:
         
         try:
             # Look up key
+            active_lit = db_optimizer.sql_true_literal()
             result = db_optimizer.execute_query("""
                 SELECT id, user_id, key_prefix, name, description, tenant_id,
                        scopes, allowed_origins, rate_limit_per_minute, rate_limit_per_hour,
                        is_active, expires_at, last_used_at
                 FROM api_keys
-                WHERE key_hash = ? AND is_active = 1
-            """, (key_hash,))
+                WHERE key_hash = ? AND is_active = """ + active_lit, (key_hash,))
             
             if not result:
                 return None
@@ -350,7 +351,7 @@ class APIKeyManager:
         try:
             db_optimizer.execute_query("""
                 UPDATE api_keys
-                SET is_active = 0, updated_at = CURRENT_TIMESTAMP
+                SET is_active = """ + db_optimizer.sql_false_literal() + """, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ? AND user_id = ?
             """, (api_key_id, user_id), fetch=False)
             
