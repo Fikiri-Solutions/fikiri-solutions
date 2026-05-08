@@ -113,7 +113,9 @@ class AutomationSafetyManager:
                 "SELECT global_kill_switch FROM automation_safety_config WHERE user_id IS NULL LIMIT 1"
             )
             if result:
-                return bool(result[0][0])
+                row = result[0]
+                val = row.get("global_kill_switch") if isinstance(row, dict) else row[0]
+                return bool(val)
             return False
         except Exception as e:
             logger.error(f"Failed to check global kill-switch: {e}")
@@ -123,15 +125,28 @@ class AutomationSafetyManager:
         """Toggle global automation kill-switch"""
         try:
             # Update or insert global config
-            self.db_optimizer.execute_query(
-                """
-                INSERT OR REPLACE INTO automation_safety_config 
-                (user_id, global_kill_switch, updated_at)
-                VALUES (NULL, ?, CURRENT_TIMESTAMP)
-                """,
-                (enabled,),
-                fetch=False
+            existing = self.db_optimizer.execute_query(
+                "SELECT id FROM automation_safety_config WHERE user_id IS NULL LIMIT 1"
             )
+            if existing:
+                self.db_optimizer.execute_query(
+                    """
+                    UPDATE automation_safety_config
+                    SET global_kill_switch = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE user_id IS NULL
+                    """,
+                    (enabled,),
+                    fetch=False,
+                )
+            else:
+                self.db_optimizer.execute_query(
+                    """
+                    INSERT INTO automation_safety_config (user_id, global_kill_switch, updated_at)
+                    VALUES (NULL, ?, CURRENT_TIMESTAMP)
+                    """,
+                    (enabled,),
+                    fetch=False,
+                )
             
             logger.info(f"Global kill-switch {'enabled' if enabled else 'disabled'}")
             return {
@@ -302,13 +317,14 @@ class AutomationSafetyManager:
                                 action_type: str, hours: int) -> int:
         """Get action count for specific contact within time window"""
         try:
+            ts_pred = self.db_optimizer.sql_column_newer_than_n_hours_ago("created_at", hours)
             result = self.db_optimizer.execute_query(
-                """
+                f"""
                 SELECT COUNT(*) as count FROM automation_action_log 
                 WHERE user_id = ? AND target_contact = ? AND action_type = ? 
-                AND datetime(created_at) > datetime('now', '-{} hours')
-                """.format(hours),
-                (user_id, target_contact, action_type)
+                AND {ts_pred}
+                """,
+                (user_id, target_contact, action_type),
             )
             if not result:
                 return 0
@@ -321,12 +337,13 @@ class AutomationSafetyManager:
     def _get_user_action_count(self, user_id: int, minutes: int) -> int:
         """Get action count for user within time window"""
         try:
+            ts_pred = self.db_optimizer.sql_column_newer_than_n_minutes_ago("created_at", minutes)
             result = self.db_optimizer.execute_query(
-                """
+                f"""
                 SELECT COUNT(*) as count FROM automation_action_log 
-                WHERE user_id = ? AND datetime(created_at) > datetime('now', '-{} minutes')
-                """.format(minutes),
-                (user_id,)
+                WHERE user_id = ? AND {ts_pred}
+                """,
+                (user_id,),
             )
             if not result:
                 return 0
@@ -342,12 +359,15 @@ class AutomationSafetyManager:
             config = self._get_user_safety_config(user_id)
             
             # Count failures in the window
+            ts_pred = self.db_optimizer.sql_column_newer_than_n_minutes_ago(
+                "created_at", config.oauth_failure_window_minutes
+            )
             result = self.db_optimizer.execute_query(
-                """
+                f"""
                 SELECT COUNT(*) as count FROM oauth_failure_log 
-                WHERE user_id = ? AND datetime(created_at) > datetime('now', '-{} minutes')
-                """.format(config.oauth_failure_window_minutes),
-                (user_id,)
+                WHERE user_id = ? AND {ts_pred}
+                """,
+                (user_id,),
             )
             
             if not result:
@@ -389,12 +409,15 @@ class AutomationSafetyManager:
             # Get OAuth failure count
             # Check if oauth_failure_log table exists
             try:
+                ts_pred = self.db_optimizer.sql_column_newer_than_n_minutes_ago(
+                    "created_at", config.oauth_failure_window_minutes
+                )
                 oauth_failures = self.db_optimizer.execute_query(
-                    """
+                    f"""
                     SELECT COUNT(*) as failure_count FROM oauth_failure_log 
-                    WHERE user_id = ? AND datetime(created_at) > datetime('now', '-{} minutes')
-                    """.format(config.oauth_failure_window_minutes),
-                    (user_id,)
+                    WHERE user_id = ? AND {ts_pred}
+                    """,
+                    (user_id,),
                 )
                 # Handle both dict and tuple result formats
                 if oauth_failures:

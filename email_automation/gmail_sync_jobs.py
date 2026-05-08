@@ -183,27 +183,18 @@ class GmailSyncJobManager:
             
             # Migration: add columns when missing (idempotent; matches core/database_optimization).
             try:
-                db_url = (os.getenv("DATABASE_URL") or "").lower()
-                if "sqlite" in db_url or not db_url:
-                    info = db_optimizer.execute_query("PRAGMA table_info(synced_emails)")
-                    col_names = set()
-                    if info:
-                        for row in info:
-                            if isinstance(row, dict):
-                                col_names.add(row.get("name"))
-                            elif row is not None and len(row) > 1:
-                                col_names.add(row[1])
-                    if info is not None and "provider" not in col_names:
-                        db_optimizer.execute_query(
-                            "ALTER TABLE synced_emails ADD COLUMN provider TEXT DEFAULT 'gmail'",
-                            fetch=False,
-                        )
-                        logger.info("✅ Added provider column to synced_emails (gmail_sync_jobs migration)")
-                    if info is not None and "is_read" not in col_names:
-                        db_optimizer.execute_query(
-                            "ALTER TABLE synced_emails ADD COLUMN is_read BOOLEAN DEFAULT 0",
-                            fetch=False,
-                        )
+                cols = set(db_optimizer.list_table_columns("synced_emails") or [])
+                if cols and "provider" not in cols:
+                    db_optimizer.execute_query(
+                        "ALTER TABLE synced_emails ADD COLUMN provider TEXT DEFAULT 'gmail'",
+                        fetch=False,
+                    )
+                    logger.info("✅ Added provider column to synced_emails (gmail_sync_jobs migration)")
+                if cols and "is_read" not in cols:
+                    db_optimizer.execute_query(
+                        "ALTER TABLE synced_emails ADD COLUMN is_read BOOLEAN DEFAULT 0",
+                        fetch=False,
+                    )
             except Exception as mig_err:
                 logger.debug("synced_emails column migration skipped: %s", mig_err)
             try:
@@ -308,11 +299,9 @@ class GmailSyncJobManager:
             
             # Update user_sync_status to show pending sync
             try:
-                db_optimizer.execute_query("""
-                    INSERT OR REPLACE INTO user_sync_status 
-                    (user_id, sync_status, syncing, updated_at)
-                    VALUES (?, 'pending', 0, datetime('now'))
-                """, (user_id,), fetch=False)
+                db_optimizer.upsert_user_sync_status_merge(
+                    user_id, sync_status="pending", syncing=0
+                )
                 logger.info(f"✅ Updated user_sync_status to 'pending' for user {user_id}")
             except Exception as status_error:
                 logger.warning(f"⚠️ Could not update user_sync_status to pending: {status_error}")
@@ -376,18 +365,19 @@ class GmailSyncJobManager:
             # Update job status
             db_optimizer.execute_query("""
                 UPDATE gmail_sync_jobs 
-                SET status = 'processing', started_at = datetime('now')
+                SET status = 'processing', started_at = CURRENT_TIMESTAMP
                 WHERE job_id = ?
             """, (job_id,), fetch=False)
             logger.info(f"✅ Updated job {job_id} status to 'processing'")
             
             # Update user_sync_status to show syncing in progress
             try:
-                db_optimizer.execute_query("""
-                    INSERT OR REPLACE INTO user_sync_status 
-                    (user_id, last_sync, sync_status, syncing, updated_at)
-                    VALUES (?, datetime('now'), 'in_progress', 1, datetime('now'))
-                """, (user_id,), fetch=False)
+                db_optimizer.upsert_user_sync_status_merge(
+                    user_id,
+                    last_sync=_utcnow_naive().isoformat(),
+                    sync_status="in_progress",
+                    syncing=1,
+                )
             except Exception as status_error:
                 logger.warning(f"⚠️ Could not update user_sync_status to in_progress: {status_error}")
             
@@ -405,7 +395,7 @@ class GmailSyncJobManager:
             final_progress = 100
             db_optimizer.execute_query("""
                 UPDATE gmail_sync_jobs 
-                SET status = 'completed', completed_at = datetime('now'),
+                SET status = 'completed', completed_at = CURRENT_TIMESTAMP,
                     progress = ?, emails_synced = ?, contacts_found = ?, leads_identified = ?
                 WHERE job_id = ?
             """, (
@@ -420,11 +410,7 @@ class GmailSyncJobManager:
             # Update user_sync_status to reflect completed sync
             try:
                 total_emails = sync_result.get('emails_synced', 0)
-                db_optimizer.execute_query("""
-                    INSERT OR REPLACE INTO user_sync_status 
-                    (user_id, last_sync, sync_status, syncing, total_emails, updated_at)
-                    VALUES (?, datetime('now'), 'completed', 0, ?, datetime('now'))
-                """, (user_id, total_emails), fetch=False)
+                db_optimizer.upsert_user_sync_status_completed(user_id, total_emails)
                 logger.info(f"✅ Updated user_sync_status for user {user_id}")
             except Exception as status_error:
                 logger.warning(f"⚠️ Could not update user_sync_status: {status_error}")
@@ -457,11 +443,12 @@ class GmailSyncJobManager:
                 job = job_data[0] if 'job_data' in locals() and job_data else None
                 user_id = job['user_id'] if job else None
                 if user_id:
-                    db_optimizer.execute_query("""
-                        INSERT OR REPLACE INTO user_sync_status 
-                        (user_id, last_sync, sync_status, syncing, updated_at)
-                        VALUES (?, datetime('now'), 'failed', 0, datetime('now'))
-                    """, (user_id,), fetch=False)
+                    db_optimizer.upsert_user_sync_status_merge(
+                        user_id,
+                        last_sync=_utcnow_naive().isoformat(),
+                        sync_status="failed",
+                        syncing=0,
+                    )
                     logger.info(f"✅ Updated user_sync_status to 'failed' for user {user_id}")
             except Exception as status_error:
                 logger.warning(f"⚠️ Could not update user_sync_status on error: {status_error}")
@@ -478,7 +465,7 @@ class GmailSyncJobManager:
             # Update initial progress to show sync has started
             db_optimizer.execute_query("""
                 UPDATE gmail_sync_jobs 
-                SET progress = 5, status = 'processing', started_at = datetime('now')
+                SET progress = 5, status = 'processing', started_at = CURRENT_TIMESTAMP
                 WHERE job_id = ?
             """, (job_id,), fetch=False)
             logger.info(f"📊 Sync job {job_id} started - progress set to 5%")
@@ -634,11 +621,13 @@ class GmailSyncJobManager:
                             total_emails = total_count_result[0]['total'] if total_count_result and total_count_result[0] else emails_synced
                             
                             # Update status to show progress
-                            db_optimizer.execute_query("""
-                                INSERT OR REPLACE INTO user_sync_status 
-                                (user_id, last_sync, sync_status, syncing, total_emails, updated_at)
-                                VALUES (?, datetime('now'), 'in_progress', 1, ?, datetime('now'))
-                            """, (user_id, total_emails), fetch=False)
+                            db_optimizer.upsert_user_sync_status_merge(
+                                user_id,
+                                last_sync=_utcnow_naive().isoformat(),
+                                sync_status="in_progress",
+                                syncing=1,
+                                total_emails=total_emails,
+                            )
                         except Exception as status_update_error:
                             logger.warning(f"Could not update sync status during progress: {status_update_error}")
                     
@@ -746,14 +735,10 @@ class GmailSyncJobManager:
             is_read = 0 if 'UNREAD' in labels else 1
 
             # Store in database
-            email_id = db_optimizer.execute_query("""
-                INSERT OR REPLACE INTO synced_emails 
-                (user_id, gmail_id, thread_id, subject, sender, recipient, date, body, labels, is_read)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
+            db_optimizer.upsert_synced_email_from_gmail(
                 user_id,
-                message['id'],
-                message.get('threadId'),
+                message["id"],
+                message.get("threadId"),
                 subject,
                 sender,
                 recipient,
@@ -761,9 +746,9 @@ class GmailSyncJobManager:
                 body,
                 json.dumps(labels),
                 is_read,
-            ), fetch=False)
-            
-            return email_id
+            )
+
+            return 1
             
         except Exception as e:
             logger.error(f"❌ Email storage failed: {e}")
@@ -904,7 +889,7 @@ class GmailSyncJobManager:
                 
                 db_optimizer.execute_query("""
                     UPDATE contacts 
-                    SET contact_count = ?, last_contact = ?, updated_at = datetime('now')
+                    SET contact_count = ?, last_contact = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
                 """, (new_count, contact.last_contact.isoformat(), contact_id), fetch=False)
             else:
@@ -1021,9 +1006,10 @@ class GmailSyncJobManager:
             """, (user_id,))
             
             # Get recent activity
-            recent_emails = db_optimizer.execute_query("""
+            recent_pred = db_optimizer.sql_column_newer_than_n_days_ago("date", 7)
+            recent_emails = db_optimizer.execute_query(f"""
                 SELECT COUNT(*) as count FROM synced_emails 
-                WHERE user_id = ? AND datetime(date) > datetime('now', '-7 days')
+                WHERE user_id = ? AND {recent_pred}
             """, (user_id,))
             
             return {

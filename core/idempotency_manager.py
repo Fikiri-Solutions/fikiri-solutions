@@ -150,10 +150,11 @@ class IdempotencyManager:
             
             # Fallback to database
             # Rulepack compliance: specific columns, not SELECT *
-            key_data = db_optimizer.execute_query("""
+            alive = db_optimizer.sql_timestamp_gt_now("expires_at")
+            key_data = db_optimizer.execute_query(f"""
                 SELECT id, key_hash, operation_type, user_id, request_data, response_data, status, created_at, expires_at, metadata 
                 FROM idempotency_keys 
-                WHERE key_hash = ? AND datetime(expires_at) > datetime('now')
+                WHERE key_hash = ? AND {alive}
             """, (key,))
             
             if key_data:
@@ -193,17 +194,28 @@ class IdempotencyManager:
             expires_at = _utcnow_naive() + timedelta(seconds=ttl)
             
             # Store in database
-            db_optimizer.execute_query("""
-                INSERT OR REPLACE INTO idempotency_keys 
-                (key_hash, operation_type, user_id, request_data, status, expires_at)
-                VALUES (?, ?, ?, ?, 'pending', ?)
-            """, (
+            params = (
                 key,
                 operation_type,
                 user_id,
                 json.dumps(request_data) if request_data else None,
-                expires_at.isoformat()
-            ), fetch=False)
+                expires_at.isoformat(),
+            )
+            db_optimizer.execute_query(
+                """
+                INSERT INTO idempotency_keys (
+                    key_hash, operation_type, user_id, request_data, status, expires_at
+                ) VALUES (?, ?, ?, ?, 'pending', ?)
+                ON CONFLICT (key_hash) DO UPDATE SET
+                    operation_type = EXCLUDED.operation_type,
+                    user_id = EXCLUDED.user_id,
+                    request_data = EXCLUDED.request_data,
+                    status = 'pending',
+                    expires_at = EXCLUDED.expires_at
+                """,
+                params,
+                fetch=False,
+            )
             
             # Cache in Redis
             if self.redis_client:
@@ -267,9 +279,10 @@ class IdempotencyManager:
         """Clean up expired idempotency keys"""
         try:
             # Clean database
-            db_optimizer.execute_query("""
+            expired = db_optimizer.sql_timestamp_lt_now("expires_at")
+            db_optimizer.execute_query(f"""
                 DELETE FROM idempotency_keys 
-                WHERE datetime(expires_at) < datetime('now')
+                WHERE {expired}
             """, fetch=False)
             
             # Clean Redis (TTL handles expiration automatically)
@@ -285,14 +298,15 @@ class IdempotencyManager:
     def get_key_stats(self) -> Dict[str, Any]:
         """Get idempotency key statistics"""
         try:
-            stats = db_optimizer.execute_query("""
+            alive = db_optimizer.sql_timestamp_gt_now("expires_at")
+            stats = db_optimizer.execute_query(f"""
                 SELECT 
                     COUNT(*) as total_keys,
                     COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_keys,
                     COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_keys,
                     COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_keys
                 FROM idempotency_keys
-                WHERE datetime(expires_at) > datetime('now')
+                WHERE {alive}
             """)
             
             if stats:

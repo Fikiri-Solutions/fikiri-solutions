@@ -821,12 +821,7 @@ def sync_gmail():
         
         # Update user_sync_status to reflect sync was triggered
         try:
-            from datetime import datetime
-            db_optimizer.execute_query("""
-                INSERT OR REPLACE INTO user_sync_status 
-                (user_id, last_sync, sync_status, syncing, updated_at)
-                VALUES (?, datetime('now'), 'pending', 1, datetime('now'))
-            """, (user_id,), fetch=False)
+            db_optimizer.upsert_user_sync_status_pending(user_id)
         except Exception as status_error:
             logger.warning(f"Could not update sync status: {status_error}")
         
@@ -846,11 +841,7 @@ def sync_gmail():
                     total_emails = email_count_result[0]['total'] if email_count_result and email_count_result[0] else 0
                     
                     # Update user_sync_status to completed
-                    db_optimizer.execute_query("""
-                        INSERT OR REPLACE INTO user_sync_status 
-                        (user_id, last_sync, sync_status, syncing, total_emails, updated_at)
-                        VALUES (?, datetime('now'), 'completed', 0, ?, datetime('now'))
-                    """, (user_id, total_emails), fetch=False)
+                    db_optimizer.upsert_user_sync_status_completed(user_id, total_emails)
                     logger.info(f"✅ Updated user_sync_status to 'completed' for user {user_id} with {total_emails} emails")
                 except Exception as status_update_error:
                     logger.warning(f"Could not update sync status to completed: {status_update_error}")
@@ -921,11 +912,7 @@ def sync_outlook():
                 )
                 total_emails = total_emails_result[0]['total'] if total_emails_result and total_emails_result[0] else 0
                 
-                db_optimizer.execute_query("""
-                    INSERT OR REPLACE INTO user_sync_status 
-                    (user_id, last_sync, sync_status, syncing, total_emails, updated_at)
-                    VALUES (?, datetime('now'), 'completed', 0, ?, datetime('now'))
-                """, (user_id, total_emails), fetch=False)
+                db_optimizer.upsert_user_sync_status_completed(user_id, total_emails)
             except Exception as status_error:
                 logger.warning(f"Could not update sync status: {status_error}")
             
@@ -2741,12 +2728,14 @@ def create_service():
         import json
         settings_json = json.dumps(settings)
         
-        # Use INSERT OR REPLACE for upsert
-        db_optimizer.execute_query("""
-            INSERT OR REPLACE INTO user_services 
-            (user_id, service_id, service_name, enabled, status, settings, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        """, (user_id, service_id, service_name, enabled, 'active' if enabled else 'inactive', settings_json), fetch=False)
+        db_optimizer.upsert_user_services_row(
+            user_id,
+            service_id,
+            service_name,
+            enabled,
+            "active" if enabled else "inactive",
+            settings_json,
+        )
 
         status_label = 'enabled' if enabled else 'disabled'
         log_activity_event(
@@ -2934,14 +2923,13 @@ def save_imap_config():
             return create_error_response("Failed to authenticate IMAP/SMTP credentials", 400, 'IMAP_AUTH_FAILED')
 
         settings_json = json.dumps(settings)
-        db_optimizer.execute_query(
-            """
-            INSERT OR REPLACE INTO user_services
-              (user_id, service_id, service_name, enabled, status, settings, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """,
-            (user_id, 'imap', settings.get('service_name', 'IMAP/SMTP'), True, 'active', settings_json),
-            fetch=False
+        db_optimizer.upsert_user_services_row(
+            user_id,
+            "imap",
+            settings.get("service_name", "IMAP/SMTP"),
+            True,
+            "active",
+            settings_json,
         )
 
         log_activity_event(

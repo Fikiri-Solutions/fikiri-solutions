@@ -99,23 +99,7 @@ class JWTAuthManager:
             
             # Add device_id column if it doesn't exist (schema migration)
             try:
-                if db_optimizer.db_type == "postgresql":
-                    cols = db_optimizer.execute_query(
-                        """
-                        SELECT column_name FROM information_schema.columns
-                        WHERE table_schema = 'public' AND table_name = 'refresh_tokens'
-                        ORDER BY ordinal_position
-                        """
-                    )
-                    column_names = [
-                        (c.get("column_name") if isinstance(c, dict) else c[0])
-                        for c in (cols or [])
-                    ]
-                else:
-                    existing_columns = db_optimizer.execute_query(
-                        "PRAGMA table_info(refresh_tokens)"
-                    )
-                    column_names = [col[1] for col in existing_columns] if existing_columns else []
+                column_names = db_optimizer.list_table_columns("refresh_tokens")
 
                 if "device_id" not in column_names:
                     db_optimizer.execute_query("""

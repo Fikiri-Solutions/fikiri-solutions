@@ -2151,6 +2151,37 @@ class DatabaseOptimizer:
             return f"({column_expr} < CURRENT_TIMESTAMP)"
         return f"(datetime({column_expr}) < datetime('now'))"
 
+    def sql_column_newer_than_n_hours_ago(self, column_expr: str, hours: int) -> str:
+        """True when column is strictly after (current time - hours). SQLite vs PostgreSQL."""
+        h = max(1, int(hours))
+        if self.db_type == "postgresql":
+            return f"({column_expr} > (CURRENT_TIMESTAMP - ({h} * INTERVAL '1 hour')))"
+        return f"(datetime({column_expr}) > datetime('now', '-{h} hours'))"
+
+    def sql_column_newer_than_n_minutes_ago(self, column_expr: str, minutes: int) -> str:
+        m = max(1, int(minutes))
+        if self.db_type == "postgresql":
+            return f"({column_expr} > (CURRENT_TIMESTAMP - ({m} * INTERVAL '1 minute')))"
+        return f"(datetime({column_expr}) > datetime('now', '-{m} minutes'))"
+
+    def sql_column_newer_than_n_seconds_ago(self, column_expr: str, seconds: int) -> str:
+        s = max(1, int(seconds))
+        if self.db_type == "postgresql":
+            return f"({column_expr} > (CURRENT_TIMESTAMP - ({s} * INTERVAL '1 second')))"
+        return f"(datetime({column_expr}) > datetime('now', '-{s} seconds'))"
+
+    def sql_column_older_than_n_minutes_ago(self, column_expr: str, minutes: int) -> str:
+        """True when column is strictly before (current time - minutes)."""
+        m = max(1, int(minutes))
+        if self.db_type == "postgresql":
+            return f"({column_expr} < (CURRENT_TIMESTAMP - ({m} * INTERVAL '1 minute')))"
+        return f"(datetime({column_expr}) < datetime('now', '-{m} minutes'))"
+
+    def sql_column_newer_than_n_days_ago(self, column_expr: str, days: int) -> str:
+        """Same as n_hours with days * 24 (readable call sites for week/month windows)."""
+        d = max(1, int(days))
+        return self.sql_column_newer_than_n_hours_ago(column_expr, d * 24)
+
     def sql_false_literal(self) -> str:
         """Literal for UPDATE ... SET flag = ... (BOOLEAN vs INTEGER)."""
         return "FALSE" if self.db_type == "postgresql" else "0"
@@ -2736,6 +2767,289 @@ class DatabaseOptimizer:
         except Exception as e:
             logger.warning("list_table_columns failed for %s: %s", ident, e)
             return []
+
+    def upsert_user_services_row(
+        self,
+        user_id,
+        service_id,
+        service_name,
+        enabled,
+        status,
+        settings_json,
+    ) -> None:
+        """Upsert user_services on UNIQUE(user_id, service_id)."""
+        params = (user_id, service_id, service_name, enabled, status, settings_json)
+        if self.db_type == "postgresql":
+            self.execute_query(
+                """
+                INSERT INTO user_services (
+                    user_id, service_id, service_name, enabled, status, settings, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (user_id, service_id) DO UPDATE SET
+                    service_name = EXCLUDED.service_name,
+                    enabled = EXCLUDED.enabled,
+                    status = EXCLUDED.status,
+                    settings = EXCLUDED.settings,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                params,
+                fetch=False,
+            )
+        else:
+            self.execute_query(
+                """
+                INSERT OR REPLACE INTO user_services
+                (user_id, service_id, service_name, enabled, status, settings, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                params,
+                fetch=False,
+            )
+
+    def upsert_user_sync_status_pending(self, user_id: int) -> None:
+        """Mark sync as pending for user (portable upsert on user_id)."""
+        self.execute_query(
+            """
+            INSERT INTO user_sync_status (user_id, last_sync, sync_status, syncing, updated_at)
+            VALUES (?, CURRENT_TIMESTAMP, 'pending', 1, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id) DO UPDATE SET
+                last_sync = EXCLUDED.last_sync,
+                sync_status = EXCLUDED.sync_status,
+                syncing = EXCLUDED.syncing,
+                updated_at = EXCLUDED.updated_at
+            """,
+            (user_id,),
+            fetch=False,
+        )
+
+    def upsert_user_sync_status_completed(self, user_id: int, total_emails: int) -> None:
+        """Mark sync completed and set total_emails (portable upsert on user_id)."""
+        self.execute_query(
+            """
+            INSERT INTO user_sync_status (
+                user_id, last_sync, sync_status, syncing, total_emails, updated_at
+            ) VALUES (?, CURRENT_TIMESTAMP, 'completed', 0, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id) DO UPDATE SET
+                last_sync = EXCLUDED.last_sync,
+                sync_status = EXCLUDED.sync_status,
+                syncing = EXCLUDED.syncing,
+                total_emails = EXCLUDED.total_emails,
+                updated_at = EXCLUDED.updated_at
+            """,
+            (user_id, total_emails),
+            fetch=False,
+        )
+
+    def upsert_user_sync_status_merge(self, user_id: int, **kwargs: Any) -> None:
+        """
+        Upsert user_sync_status on user_id updating only provided columns (plus updated_at).
+        Allowed keys: last_sync, sync_status, syncing, total_emails.
+        """
+        allowed = ("last_sync", "sync_status", "syncing", "total_emails")
+        for k in kwargs:
+            if k not in allowed:
+                raise ValueError(f"upsert_user_sync_status_merge: unknown field {k!r}")
+        field_names = [k for k in allowed if k in kwargs]
+        if not field_names:
+            raise ValueError("upsert_user_sync_status_merge: need at least one field")
+        cols = ["user_id"] + field_names + ["updated_at"]
+        ph = ", ".join(["?"] * (1 + len(field_names))) + ", CURRENT_TIMESTAMP"
+        params = tuple([user_id] + [kwargs[k] for k in field_names])
+        set_parts = [f"{k} = EXCLUDED.{k}" for k in field_names] + ["updated_at = EXCLUDED.updated_at"]
+        sql = f"""
+            INSERT INTO user_sync_status ({", ".join(cols)})
+            VALUES ({ph})
+            ON CONFLICT (user_id) DO UPDATE SET {", ".join(set_parts)}
+        """
+        self.execute_query(sql, params, fetch=False)
+
+    def upsert_synced_email_from_gmail(
+        self,
+        user_id: int,
+        gmail_id: str,
+        thread_id: Any,
+        subject: str,
+        sender: str,
+        recipient: str,
+        date_iso: str,
+        body: str,
+        labels_json: str,
+        is_read: int,
+    ) -> None:
+        """
+        Upsert a Gmail row into synced_emails using UNIQUE(user_id, external_id, provider).
+        external_id is set to gmail_id so Postgres ON CONFLICT matches the schema.
+        """
+        params = (
+            user_id,
+            gmail_id,
+            gmail_id,
+            "gmail",
+            thread_id,
+            subject,
+            sender,
+            recipient,
+            date_iso,
+            body,
+            labels_json,
+            is_read,
+        )
+        self.execute_query(
+            """
+            INSERT INTO synced_emails (
+                user_id, gmail_id, external_id, provider, thread_id, subject, sender, recipient,
+                date, body, labels, is_read
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (user_id, external_id, provider) DO UPDATE SET
+                gmail_id = EXCLUDED.gmail_id,
+                thread_id = EXCLUDED.thread_id,
+                subject = EXCLUDED.subject,
+                sender = EXCLUDED.sender,
+                recipient = EXCLUDED.recipient,
+                date = EXCLUDED.date,
+                body = EXCLUDED.body,
+                labels = EXCLUDED.labels,
+                is_read = EXCLUDED.is_read
+            """,
+            params,
+            fetch=False,
+        )
+
+    def upsert_oauth_state_row(
+        self,
+        state: str,
+        user_id: int,
+        provider: str,
+        redirect_url: Any,
+        expires_at: int,
+        metadata_json: Optional[str] = None,
+    ) -> None:
+        """Upsert oauth_states row (state is UNIQUE)."""
+        cols = "state, user_id, provider, redirect_url, expires_at"
+        vals = "?, ?, ?, ?, ?"
+        params: Tuple[Any, ...] = (state, user_id, provider, redirect_url, expires_at)
+        if metadata_json is not None:
+            cols += ", metadata"
+            vals += ", ?"
+            params = params + (metadata_json,)
+        if self.db_type == "postgresql":
+            set_meta = (
+                "metadata = EXCLUDED.metadata"
+                if metadata_json is not None
+                else "metadata = oauth_states.metadata"
+            )
+            self.execute_query(
+                f"""
+                INSERT INTO oauth_states ({cols})
+                VALUES ({vals})
+                ON CONFLICT (state) DO UPDATE SET
+                    user_id = EXCLUDED.user_id,
+                    provider = EXCLUDED.provider,
+                    redirect_url = EXCLUDED.redirect_url,
+                    expires_at = EXCLUDED.expires_at,
+                    {set_meta}
+                """,
+                params,
+                fetch=False,
+            )
+        else:
+            self.execute_query(
+                f"""
+                INSERT OR REPLACE INTO oauth_states ({cols})
+                VALUES ({vals})
+                """,
+                params,
+                fetch=False,
+            )
+
+    def upsert_kpi_snapshot_row(
+        self, snapshot_date: str, company_stage: str, kpi_type: str, kpi_value: Any
+    ) -> None:
+        """Upsert kpi_snapshots on UNIQUE(snapshot_date, company_stage, kpi_type)."""
+        params = (snapshot_date, company_stage, kpi_type, kpi_value)
+        if self.db_type == "postgresql":
+            self.execute_query(
+                """
+                INSERT INTO kpi_snapshots (snapshot_date, company_stage, kpi_type, kpi_value)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT (snapshot_date, company_stage, kpi_type) DO UPDATE SET
+                    kpi_value = EXCLUDED.kpi_value
+                """,
+                params,
+                fetch=False,
+            )
+        else:
+            self.execute_query(
+                """
+                INSERT OR REPLACE INTO kpi_snapshots
+                (snapshot_date, company_stage, kpi_type, kpi_value)
+                VALUES (?, ?, ?, ?)
+                """,
+                params,
+                fetch=False,
+            )
+
+    def upsert_stripe_subscription_row(
+        self,
+        user_id: int,
+        stripe_customer_id: str,
+        stripe_subscription_id: str,
+        status: str,
+        tier: str,
+        billing_period: str,
+        current_period_start: Any,
+        current_period_end: Any,
+        trial_end: Any,
+        cancel_at_period_end: Any,
+    ) -> None:
+        """Upsert subscriptions cache row (stripe_subscription_id is UNIQUE)."""
+        params = (
+            user_id,
+            stripe_customer_id,
+            stripe_subscription_id,
+            status,
+            tier,
+            billing_period,
+            current_period_start,
+            current_period_end,
+            trial_end,
+            cancel_at_period_end,
+        )
+        if self.db_type == "postgresql":
+            self.execute_query(
+                """
+                INSERT INTO subscriptions (
+                    user_id, stripe_customer_id, stripe_subscription_id, status, tier,
+                    billing_period, current_period_start, current_period_end,
+                    trial_end, cancel_at_period_end, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (stripe_subscription_id) DO UPDATE SET
+                    user_id = EXCLUDED.user_id,
+                    stripe_customer_id = EXCLUDED.stripe_customer_id,
+                    status = EXCLUDED.status,
+                    tier = EXCLUDED.tier,
+                    billing_period = EXCLUDED.billing_period,
+                    current_period_start = EXCLUDED.current_period_start,
+                    current_period_end = EXCLUDED.current_period_end,
+                    trial_end = EXCLUDED.trial_end,
+                    cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                params,
+                fetch=False,
+            )
+        else:
+            self.execute_query(
+                """
+                INSERT OR REPLACE INTO subscriptions 
+                (user_id, stripe_customer_id, stripe_subscription_id, status, tier,
+                 billing_period, current_period_start, current_period_end, 
+                 trial_end, cancel_at_period_end, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                params,
+                fetch=False,
+            )
 
     def json_field_expr(self, column: str, dotted_path: str) -> str:
         """Portable JSON field read (SQLite json_extract vs PostgreSQL ::jsonb)."""

@@ -35,11 +35,9 @@ OAUTH_STATE_TOKEN_LENGTH = 24
 def store_oauth_state(state: str, user_id: int, provider: str, redirect_url: str = None):
     """Store OAuth state for CSRF protection"""
     expires_at = int((datetime.now() + timedelta(minutes=OAUTH_STATE_EXPIRY_MINUTES)).timestamp())
-    db_optimizer.execute_query("""
-        INSERT OR REPLACE INTO oauth_states 
-        (state, user_id, provider, redirect_url, expires_at)
-        VALUES (?, ?, ?, ?, ?)
-    """, (state, user_id, provider, redirect_url, expires_at), fetch=False)
+    db_optimizer.upsert_oauth_state_row(
+        state, user_id, provider, redirect_url, expires_at, metadata_json=None
+    )
 
 def verify_oauth_state(state: str) -> Dict:
     """Verify OAuth state"""

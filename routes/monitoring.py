@@ -354,10 +354,11 @@ def email_sync_status():
                             # Try to estimate progress from recent email activity
                             try:
                                 # Check if emails are being synced by looking at recent synced_emails
-                                recent_sync_check = db_optimizer.execute_query("""
+                                recent_pred = db_optimizer.sql_column_newer_than_n_minutes_ago("created_at", 5)
+                                recent_sync_check = db_optimizer.execute_query(f"""
                                     SELECT COUNT(*) as count 
                                     FROM synced_emails 
-                                    WHERE user_id = ? AND datetime(created_at) > datetime('now', '-5 minutes')
+                                    WHERE user_id = ? AND {recent_pred}
                                 """, (user_id,))
                                 if recent_sync_check and len(recent_sync_check) > 0:
                                     recent_count = recent_sync_check[0].get('count', 0) if isinstance(recent_sync_check[0], dict) else recent_sync_check[0][0] if len(recent_sync_check[0]) > 0 else 0
@@ -422,11 +423,13 @@ def email_sync_status():
                             last_sync_date = last_email_result[0]['last_date'] if last_email_result and last_email_result[0] else None
                             
                             # Update user_sync_status
-                            db_optimizer.execute_query("""
-                                INSERT OR REPLACE INTO user_sync_status 
-                                (user_id, last_sync, sync_status, syncing, total_emails, updated_at)
-                                VALUES (?, ?, 'completed', 0, ?, datetime('now'))
-                            """, (user_id, last_sync_date, total_emails), fetch=False)
+                            db_optimizer.upsert_user_sync_status_merge(
+                                user_id,
+                                last_sync=last_sync_date,
+                                sync_status="completed",
+                                syncing=0,
+                                total_emails=total_emails,
+                            )
                             
                             return create_success_response({
                                 'last_sync': last_sync_date,

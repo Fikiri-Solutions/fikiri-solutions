@@ -165,16 +165,16 @@ def gmail_start():
 
         # Always persist state in DB to survive missing/cleared sessions
         from core.database_optimization import db_optimizer
-        db_optimizer.execute_query("""
-            INSERT OR REPLACE INTO oauth_states 
-            (state, user_id, provider, redirect_url, expires_at, metadata)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            state, user_id or 0, 'gmail', 
+        db_optimizer.upsert_oauth_state_row(
+            state,
+            user_id or 0,
+            "gmail",
             request.args.get("redirect", "/onboarding-flow/2"),
-            int(time.time()) + 600,  # 10 minutes
-            json.dumps({'oauth_state': state, 'onboarding': user_id is None, 'user_id': user_id})
-        ), fetch=False)
+            int(time.time()) + 600,
+            metadata_json=json.dumps(
+                {"oauth_state": state, "onboarding": user_id is None, "user_id": user_id}
+            ),
+        )
         logger.info("🧪 OAuth state persisted (gmail) state=%s user_id=%s", state, user_id)
 
         # Use manual URL construction for full control over OAuth parameters
@@ -558,16 +558,16 @@ def outlook_start():
             g.session_data['post_connect_redirect'] = request.args.get("redirect", "/onboarding-flow/2")
 
         from core.database_optimization import db_optimizer
-        db_optimizer.execute_query("""
-            INSERT OR REPLACE INTO oauth_states 
-            (state, user_id, provider, redirect_url, expires_at, metadata)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            state, user_id or 0, 'outlook', 
+        db_optimizer.upsert_oauth_state_row(
+            state,
+            user_id or 0,
+            "outlook",
             request.args.get("redirect", "/onboarding-flow/2"),
-            int(time.time()) + 600,  # 10 minutes
-            json.dumps({'oauth_state': state, 'onboarding': user_id is None, 'user_id': user_id})
-        ), fetch=False)
+            int(time.time()) + 600,
+            metadata_json=json.dumps(
+                {"oauth_state": state, "onboarding": user_id is None, "user_id": user_id}
+            ),
+        )
 
         # Microsoft OAuth 2.0 authorization URL
         auth_base = f"https://login.microsoftonline.com/{MICROSOFT_TENANT_ID}/oauth2/v2.0"

@@ -710,14 +710,15 @@ class EnhancedCRMService:
                 }
             
             # Get recent email activities
+            ts_pred = db_optimizer.sql_column_newer_than_n_days_ago("la.timestamp", 7)
             activities_data = db_optimizer.execute_query(
-                """SELECT DISTINCT la.lead_id, l.email, l.name, l.company
+                f"""SELECT DISTINCT la.lead_id, l.email, l.name, l.company
                    FROM lead_activities la
                    JOIN leads l ON la.lead_id = l.id
                    WHERE l.user_id = ? AND la.activity_type = 'email_received'
-                   AND datetime(la.timestamp) >= datetime('now', '-7 days')
+                   AND {ts_pred}
                    ORDER BY la.timestamp DESC""",
-                (user_id,)
+                (user_id,),
             )
             
             synced_leads = []

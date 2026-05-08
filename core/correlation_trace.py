@@ -98,18 +98,19 @@ def fetch_correlation_trace(
     }
 
     try:
+        cid_expr = db_optimizer.json_field_expr("payload_json", "$.correlation_id")
         job_rows = _rows(
-            """
+            f"""
             SELECT job_id, payload_type, status, attempt, created_at, started_at, completed_at, error_message
             FROM automation_jobs
-            WHERE user_id = ? AND json_extract(payload_json, '$.correlation_id') = ?
+            WHERE user_id = ? AND {cid_expr} = ?
             ORDER BY created_at DESC
             LIMIT ?
             """,
             (user_id, cid, lim),
         )
         sections["automation_jobs"] = job_rows
-    except Exception as exc:  # noqa: BLE001 — json_extract unavailable in some builds
+    except Exception as exc:  # noqa: BLE001
         logger.debug("automation_jobs correlation trace skipped: %s", exc)
         sections["automation_jobs"] = []
 

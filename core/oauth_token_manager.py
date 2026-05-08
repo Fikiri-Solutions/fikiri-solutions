@@ -168,17 +168,34 @@ class OAuthTokenManager:
             if token_data.get('expires_in'):
                 expires_at = datetime.now() + timedelta(seconds=token_data['expires_in'])
             
-            # Store in database
+            params = (
+                user_id,
+                service,
+                access_token_encrypted,
+                refresh_token_encrypted,
+                token_data.get("token_type", "Bearer"),
+                expires_at,
+                token_data.get("scope"),
+            )
             self.db_optimizer.execute_query(
                 """
-                INSERT OR REPLACE INTO oauth_tokens 
-                (user_id, service, access_token_encrypted, refresh_token_encrypted, 
-                 token_type, expires_at, scope, updated_at, last_refresh_at, refresh_count, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, TRUE)
+                INSERT INTO oauth_tokens (
+                    user_id, service, access_token_encrypted, refresh_token_encrypted,
+                    token_type, expires_at, scope, updated_at, last_refresh_at, refresh_count, is_active
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, TRUE)
+                ON CONFLICT (user_id, service) DO UPDATE SET
+                    access_token_encrypted = EXCLUDED.access_token_encrypted,
+                    refresh_token_encrypted = EXCLUDED.refresh_token_encrypted,
+                    token_type = EXCLUDED.token_type,
+                    expires_at = EXCLUDED.expires_at,
+                    scope = EXCLUDED.scope,
+                    updated_at = CURRENT_TIMESTAMP,
+                    last_refresh_at = CURRENT_TIMESTAMP,
+                    refresh_count = 0,
+                    is_active = TRUE
                 """,
-                (user_id, service, access_token_encrypted, refresh_token_encrypted,
-                 token_data.get('token_type', 'Bearer'), expires_at, token_data.get('scope')),
-                fetch=False
+                params,
+                fetch=False,
             )
             
             logger.info(f"Stored encrypted tokens for user {user_id}, service {service}")
@@ -426,13 +443,14 @@ class OAuthTokenManager:
         """Check if we should attempt token refresh (rate limiting)"""
         try:
             # Check recent failures
+            recent_pred = self.db_optimizer.sql_column_newer_than_n_minutes_ago("created_at", 15)
             recent_failures = self.db_optimizer.execute_query(
-                """
+                f"""
                 SELECT COUNT(*) FROM oauth_refresh_failures 
                 WHERE user_id = ? AND service = ? 
-                AND datetime(created_at) > datetime('now', '-15 minutes')
+                AND {recent_pred}
                 """,
-                (user_id, service)
+                (user_id, service),
             )
             
             failure_count = recent_failures[0][0] if recent_failures else 0
@@ -613,13 +631,14 @@ class OAuthTokenManager:
                     is_expired = False
             
             # Get recent failure count
+            recent_pred = self.db_optimizer.sql_column_newer_than_n_hours_ago("created_at", 1)
             recent_failures = self.db_optimizer.execute_query(
-                """
+                f"""
                 SELECT COUNT(*) as failure_count FROM oauth_refresh_failures 
                 WHERE user_id = ? AND service = ? 
-                AND datetime(created_at) > datetime('now', '-1 hour')
+                AND {recent_pred}
                 """,
-                (user_id, service)
+                (user_id, service),
             )
             # Handle both tuple and dict result formats
             if recent_failures:

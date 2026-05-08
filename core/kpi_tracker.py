@@ -546,10 +546,11 @@ class KPITracker:
             start_count = customers_at_start[0]['count'] if customers_at_start else 0
             
             # Get churned customers (canceled subscriptions)
+            start_iso = start_date.isoformat()
             churned_customers = db_optimizer.execute_query(
                 """SELECT COUNT(*) as count FROM subscriptions 
-                   WHERE status = 'canceled' AND datetime(updated_at) >= datetime(?) AND datetime(updated_at) < datetime('now')""",
-                (start_date.isoformat(),)
+                   WHERE status = 'canceled' AND updated_at >= ? AND updated_at < CURRENT_TIMESTAMP""",
+                (start_iso,),
             )
             churned_count = churned_customers[0]['count'] if churned_customers else 0
             

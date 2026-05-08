@@ -757,24 +757,18 @@ class StripeWebhookHandler:
                     logger.warning(f"Failed to get product details: {e}")
             
             # Update or insert subscription in database
-            db.execute_query("""
-                INSERT OR REPLACE INTO subscriptions 
-                (user_id, stripe_customer_id, stripe_subscription_id, status, tier,
-                 billing_period, current_period_start, current_period_end, 
-                 trial_end, cancel_at_period_end, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """, (
-                user_id, 
-                customer_id, 
-                subscription_id, 
-                status, 
+            db.upsert_stripe_subscription_row(
+                user_id,
+                customer_id,
+                subscription_id,
+                status,
                 tier,
                 billing_period,
                 subscription.current_period_start,
                 subscription.current_period_end,
                 subscription.trial_end,
-                subscription.cancel_at_period_end or False
-            ), fetch=False)
+                subscription.cancel_at_period_end or False,
+            )
             
             # Update customer_id in users table
             db.execute_query(

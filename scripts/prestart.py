@@ -164,15 +164,18 @@ def initialize_database():
         
         # Insert schema version
         cursor.execute("""
-            INSERT OR REPLACE INTO system_config (key, value) 
+            INSERT INTO system_config (key, value)
             VALUES ('schema_version', '1.0.0')
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value
         """)
         
         conn.commit()
         print("✅ Database schema initialized successfully")
         
         # Verify critical tables exist
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('users', 'query_performance_log', 'email_jobs')")
+        cursor.execute(
+            "SELECT name FROM pragma_table_list WHERE type='table' AND name IN ('users', 'query_performance_log', 'email_jobs')"
+        )
         tables = [row[0] for row in cursor.fetchall()]
         
         if len(tables) == 3:

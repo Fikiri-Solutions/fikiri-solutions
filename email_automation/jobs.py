@@ -431,7 +431,7 @@ class EmailJobManager:
             db_optimizer.execute_query(
                 """
                 UPDATE email_jobs
-                SET status = 'sent', sent_at = datetime('now'), error_message = NULL
+                SET status = 'sent', sent_at = CURRENT_TIMESTAMP, error_message = NULL
                 WHERE id = ?
                 """,
                 (job_id,),
@@ -490,7 +490,7 @@ class EmailJobManager:
             AND status = 'pending'
             AND (
                 scheduled_at IS NULL
-                OR datetime(scheduled_at) <= datetime('now')
+                OR scheduled_at <= CURRENT_TIMESTAMP
             )
             """,
             (job_id,),
@@ -536,7 +536,7 @@ class EmailJobManager:
                 WHERE status = 'pending'
                 AND (
                     scheduled_at IS NULL
-                    OR datetime(scheduled_at) <= datetime('now')
+                    OR scheduled_at <= CURRENT_TIMESTAMP
                 )
                 ORDER BY priority ASC, created_at ASC
                 LIMIT ?

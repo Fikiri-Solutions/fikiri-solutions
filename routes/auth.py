@@ -8,6 +8,7 @@ from flask import Blueprint, request, jsonify, redirect, session
 from werkzeug.exceptions import BadRequest
 from functools import wraps
 import time
+import threading
 import logging
 import os
 from datetime import datetime, timezone
@@ -231,18 +232,30 @@ def api_signup():
             'role': user_dict.get('role', 'user')
         }
 
+        _tok_t0 = time.monotonic()
         tokens = get_jwt_manager().generate_tokens(
             user_data['id'],
             user_data,
             device_info=request.headers.get('User-Agent'),
             ip_address=request.remote_addr
         )
+        logger.info(
+            "Signup timing after generate_tokens ms=%.0f email=%s",
+            (time.monotonic() - _tok_t0) * 1000,
+            user_data["email"],
+        )
 
+        _sess_t0 = time.monotonic()
         session_id, cookie_data = secure_session_manager.create_session(
             user_data['id'],
             user_data,
             request.remote_addr,
             request.headers.get('User-Agent')
+        )
+        logger.info(
+            "Signup timing after create_session ms=%.0f email=%s",
+            (time.monotonic() - _sess_t0) * 1000,
+            user_data["email"],
         )
 
         try:
@@ -267,25 +280,32 @@ def api_signup():
         except Exception as e:
             logger.warning(f"Analytics tracking failed: {e}")
 
-        try:
-            email_job_manager.queue_welcome_email(
-                user_id=user_data['id'],
-                email=user_data['email'],
-                name=user_data['name'],
-                company_name=data.get('business_name', 'My Company')
-            )
-        except Exception as e:
-            logger.warning(f"Failed to queue welcome email: {e}")
+        # Keep signup response fast: queue outbound emails in a background thread.
+        def _enqueue_post_signup_emails() -> None:
+            try:
+                email_job_manager.queue_welcome_email(
+                    user_id=user_data['id'],
+                    email=user_data['email'],
+                    name=user_data['name'],
+                    company_name=data.get('business_name', 'My Company')
+                )
+            except Exception as e:
+                logger.warning("Failed to queue welcome email: %s", e)
 
-        # Verification email should be non-blocking for onboarding.
-        try:
-            user_auth_manager.request_email_verification(
-                user_id=user_data['id'],
-                email=user_data['email'],
-                name=user_data['name'],
-            )
-        except Exception as e:
-            logger.warning(f"Failed to queue verification email: {e}")
+            try:
+                user_auth_manager.request_email_verification(
+                    user_id=user_data['id'],
+                    email=user_data['email'],
+                    name=user_data['name'],
+                )
+            except Exception as e:
+                logger.warning("Failed to queue verification email: %s", e)
+
+        threading.Thread(
+            target=_enqueue_post_signup_emails,
+            daemon=True,
+            name="signup-email-queue",
+        ).start()
 
         response_data = {
             'user': {

@@ -374,12 +374,8 @@ def create_kpi_snapshot():
         ]
         
         for kpi_type, value in early_stage_kpis:
-            db_optimizer.execute_query(
-                """INSERT OR REPLACE INTO kpi_snapshots 
-                   (snapshot_date, company_stage, kpi_type, kpi_value)
-                   VALUES (?, ?, ?, ?)""",
-                (snapshot_date, CompanyStage.EARLY_STAGE.value, kpi_type, value),
-                fetch=False
+            db_optimizer.upsert_kpi_snapshot_row(
+                snapshot_date, CompanyStage.EARLY_STAGE.value, kpi_type, value
             )
             snapshots_created.append(f"{CompanyStage.EARLY_STAGE.value}.{kpi_type}")
         
@@ -392,12 +388,8 @@ def create_kpi_snapshot():
         ]
         
         for kpi_type, value in mid_stage_kpis:
-            db_optimizer.execute_query(
-                """INSERT OR REPLACE INTO kpi_snapshots 
-                   (snapshot_date, company_stage, kpi_type, kpi_value)
-                   VALUES (?, ?, ?, ?)""",
-                (snapshot_date, CompanyStage.MID_STAGE.value, kpi_type, value),
-                fetch=False
+            db_optimizer.upsert_kpi_snapshot_row(
+                snapshot_date, CompanyStage.MID_STAGE.value, kpi_type, value
             )
             snapshots_created.append(f"{CompanyStage.MID_STAGE.value}.{kpi_type}")
         

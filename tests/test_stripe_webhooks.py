@@ -123,17 +123,16 @@ class TestStripeWebhookHandler(unittest.TestCase):
         mock_db = MagicMock()
         mock_db.execute_query.side_effect = [
             [{"id": 7}],  # user lookup
-            None,  # insert/update subscriptions
             None,  # update users
         ]
+        mock_db.upsert_stripe_subscription_row = MagicMock()
 
         with patch("core.database_optimization.DatabaseOptimizer", return_value=mock_db):
             handler = StripeWebhookHandler()
             handler._update_user_subscription("sub_1", "cus_1", "active")
 
-        # Ensure subscription insert and user update executed
+        mock_db.upsert_stripe_subscription_row.assert_called_once()
         calls = [c[0][0] for c in mock_db.execute_query.call_args_list]
-        self.assertTrue(any("INSERT OR REPLACE INTO subscriptions" in q for q in calls))
         self.assertTrue(any("UPDATE users SET stripe_customer_id" in q for q in calls))
 
     def test_handle_event_returns_error_when_event_is_none(self):

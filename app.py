@@ -219,8 +219,26 @@ def create_app():
             logger.info("Checking database connectivity...")
             try:
                 logger.info("Database path: %s", db_optimizer.db_path)
-                result = db_optimizer.execute_query("SELECT name FROM sqlite_master WHERE type='table';")
-                logger.info("Existing tables: %s", [r['name'] for r in result])
+                if getattr(db_optimizer, "db_type", None) == "postgresql":
+                    result = db_optimizer.execute_query(
+                        """
+                        SELECT table_name AS name FROM information_schema.tables
+                        WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+                        ORDER BY table_name
+                        """
+                    )
+                else:
+                    result = db_optimizer.execute_query(
+                        "SELECT name FROM pragma_table_list WHERE type='table'"
+                    )
+                rows = result or []
+                names = []
+                for r in rows:
+                    if isinstance(r, dict):
+                        names.append(r.get("name") or r.get("table_name"))
+                    else:
+                        names.append(r[0])
+                logger.info("Existing tables: %s", [n for n in names if n])
             except Exception as e:
                 logger.error("Database connection failed: %s", e)
             logger.info("Running database health check ...")

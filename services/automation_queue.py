@@ -107,24 +107,24 @@ class AutomationJobManager:
         except ValueError:
             stale_minutes = 30
 
-        threshold = f"-{max(1, stale_minutes)} minutes"
+        co_expr = "COALESCE(started_at, created_at)"
+        stale_pred = db_optimizer.sql_column_older_than_n_minutes_ago(co_expr, stale_minutes)
         try:
             db_optimizer.execute_query(
-                """
+                f"""
                 UPDATE automation_jobs
                 SET status = ?, completed_at = ?, error_message = COALESCE(
                     error_message,
                     'Marked dead during startup reconciliation (stale running/retrying job)'
                 )
                 WHERE status IN (?, ?)
-                  AND datetime(COALESCE(started_at, created_at)) < datetime('now', ?)
+                  AND {stale_pred}
                 """,
                 (
                     AUTOMATION_JOB_DEAD,
                     _utcnow_iso(),
                     AUTOMATION_JOB_RUNNING,
                     AUTOMATION_JOB_RETRYING,
-                    threshold,
                 ),
                 fetch=False,
             )
@@ -169,11 +169,12 @@ class AutomationJobManager:
                     payload["trigger_data"] = td
 
         if idempotency_key:
+            idem_pred = db_optimizer.sql_column_newer_than_n_seconds_ago("created_at", IDEMPOTENCY_TTL_SECONDS)
             existing = db_optimizer.execute_query(
-                """SELECT job_id, status FROM automation_jobs
-                   WHERE idempotency_key = ? AND status IN (?, ?, ?) AND datetime(created_at) > datetime('now', ?)
+                f"""SELECT job_id, status FROM automation_jobs
+                   WHERE idempotency_key = ? AND status IN (?, ?, ?) AND {idem_pred}
                    ORDER BY created_at DESC LIMIT 1""",
-                (idempotency_key, AUTOMATION_JOB_QUEUED, AUTOMATION_JOB_RUNNING, AUTOMATION_JOB_SUCCESS, f"-{IDEMPOTENCY_TTL_SECONDS} seconds"),
+                (idempotency_key, AUTOMATION_JOB_QUEUED, AUTOMATION_JOB_RUNNING, AUTOMATION_JOB_SUCCESS),
             )
             if existing:
                 logger.info("Idempotency: skipping duplicate run for key %s (existing status: %s)", idempotency_key[:16], existing[0].get("status"))
@@ -440,9 +441,10 @@ class AutomationJobManager:
     def get_queue_depth(self) -> Dict[str, int]:
         """Return counts for queued/running/dead for observability."""
         try:
+            depth_pred = db_optimizer.sql_column_newer_than_n_hours_ago("created_at", 24 * 7)
             rows = db_optimizer.execute_query(
-                """SELECT status, COUNT(*) as cnt FROM automation_jobs
-                   WHERE datetime(created_at) > datetime('now', '-7 days')
+                f"""SELECT status, COUNT(*) as cnt FROM automation_jobs
+                   WHERE {depth_pred}
                    GROUP BY status"""
             )
             by_status = {r["status"]: r["cnt"] for r in rows} if rows else {}
@@ -462,8 +464,8 @@ class AutomationJobManager:
         """Return queue depth plus success rate and p95 duration for observability."""
         depth = self.get_queue_depth()
         try:
-            where = "datetime(created_at) > datetime('now', ?)"
-            params: List[Any] = [f"-{hours} hours"]
+            where = db_optimizer.sql_column_newer_than_n_hours_ago("created_at", hours)
+            params: List[Any] = []
             if user_id is not None:
                 where += " AND user_id = ?"
                 params.append(user_id)
@@ -479,14 +481,15 @@ class AutomationJobManager:
             success_rate_24h = (total_success / total_finished) if total_finished else None
 
             # P95 duration: completed jobs with started_at and completed_at
-            duration_params: List[Any] = [AUTOMATION_JOB_SUCCESS, f"-{hours} hours"]
+            duration_params: List[Any] = [AUTOMATION_JOB_SUCCESS]
+            dur_where = db_optimizer.sql_column_newer_than_n_hours_ago("created_at", hours)
             if user_id is not None:
                 duration_params.append(user_id)
             user_clause = " AND user_id = ?" if user_id is not None else ""
             duration_rows = db_optimizer.execute_query(
                 f"""SELECT started_at, completed_at FROM automation_jobs
                     WHERE status = ? AND started_at IS NOT NULL AND completed_at IS NOT NULL
-                    AND datetime(created_at) > datetime('now', ?){user_clause}""",
+                    AND {dur_where}{user_clause}""",
                 tuple(duration_params),
             )
             durations_sec = []

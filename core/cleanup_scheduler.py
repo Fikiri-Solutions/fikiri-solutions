@@ -128,8 +128,9 @@ class CleanupScheduler:
     def cleanup_expired_sessions(self) -> Dict[str, Any]:
         """Clean up expired user sessions"""
         now = datetime.utcnow()
+        false_lit = db_optimizer.sql_false_literal()
         result = db_optimizer.execute_query(
-            "DELETE FROM user_sessions WHERE expires_at < ? OR is_valid = 0",
+            f"DELETE FROM user_sessions WHERE expires_at < ? OR is_valid = {false_lit}",
             (now.isoformat(),), fetch=False
         )
         deleted_count = result if isinstance(result, int) else 0

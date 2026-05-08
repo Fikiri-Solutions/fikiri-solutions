@@ -257,11 +257,16 @@ class IntegrationManager:
                 """, (json.dumps(scopes or []), json.dumps(meta_dict), integration_id), fetch=False)
                 
                 # Ensure sync state row exists (for reconnection)
-                db_optimizer.execute_query("""
-                    INSERT OR IGNORE INTO integration_sync_state
+                db_optimizer.execute_query(
+                    """
+                    INSERT INTO integration_sync_state
                     (integration_id, resource, status, updated_at)
                     VALUES (?, 'token_refresh', 'idle', CURRENT_TIMESTAMP)
-                """, (integration_id,), fetch=False)
+                    ON CONFLICT (integration_id, resource) DO NOTHING
+                    """,
+                    (integration_id,),
+                    fetch=False,
+                )
             else:
                 # Create new integration
                 # Ensure token_enc_version is in meta for key rotation
@@ -275,11 +280,16 @@ class IntegrationManager:
                 """, (user_id, provider, json.dumps(scopes or []), json.dumps(meta_dict)), fetch=False)
                 
                 # Initialize sync state for token refresh (ensure row exists)
-                db_optimizer.execute_query("""
-                    INSERT OR IGNORE INTO integration_sync_state
+                db_optimizer.execute_query(
+                    """
+                    INSERT INTO integration_sync_state
                     (integration_id, resource, status, updated_at)
                     VALUES (?, 'token_refresh', 'idle', CURRENT_TIMESTAMP)
-                """, (integration_id,), fetch=False)
+                    ON CONFLICT (integration_id, resource) DO NOTHING
+                    """,
+                    (integration_id,),
+                    fetch=False,
+                )
             
             # Store encrypted tokens
             if not token_data.get('access_token'):
@@ -309,19 +319,30 @@ class IntegrationManager:
                 meta_dict = json.loads(meta) if isinstance(meta, str) else meta
                 enc_version = meta_dict.get('token_enc_version', 1)
             
-            # Store tokens (INSERT OR REPLACE for UNIQUE constraint)
-            db_optimizer.execute_query("""
-                INSERT OR REPLACE INTO integration_tokens 
-                (integration_id, access_token_enc, refresh_token_enc, expires_at, token_type, enc_version, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """, (
+            tok_params = (
                 integration_id,
                 access_token_enc,
                 refresh_token_enc,
                 expires_at_epoch,
-                token_data.get('token_type', 'Bearer'),
-                enc_version
-            ), fetch=False)
+                token_data.get("token_type", "Bearer"),
+                enc_version,
+            )
+            db_optimizer.execute_query(
+                """
+                INSERT INTO integration_tokens
+                (integration_id, access_token_enc, refresh_token_enc, expires_at, token_type, enc_version, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (integration_id) DO UPDATE SET
+                    access_token_enc = EXCLUDED.access_token_enc,
+                    refresh_token_enc = EXCLUDED.refresh_token_enc,
+                    expires_at = EXCLUDED.expires_at,
+                    token_type = EXCLUDED.token_type,
+                    enc_version = EXCLUDED.enc_version,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                tok_params,
+                fetch=False,
+            )
             
             logger.info(f"✅ Connected {provider} for user {user_id}")
             return {'success': True, 'integration_id': integration_id}
@@ -396,11 +417,16 @@ class IntegrationManager:
                 return tokens
         
         # Initialize sync state for refresh tracking (ensure row exists)
-        db_optimizer.execute_query("""
-            INSERT OR IGNORE INTO integration_sync_state
+        db_optimizer.execute_query(
+            """
+            INSERT INTO integration_sync_state
             (integration_id, resource, status, updated_at)
             VALUES (?, 'token_refresh', 'idle', CURRENT_TIMESTAMP)
-        """, (integration_id,), fetch=False)
+            ON CONFLICT (integration_id, resource) DO NOTHING
+            """,
+            (integration_id,),
+            fetch=False,
+        )
         
         # Acquire lock (atomic CAS update) - COMMIT IMMEDIATELY
         lock_acquired = False
@@ -468,14 +494,22 @@ class IntegrationManager:
     
     def _store_sync_error(self, integration_id: int, resource: str, error: str):
         """Store error in sync state"""
-        db_optimizer.execute_query("""
-            INSERT OR REPLACE INTO integration_sync_state
+        db_optimizer.execute_query(
+            """
+            INSERT INTO integration_sync_state
             (integration_id, resource, status, error, updated_at)
             VALUES (?, ?, 'error', ?, CURRENT_TIMESTAMP)
-        """, (integration_id, resource, error), fetch=False)
+            ON CONFLICT (integration_id, resource) DO UPDATE SET
+                status = EXCLUDED.status,
+                error = EXCLUDED.error,
+                updated_at = EXCLUDED.updated_at
+            """,
+            (integration_id, resource, error),
+            fetch=False,
+        )
     
     def _update_tokens(self, integration_id: int, token_data: Dict[str, Any]):
-        """Update tokens for integration (INSERT OR REPLACE for UNIQUE constraint)"""
+        """Update tokens for integration on unique integration_id."""
         access_token_enc = encrypt_token(token_data['access_token'])
         refresh_token_enc = None
         if token_data.get('refresh_token'):
@@ -500,19 +534,31 @@ class IntegrationManager:
             (integration_id,)
         )
         enc_version = existing_tokens[0]['enc_version'] if existing_tokens and existing_tokens[0].get('enc_version') else 1
-        
-        db_optimizer.execute_query("""
-            INSERT OR REPLACE INTO integration_tokens 
-            (integration_id, access_token_enc, refresh_token_enc, expires_at, token_type, enc_version, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        """, (
+
+        tok_params = (
             integration_id,
             access_token_enc,
             refresh_token_enc,
             expires_at_epoch,
-            token_data.get('token_type', 'Bearer'),
-            enc_version
-        ), fetch=False)
+            token_data.get("token_type", "Bearer"),
+            enc_version,
+        )
+        db_optimizer.execute_query(
+            """
+            INSERT INTO integration_tokens
+            (integration_id, access_token_enc, refresh_token_enc, expires_at, token_type, enc_version, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT (integration_id) DO UPDATE SET
+                access_token_enc = EXCLUDED.access_token_enc,
+                refresh_token_enc = EXCLUDED.refresh_token_enc,
+                expires_at = EXCLUDED.expires_at,
+                token_type = EXCLUDED.token_type,
+                enc_version = EXCLUDED.enc_version,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            tok_params,
+            fetch=False,
+        )
     
     def disconnect(self, user_id: int, provider: str) -> Dict:
         """Disconnect integration with cascade cleanup - correct order: revoke -> mark revoked -> delete tokens"""
@@ -594,13 +640,30 @@ class IntegrationManager:
                            internal_entity_type: str, internal_entity_id: int,
                            external_event_id: str, external_calendar_id: str = 'primary'):
         """Link internal entity to external calendar event"""
-        db_optimizer.execute_query("""
-            INSERT OR REPLACE INTO calendar_event_links
+        cal_params = (
+            user_id,
+            integration_id,
+            internal_entity_type,
+            internal_entity_id,
+            external_event_id,
+            external_calendar_id,
+        )
+        db_optimizer.execute_query(
+            """
+            INSERT INTO calendar_event_links
             (user_id, integration_id, internal_entity_type, internal_entity_id,
              external_event_id, external_calendar_id, is_active, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
-        """, (user_id, integration_id, internal_entity_type, internal_entity_id,
-              external_event_id, external_calendar_id), fetch=False)
+            ON CONFLICT (user_id, internal_entity_type, internal_entity_id, integration_id)
+            DO UPDATE SET
+                external_event_id = EXCLUDED.external_event_id,
+                external_calendar_id = EXCLUDED.external_calendar_id,
+                is_active = EXCLUDED.is_active,
+                updated_at = EXCLUDED.updated_at
+            """,
+            cal_params,
+            fetch=False,
+        )
     
     def get_calendar_event_link(self, user_id: int, internal_entity_type: str, 
                                 internal_entity_id: int, integration_id: int = None) -> Optional[Dict]:

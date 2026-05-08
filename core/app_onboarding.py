@@ -73,13 +73,28 @@ def save_onboarding():
         sanitized_company = safe_to_str(company)
         sanitized_industry = safe_to_str(industry)
         
-        # Save or update onboarding info (SQLite compatible)
-        upsert_sql = """
-        INSERT OR REPLACE INTO onboarding_info (user_id, name, company, industry, updated_at)
-        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-        """
-        
-        db_optimizer.execute_query(upsert_sql, (user_id, sanitized_name, sanitized_company, sanitized_industry))
+        existing = db_optimizer.execute_query(
+            "SELECT id FROM onboarding_info WHERE user_id = ? LIMIT 1", (user_id,)
+        )
+        if existing:
+            db_optimizer.execute_query(
+                """
+                UPDATE onboarding_info
+                SET name = ?, company = ?, industry = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ?
+                """,
+                (sanitized_name, sanitized_company, sanitized_industry, user_id),
+                fetch=False,
+            )
+        else:
+            db_optimizer.execute_query(
+                """
+                INSERT INTO onboarding_info (user_id, name, company, industry, updated_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (user_id, sanitized_name, sanitized_company, sanitized_industry),
+                fetch=False,
+            )
 
         # Also update user profile with onboarding completion
         update_user_sql = """
@@ -87,7 +102,7 @@ def save_onboarding():
         SET onboarding_completed = 1, onboarding_step = 4, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         """
-        db_optimizer.execute_query(update_user_sql, (user_id,))
+        db_optimizer.execute_query(update_user_sql, (user_id,), fetch=False)
 
         logger.info(f"Onboarding data saved for user {user_id}: {name} at {company}")
 

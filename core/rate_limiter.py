@@ -398,7 +398,7 @@ class EnhancedRateLimiter:
                 
                 db_optimizer.execute_query("""
                     UPDATE rate_limit_violations 
-                    SET violation_count = ?, last_violation = datetime('now')
+                    SET violation_count = ?, last_violation = CURRENT_TIMESTAMP
                     WHERE id = ?
                 """, (new_count, violation_id), fetch=False)
             else:
@@ -528,14 +528,15 @@ class EnhancedRateLimiter:
     def get_violation_stats(self) -> Dict[str, Any]:
         """Get rate limit violation statistics"""
         try:
-            stats = db_optimizer.execute_query("""
+            since_24h = db_optimizer.sql_column_newer_than_n_hours_ago("last_violation", 24)
+            stats = db_optimizer.execute_query(f"""
                 SELECT 
                     limit_name,
                     COUNT(*) as violation_count,
                     SUM(violation_count) as total_violations,
                     MAX(last_violation) as last_violation
                 FROM rate_limit_violations 
-                WHERE datetime(last_violation) > datetime('now', '-24 hours')
+                WHERE {since_24h}
                 GROUP BY limit_name
                 ORDER BY total_violations DESC
             """)

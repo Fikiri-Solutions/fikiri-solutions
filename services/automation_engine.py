@@ -1149,12 +1149,12 @@ class AutomationEngine:
         try:
             # Get recent email activities
             activities_data = db_optimizer.execute_query(
-                """SELECT la.activity_type, COUNT(*) as count
+                f"""SELECT la.activity_type, COUNT(*) as count
                    FROM lead_activities la
                    JOIN leads l ON la.lead_id = l.id
-                   WHERE l.user_id = ? AND datetime(la.timestamp) >= datetime('now', '-30 days')
+                   WHERE l.user_id = ? AND {db_optimizer.sql_column_newer_than_n_days_ago('la.timestamp', 30)}
                    GROUP BY la.activity_type""",
-                (user_id,)
+                (user_id,),
             )
             
             patterns = {}

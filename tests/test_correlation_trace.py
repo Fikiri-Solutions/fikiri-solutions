@@ -19,6 +19,7 @@ class TestCorrelationTrace(unittest.TestCase):
 
     @patch("core.correlation_trace.db_optimizer")
     def test_fetches_sections(self, mock_db):
+        mock_db.json_field_expr.return_value = "json_extract(payload_json, '$.correlation_id')"
         mock_db.execute_query.return_value = [{"id": 1, "event_type": "lead.created"}]
         from core.correlation_trace import fetch_correlation_trace
 

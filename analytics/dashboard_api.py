@@ -308,11 +308,12 @@ def get_dashboard_metrics():
         
         # Try to get recent leads
         try:
+            recent_pred = db_optimizer.sql_column_newer_than_n_days_ago("created_at", 7)
             recent_leads_data = db_optimizer.execute_query(
                 "SELECT COUNT(*) as count FROM leads WHERE user_id = ?"
                 + _LEADS_ACTIVE_FILTER
-                + " AND datetime(created_at) >= datetime('now', '-7 days')",
-                (user_id,)
+                + f" AND {recent_pred}",
+                (user_id,),
             )
             if recent_leads_data and len(recent_leads_data) > 0:
                 recent_row = recent_leads_data[0]
