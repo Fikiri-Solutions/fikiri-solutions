@@ -49,6 +49,21 @@ async function refreshSessionAccessToken(): Promise<string | null> {
   }
 }
 
+/** Routes where a 401 must not clear tokens + hard-redirect (onboarding, verify-email, etc.). */
+function shouldSuppressUnauthorizedRedirect(): boolean {
+  if (typeof window === 'undefined') return false
+  const p = window.location.pathname
+  return (
+    p === '/login' ||
+    p.startsWith('/signup') ||
+    p.startsWith('/onboarding') ||
+    p.startsWith('/verify-email') ||
+    p.startsWith('/forgot-password') ||
+    p.startsWith('/reset-password') ||
+    p === '/inbox'
+  )
+}
+
 // Types for API responses
 export interface ServiceStatus {
   status: 'healthy' | 'unhealthy' | 'error'
@@ -436,6 +451,11 @@ class ApiClient {
             }
           }
 
+          // Already refreshed + retried once; do not treat as global logout (avoids onboarding/dashboard loops).
+          if (cfg._retry) {
+            return Promise.reject(error)
+          }
+
           const method = String(cfg.method || 'get').toLowerCase()
           // Optional asset when logged out — do not redirect
           if (method === 'get' && reqUrl.includes('/user/customization/logo')) {
@@ -443,9 +463,8 @@ class ApiClient {
           }
 
           const isLoginRequest = reqUrl.includes('/auth/login')
-          const isOnLoginPage = window.location.pathname === '/login'
 
-          if (!isLoginRequest && !isOnLoginPage) {
+          if (!isLoginRequest && !shouldSuppressUnauthorizedRedirect()) {
             if (typeof window !== 'undefined') {
               console.log('[apiClient] 401 error - clearing localStorage and redirecting to login')
               localStorage.removeItem('fikiri-user')
@@ -455,14 +474,8 @@ class ApiClient {
 
               window.dispatchEvent(new CustomEvent('auth:unauthorized'))
 
-              if (
-                window.location.pathname !== '/login' &&
-                !window.location.pathname.startsWith('/signup') &&
-                window.location.pathname !== '/inbox'
-              ) {
-                window.location.href =
-                  '/login?redirect=' + encodeURIComponent(window.location.pathname)
-              }
+              window.location.href =
+                '/login?redirect=' + encodeURIComponent(window.location.pathname)
             }
           } else if (import.meta.env.DEV) {
             console.log('[apiClient] 401 error on login endpoint or login page - NOT clearing localStorage')
