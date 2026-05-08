@@ -120,8 +120,6 @@ def validate_security_event_token(token: str) -> Dict[str, Any]:
 
 def _jti_first_seen(jti: str) -> bool:
     """Return True if this is the first time we see jti (insert succeeded)."""
-    import sqlite3
-
     _ensure_tables()
     try:
         db_optimizer.execute_query(
@@ -130,8 +128,12 @@ def _jti_first_seen(jti: str) -> bool:
             fetch=False,
         )
         return True
-    except sqlite3.IntegrityError:
-        return False
+    except Exception as e:
+        # Portable duplicate-key handling (SQLite + Postgres) without backend-specific imports.
+        message = str(e).lower()
+        if "unique" in message or "duplicate key" in message:
+            return False
+        raise
 
 
 def resolve_user_id_from_google_sub(sub: str) -> Optional[int]:
@@ -139,8 +141,9 @@ def resolve_user_id_from_google_sub(sub: str) -> Optional[int]:
     if not sub:
         return None
     try:
+        active_user_pred = db_optimizer.sql_cast_int_eq_one("is_active")
         rows = db_optimizer.execute_query(
-            "SELECT id, metadata FROM users WHERE is_active = 1 AND metadata IS NOT NULL"
+            "SELECT id, metadata FROM users WHERE " + active_user_pred + " AND metadata IS NOT NULL"
         )
     except Exception as e:
         logger.warning("google_risc user lookup failed: %s", e)
@@ -183,11 +186,14 @@ def _find_users_matching_refresh_hint(
 
     user_ids: List[int] = []
     try:
+        active_token_pred = db_optimizer.sql_cast_int_eq_one("is_active")
         rows = db_optimizer.execute_query(
             """
             SELECT user_id, refresh_token_enc, refresh_token
             FROM gmail_tokens
-            WHERE is_active = 1 AND (refresh_token_enc IS NOT NULL OR refresh_token IS NOT NULL)
+            WHERE """
+            + active_token_pred +
+            """ AND (refresh_token_enc IS NOT NULL OR refresh_token IS NOT NULL)
             """
         )
     except Exception as e:
@@ -227,11 +233,14 @@ def _find_users_matching_refresh_hint(
 
     # oauth_tokens (gmail / google_calendar)
     try:
+        active_oauth_pred = db_optimizer.sql_cast_int_eq_one("is_active")
         orows = db_optimizer.execute_query(
             """
             SELECT user_id, refresh_token_encrypted
             FROM oauth_tokens
-            WHERE is_active = 1 AND service IN ('gmail', 'google_calendar')
+            WHERE """
+            + active_oauth_pred +
+            """ AND service IN ('gmail', 'google_calendar')
               AND refresh_token_encrypted IS NOT NULL
             """
         )

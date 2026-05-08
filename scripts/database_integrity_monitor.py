@@ -6,7 +6,6 @@ Monitors onboarding completion rates and sends alerts for anomalies
 
 import os
 import sys
-import sqlite3
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple
@@ -32,14 +31,17 @@ class DatabaseIntegrityMonitor:
     def check_onboarding_integrity(self) -> Dict[str, any]:
         """Check onboarding data integrity"""
         try:
+            active_user_pred = self.db_optimizer.sql_cast_int_eq_one("is_active")
+            onboarding_done_pred = self.db_optimizer.sql_cast_int_eq_one("onboarding_completed")
+            onboarding_pending_pred = f"NOT {onboarding_done_pred}"
             # Get total users
             total_users = self.db_optimizer.execute_query(
-                "SELECT COUNT(*) as count FROM users WHERE is_active = 1"
+                f"SELECT COUNT(*) as count FROM users WHERE {active_user_pred}"
             )[0]['count']
             
             # Get users with incomplete onboarding
             incomplete_onboarding = self.db_optimizer.execute_query(
-                "SELECT COUNT(*) as count FROM users WHERE onboarding_completed = 0 AND is_active = 1"
+                f"SELECT COUNT(*) as count FROM users WHERE {onboarding_pending_pred} AND {active_user_pred}"
             )[0]['count']
             
             # Get users with onboarding data but incomplete status
@@ -47,8 +49,8 @@ class DatabaseIntegrityMonitor:
                 SELECT COUNT(*) as count 
                 FROM users u 
                 LEFT JOIN onboarding_info oi ON u.id = oi.user_id 
-                WHERE u.is_active = 1 
-                AND u.onboarding_completed = 0 
+                WHERE """ + self.db_optimizer.sql_cast_int_eq_one("u.is_active") + """ 
+                AND NOT """ + self.db_optimizer.sql_cast_int_eq_one("u.onboarding_completed") + """ 
                 AND oi.user_id IS NOT NULL
             """)[0]['count']
             
@@ -57,8 +59,8 @@ class DatabaseIntegrityMonitor:
                 SELECT COUNT(*) as count 
                 FROM users u 
                 LEFT JOIN onboarding_info oi ON u.id = oi.user_id 
-                WHERE u.is_active = 1 
-                AND u.onboarding_completed = 1 
+                WHERE """ + self.db_optimizer.sql_cast_int_eq_one("u.is_active") + """ 
+                AND """ + self.db_optimizer.sql_cast_int_eq_one("u.onboarding_completed") + """ 
                 AND oi.user_id IS NULL
             """)[0]['count']
             
@@ -89,7 +91,7 @@ class DatabaseIntegrityMonitor:
                     DATE(updated_at) as date,
                     COUNT(*) as completions
                 FROM users 
-                WHERE onboarding_completed = 1 
+                WHERE """ + self.db_optimizer.sql_cast_int_eq_one("onboarding_completed") + """ 
                 AND updated_at >= ?
                 GROUP BY DATE(updated_at)
                 ORDER BY date DESC
@@ -142,7 +144,7 @@ class DatabaseIntegrityMonitor:
                 SELECT id, email, onboarding_step, onboarding_completed
                 FROM users 
                 WHERE onboarding_step < 1 AND onboarding_step != -1
-                AND is_active = 1
+                AND """ + self.db_optimizer.sql_cast_int_eq_one("is_active") + """
             """)
             
             if invalid_steps:
@@ -156,9 +158,9 @@ class DatabaseIntegrityMonitor:
             stuck_users = self.db_optimizer.execute_query("""
                 SELECT id, email, onboarding_step, created_at
                 FROM users 
-                WHERE onboarding_completed = 0 
+                WHERE NOT """ + self.db_optimizer.sql_cast_int_eq_one("onboarding_completed") + """ 
                 AND created_at < ?
-                AND is_active = 1
+                AND """ + self.db_optimizer.sql_cast_int_eq_one("is_active") + """
             """, ((datetime.now() - timedelta(days=7)).isoformat(),))
             
             if stuck_users:

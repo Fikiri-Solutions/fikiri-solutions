@@ -236,11 +236,12 @@ def mark_alert_read(alert_id):
 def get_pipeline_stages():
     """Get all pipeline stages"""
     try:
+        is_active_pred = db_optimizer.sql_cast_int_eq_one("is_active")
         # Rulepack compliance: specific columns, not SELECT *
         query = """
             SELECT id, name, description, order_index, is_active, created_at 
             FROM lead_pipeline_stages 
-            WHERE is_active = 1 
+            WHERE """ + is_active_pred + """ 
             ORDER BY order_index ASC
         """
         

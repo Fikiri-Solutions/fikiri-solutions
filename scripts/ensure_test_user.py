@@ -59,7 +59,7 @@ def main() -> int:
     db_optimizer.execute_query(
         """
         UPDATE users
-        SET password_hash = ?, metadata = ?, is_active = 1, updated_at = CURRENT_TIMESTAMP
+        SET password_hash = ?, metadata = ?, is_active = """ + db_optimizer.sql_true_literal() + """, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         """,
         (password_hash, json.dumps(metadata_obj), user_id),

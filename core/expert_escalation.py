@@ -184,9 +184,12 @@ class ExpertEscalationEngine:
         """
         try:
             # Get active experts in team
+            active_pred = db_optimizer.sql_cast_int_eq_one("is_active")
             experts = db_optimizer.execute_query(
                 """SELECT user_id FROM expert_team_members 
-                   WHERE team_id = ? AND is_active = 1 
+                   WHERE team_id = ? AND """
+                   + active_pred +
+                   """ 
                    ORDER BY user_id ASC""",
                 (team_id,)
             )

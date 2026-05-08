@@ -80,8 +80,9 @@ class ExpertManager:
         """
         try:
             db_optimizer.execute_query(
-                """INSERT OR IGNORE INTO expert_team_members (team_id, user_id, role)
-                   VALUES (?, ?, ?)""",
+                """INSERT INTO expert_team_members (team_id, user_id, role)
+                   VALUES (?, ?, ?)
+                   ON CONFLICT DO NOTHING""",
                 (team_id, user_id, role),
                 fetch=False
             )

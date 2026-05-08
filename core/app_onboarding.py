@@ -97,9 +97,10 @@ def save_onboarding():
             )
 
         # Also update user profile with onboarding completion
+        completed_lit = db_optimizer.sql_true_literal()
         update_user_sql = """
         UPDATE users 
-        SET onboarding_completed = 1, onboarding_step = 4, updated_at = CURRENT_TIMESTAMP
+        SET onboarding_completed = """ + completed_lit + """, onboarding_step = 4, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         """
         db_optimizer.execute_query(update_user_sql, (user_id,), fetch=False)

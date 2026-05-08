@@ -18,7 +18,6 @@ Usage:
 
 import sys
 import os
-import sqlite3
 import logging
 from datetime import datetime
 from typing import Dict, Any, List, Tuple
@@ -269,8 +268,7 @@ class LeadsTableMigration:
         """Simulate UP migration without making changes"""
         try:
             # Check current table structure
-            current_schema = db_optimizer.execute_query("PRAGMA table_info(leads)")
-            current_columns = [row[1] for row in current_schema] if current_schema else []
+            current_columns = db_optimizer.list_table_columns("leads")
             
             # Check if user_id already exists
             has_user_id = 'user_id' in current_columns
@@ -313,8 +311,7 @@ class LeadsTableMigration:
         """Simulate DOWN migration without making changes"""
         try:
             # Check current table structure
-            current_schema = db_optimizer.execute_query("PRAGMA table_info(leads)")
-            current_columns = [row[1] for row in current_schema] if current_schema else []
+            current_columns = db_optimizer.list_table_columns("leads")
             
             # Check if user_id exists
             has_user_id = 'user_id' in current_columns
@@ -367,11 +364,8 @@ class LeadsTableMigration:
         """Check if migration has been applied"""
         try:
             # Check if user_id column exists
-            schema = db_optimizer.execute_query("PRAGMA table_info(leads)")
-            if schema:
-                columns = [row[1] for row in schema]
-                return 'user_id' in columns
-            return False
+            columns = db_optimizer.list_table_columns("leads")
+            return 'user_id' in columns
         except Exception as e:
             logger.error(f"Failed to check migration status: {e}")
             return False
@@ -392,9 +386,14 @@ class LeadsTableMigration:
             
             db_optimizer.execute_query(
                 """
-                INSERT OR REPLACE INTO migration_log 
+                INSERT INTO migration_log 
                 (migration_id, description, version, status)
                 VALUES (?, ?, ?, ?)
+                ON CONFLICT (migration_id) DO UPDATE SET
+                    description = EXCLUDED.description,
+                    version = EXCLUDED.version,
+                    status = EXCLUDED.status,
+                    applied_at = CURRENT_TIMESTAMP
                 """,
                 (self.migration_id, self.description, self.version, 'completed'),
                 fetch=False

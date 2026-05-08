@@ -469,11 +469,7 @@ def test_ml_scoring():
         scoring_log_exists = False
         if getattr(scorer, 'db_optimizer', None):
             try:
-                rows = scorer.db_optimizer.execute_query(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name='ml_scoring_log'",
-                    fetch=True
-                )
-                scoring_log_exists = bool(rows)
+                scoring_log_exists = bool(scorer.db_optimizer.table_exists("ml_scoring_log"))
             except Exception:
                 scoring_log_exists = False
         

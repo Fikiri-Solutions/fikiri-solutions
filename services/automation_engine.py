@@ -503,7 +503,7 @@ class AutomationEngine:
                        last_executed, execution_count, success_count, error_count
                        FROM automation_rules
                        WHERE user_id = ? AND trigger_type = ? AND status = ?
-                       ORDER BY datetime(created_at) ASC, id ASC""",
+                       ORDER BY created_at ASC, id ASC""",
                     (user_id, trigger_type.value, AutomationStatus.ACTIVE.value),
                 )
 

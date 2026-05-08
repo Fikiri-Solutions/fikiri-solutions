@@ -69,7 +69,7 @@ def create_lead_pipeline_stages_table(db_path: str = "data/fikiri.db"):
                 name TEXT NOT NULL UNIQUE,
                 description TEXT,
                 order_index INTEGER NOT NULL,
-                is_active BOOLEAN DEFAULT 1,
+                is_active BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -86,9 +86,10 @@ def create_lead_pipeline_stages_table(db_path: str = "data/fikiri.db"):
         
         for stage_name, description, order_idx in default_stages:
             cursor.execute("""
-                INSERT OR IGNORE INTO lead_pipeline_stages 
+                INSERT INTO lead_pipeline_stages 
                 (name, description, order_index) 
                 VALUES (?, ?, ?)
+                ON CONFLICT(name) DO NOTHING
             """, (stage_name, description, order_idx))
         
         conn.commit()
@@ -107,9 +108,9 @@ def update_leads_table_for_pipeline(db_path: str = "data/fikiri.db"):
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
-        # Check if user_id column exists
-        cursor.execute("PRAGMA table_info(leads)")
-        columns = [column[1] for column in cursor.fetchall()]
+        # Portable column discovery without PRAGMA table_info
+        cursor.execute("SELECT * FROM leads LIMIT 0")
+        columns = [column[0] for column in (cursor.description or [])]
         
         if 'user_id' not in columns:
             # Add user_id column
@@ -167,7 +168,7 @@ def create_reminders_alerts_tables(db_path: str = "data/fikiri.db"):
                 description TEXT,
                 due_date TIMESTAMP NOT NULL,
                 priority TEXT DEFAULT 'medium',
-                is_active BOOLEAN DEFAULT 1,
+                is_active BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
             )
@@ -182,7 +183,7 @@ def create_reminders_alerts_tables(db_path: str = "data/fikiri.db"):
                 title TEXT NOT NULL,
                 message TEXT NOT NULL,
                 priority TEXT DEFAULT 'medium',
-                is_read BOOLEAN DEFAULT 0,
+                is_read BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
             )

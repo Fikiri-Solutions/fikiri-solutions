@@ -1991,22 +1991,24 @@ class DatabaseOptimizer:
     
     def _create_views(self, cursor):
         """Create optimized views for common queries"""
+        active_user_pred = self.sql_cast_int_eq_one("is_active")
+        recent_lead_pred = self.sql_column_newer_than_n_days_ago("l.created_at", 30)
         
         # Active users view
-        cursor.execute("""
+        cursor.execute(f"""
             CREATE VIEW IF NOT EXISTS active_users AS
             SELECT id, email, name, role, business_name, created_at, last_login
             FROM users 
-            WHERE is_active = 1
+            WHERE {active_user_pred}
         """)
         
         # Recent leads view
-        cursor.execute("""
+        cursor.execute(f"""
             CREATE VIEW IF NOT EXISTS recent_leads AS
             SELECT l.*, u.name as user_name, u.email as user_email
             FROM leads l
             JOIN users u ON l.user_id = u.id
-            WHERE datetime(l.created_at) >= datetime('now', '-30 days')
+            WHERE {recent_lead_pred}
             ORDER BY l.created_at DESC
         """)
         
@@ -2641,7 +2643,13 @@ class DatabaseOptimizer:
         
         # Store migration in system config
         self.execute_query(
-            "INSERT OR REPLACE INTO system_config (key, value) VALUES (?, ?)",
+            """
+            INSERT INTO system_config (key, value)
+            VALUES (?, ?)
+            ON CONFLICT (key) DO UPDATE SET
+                value = EXCLUDED.value,
+                updated_at = CURRENT_TIMESTAMP
+            """,
             (f"migration_{version}", json.dumps(safe_json_serialize(migration), default=str))
         )
         
@@ -2680,7 +2688,13 @@ class DatabaseOptimizer:
             
             # Mark as applied
             self.execute_query(
-                "INSERT OR REPLACE INTO system_config (key, value) VALUES (?, ?)",
+                """
+                INSERT INTO system_config (key, value)
+                VALUES (?, ?)
+                ON CONFLICT (key) DO UPDATE SET
+                    value = EXCLUDED.value,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
                 (f"applied_migration_{version}", json.dumps(safe_json_serialize({
                     'applied_at': datetime.now(timezone.utc).isoformat(),
                     'version': version

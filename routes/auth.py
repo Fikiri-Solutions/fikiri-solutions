@@ -492,8 +492,9 @@ def api_reset_password():
         return create_error_response("Password must be at least 6 characters", 400, 'WEAK_PASSWORD')
     
     # Find user with this reset token
+    active_user_pred = db_optimizer.sql_cast_int_eq_one("is_active")
     user_data = db_optimizer.execute_query(
-        f"SELECT id, email, metadata FROM users WHERE {db_optimizer.json_field_expr('metadata', '$.reset_token')} = ? AND is_active",
+        f"SELECT id, email, metadata FROM users WHERE {db_optimizer.json_field_expr('metadata', '$.reset_token')} = ? AND {active_user_pred}",
         (token,),
     )
     

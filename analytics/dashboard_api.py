@@ -167,10 +167,13 @@ def debug_dashboard():
             'queries_tested': []
         }
         
+        active_user_pred = db_optimizer.sql_cast_int_eq_one("is_active")
+
         # Test basic database query
         try:
             user_data_db = db_optimizer.execute_query(
-                "SELECT id, email, name, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE id = ? AND is_active = 1",
+                "SELECT id, email, name, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE id = ? AND "
+                + active_user_pred,
                 (user_id,)
             )
             debug_info['queries_tested'].append({
@@ -267,8 +270,10 @@ def get_dashboard_metrics():
         
         # Try to get user data from database
         try:
+            active_user_pred = db_optimizer.sql_cast_int_eq_one("is_active")
             user_data_db = db_optimizer.execute_query(
-                "SELECT id, email, name, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE id = ? AND is_active = 1",
+                "SELECT id, email, name, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE id = ? AND "
+                + active_user_pred,
                 (user_id,)
             )
             
@@ -327,11 +332,14 @@ def get_dashboard_metrics():
         
         # Try to check Gmail connection using canonical gmail_tokens table
         try:
+            active_token_pred = db_optimizer.sql_cast_int_eq_one("is_active")
             gmail_token_rows = db_optimizer.execute_query(
                 """
                 SELECT access_token_enc, access_token, is_active, expiry_timestamp
                 FROM gmail_tokens
-                WHERE user_id = ? AND is_active = 1
+                WHERE user_id = ? AND """
+                + active_token_pred
+                + """
                 ORDER BY updated_at DESC
                 LIMIT 1
                 """,

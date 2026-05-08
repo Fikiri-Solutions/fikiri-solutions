@@ -1743,8 +1743,9 @@ def archive_email():
                 except (ValueError, TypeError):
                     user_id = None
             if user_id:
+                active_user_pred = db_optimizer.sql_cast_int_eq_one("is_active")
                 user_check = db_optimizer.execute_query(
-                    "SELECT id FROM users WHERE id = ? AND is_active = 1 LIMIT 1",
+                    "SELECT id FROM users WHERE id = ? AND " + active_user_pred + " LIMIT 1",
                     (user_id,)
                 )
                 if not user_check:
@@ -1807,8 +1808,9 @@ def mark_email_read():
                 except (ValueError, TypeError):
                     user_id = None
             if user_id:
+                active_user_pred = db_optimizer.sql_cast_int_eq_one("is_active")
                 user_check = db_optimizer.execute_query(
-                    "SELECT id FROM users WHERE id = ? AND is_active = 1 LIMIT 1",
+                    "SELECT id FROM users WHERE id = ? AND " + active_user_pred + " LIMIT 1",
                     (user_id,),
                 )
                 if not user_check:
@@ -1860,7 +1862,7 @@ def mark_email_read():
             db_optimizer.execute_query(
                 """
                 UPDATE synced_emails
-                SET labels = ?, is_read = 1
+                SET labels = ?, is_read = """ + db_optimizer.sql_true_literal() + """
                 WHERE user_id = ? AND (external_id = ? OR gmail_id = ?)
                 """,
                 (json.dumps(labels), user_id, email_id, email_id),

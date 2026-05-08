@@ -237,9 +237,10 @@ def sync_outlook_emails(user_id: int, limit: int = 50, days: int = 30) -> Dict[s
                 
                 # Insert email (using same schema as Gmail for compatibility)
                 db_optimizer.execute_query("""
-                    INSERT OR IGNORE INTO synced_emails 
+                    INSERT INTO synced_emails 
                     (user_id, external_id, provider, subject, sender, recipient, date, body, labels, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT DO NOTHING
                 """, (
                     user_id, 
                     email_id, 

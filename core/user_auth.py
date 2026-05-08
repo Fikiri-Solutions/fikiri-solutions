@@ -611,7 +611,7 @@ class UserAuthManager:
                 SELECT id, email, name, role, onboarding_completed, onboarding_step, email_verified, metadata
                 FROM users
                 WHERE {field} = ?
-                  AND is_active
+                  AND {db_optimizer.sql_cast_int_eq_one("is_active")}
                 """,
                 (token,),
             )

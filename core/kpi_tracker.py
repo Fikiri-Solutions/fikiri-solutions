@@ -72,11 +72,12 @@ class KPITracker:
         """
         try:
             start_date = datetime.now() - timedelta(days=period_days)
+            active_user_pred = db_optimizer.sql_cast_int_eq_one("is_active")
             
             # Get new customers in period
             new_customers = db_optimizer.execute_query(
                 """SELECT COUNT(*) as count FROM users 
-                   WHERE created_at >= ? AND is_active = 1""",
+                   WHERE created_at >= ? AND """ + active_user_pred + """ """,
                 (start_date.isoformat(),)
             )
             customer_count = new_customers[0]['count'] if new_customers else 0
@@ -319,9 +320,10 @@ class KPITracker:
             end_date = datetime.now()
             
             # Get customers at start of period
+            active_user_pred = db_optimizer.sql_cast_int_eq_one("is_active")
             customers_at_start = db_optimizer.execute_query(
                 """SELECT COUNT(*) as count FROM users 
-                   WHERE created_at < ? AND is_active = 1""",
+                   WHERE created_at < ? AND """ + active_user_pred + """ """,
                 (start_date.isoformat(),)
             )
             start_count = customers_at_start[0]['count'] if customers_at_start else 0
@@ -329,7 +331,7 @@ class KPITracker:
             # Get new customers during period
             new_customers = db_optimizer.execute_query(
                 """SELECT COUNT(*) as count FROM users 
-                   WHERE created_at >= ? AND created_at < ? AND is_active = 1""",
+                   WHERE created_at >= ? AND created_at < ? AND """ + active_user_pred + """ """,
                 (start_date.isoformat(), end_date.isoformat())
             )
             new_count = new_customers[0]['count'] if new_customers else 0
@@ -337,7 +339,7 @@ class KPITracker:
             # Get active customers at end (who were customers at start)
             customers_at_end = db_optimizer.execute_query(
                 """SELECT COUNT(*) as count FROM users 
-                   WHERE created_at < ? AND is_active = 1""",
+                   WHERE created_at < ? AND """ + active_user_pred + """ """,
                 (end_date.isoformat(),)
             )
             end_count = customers_at_end[0]['count'] if customers_at_end else 0
@@ -540,7 +542,7 @@ class KPITracker:
             # Get customers at start
             customers_at_start = db_optimizer.execute_query(
                 """SELECT COUNT(*) as count FROM subscriptions 
-                   WHERE status IN ('active', 'trialing') AND datetime(updated_at) < datetime(?)""",
+                   WHERE status IN ('active', 'trialing') AND updated_at < ?""",
                 (start_date.isoformat(),)
             )
             start_count = customers_at_start[0]['count'] if customers_at_start else 0
@@ -828,7 +830,7 @@ class KPITracker:
             if not has_actual_costs:
                 new_customers = db_optimizer.execute_query(
                     """SELECT COUNT(*) as count FROM users 
-                       WHERE created_at >= ? AND is_active = 1""",
+                       WHERE created_at >= ? AND """ + db_optimizer.sql_cast_int_eq_one("is_active") + """ """,
                     (start_date.isoformat(),)
                 )
                 customer_count = new_customers[0]['count'] if new_customers else 0
@@ -975,7 +977,7 @@ class KPITracker:
         """Check if we have customer data"""
         try:
             customers = db_optimizer.execute_query(
-                "SELECT COUNT(*) as count FROM users WHERE is_active = 1"
+                "SELECT COUNT(*) as count FROM users WHERE " + db_optimizer.sql_cast_int_eq_one("is_active")
             )
             return customers and customers[0].get('count', 0) > 0
         except Exception:

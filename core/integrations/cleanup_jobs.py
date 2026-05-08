@@ -63,10 +63,11 @@ def cleanup_inactive_event_links(months: int = INACTIVE_LINKS_MONTHS) -> Dict[st
     """Optionally prune inactive event links older than threshold"""
     try:
         cutoff_date = datetime.now() - timedelta(days=months * 30)
+        inactive_pred = f"NOT {db_optimizer.sql_cast_int_eq_one('is_active')}"
         
         result = db_optimizer.execute_query("""
             DELETE FROM calendar_event_links 
-            WHERE is_active = 0 
+            WHERE """ + inactive_pred + """ 
             AND updated_at < ?
         """, (cutoff_date.isoformat(),), fetch=False)
         

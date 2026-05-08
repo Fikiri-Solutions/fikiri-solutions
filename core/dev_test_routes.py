@@ -82,13 +82,8 @@ def database_health_check():
         db_optimizer = DatabaseOptimizer()
         
         # Check critical tables exist
-        tables_check = db_optimizer.execute_query("""
-            SELECT name FROM sqlite_master 
-            WHERE type='table' AND name IN ('users', 'query_performance_log', 'email_jobs', 'leads')
-        """)
-        
-        table_names = [row[0] for row in tables_check]
         expected_tables = {'users', 'query_performance_log', 'email_jobs', 'leads'}
+        table_names = sorted([name for name in expected_tables if db_optimizer.table_exists(name)])
         missing_tables = expected_tables - set(table_names)
         
         # Check table row counts

@@ -151,7 +151,7 @@ class EnhancedCRMService:
                    status, error_message, source
             FROM crm_events
             WHERE user_id = ? AND entity_id = ? AND entity_type IN ('lead', 'contact')
-            ORDER BY datetime(created_at) DESC, id DESC
+            ORDER BY created_at DESC, id DESC
             LIMIT ? OFFSET ?
             """,
             (user_id, lead_id, limit, offset),

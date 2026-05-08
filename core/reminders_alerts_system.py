@@ -285,12 +285,13 @@ class RemindersAlertsSystem:
     def get_user_reminders(self, user_id: int, upcoming_days: int = 7) -> Dict[str, Any]:
         """Get user's upcoming reminders"""
         try:
+            active_pred = db_optimizer.sql_cast_int_eq_one("is_active")
             # Rulepack compliance: specific columns, not SELECT *
             query = """
                 SELECT id, user_id, lead_id, reminder_type, title, description, due_date, priority, is_active, created_at 
                 FROM reminders 
                 WHERE user_id = ? 
-                AND is_active = 1
+                AND """ + active_pred + """
                 AND due_date BETWEEN ? AND ?
                 ORDER BY due_date ASC
             """
@@ -328,7 +329,7 @@ class RemindersAlertsSystem:
         """Mark an alert as read"""
         try:
             # Update database
-            query = "UPDATE alerts SET is_read = 1 WHERE id = ?"
+            query = f"UPDATE alerts SET is_read = {db_optimizer.sql_true_literal()} WHERE id = ?"
             db_optimizer.execute_query(query, (alert_id,), fetch=False)
             
             # Remove from Redis
@@ -345,7 +346,7 @@ class RemindersAlertsSystem:
         """Cancel a reminder"""
         try:
             # Update database
-            query = "UPDATE reminders SET is_active = 0 WHERE id = ?"
+            query = f"UPDATE reminders SET is_active = {db_optimizer.sql_false_literal()} WHERE id = ?"
             db_optimizer.execute_query(query, (reminder_id,), fetch=False)
             
             # Remove from Redis
@@ -401,12 +402,13 @@ class RemindersAlertsSystem:
     def process_expired_reminders(self) -> Dict[str, Any]:
         """Process expired reminders and create alerts"""
         try:
+            active_pred = db_optimizer.sql_cast_int_eq_one("is_active")
             # Get expired reminders
             # Rulepack compliance: specific columns, not SELECT *
             query = """
                 SELECT id, user_id, lead_id, reminder_type, title, description, due_date, priority, is_active, created_at 
                 FROM reminders 
-                WHERE is_active = 1 
+                WHERE """ + active_pred + """ 
                 AND due_date <= ?
             """
             
