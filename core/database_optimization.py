@@ -2150,40 +2150,51 @@ class DatabaseOptimizer:
         """
         return f"(CAST({column_expr} AS INTEGER) = 1)"
 
+    def _pg_ts(self, column_expr: str) -> str:
+        """
+        Cast a column to timestamptz for postgres comparisons.
+
+        Some legacy tables (e.g. automation_jobs) declare timestamp columns
+        as TEXT and store ISO strings, so a direct `text > timestamptz`
+        comparison fails with `operator does not exist`. Casting is a no-op
+        for native TIMESTAMP/TIMESTAMPTZ columns and parses ISO strings.
+        """
+        return f"({column_expr})::timestamptz"
+
     def sql_timestamp_gt_now(self, column_expr: str) -> str:
         if self.db_type == "postgresql":
-            return f"({column_expr} > CURRENT_TIMESTAMP)"
+            return f"({self._pg_ts(column_expr)} > CURRENT_TIMESTAMP)"
         return f"(datetime({column_expr}) > datetime('now'))"
 
     def sql_timestamp_lt_now(self, column_expr: str) -> str:
         if self.db_type == "postgresql":
-            return f"({column_expr} < CURRENT_TIMESTAMP)"
+            return f"({self._pg_ts(column_expr)} < CURRENT_TIMESTAMP)"
         return f"(datetime({column_expr}) < datetime('now'))"
 
     def sql_column_newer_than_n_hours_ago(self, column_expr: str, hours: int) -> str:
         """True when column is strictly after (current time - hours). SQLite vs PostgreSQL."""
         h = max(1, int(hours))
         if self.db_type == "postgresql":
-            return f"({column_expr} > (CURRENT_TIMESTAMP - ({h} * INTERVAL '1 hour')))"
+            return f"({self._pg_ts(column_expr)} > (CURRENT_TIMESTAMP - ({h} * INTERVAL '1 hour')))"
         return f"(datetime({column_expr}) > datetime('now', '-{h} hours'))"
 
     def sql_column_newer_than_n_minutes_ago(self, column_expr: str, minutes: int) -> str:
         m = max(1, int(minutes))
         if self.db_type == "postgresql":
-            return f"({column_expr} > (CURRENT_TIMESTAMP - ({m} * INTERVAL '1 minute')))"
+            return f"({self._pg_ts(column_expr)} > (CURRENT_TIMESTAMP - ({m} * INTERVAL '1 minute')))"
         return f"(datetime({column_expr}) > datetime('now', '-{m} minutes'))"
 
     def sql_column_newer_than_n_seconds_ago(self, column_expr: str, seconds: int) -> str:
         s = max(1, int(seconds))
         if self.db_type == "postgresql":
-            return f"({column_expr} > (CURRENT_TIMESTAMP - ({s} * INTERVAL '1 second')))"
+            return f"({self._pg_ts(column_expr)} > (CURRENT_TIMESTAMP - ({s} * INTERVAL '1 second')))"
         return f"(datetime({column_expr}) > datetime('now', '-{s} seconds'))"
 
     def sql_column_older_than_n_minutes_ago(self, column_expr: str, minutes: int) -> str:
         """True when column is strictly before (current time - minutes)."""
         m = max(1, int(minutes))
         if self.db_type == "postgresql":
-            return f"({column_expr} < (CURRENT_TIMESTAMP - ({m} * INTERVAL '1 minute')))"
+            return f"({self._pg_ts(column_expr)} < (CURRENT_TIMESTAMP - ({m} * INTERVAL '1 minute')))"
         return f"(datetime({column_expr}) < datetime('now', '-{m} minutes'))"
 
     def sql_column_newer_than_n_days_ago(self, column_expr: str, days: int) -> str:

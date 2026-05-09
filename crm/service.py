@@ -51,6 +51,20 @@ def _crm_meta_dict(raw: Any) -> Dict[str, Any]:
     return {}
 
 
+def _coerce_dt(value: Any) -> Optional[datetime]:
+    """
+    Normalize a timestamp from either backend:
+    - SQLite returns ISO strings, postgres/psycopg2 returns datetime objects.
+    """
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        return datetime.fromisoformat(value)
+    return None
+
+
 def lead_row_to_public_dict(lead_row: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     if not lead_row:
         return {}
@@ -831,9 +845,9 @@ class EnhancedCRMService:
             source=lead_data['source'],
             stage=lead_data['stage'],
             score=lead_data['score'],
-            created_at=datetime.fromisoformat(lead_data['created_at']),
-            updated_at=datetime.fromisoformat(lead_data['updated_at']),
-            last_contact=datetime.fromisoformat(lead_data['last_contact']) if lead_data.get('last_contact') else None,
+            created_at=_coerce_dt(lead_data['created_at']),
+            updated_at=_coerce_dt(lead_data['updated_at']),
+            last_contact=_coerce_dt(lead_data.get('last_contact')),
             notes=lead_data.get('notes'),
             tags=_crm_tags_list(lead_data.get('tags')),
             metadata=_crm_meta_dict(lead_data.get('metadata')),
@@ -846,7 +860,7 @@ class EnhancedCRMService:
             lead_id=activity_data['lead_id'],
             activity_type=activity_data['activity_type'],
             description=activity_data['description'],
-            timestamp=datetime.fromisoformat(activity_data['timestamp']),
+            timestamp=_coerce_dt(activity_data['timestamp']),
             metadata=_crm_meta_dict(activity_data.get('metadata')),
         )
     
@@ -875,7 +889,7 @@ class EnhancedCRMService:
             if result:
                 row = result[0]
                 last = row.get('last_activity')
-                last_dt = datetime.fromisoformat(last) if last else None
+                last_dt = _coerce_dt(last)
                 return int(row.get('count', 0) or 0), last_dt
         except Exception as e:
             logger.warning(f"Failed to compute lead activity metrics: {e}")
