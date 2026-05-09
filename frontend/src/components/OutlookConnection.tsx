@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { CheckCircle, AlertCircle, Mail, Eye, Loader2, Info } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
@@ -26,6 +26,12 @@ export const OutlookConnection: React.FC<OutlookConnectionProps> = ({ userId, on
   const [error, setError] = useState<string | null>(null)
   const [showDetails, setShowDetails] = useState(false)
   const { addToast } = useToast()
+  const onConnectedRef = useRef(onConnected)
+  const hasNotifiedConnectedRef = useRef(false)
+
+  useEffect(() => {
+    onConnectedRef.current = onConnected
+  }, [onConnected])
   
   const getRedirectParam = () => {
     const urlParams = new URLSearchParams(location.search)
@@ -76,15 +82,18 @@ export const OutlookConnection: React.FC<OutlookConnectionProps> = ({ userId, on
         error: status?.error
       })
       
-      if (status?.connected) {
+      if (status?.connected && !hasNotifiedConnectedRef.current) {
+        hasNotifiedConnectedRef.current = true
         setError(null)
-        onConnected()
+        onConnectedRef.current()
+      } else if (!status?.connected) {
+        hasNotifiedConnectedRef.current = false
       }
     } catch (err: any) {
       setError(err.message || 'Failed to check Outlook status')
       setOutlookStatus({ connected: false, error: err.message })
     }
-  }, [userId, onConnected])
+  }, [userId])
 
   useEffect(() => {
     checkOutlookStatus()
@@ -143,6 +152,7 @@ export const OutlookConnection: React.FC<OutlookConnectionProps> = ({ userId, on
     try {
       const data = await apiClient.disconnectOutlook(userId)
       if (data.success || (data as any).data?.success) {
+        hasNotifiedConnectedRef.current = false
         setOutlookStatus({ connected: false })
         setError(null)
         // Refresh status to confirm disconnect
@@ -152,7 +162,7 @@ export const OutlookConnection: React.FC<OutlookConnectionProps> = ({ userId, on
           title: 'Outlook Disconnected', 
           message: 'Your Outlook account has been disconnected successfully.' 
         })
-        onConnected() // Notify parent to refresh
+        onConnectedRef.current() // Notify parent to refresh
       } else {
         throw new Error(data.error || 'Failed to disconnect Outlook')
       }

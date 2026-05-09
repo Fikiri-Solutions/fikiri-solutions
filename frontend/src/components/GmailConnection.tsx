@@ -27,6 +27,12 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
   const [showDetails, setShowDetails] = useState(false)
   const { addToast } = useToast()
   const hasShownOAuthToast = useRef(false) // Prevent duplicate toasts
+  const onConnectedRef = useRef(onConnected)
+  const hasNotifiedConnectedRef = useRef(false)
+
+  useEffect(() => {
+    onConnectedRef.current = onConnected
+  }, [onConnected])
   
   // Get redirect parameter from URL to preserve through OAuth
   const getRedirectParam = () => {
@@ -99,8 +105,11 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
         const status = (data.data ?? {}) as GmailStatus
         setGmailStatus(status)
         setError(null)
-        if (status.connected) {
-          onConnected()
+        if (status.connected && !hasNotifiedConnectedRef.current) {
+          hasNotifiedConnectedRef.current = true
+          onConnectedRef.current()
+        } else if (!status.connected) {
+          hasNotifiedConnectedRef.current = false
         }
       } else {
         throw new Error(data.error || 'Failed to check Gmail status')
@@ -129,7 +138,7 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
         abortControllerRef.current = null
       }
     }
-  }, [userId, onConnected, addToast])
+  }, [userId, addToast])
 
   useEffect(() => {
     isMountedRef.current = true
@@ -238,6 +247,7 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
       const data = await apiClient.disconnectGmail(userId)
       
       if (data.success) {
+        hasNotifiedConnectedRef.current = false
         setGmailStatus({ connected: false })
         setError(null)
         // Refresh status to confirm disconnect
@@ -247,7 +257,7 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
           title: 'Gmail Disconnected', 
           message: 'Your Gmail account has been disconnected successfully.' 
         })
-        onConnected() // Notify parent to refresh
+        onConnectedRef.current() // Notify parent to refresh
       } else {
         throw new Error(data.error || 'Failed to disconnect Gmail')
       }
@@ -347,7 +357,7 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
             Disconnect
           </button>
           <button
-            onClick={onConnected}
+            onClick={() => onConnectedRef.current()}
             className="px-6 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800"
           >
             Continue
