@@ -22,10 +22,17 @@ def is_postgresql_dsn(url: str) -> bool:
 
 
 def adapt_qmark_params_to_psycopg2(sql: str) -> str:
-    """Convert sqlite-style ? placeholders to psycopg2 %s (no literal ? in SQL)."""
+    """
+    Convert sqlite-style ? placeholders to psycopg2 %s placeholders.
+
+    psycopg2 uses Python percent formatting internally for parameters. When a
+    SQLite-oriented query also contains literal LIKE patterns such as '%ai%',
+    those percent signs must be escaped or psycopg2 can treat them as format
+    tokens and raise tuple-index errors.
+    """
     if "?" not in sql:
         return sql
-    return sql.replace("?", "%s")
+    return sql.replace("%", "%%").replace("?", "%s")
 
 
 def translate_sqlite_ddl_to_postgres(sql: str) -> str:

@@ -335,6 +335,9 @@ def create_app():
     
     # Setup routes
     setup_routes(app)
+
+    # Register request middleware before service initialization can be deferred.
+    register_request_middleware(app)
     
     # Initialize SocketIO for real-time updates (optional, non-blocking)
     # Gunicorn + threading does not support WebSocket upgrade; use gevent worker + async_mode
@@ -474,6 +477,44 @@ def setup_socketio_handlers(socketio):
         join_room(room)
         emit('subscribed', {'room': room})
 
+
+def register_request_middleware(app):
+    """
+    Register request/response middleware synchronously during app creation.
+
+    These hooks must exist before the first request even when heavy service startup
+    is deferred, otherwise cold-start traffic can miss session/JWT fallback, timeout,
+    trace, security-header, and monitoring middleware.
+    """
+    if getattr(app, "_fikiri_request_middleware_registered", False):
+        return
+
+    init_flask_sessions(app)
+    if callable(init_secure_sessions):
+        init_secure_sessions(app)
+
+    try:
+        from core.request_timeout import init_request_timeout
+        init_request_timeout(app)
+        logger.info("✅ Request timeout middleware initialized")
+    except Exception as e:
+        logger.warning(f"⚠️ Request timeout middleware initialization failed: {e}")
+
+    try:
+        from core.trace_context import init_trace_context
+        init_trace_context(app)
+        logger.info("✅ Trace context middleware initialized")
+    except Exception as e:
+        logger.warning(f"⚠️ Trace context middleware initialization failed: {e}")
+
+    init_security(app)
+
+    from core.monitoring import init_monitoring
+    init_monitoring(app)
+
+    app._fikiri_request_middleware_registered = True
+
+
 def initialize_services(app):
     """Initialize all core services with app reference."""
     global services
@@ -493,32 +534,9 @@ def initialize_services(app):
         services['feature_flags'] = get_feature_flags()
         services['email_manager'] = EmailServiceManager()
 
-        # ✅ Security / session layers (get_jwt_manager() builds tables in JWTAuthManager.__init__)
+        # JWT manager builds/validates token storage. Request middleware is registered
+        # synchronously in create_app() so cold-start requests are authenticated correctly.
         get_jwt_manager()
-        init_flask_sessions(app)
-        if callable(init_secure_sessions):
-            init_secure_sessions(app)
-        
-        # Initialize request timeout middleware
-        try:
-            from core.request_timeout import init_request_timeout
-            init_request_timeout(app)
-            logger.info("✅ Request timeout middleware initialized")
-        except Exception as e:
-            logger.warning(f"⚠️ Request timeout middleware initialization failed: {e}")
-        
-        # Initialize trace context middleware
-        try:
-            from core.trace_context import init_trace_context
-            init_trace_context(app)
-            logger.info("✅ Trace context middleware initialized")
-        except Exception as e:
-            logger.warning(f"⚠️ Trace context middleware initialization failed: {e}")
-        init_security(app)
-
-        # ✅ Observability layer - Single monitoring initialization
-        from core.monitoring import init_monitoring
-        init_monitoring(app)
         
         # ✅ Cleanup scheduler - Start background cleanup jobs
         from core.cleanup_scheduler import cleanup_scheduler
