@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { apiClient } from '../services/apiClient'
 import { useToast } from '../components/Toast'
+import { useAuth } from '../contexts/AuthContext'
 
 type TabId = 'overview' | 'knowledge' | 'documents' | 'forms' | 'contacts'
 
@@ -28,12 +29,18 @@ const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
 
 export const ContentMigration: React.FC = () => {
   const { addToast } = useToast()
+  const { isAuthenticated } = useAuth()
   const [tab, setTab] = useState<TabId>('overview')
 
   const { data: cap, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['content-migration-capabilities'],
     queryFn: () => apiClient.getContentMigrationCapabilities(),
+    enabled: isAuthenticated,
     staleTime: 60_000,
+    retry: (failureCount, err: any) => {
+      if (err?.response?.status === 401 || err?.response?.status === 403) return false
+      return failureCount < 1
+    },
   })
 
   const [file, setFile] = useState<File | null>(null)

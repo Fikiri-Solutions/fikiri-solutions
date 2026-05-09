@@ -193,8 +193,29 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
     }
   }, [isAuthenticated, user?.onboarding_completed, isLoading, location.pathname, navigate, requireAuth, requireOnboarding, redirectTo])
 
-  // Show loading state while determining redirect
-  if (isLoading) {
+  // Hold rendering until auth state and redirect rules have resolved.
+  // Without this, protected children mount during the redirect window and fire
+  // authenticated queries that come back as 401 before navigation lands.
+  const currentPath = location.pathname
+  const onAuthPage = currentPath === '/login' || currentPath === '/signup'
+  const onInbox = currentPath === '/inbox'
+
+  const hasLocalStorageAuth =
+    typeof window !== 'undefined' &&
+    !!localStorage.getItem('fikiri-user') &&
+    !!localStorage.getItem('fikiri-user-id')
+
+  const onProtectedAndUnauthed =
+    requireAuth && !isAuthenticated && !onAuthPage && !onInbox
+
+  const waitingForRedirect =
+    isLoading ||
+    onProtectedAndUnauthed ||
+    (requireOnboarding && isAuthenticated && user && !user.onboarding_completed && !currentPath.startsWith('/onboarding')) ||
+    (isAuthenticated && user?.onboarding_completed && currentPath.startsWith('/onboarding')) ||
+    (isAuthenticated && user && onAuthPage && hasLocalStorageAuth)
+
+  if (waitingForRedirect) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-500"></div>
