@@ -142,7 +142,10 @@ PATTERNS: tuple[Pattern, ...] = (
     ),
     Pattern(
         "strftime(",
-        re.compile(r"\bstrftime\s*\(", re.IGNORECASE),
+        # Negative lookbehind for "." rules out Python's datetime.strftime() method
+        # call form, which works identically on every backend. Only bare "strftime("
+        # (SQLite's SQL function inside a query string) is flagged.
+        re.compile(r"(?<!\.)\bstrftime\s*\(", re.IGNORECASE),
         "high",
         "Use `to_char()`, `EXTRACT()`, or `date_trunc()`.",
     ),
