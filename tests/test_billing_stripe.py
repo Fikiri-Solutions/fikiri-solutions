@@ -67,6 +67,27 @@ class TestBillingAPI(unittest.TestCase):
         self.assertEqual(data.get("customer", {}).get("id"), "cus_123")
         mock_stripe_manager.create_customer.assert_called_once()
 
+    @patch("core.database_optimization.DatabaseOptimizer")
+    def test_get_stripe_customer_id_reads_postgres_dict_cached_row(self, mock_db_cls):
+        """RealDictCursor rows are dicts; indexed [0][0] access must not KeyError (production PG)."""
+        mock_db = MagicMock()
+        mock_db.execute_query.return_value = [{"stripe_customer_id": "cus_pg"}]
+        mock_db_cls.return_value = mock_db
+
+        from core.billing_api import get_stripe_customer_id
+
+        self.assertEqual(get_stripe_customer_id("u@example.com", user_id=5), "cus_pg")
+
+    @patch("core.database_optimization.DatabaseOptimizer")
+    def test_get_stripe_customer_id_reads_sqlite_tuple_cached_row(self, mock_db_cls):
+        mock_db = MagicMock()
+        mock_db.execute_query.return_value = [("cus_sqlite",)]
+        mock_db_cls.return_value = mock_db
+
+        from core.billing_api import get_stripe_customer_id
+
+        self.assertEqual(get_stripe_customer_id("u@example.com", user_id=5), "cus_sqlite")
+
     @patch("core.jwt_auth.get_jwt_manager")
     @patch("core.billing_api.stripe_manager")
     def test_checkout_allows_card_and_ach_types(self, mock_stripe_manager, mock_jwt_manager):

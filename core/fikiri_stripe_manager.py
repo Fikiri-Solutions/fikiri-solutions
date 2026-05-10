@@ -496,36 +496,58 @@ class FikiriStripeManager:
         if not STRIPE_AVAILABLE:
             return {}
         try:
-            customer = stripe.Customer.retrieve(customer_id, expand=['default_source', 'invoice_settings.default_payment_method'])
-
-            # Stripe returns StripeObject instances which are not JSON-serializable.
-            # Coerce to plain Python types so jsonify() can encode the response.
-            # `default_payment_method` was expanded -> may be a PaymentMethod object;
-            # the frontend compares it as a string id, so flatten to the id.
-            default_pm = None
-            if customer.invoice_settings:
-                raw_pm = customer.invoice_settings.default_payment_method
-                default_pm = getattr(raw_pm, 'id', raw_pm) if raw_pm else None
-
-            return {
-                'id': customer.id,
-                'email': customer.email,
-                'name': customer.name,
-                'phone': customer.phone,
-                'address': {
-                    'line1': customer.address.line1 if customer.address else None,
-                    'line2': customer.address.line2 if customer.address else None,
-                    'city': customer.address.city if customer.address else None,
-                    'state': customer.address.state if customer.address else None,
-                    'postal_code': customer.address.postal_code if customer.address else None,
-                    'country': customer.address.country if customer.address else None
-                } if customer.address else None,
-                'default_payment_method': default_pm,
-                'created': customer.created,
-                'metadata': dict(customer.metadata) if customer.metadata else {},
-            }
+            customer = stripe.Customer.retrieve(
+                customer_id,
+                expand=["invoice_settings.default_payment_method"],
+            )
         except stripe.error.StripeError as e:
             logger.error(f"Failed to get customer details: {e}")
+            return {}
+
+        try:
+            # StripeObject subclasses dict — use .get() only so missing nested keys never raise.
+            inv = customer.get("invoice_settings") or {}
+            raw_pm = inv.get("default_payment_method") if inv else None
+            default_pm = None
+            if raw_pm:
+                if isinstance(raw_pm, str):
+                    default_pm = raw_pm
+                elif isinstance(raw_pm, dict):
+                    default_pm = raw_pm.get("id")
+                else:
+                    default_pm = getattr(raw_pm, "id", None)
+
+            addr = customer.get("address")
+            address_dict = None
+            if addr:
+                address_dict = {
+                    "line1": addr.get("line1"),
+                    "line2": addr.get("line2"),
+                    "city": addr.get("city"),
+                    "state": addr.get("state"),
+                    "postal_code": addr.get("postal_code"),
+                    "country": addr.get("country"),
+                }
+
+            meta = customer.get("metadata")
+            meta_dict = dict(meta) if meta else {}
+
+            return {
+                "id": customer.get("id"),
+                "email": customer.get("email"),
+                "name": customer.get("name"),
+                "phone": customer.get("phone"),
+                "address": address_dict,
+                "default_payment_method": default_pm,
+                "created": customer.get("created"),
+                "metadata": meta_dict,
+            }
+        except Exception as e:
+            logger.exception(
+                "Failed to serialize Stripe customer details for %s: %s",
+                customer_id,
+                e,
+            )
             return {}
 
     def get_customer_limits(self, customer_id: str) -> Dict[str, int]:

@@ -106,6 +106,21 @@ def retry_stripe_api(max_retries=3, delay=1, backoff=2):
         return wrapper
     return decorator
 
+
+def _db_row_scalar(row, column_name: str):
+    """One column from execute_query row: PostgreSQL RealDict is a dict; SQLite may be tuple or Row."""
+    if row is None:
+        return None
+    if isinstance(row, dict):
+        return row.get(column_name)
+    if isinstance(row, (list, tuple)):
+        return row[0] if len(row) > 0 else None
+    try:
+        return row[column_name]
+    except (KeyError, TypeError):
+        return None
+
+
 def get_user_email(user_id):
     """Get user email from database"""
     from core.database_optimization import DatabaseOptimizer
@@ -113,8 +128,7 @@ def get_user_email(user_id):
     user_data = db.execute_query("SELECT email FROM users WHERE id = ?", (user_id,))
     if not user_data:
         return None
-    user_row = user_data[0]
-    return user_row['email'] if hasattr(user_row, 'keys') else user_row[0]
+    return _db_row_scalar(user_data[0], "email")
 
 
 def get_user_name(user_id):
@@ -124,8 +138,7 @@ def get_user_name(user_id):
     user_data = db.execute_query("SELECT name FROM users WHERE id = ?", (user_id,))
     if not user_data:
         return None
-    user_row = user_data[0]
-    return user_row['name'] if hasattr(user_row, 'keys') else user_row[0]
+    return _db_row_scalar(user_data[0], "name")
 
 
 def _stripe_dashboard_message(exc: BaseException) -> str:
@@ -325,8 +338,10 @@ def get_stripe_customer_id(user_email, user_id=None):
                 "SELECT stripe_customer_id FROM users WHERE id = ? AND stripe_customer_id IS NOT NULL",
                 (user_id,)
             )
-            if cached and len(cached) > 0 and cached[0] and len(cached[0]) > 0:
-                return cached[0][0]
+            if cached and len(cached) > 0 and cached[0]:
+                cid = _db_row_scalar(cached[0], "stripe_customer_id")
+                if cid:
+                    return cid
         except Exception as e:
             logger.warning(f"Failed to get cached customer ID: {e}")
     
