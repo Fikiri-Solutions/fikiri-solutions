@@ -74,9 +74,19 @@ class PostgresBootstrapCursor:
         self._fetch_override: Optional[List[Tuple[Any, ...]]] = None
 
     def execute(self, sql: Optional[str] = None, params: Optional[Sequence[Any]] = None) -> Any:
+        """
+        Execute a query against the wrapped psycopg2 cursor and return ``self``.
+
+        Returning ``self`` matches sqlite3's behavior (sqlite3.Cursor.execute
+        returns the cursor) so call-site idioms like
+        ``cursor.execute(sql, params).fetchall()`` work uniformly across both
+        backends. psycopg2's cursor.execute returns ``None`` natively, which
+        is why the chained idiom silently breaks under Postgres.
+        """
         self._fetch_override = None
         if not sql:
-            return self._inner.execute(sql, params)  # type: ignore[arg-type]
+            self._inner.execute(sql, params)  # type: ignore[arg-type]
+            return self
 
         stripped = sql.strip()
         m = _PRAGMA_TABLE_INFO.match(stripped)
@@ -90,8 +100,10 @@ class PostgresBootstrapCursor:
         else:
             tsql = stripped
         if params:
-            return self._inner.execute(adapt_qmark_params_to_psycopg2(tsql), params)
-        return self._inner.execute(tsql)
+            self._inner.execute(adapt_qmark_params_to_psycopg2(tsql), params)
+        else:
+            self._inner.execute(tsql)
+        return self
 
     def fetchall(self) -> Any:
         if self._fetch_override is not None:

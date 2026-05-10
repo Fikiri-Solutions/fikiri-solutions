@@ -20,23 +20,32 @@ from core.appointments_service import (
 
 
 class _FakeCursor:
-    def __init__(self, conflict_rows=None):
+    """Stand-in for the cursor yielded by `db_optimizer.transaction()`.
+
+    Returns dict rows for both `fetchall()` (conflict check) and
+    `fetchone()` (the post-RETURNING id read), matching the real
+    PostgresBootstrapCursor wrapping RealDictCursor.
+    """
+
+    def __init__(self, conflict_rows=None, inserted_id=123):
         self._conflict_rows = conflict_rows or []
+        self._inserted_id = inserted_id
         self._execute_calls = 0
-        self.lastrowid = 123
 
     def execute(self, _query, _params=None):
         self._execute_calls += 1
         return self
 
     def fetchall(self):
-        # first call is conflict check
         return self._conflict_rows
+
+    def fetchone(self):
+        return {"id": self._inserted_id}
 
 
 class _FakeConn:
-    def __init__(self, conflict_rows=None):
-        self._cursor = _FakeCursor(conflict_rows=conflict_rows)
+    def __init__(self, conflict_rows=None, inserted_id=123):
+        self._cursor = _FakeCursor(conflict_rows=conflict_rows, inserted_id=inserted_id)
         self.committed = False
         self.rolled_back = False
 
@@ -56,6 +65,19 @@ class _FakeConn:
         return False
 
 
+class _FakeTransactionContext:
+    """Stands in for `db_optimizer.transaction()` — yields (conn, cursor)."""
+
+    def __init__(self, conflict_rows=None, inserted_id=123):
+        self.conn = _FakeConn(conflict_rows=conflict_rows, inserted_id=inserted_id)
+
+    def __enter__(self):
+        return self.conn, self.conn.cursor()
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
 class TestAppointmentsService(unittest.TestCase):
     def setUp(self):
         self.service = AppointmentsService(user_id=1)
@@ -69,16 +91,16 @@ class TestAppointmentsService(unittest.TestCase):
     def test_create_appointment_conflict_raises(self):
         start = datetime.now() + timedelta(hours=1)
         end = start + timedelta(minutes=30)
-        fake_conn = _FakeConn(conflict_rows=[(1,)])
-        with patch("core.appointments_service.db_optimizer.get_connection", return_value=fake_conn):
+        tx = _FakeTransactionContext(conflict_rows=[{"id": 1}])
+        with patch("core.appointments_service.db_optimizer.transaction", return_value=tx):
             with self.assertRaises(ValueError):
                 self.service.create_appointment("Title", start, end)
-        self.assertTrue(fake_conn.rolled_back)
+        self.assertTrue(tx.conn.rolled_back)
 
     def test_create_appointment_success(self):
         start = datetime.now() + timedelta(hours=2)
         end = start + timedelta(minutes=30)
-        fake_conn = _FakeConn(conflict_rows=[])
+        tx = _FakeTransactionContext(conflict_rows=[], inserted_id=123)
 
         row = {
             "id": 123,
@@ -96,13 +118,13 @@ class TestAppointmentsService(unittest.TestCase):
             "notes": None,
             "sync_to_calendar": 0,
         }
-        with patch("core.appointments_service.db_optimizer.get_connection", return_value=fake_conn):
+        with patch("core.appointments_service.db_optimizer.transaction", return_value=tx):
             with patch("core.appointments_service.db_optimizer.execute_query", return_value=[row]):
                 result = self.service.create_appointment("Title", start, end)
 
         self.assertEqual(result["id"], 123)
         self.assertEqual(result["status"], "scheduled")
-        self.assertTrue(fake_conn.committed)
+        self.assertTrue(tx.conn.committed)
 
     def test_update_appointment_invalid_transition(self):
         appointment = {

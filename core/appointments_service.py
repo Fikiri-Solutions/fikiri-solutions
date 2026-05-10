@@ -95,36 +95,39 @@ class AppointmentsService:
         if start_time < now:
             raise ValueError("start_time cannot be in the past")
         
-        # Atomic conflict check + insert using a single transaction
-        # This prevents race conditions by checking and inserting in one operation
-        with db_optimizer.get_connection() as conn:
-            cursor = conn.cursor()
-            
-            # Check for conflicts within the same transaction
-            conflict_check = cursor.execute("""
+        # Atomic conflict check + insert using a single transaction.
+        # This prevents race conditions by checking and inserting in one operation.
+        # `db_optimizer.transaction()` yields a cursor that adapts ? -> %s on
+        # Postgres, so the same SQLite-style SQL works on both backends.
+        # `INSERT ... RETURNING id` is required on Postgres (psycopg2 always
+        # reports cursor.lastrowid = None).
+        with db_optimizer.transaction() as (conn, cursor):
+            cursor.execute("""
                 SELECT id FROM appointments 
                 WHERE user_id = ? 
                 AND status NOT IN ('canceled', 'no_show')
                 AND start_time < ? AND end_time > ?
-            """, (self.user_id, end_time.isoformat(), start_time.isoformat())).fetchall()
-            
+            """, (self.user_id, end_time.isoformat(), start_time.isoformat()))
+            conflict_check = cursor.fetchall()
+
             if conflict_check:
                 conn.rollback()
-                conflict_ids = [row[0] for row in conflict_check]
+                conflict_ids = [row["id"] if "id" in row else row[0] for row in conflict_check]
                 raise ValueError(f"Time slot conflicts with existing appointment(s): {conflict_ids}")
-            
-            # Insert appointment (still in same transaction)
+
             cursor.execute("""
                 INSERT INTO appointments 
                 (user_id, title, description, start_time, end_time, status,
                  contact_id, contact_name, contact_email, contact_phone, location, notes, sync_to_calendar)
                 VALUES (?, ?, ?, ?, ?, 'scheduled', ?, ?, ?, ?, ?, ?, ?)
+                RETURNING id
             """, (
                 self.user_id, title.strip(), description, start_time.isoformat(), end_time.isoformat(),
-                contact_id, contact_name, contact_email, contact_phone, location, notes, 1 if sync_to_calendar else 0
+                contact_id, contact_name, contact_email, contact_phone, location, notes,
+                1 if sync_to_calendar else 0
             ))
-            
-            appointment_id = cursor.lastrowid
+            row = cursor.fetchone()
+            appointment_id = int(row["id"]) if row and "id" in row else (int(row[0]) if row else None)
             conn.commit()
         
         # Fetch created appointment
@@ -219,20 +222,21 @@ class AppointmentsService:
         appointment_end = appointment['end_time'] if isinstance(appointment['end_time'], datetime) else datetime.fromisoformat(appointment['end_time'])
         
         if start_time != appointment_start or end_time != appointment_end:
-            # Time changed, check conflicts atomically within transaction
-            with db_optimizer.get_connection() as conn:
-                cursor = conn.cursor()
-                conflict_check = cursor.execute("""
+            # Time changed, check conflicts atomically within transaction.
+            # transaction() yields a cursor that adapts ? -> %s on Postgres.
+            with db_optimizer.transaction() as (conn, cursor):
+                cursor.execute("""
                     SELECT id FROM appointments 
                     WHERE user_id = ? 
                     AND status NOT IN ('canceled', 'no_show')
                     AND start_time < ? AND end_time > ?
                     AND id != ?
-                """, (self.user_id, end_time.isoformat(), start_time.isoformat(), appointment_id)).fetchall()
-                
+                """, (self.user_id, end_time.isoformat(), start_time.isoformat(), appointment_id))
+                conflict_check = cursor.fetchall()
+
                 if conflict_check:
                     conn.rollback()
-                    conflict_ids = [row[0] for row in conflict_check]
+                    conflict_ids = [row["id"] if "id" in row else row[0] for row in conflict_check]
                     raise ValueError(f"Time slot conflicts with existing appointment(s): {conflict_ids}")
         
         # Build update query with field name validation (prevent SQL injection)
