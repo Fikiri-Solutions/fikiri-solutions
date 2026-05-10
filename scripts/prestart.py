@@ -1,207 +1,95 @@
 #!/usr/bin/env python3
 """
-Prestart initialization script for Fikiri Solutions.
-Ensures database schema is created before workers start.
+Prestart initialization for Fikiri Solutions.
+
+This script is a manual convenience for triggering database schema bootstrap
+before starting Gunicorn workers. In normal production use (Render via
+``gunicorn wsgi:wsgi_app``) this is **not** required: importing
+``core.database_optimization.db_optimizer`` runs the same bootstrap path
+synchronously during process startup, before the worker accepts requests.
+
+Run it explicitly when:
+
+  * Booting a fresh database (dev, staging, or DR) and you want to fail
+    fast on schema problems before serving traffic.
+  * An external orchestrator (e.g., Kubernetes init container) needs a
+    discrete "schema is ready" signal — a ``data/.db_init_lock`` file is
+    written on success.
+
+Behavior:
+  * Imports ``db_optimizer``, which auto-runs ``_initialize_database()``.
+    That path is Postgres-aware: SQLite DDL in CREATE TABLE statements is
+    translated for psycopg2, and ``?`` placeholders are adapted to ``%s``.
+    See ``core/postgres_compat.py``.
+  * Writes ``data/.db_init_lock`` so subsequent invocations are no-ops.
+  * Exits 0 on success, 1 if ``db_optimizer`` reports it isn't ready.
+
+This script intentionally contains no SQL, no ``sqlite3`` import, and no
+SQLite-only DDL. Those used to live here and silently created a local
+SQLite file that the production Postgres app never read — see
+docs/POSTGRES_MIGRATION_AUDIT.md (commit replacing this file).
 """
 
-import os
+from __future__ import annotations
+
 import sys
-import sqlite3
 import time
 from pathlib import Path
 
-# Add project root to path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
 
-def create_init_lock(db_path):
-    """Create initialization lock to prevent double initialization."""
-    lock_path = Path(db_path).parent / ".db_init_lock"
-    if lock_path.exists():
-        print("✅ Database already initialized (lock file exists)")
+
+def _lock_path(data_dir: Path) -> Path:
+    return data_dir / ".db_init_lock"
+
+
+def _already_initialized(data_dir: Path) -> bool:
+    lock = _lock_path(data_dir)
+    if lock.exists():
+        print(f"✅ Lock file already present at {lock} — skipping bootstrap.")
         return True
-    
-    # Create lock file
-    lock_path.write_text(f"initialized_at={time.time()}")
     return False
 
-def initialize_database():
-    """Initialize database schema with proper order."""
-    db_path = "data/fikiri.db"
-    
-    # Check if already initialized
-    if create_init_lock(db_path):
-        return True
-    
-    print("🚀 Initializing database schema...")
-    
-    # Ensure data directory exists
-    os.makedirs("data", exist_ok=True)
-    
-    # Connect to database
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    try:
-        # Enable WAL mode for better concurrency
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA busy_timeout=30000")
-        cursor.execute("PRAGMA synchronous=NORMAL")
-        
-        # Create tables in proper order (metrics first)
-        tables_sql = [
-            # Core system tables first
-            """
-            CREATE TABLE IF NOT EXISTS system_config (
-                key TEXT PRIMARY KEY,
-                value TEXT,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """,
-            
-            # Metrics table (critical for avoiding race conditions)
-            """
-            CREATE TABLE IF NOT EXISTS query_performance_log (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                query_hash TEXT,
-                query_type TEXT,
-                execution_time REAL,
-                rows_affected INTEGER,
-                success BOOLEAN,
-                error_message TEXT,
-                user_id INTEGER,
-                endpoint TEXT,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """,
-            
-            # User tables
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                name TEXT,
-                role TEXT DEFAULT 'user',
-                onboarding_completed BOOLEAN DEFAULT FALSE,
-                onboarding_step INTEGER DEFAULT 1,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_login TIMESTAMP,
-                is_active BOOLEAN DEFAULT TRUE
-            )
-            """,
-            
-            # JWT and session tables
-            """
-            CREATE TABLE IF NOT EXISTS refresh_tokens (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                token_hash TEXT UNIQUE NOT NULL,
-                user_id INTEGER NOT NULL,
-                device_id TEXT,
-                expires_at TIMESTAMP NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-            """,
-            
-            # Other essential tables
-            """
-            CREATE TABLE IF NOT EXISTS email_jobs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                email_id TEXT,
-                job_type TEXT,
-                status TEXT DEFAULT 'pending',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                processed_at TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-            """,
-            
-            """
-            CREATE TABLE IF NOT EXISTS leads (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT,
-                name TEXT,
-                company TEXT,
-                status TEXT DEFAULT 'new',
-                source TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """,
-            
-            # Rate limiting
-            """
-            CREATE TABLE IF NOT EXISTS rate_limit_violations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ip_address TEXT,
-                endpoint TEXT,
-                violation_count INTEGER DEFAULT 1,
-                first_violation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_violation TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """
-        ]
-        
-        # Execute all table creation statements
-        for sql in tables_sql:
-            cursor.execute(sql)
-        
-        # Create indexes for performance
-        indexes = [
-            "CREATE INDEX IF NOT EXISTS idx_query_performance_timestamp ON query_performance_log(timestamp)",
-            "CREATE INDEX IF NOT EXISTS idx_query_performance_user ON query_performance_log(user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)",
-            "CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_email_jobs_user ON email_jobs(user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_leads_email ON leads(email)",
-            "CREATE INDEX IF NOT EXISTS idx_rate_limit_ip ON rate_limit_violations(ip_address)"
-        ]
-        
-        for index_sql in indexes:
-            cursor.execute(index_sql)
-        
-        # Insert schema version
-        cursor.execute("""
-            INSERT INTO system_config (key, value)
-            VALUES ('schema_version', '1.0.0')
-            ON CONFLICT(key) DO UPDATE SET value = excluded.value
-        """)
-        
-        conn.commit()
-        print("✅ Database schema initialized successfully")
-        
-        # Verify critical tables exist
-        cursor.execute(
-            "SELECT name FROM pragma_table_list WHERE type='table' AND name IN ('users', 'query_performance_log', 'email_jobs')"
-        )
-        tables = [row[0] for row in cursor.fetchall()]
-        
-        if len(tables) == 3:
-            print("✅ All critical tables verified")
-            return True
-        else:
-            print(f"❌ Missing tables: {set(['users', 'query_performance_log', 'email_jobs']) - set(tables)}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Database initialization failed: {e}")
-        conn.rollback()
-        return False
-    finally:
-        conn.close()
 
-def main():
-    """Main prestart function."""
+def _write_lock(data_dir: Path, db_type: str) -> None:
+    data_dir.mkdir(parents=True, exist_ok=True)
+    _lock_path(data_dir).write_text(
+        f"initialized_at={time.time()}\ndb_type={db_type}\n"
+    )
+
+
+def initialize_database() -> bool:
+    """Trigger schema bootstrap via db_optimizer and stamp a lock file."""
+    data_dir = PROJECT_ROOT / "data"
+
+    if _already_initialized(data_dir):
+        return True
+
+    print("🚀 Initializing database schema via db_optimizer...")
+
+    # Importing db_optimizer triggers _initialize_database() synchronously.
+    # On Postgres the PostgresBootstrapCursor translates SQLite-style DDL.
+    from core.database_optimization import db_optimizer
+
+    if not getattr(db_optimizer, "_ready", False):
+        print("❌ db_optimizer reports not ready after initialization.")
+        return False
+
+    _write_lock(data_dir, db_type=db_optimizer.db_type)
+    print(f"✅ Database schema initialized ({db_optimizer.db_type}).")
+    return True
+
+
+def main() -> None:
     print("🔧 Fikiri Solutions Prestart Initialization")
-    
+
     if initialize_database():
         print("✅ Prestart initialization completed successfully")
         sys.exit(0)
-    else:
-        print("❌ Prestart initialization failed")
-        sys.exit(1)
+    print("❌ Prestart initialization failed")
+    sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

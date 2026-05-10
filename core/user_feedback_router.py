@@ -11,7 +11,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import sqlite3
 import time
 from typing import Any, Dict, Optional
 
@@ -21,6 +20,14 @@ logger = logging.getLogger(__name__)
 
 _MAX_DB_RETRIES = 3
 _RETRY_BASE_SLEEP_SECONDS = 0.05
+
+# Lower-case substrings we treat as "transient lock/contention" and retry.
+# These cover the messages emitted by both sqlite3 (`database is locked`,
+# `database is busy`) and psycopg2 (`deadlock detected`, `could not obtain
+# lock`, `canceling statement due to lock timeout`). Matching on the message
+# instead of the driver-specific exception class keeps this module portable
+# across both backends.
+_TRANSIENT_DB_ERROR_TOKENS = ("locked", "busy", "deadlock", "lock timeout")
 
 
 class UserFeedbackRouter:
@@ -142,15 +149,13 @@ class UserFeedbackRouter:
         for attempt in range(_MAX_DB_RETRIES):
             try:
                 return db_optimizer.execute_query(query, params, fetch=False)
-            except sqlite3.OperationalError as exc:
-                if "locked" not in str(exc).lower() and "busy" not in str(exc).lower():
+            except Exception as exc:
+                msg = str(exc).lower()
+                if not any(token in msg for token in _TRANSIENT_DB_ERROR_TOKENS):
                     raise
                 last_error = exc
                 if attempt < _MAX_DB_RETRIES - 1:
                     time.sleep(_RETRY_BASE_SLEEP_SECONDS * (2**attempt))
-            except Exception as exc:
-                last_error = exc
-                raise
         raise last_error or RuntimeError("feedback insert failed after retries")
 
 
