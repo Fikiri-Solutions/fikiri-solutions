@@ -34,18 +34,29 @@ export const GmailConnect: React.FC = () => {
     enabled: !!user && !!gmailStatus?.connected, // Only fetch sync status if Gmail is connected
     staleTime: 0, // Always consider data stale to get fresh progress
     gcTime: 5 * 60 * 1000, // 5 minutes
-    // Dynamic refetch interval: faster when syncing, slower when idle
+    // Dynamic refetch interval: faster when syncing, slower when idle.
+    // Trust `syncing: boolean` from the backend; `sync_status === 'pending'`
+    // alone is the default idle/no-record state and must not trigger 1Hz polling.
     refetchInterval: (query) => {
       if (!gmailStatus?.connected) return false
       const data = query.state.data as EmailSyncStatus | undefined
-      const isSyncing = data?.syncing || 
-                       data?.sync_status === 'in_progress' || 
-                       data?.sync_status === 'processing' || 
-                       data?.sync_status === 'pending'
-      // Poll every 1 second when syncing (faster updates), every 10 seconds when idle
+      const isSyncing = data?.syncing === true ||
+                       data?.sync_status === 'in_progress' ||
+                       data?.sync_status === 'processing'
       return isSyncing ? 1 * 1000 : 10 * 1000
     },
   })
+
+  /**
+   * Sync is actively in flight. `sync_status === 'pending'` on its own does
+   * NOT count: the backend returns 'pending' as a fallback for "Gmail
+   * connected, no sync record yet" with `syncing: false`. Trust the explicit
+   * boolean so the spinner only appears once the user clicks "Sync inbox".
+   */
+  const isActivelySyncing =
+    syncStatus?.syncing === true ||
+    syncStatus?.sync_status === 'in_progress' ||
+    syncStatus?.sync_status === 'processing'
 
   // Track previous sync status to detect when sync completes
   const prevSyncStatusRef = React.useRef<EmailSyncStatus | undefined>(syncStatus)
@@ -55,11 +66,10 @@ export const GmailConnect: React.FC = () => {
     
     // Detect when sync completes (was syncing, now completed)
     if (prev && current) {
-      const wasSyncing = prev.syncing || 
-                        prev.sync_status === 'in_progress' || 
-                        prev.sync_status === 'processing' || 
-                        prev.sync_status === 'pending'
-      const isCompleted = current.sync_status === 'completed' && 
+      const wasSyncing = prev.syncing === true ||
+                        prev.sync_status === 'in_progress' ||
+                        prev.sync_status === 'processing'
+      const isCompleted = current.sync_status === 'completed' &&
                          !current.syncing &&
                          current.last_sync
       
@@ -131,7 +141,6 @@ export const GmailConnect: React.FC = () => {
         ? (() => {
             try {
               const date = new Date(syncStatus.last_sync)
-              // Format in user's local timezone with better formatting
               return date.toLocaleString(undefined, {
                 year: 'numeric',
                 month: '2-digit',
@@ -145,26 +154,25 @@ export const GmailConnect: React.FC = () => {
               return new Date(syncStatus.last_sync).toLocaleString()
             }
           })()
-        : syncStatus?.syncing
+        : isActivelySyncing
           ? 'Syncing now...'
-          : gmailStatus?.connected 
+          : gmailStatus?.connected
             ? 'Never synced'
             : 'N/A',
       icon: Clock,
-      tone: syncStatus?.last_sync 
-        ? 'text-green-600 dark:text-green-400' 
-        : syncStatus?.syncing
+      tone: syncStatus?.last_sync
+        ? 'text-green-600 dark:text-green-400'
+        : isActivelySyncing
           ? 'text-blue-600 dark:text-blue-400 animate-pulse'
-          : gmailStatus?.connected 
-            ? 'text-gray-500 dark:text-gray-400' 
+          : gmailStatus?.connected
+            ? 'text-gray-500 dark:text-gray-400'
             : 'text-gray-400 dark:text-gray-500',
       showProgress: false
     },
     {
       label: 'Sync status',
       value: (() => {
-        const isSyncing = syncStatus?.syncing || syncStatus?.sync_status === 'in_progress' || syncStatus?.sync_status === 'processing' || syncStatus?.sync_status === 'pending'
-        if (isSyncing) {
+        if (isActivelySyncing) {
           const progress = syncStatus?.progress ?? 0
           const emailsCount = syncStatus?.emails_synced_this_job ?? 0
           if (progress > 0) {
@@ -172,29 +180,23 @@ export const GmailConnect: React.FC = () => {
           }
           return 'Syncing in progress...'
         }
-        if (syncStatus?.sync_status === 'pending') return 'Sync queued...'
         if (syncStatus?.sync_status === 'completed') return 'Sync completed'
         if (syncStatus?.sync_status === 'failed') return 'Sync failed'
-        if (syncStatus?.sync_status === 'connected_pending_sync') return 'Ready to sync'
         if (syncStatus?.sync_status === 'not_connected') return 'Not connected'
         return gmailStatus?.connected ? 'Ready to sync' : 'Not connected'
       })(),
       icon: Activity,
-      tone: syncStatus?.syncing || syncStatus?.sync_status === 'in_progress' || syncStatus?.sync_status === 'processing'
-        ? 'text-blue-600 dark:text-blue-400 animate-pulse' 
-        : syncStatus?.sync_status === 'pending'
-          ? 'text-blue-600 dark:text-blue-400 animate-pulse'
+      tone: isActivelySyncing
+        ? 'text-blue-600 dark:text-blue-400 animate-pulse'
         : syncStatus?.sync_status === 'completed'
           ? 'text-green-600 dark:text-green-400'
           : syncStatus?.sync_status === 'failed'
             ? 'text-red-600 dark:text-red-400'
-            : syncStatus?.sync_status === 'connected_pending_sync'
+            : gmailStatus?.connected
               ? 'text-yellow-600 dark:text-yellow-400'
-              : gmailStatus?.connected 
-                ? 'text-yellow-600 dark:text-yellow-400' 
-                : 'text-red-600 dark:text-red-400',
-      showProgress: syncStatus?.syncing || syncStatus?.sync_status === 'in_progress' || syncStatus?.sync_status === 'processing' || syncStatus?.sync_status === 'pending',
-      progress: syncStatus?.progress !== undefined ? syncStatus.progress : (syncStatus?.syncing || syncStatus?.sync_status === 'in_progress' || syncStatus?.sync_status === 'processing' || syncStatus?.sync_status === 'pending' ? 1 : 0)
+              : 'text-red-600 dark:text-red-400',
+      showProgress: isActivelySyncing,
+      progress: syncStatus?.progress ?? (isActivelySyncing ? 1 : 0)
     }
   ]
 

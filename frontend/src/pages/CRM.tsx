@@ -473,12 +473,12 @@ export const CRM: React.FC = () => {
                                 dragSnapshot.isDragging ? 'ring-2 ring-brand-primary/40' : ''
                               }`}
                             >
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="font-semibold text-brand-text dark:text-white">{lead.name}</p>
-                                  <p className="text-xs text-brand-text/60 dark:text-gray-400">{lead.email}</p>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-semibold text-brand-text dark:text-white truncate">{lead.name}</p>
+                                  <p className="text-xs text-brand-text/60 dark:text-gray-400 truncate">{lead.email}</p>
                                 </div>
-                                <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                                <span className={`shrink-0 whitespace-nowrap text-xs font-semibold px-2 py-1 rounded-full ${
                                   lead.score >= 70 ? 'bg-emerald-100 text-emerald-700' :
                                   lead.score >= 40 ? 'bg-amber-100 text-amber-700' :
                                   'bg-rose-100 text-rose-700'
