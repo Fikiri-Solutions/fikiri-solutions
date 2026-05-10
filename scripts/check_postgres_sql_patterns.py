@@ -190,7 +190,12 @@ PATTERNS: tuple[Pattern, ...] = (
     ),
     Pattern(
         "boolean = integer literal",
-        re.compile(rf"\b(?:{_BOOL_COLS_RE})\s*=\s*[01]\b", re.IGNORECASE),
+        # Require a SQL context (WHERE/AND/OR/SET/comma) before the column name
+        # so we don't false-flag Python initializations like `processed = 0`.
+        re.compile(
+            rf"\b(?:WHERE|AND|OR|SET|,)\s+(?:[\w]+\.)?(?:{_BOOL_COLS_RE})\s*=\s*[01]\b",
+            re.IGNORECASE,
+        ),
         "high",
         "Postgres rejects `BOOLEAN = INTEGER`. Use `= TRUE` / `= FALSE` "
         "(portable; SQLite accepts both).",
