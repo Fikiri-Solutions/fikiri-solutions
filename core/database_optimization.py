@@ -2357,6 +2357,40 @@ class DatabaseOptimizer:
             logger.error(f"Query execution error: {e}")
             raise
 
+    @contextmanager
+    def transaction(self):
+        """
+        Yield (conn, cursor) for a single transactional block where multiple
+        statements must execute atomically (e.g. conflict-check + insert).
+
+        On PostgreSQL the cursor is wrapped with ``PostgresBootstrapCursor`` so
+        SQLite-style ``?`` placeholders are translated to psycopg2's ``%s`` and
+        any inline DDL is also adapted. Callers should still issue ``RETURNING``
+        explicitly when they need the inserted id; do NOT rely on
+        ``cursor.lastrowid`` (always ``None`` on psycopg2).
+
+        On SQLite the cursor is the raw sqlite3 cursor; ``cursor.lastrowid`` is
+        valid as usual.
+
+        The caller is responsible for ``conn.commit()`` on success. On any
+        exception the transaction is rolled back before the exception
+        propagates.
+        """
+        with self.get_connection() as conn:
+            if self.db_type == "postgresql":
+                from psycopg2.extras import RealDictCursor
+                cursor = PostgresBootstrapCursor(conn.cursor(cursor_factory=RealDictCursor))
+            else:
+                cursor = conn.cursor()
+            try:
+                yield conn, cursor
+            except Exception:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                raise
+
     def execute_insert_returning_id(self, query: str, params: Tuple = None) -> Optional[int]:
         """Run INSERT on a single connection and return lastrowid (SQLite). Best-effort for Postgres."""
         if self.db_type == "postgresql":
