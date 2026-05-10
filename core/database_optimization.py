@@ -2627,51 +2627,101 @@ class DatabaseOptimizer:
         return optimization_results
     
     def get_database_stats(self) -> Dict[str, Any]:
-        """Get comprehensive database statistics"""
-        stats = {}
-        
+        """
+        Comprehensive database statistics for both backends.
+
+        SQLite path uses ``sqlite_master`` + ``PRAGMA page_count/page_size``.
+        Postgres path uses ``information_schema.tables`` for the table list
+        and ``pg_total_relation_size()`` aggregated over the same set for
+        size. ``pg_relation_size`` covers heap only, so the total form gives
+        a number comparable to SQLite's page-count * page-size value.
+        """
+        stats: Dict[str, Any] = {}
+
+        if self.db_type == "postgresql":
+            tables_rows = self.execute_query(
+                """
+                SELECT table_name,
+                       (
+                           SELECT COUNT(*)
+                           FROM information_schema.statistics s
+                           WHERE s.table_schema = t.table_schema
+                             AND s.table_name = t.table_name
+                       ) AS index_count
+                FROM information_schema.tables t
+                WHERE t.table_schema = 'public'
+                  AND t.table_type = 'BASE TABLE'
+                ORDER BY table_name
+                """
+            ) or []
+            stats["tables"] = [
+                {"name": r.get("table_name") if isinstance(r, dict) else r[0],
+                 "index_count": r.get("index_count") if isinstance(r, dict) else r[1]}
+                for r in tables_rows
+            ]
+            for entry in stats["tables"]:
+                tname = entry["name"]
+                if not tname or not tname.replace("_", "").isalnum():
+                    continue
+                try:
+                    cnt_rows = self.execute_query(f"SELECT COUNT(*) AS c FROM public.\"{tname}\"")
+                    if cnt_rows:
+                        row = cnt_rows[0]
+                        stats[f"{tname}_count"] = row.get("c") if isinstance(row, dict) else row[0]
+                except Exception as exc:
+                    logger.warning("Could not get count for table %s: %s", tname, exc)
+            try:
+                size_rows = self.execute_query(
+                    """
+                    SELECT COALESCE(SUM(pg_total_relation_size(c.oid)), 0) AS total
+                    FROM pg_class c
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    WHERE n.nspname = 'public' AND c.relkind = 'r'
+                    """
+                )
+                if size_rows:
+                    row = size_rows[0]
+                    stats["database_size_bytes"] = int(row.get("total") if isinstance(row, dict) else row[0])
+                else:
+                    stats["database_size_bytes"] = 0
+            except Exception as exc:
+                logger.warning("Could not get database size: %s", exc)
+                stats["database_size_bytes"] = 0
+            return stats
+
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            
-            # Table sizes
-            cursor.execute("""
-                SELECT name, 
+            cursor.execute(
+                """
+                SELECT name,
                        (SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=m.name) as table_count,
                        (SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND tbl_name=m.name) as index_count
                 FROM sqlite_master m
                 WHERE type='table' AND name NOT LIKE 'sqlite_%'
-            """)
-            
+                """
+            )
             tables = cursor.fetchall()
-            stats['tables'] = [
-                {
-                    'name': table[0],
-                    'index_count': table[2]
-                }
-                for table in tables
+            stats["tables"] = [
+                {"name": table[0], "index_count": table[2]} for table in tables
             ]
-            
-            # Row counts
             for table in tables:
                 table_name = table[0]
                 try:
                     cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
                     count = cursor.fetchone()[0]
-                    stats[f'{table_name}_count'] = count
+                    stats[f"{table_name}_count"] = count
                 except Exception as e:
-                    logger.warning(f"Could not get count for table {table_name}: {e}")
-            
-            # Database file size with improved compatibility
+                    logger.warning("Could not get count for table %s: %s", table_name, e)
             try:
                 cursor.execute("PRAGMA page_count")
                 page_count = cursor.fetchone()[0]
                 cursor.execute("PRAGMA page_size")
                 page_size = cursor.fetchone()[0]
-                stats['database_size_bytes'] = page_count * page_size
+                stats["database_size_bytes"] = page_count * page_size
             except Exception as e:
-                logger.warning(f"Could not get database size: {e}")
-                stats['database_size_bytes'] = 0
-        
+                logger.warning("Could not get database size: %s", e)
+                stats["database_size_bytes"] = 0
+
         return stats
     
     def create_migration(self, version: str, description: str, up_sql: str, 
