@@ -620,11 +620,18 @@ class OAuthTokenManager:
 
             tokens = token_result['data']
             
-            # Check if token is expired
+            # Check if token is expired. psycopg2 returns datetime objects natively;
+            # sqlite returns ISO strings — accept either so we don't silently
+            # mis-report expiry on Postgres (the previous TypeError swallow set
+            # is_expired = False even for genuinely expired tokens).
             is_expired = False
-            if tokens.get('expires_at'):
+            raw_expires_at = tokens.get('expires_at')
+            if raw_expires_at:
                 try:
-                    expires_at = datetime.fromisoformat(tokens['expires_at'])
+                    expires_at = (
+                        raw_expires_at if isinstance(raw_expires_at, datetime)
+                        else datetime.fromisoformat(raw_expires_at)
+                    )
                     is_expired = datetime.now() >= expires_at
                 except (ValueError, TypeError) as e:
                     logger.warning(f"Failed to parse expires_at: {e}")

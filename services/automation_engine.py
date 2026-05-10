@@ -791,6 +791,16 @@ class AutomationEngine:
     
     def _format_rule(self, rule_data: Dict[str, Any]) -> AutomationRule:
         """Format rule data into AutomationRule object"""
+
+        def _to_dt(value):
+            # psycopg2 returns datetime objects natively; sqlite returns ISO strings.
+            # Accept either to keep this hot path working on both backends.
+            if value is None:
+                return None
+            if isinstance(value, datetime):
+                return value
+            return datetime.fromisoformat(value)
+
         return AutomationRule(
             id=rule_data['id'],
             user_id=rule_data['user_id'],
@@ -801,9 +811,9 @@ class AutomationEngine:
             action_type=ActionType(rule_data['action_type']),
             action_parameters=json.loads(rule_data['action_parameters']),
             status=AutomationStatus(rule_data['status']),
-            created_at=datetime.fromisoformat(rule_data['created_at']),
-            updated_at=datetime.fromisoformat(rule_data['updated_at']),
-            last_executed=datetime.fromisoformat(rule_data['last_executed']) if rule_data.get('last_executed') else None,
+            created_at=_to_dt(rule_data['created_at']),
+            updated_at=_to_dt(rule_data['updated_at']),
+            last_executed=_to_dt(rule_data.get('last_executed')),
             execution_count=rule_data['execution_count'],
             success_count=rule_data['success_count'],
             error_count=rule_data['error_count']

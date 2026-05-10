@@ -675,6 +675,23 @@ class FikiriStripeManager:
             raise RuntimeError("Stripe is not available")
         try:
             subscription = stripe.Subscription.retrieve(subscription_id)
+            # `subscription.items.data` is a list of SubscriptionItem StripeObject
+            # instances which are not JSON-serializable. Flatten to plain dicts
+            # containing the fields the frontend actually uses.
+            items = []
+            for item in (subscription.items.data or []):
+                price = getattr(item, 'price', None)
+                items.append({
+                    'id': item.id,
+                    'quantity': getattr(item, 'quantity', None),
+                    'price': {
+                        'id': getattr(price, 'id', None),
+                        'product': getattr(price, 'product', None),
+                        'unit_amount': getattr(price, 'unit_amount', None),
+                        'currency': getattr(price, 'currency', None),
+                        'recurring': dict(price.recurring) if price and getattr(price, 'recurring', None) else None,
+                    } if price else None,
+                })
             return {
                 'id': subscription.id,
                 'status': subscription.status,
@@ -682,7 +699,7 @@ class FikiriStripeManager:
                 'current_period_end': subscription.current_period_end,
                 'trial_end': subscription.trial_end,
                 'cancel_at_period_end': subscription.cancel_at_period_end,
-                'items': subscription.items.data,
+                'items': items,
             }
         except stripe.error.StripeError as e:
             logger.error(f"Failed to retrieve subscription {subscription_id}: {e}")

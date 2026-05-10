@@ -236,9 +236,15 @@ class APIKeyManager:
             
             key_data = result[0]
             
-            # Check expiration
+            # Check expiration. psycopg2 returns datetime objects; sqlite returns
+            # ISO strings — accept either so this path doesn't blow up on Postgres
+            # with `fromisoformat: argument must be str`.
             if key_data.get('expires_at'):
-                expires_at = datetime.fromisoformat(key_data['expires_at'])
+                raw_expires_at = key_data['expires_at']
+                expires_at = (
+                    raw_expires_at if isinstance(raw_expires_at, datetime)
+                    else datetime.fromisoformat(raw_expires_at)
+                )
                 if datetime.utcnow() > expires_at:
                     logger.warning(f"API key expired: {key_data.get('key_prefix')}...")
                     return None

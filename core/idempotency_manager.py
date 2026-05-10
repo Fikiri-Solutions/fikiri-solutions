@@ -169,7 +169,11 @@ class IdempotencyManager:
                 
                 # Cache in Redis
                 if self.redis_client:
-                    expires_at = datetime.fromisoformat(key_record['expires_at'])
+                    raw_expires_at = key_record['expires_at']
+                    expires_at = (
+                        raw_expires_at if isinstance(raw_expires_at, datetime)
+                        else datetime.fromisoformat(raw_expires_at)
+                    )
                     ttl = int((_to_utc_naive(expires_at) - _utcnow_naive()).total_seconds())
                     if ttl > 0:
                         self.redis_client.setex(

@@ -138,7 +138,11 @@ class MicrosoftGraphProvider:
             self.refresh_token = stored_tokens.get('refresh_token')
             expires_at = stored_tokens.get('expires_at')
             if expires_at:
-                self.token_expires_at = datetime.fromisoformat(expires_at)
+                # Accept either a datetime (psycopg2) or an ISO string (sqlite/JSON config).
+                self.token_expires_at = (
+                    expires_at if isinstance(expires_at, datetime)
+                    else datetime.fromisoformat(expires_at)
+                )
             
             # Test if token is still valid
             if self.test_connection():
