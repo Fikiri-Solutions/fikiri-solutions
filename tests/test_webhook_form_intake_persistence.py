@@ -50,11 +50,12 @@ class TestWebhookFormIntakePersistence(unittest.TestCase):
         mock_api_key_mgr.record_usage.return_value = None
 
         def _db_exec(query, params=None, fetch=True, **kwargs):
-            if fetch and query and "last_insert_rowid" in query.lower():
-                return [{"id": 9001}]
             return 1 if not fetch else []
 
         mock_db.execute_query.side_effect = _db_exec
+        # Intake row id now comes from execute_insert_returning_id() instead of
+        # a follow-up SELECT last_insert_rowid() query.
+        mock_db.execute_insert_returning_id.return_value = 9001
 
         mock_crm_service.create_lead.return_value = {"success": True, "data": {"lead_id": "L42"}}
 
@@ -81,8 +82,12 @@ class TestWebhookFormIntakePersistence(unittest.TestCase):
         self.assertEqual(data.get("lead_id"), "L42")
         self.assertEqual((data.get("data") or {}).get("intake_id"), 9001)
 
-        # Ensure we inserted into our intake persistence table.
-        insert_calls = [c for c in mock_db.execute_query.call_args_list if "customer_form_intake_submissions" in c[0][0]]
+        # Ensure we inserted into our intake persistence table via the new
+        # RETURNING-id helper.
+        insert_calls = [
+            c for c in mock_db.execute_insert_returning_id.call_args_list
+            if "customer_form_intake_submissions" in c[0][0]
+        ]
         self.assertTrue(len(insert_calls) >= 1)
 
     @patch("crm.service.enhanced_crm_service")
@@ -115,11 +120,10 @@ class TestWebhookFormIntakePersistence(unittest.TestCase):
         mock_api_key_mgr.record_usage.return_value = None
 
         def _db_exec2(query, params=None, fetch=True, **kwargs):
-            if fetch and query and "last_insert_rowid" in query.lower():
-                return [{"id": 9002}]
             return 1 if not fetch else []
 
         mock_db.execute_query.side_effect = _db_exec2
+        mock_db.execute_insert_returning_id.return_value = 9002
 
         mock_crm_service.create_lead.return_value = {"success": False, "error": "lead create failed", "error_code": "LEAD_CREATE_FAILED"}
 
@@ -140,7 +144,10 @@ class TestWebhookFormIntakePersistence(unittest.TestCase):
         data = json.loads(response.data)
         self.assertFalse(data.get("success"))
 
-        insert_calls = [c for c in mock_db.execute_query.call_args_list if "customer_form_intake_submissions" in c[0][0]]
+        insert_calls = [
+            c for c in mock_db.execute_insert_returning_id.call_args_list
+            if "customer_form_intake_submissions" in c[0][0]
+        ]
         self.assertTrue(len(insert_calls) >= 1)
 
 

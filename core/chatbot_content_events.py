@@ -107,8 +107,8 @@ def _insert_event_tx(
     """
     Insert one event row inside the caller's transaction and return its id.
 
-    Uses ``INSERT ... RETURNING id`` so it works on both Postgres (where
-    ``cursor.lastrowid`` is always ``None``) and SQLite >= 3.35.
+    Uses ``INSERT ... RETURNING id`` so it works on both Postgres (where the
+    psycopg2 cursor exposes no post-insert id attribute) and SQLite >= 3.35.
     """
     payload_json, truncated = _serialize_payload(payload)
     cursor.execute(

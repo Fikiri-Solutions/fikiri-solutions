@@ -39,17 +39,6 @@ _FORM_INTAKE_INSERT_COLS = (
 )
 
 
-def _last_insert_rowid() -> int | None:
-    try:
-        r = db_optimizer.execute_query("SELECT last_insert_rowid() AS id", fetch=True)
-        if not r:
-            return None
-        row = r[0]
-        return int(row["id"]) if isinstance(row, dict) else int(row[0])
-    except Exception:
-        return None
-
-
 def _insert_customer_form_intake(
     *,
     user_id,
@@ -71,9 +60,16 @@ def _insert_customer_form_intake(
     client_submission_id=None,
     supersedes_intake_id=None,
 ) -> int | None:
-    """Append-only form intake row. Returns new row id or None on failure."""
+    """Append-only form intake row. Returns new row id or None on failure.
+
+    Uses `db_optimizer.execute_insert_returning_id()` so the insert id is
+    returned via INSERT ... RETURNING on Postgres and via the SQLite
+    cursor's native lastrow attribute on SQLite — all in the same connection
+    so there's no cross-connection race (the previous helper ran a separate
+    SELECT on a fresh connection).
+    """
     try:
-        db_optimizer.execute_query(
+        return db_optimizer.execute_insert_returning_id(
             f"""
             INSERT INTO customer_form_intake_submissions (
                 {_FORM_INTAKE_INSERT_COLS}
@@ -100,9 +96,7 @@ def _insert_customer_form_intake(
                 client_submission_id,
                 supersedes_intake_id,
             ),
-            fetch=False,
         )
-        return _last_insert_rowid()
     except Exception:
         return None
 

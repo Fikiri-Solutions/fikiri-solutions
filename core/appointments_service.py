@@ -97,10 +97,10 @@ class AppointmentsService:
         
         # Atomic conflict check + insert using a single transaction.
         # This prevents race conditions by checking and inserting in one operation.
-        # `db_optimizer.transaction()` yields a cursor that adapts ? -> %s on
-        # Postgres, so the same SQLite-style SQL works on both backends.
-        # `INSERT ... RETURNING id` is required on Postgres (psycopg2 always
-        # reports cursor.lastrowid = None).
+        # `db_optimizer.transaction()` yields a cursor that adapts qmark placeholders
+        # to psycopg2 on Postgres, so the same SQLite-style SQL works on both backends.
+        # We use INSERT ... RETURNING because the psycopg2 cursor exposes no
+        # post-insert id attribute.
         with db_optimizer.transaction() as (conn, cursor):
             cursor.execute("""
                 SELECT id FROM appointments 
