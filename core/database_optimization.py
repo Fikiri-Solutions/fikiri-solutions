@@ -1626,8 +1626,8 @@ class DatabaseOptimizer:
                 customer_email TEXT,
                 customer_phone TEXT,
                 service_type TEXT,
-                requested_date TEXT,
-                requested_time TEXT,
+                requested_date DATE,
+                requested_time TIME,
                 timezone TEXT,
                 status TEXT NOT NULL DEFAULT 'received',  -- received, completed, rescheduled, cancelled, failed, deduplicated
                 error_message TEXT,

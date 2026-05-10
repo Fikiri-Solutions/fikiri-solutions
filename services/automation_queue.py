@@ -50,6 +50,43 @@ def _utcnow_iso() -> str:
     return datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
 
 
+def _row_value_as_iso(value: Any) -> Optional[str]:
+    """
+    Coerce a row column that may be a ``datetime`` (psycopg2 against a native
+    timestamptz column) or an ISO string (psycopg2 against a legacy TEXT
+    column, or sqlite3) to an ISO string.
+
+    Returning a string here preserves the API response contract — clients
+    that already consume ``started_at`` / ``completed_at`` / ``created_at``
+    as ISO strings keep working after the schema migration that promotes
+    these columns to native ``timestamptz``.
+    """
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return str(value)
+
+
+def _row_value_as_datetime(value: Any) -> Optional[datetime]:
+    """
+    Coerce a row column to a Python ``datetime`` regardless of whether
+    psycopg2 returned a native ``datetime`` (native timestamptz column) or
+    a string (TEXT column / sqlite3). Used for duration arithmetic that
+    must work on both pre- and post-migration row shapes.
+    """
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return None
+
+
 def _generate_idempotency_key(user_id: int, payload_type: str, payload: Dict[str, Any]) -> str:
     """Generate idempotency key for trigger event to prevent duplicate runs."""
     canonical = json.dumps({"user_id": user_id, "type": payload_type, "payload": payload}, sort_keys=True)
@@ -75,9 +112,9 @@ class AutomationJobManager:
                     status TEXT NOT NULL DEFAULT 'queued',
                     attempt INTEGER NOT NULL DEFAULT 0,
                     max_attempts INTEGER NOT NULL DEFAULT 3,
-                    created_at TEXT NOT NULL,
-                    started_at TEXT,
-                    completed_at TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    started_at TIMESTAMPTZ,
+                    completed_at TIMESTAMPTZ,
                     error_message TEXT,
                     result_json TEXT,
                     FOREIGN KEY (user_id) REFERENCES users (id)
@@ -411,9 +448,9 @@ class AutomationJobManager:
             "status": r["status"],
             "attempt": r["attempt"],
             "max_attempts": r["max_attempts"],
-            "created_at": r["created_at"],
-            "started_at": r["started_at"],
-            "completed_at": r["completed_at"],
+            "created_at": _row_value_as_iso(r["created_at"]),
+            "started_at": _row_value_as_iso(r["started_at"]),
+            "completed_at": _row_value_as_iso(r["completed_at"]),
             "error_message": r["error_message"],
             "correlation_id": None,
         }
@@ -494,13 +531,10 @@ class AutomationJobManager:
             )
             durations_sec = []
             for r in duration_rows or []:
-                try:
-                    from datetime import datetime as dt
-                    start = dt.fromisoformat(r["started_at"].replace("Z", "+00:00"))
-                    end = dt.fromisoformat(r["completed_at"].replace("Z", "+00:00"))
+                start = _row_value_as_datetime(r["started_at"])
+                end = _row_value_as_datetime(r["completed_at"])
+                if start and end:
                     durations_sec.append((end - start).total_seconds())
-                except Exception:
-                    pass
             p95_duration_seconds = None
             if durations_sec:
                 durations_sec.sort()
