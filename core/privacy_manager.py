@@ -12,6 +12,23 @@ from core.database_optimization import db_optimizer
 
 logger = logging.getLogger(__name__)
 
+
+def _coerce_dt(value: Any) -> Optional[datetime]:
+    """
+    Normalize a timestamp from either backend.
+
+    psycopg2 returns native ``datetime`` objects for TIMESTAMP/TIMESTAMPTZ
+    columns; the legacy SQLite driver returns ISO strings. This keeps both
+    paths working without raising ``fromisoformat: argument must be str``.
+    """
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        return datetime.fromisoformat(value)
+    return None
+
 @dataclass
 class PrivacySettings:
     """User privacy settings data structure"""
@@ -110,8 +127,8 @@ class PrivacyManager:
                 auto_labeling_enabled=bool(settings['auto_labeling_enabled']),
                 lead_detection_enabled=bool(settings['lead_detection_enabled']),
                 analytics_tracking_enabled=bool(settings['analytics_tracking_enabled']),
-                created_at=datetime.fromisoformat(settings['created_at']),
-                updated_at=datetime.fromisoformat(settings['updated_at'])
+                created_at=_coerce_dt(settings['created_at']),
+                updated_at=_coerce_dt(settings['updated_at'])
             )
             
         except Exception as e:
@@ -180,10 +197,13 @@ class PrivacyManager:
                               ip_address: str = None, user_agent: str = None) -> Dict[str, Any]:
         """Record user privacy consent"""
         try:
-            # Revoke previous consent of same type if granting new consent
+            # Revoke previous consent of same type if granting new consent.
+            # Use the SQL boolean literal TRUE so this is portable across
+            # SQLite and Postgres (Postgres rejects `granted = 1` against a
+            # BOOLEAN column with `operator does not exist: boolean = integer`).
             if granted:
                 db_optimizer.execute_query(
-                    "UPDATE privacy_consents SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = ? AND consent_type = ? AND granted = 1",
+                    "UPDATE privacy_consents SET revoked_at = CURRENT_TIMESTAMP WHERE user_id = ? AND consent_type = ? AND granted = TRUE",
                     (user_id, consent_type),
                     fetch=False
                 )
@@ -231,8 +251,8 @@ class PrivacyManager:
                     consent_text=consent['consent_text'],
                     ip_address=consent['ip_address'],
                     user_agent=consent['user_agent'],
-                    granted_at=datetime.fromisoformat(consent['granted_at']),
-                    revoked_at=datetime.fromisoformat(consent['revoked_at']) if consent['revoked_at'] else None
+                    granted_at=_coerce_dt(consent['granted_at']),
+                    revoked_at=_coerce_dt(consent['revoked_at'])
                 ))
             
             return consents
@@ -245,9 +265,9 @@ class PrivacyManager:
         """Check if user has granted specific consent"""
         try:
             consent_data = db_optimizer.execute_query(
-                """SELECT granted FROM privacy_consents 
-                   WHERE user_id = ? AND consent_type = ? AND granted = 1 
-                   AND revoked_at IS NULL 
+                """SELECT granted FROM privacy_consents
+                   WHERE user_id = ? AND consent_type = ? AND granted = TRUE
+                   AND revoked_at IS NULL
                    ORDER BY granted_at DESC LIMIT 1""",
                 (user_id, consent_type)
             )

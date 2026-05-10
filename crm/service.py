@@ -723,15 +723,21 @@ class EnhancedCRMService:
                     'error_code': 'GMAIL_NOT_CONNECTED'
                 }
             
-            # Get recent email activities
+            # Get recent email activities, one row per lead, newest first.
+            # Postgres rejects `SELECT DISTINCT ... ORDER BY la.timestamp` because
+            # the ORDER BY column is not in the SELECT list (the DISTINCT result
+            # would otherwise be non-deterministic). Group by lead and order by
+            # the max activity timestamp instead — portable across SQLite and PG.
             ts_pred = db_optimizer.sql_column_newer_than_n_days_ago("la.timestamp", 7)
             activities_data = db_optimizer.execute_query(
-                f"""SELECT DISTINCT la.lead_id, l.email, l.name, l.company
+                f"""SELECT la.lead_id, l.email, l.name, l.company,
+                          MAX(la.timestamp) AS last_activity
                    FROM lead_activities la
                    JOIN leads l ON la.lead_id = l.id
                    WHERE l.user_id = ? AND la.activity_type = 'email_received'
                    AND {ts_pred}
-                   ORDER BY la.timestamp DESC""",
+                   GROUP BY la.lead_id, l.email, l.name, l.company
+                   ORDER BY last_activity DESC""",
                 (user_id,),
             )
             

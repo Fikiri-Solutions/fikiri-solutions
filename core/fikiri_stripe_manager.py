@@ -497,6 +497,16 @@ class FikiriStripeManager:
             return {}
         try:
             customer = stripe.Customer.retrieve(customer_id, expand=['default_source', 'invoice_settings.default_payment_method'])
+
+            # Stripe returns StripeObject instances which are not JSON-serializable.
+            # Coerce to plain Python types so jsonify() can encode the response.
+            # `default_payment_method` was expanded -> may be a PaymentMethod object;
+            # the frontend compares it as a string id, so flatten to the id.
+            default_pm = None
+            if customer.invoice_settings:
+                raw_pm = customer.invoice_settings.default_payment_method
+                default_pm = getattr(raw_pm, 'id', raw_pm) if raw_pm else None
+
             return {
                 'id': customer.id,
                 'email': customer.email,
@@ -510,9 +520,9 @@ class FikiriStripeManager:
                     'postal_code': customer.address.postal_code if customer.address else None,
                     'country': customer.address.country if customer.address else None
                 } if customer.address else None,
-                'default_payment_method': customer.invoice_settings.default_payment_method if customer.invoice_settings else None,
+                'default_payment_method': default_pm,
                 'created': customer.created,
-                'metadata': customer.metadata
+                'metadata': dict(customer.metadata) if customer.metadata else {},
             }
         except stripe.error.StripeError as e:
             logger.error(f"Failed to get customer details: {e}")
