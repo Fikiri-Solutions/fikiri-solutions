@@ -104,6 +104,12 @@ def _insert_event_tx(
     status: str = "applied",
     error_message: Optional[str] = None,
 ) -> Optional[int]:
+    """
+    Insert one event row inside the caller's transaction and return its id.
+
+    Uses ``INSERT ... RETURNING id`` so it works on both Postgres (where
+    ``cursor.lastrowid`` is always ``None``) and SQLite >= 3.35.
+    """
     payload_json, truncated = _serialize_payload(payload)
     cursor.execute(
         """
@@ -112,6 +118,7 @@ def _insert_event_tx(
             correlation_id, supersedes_event_id, payload_json, payload_truncated,
             status, error_message, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        RETURNING id
         """,
         (
             user_id,
@@ -128,7 +135,11 @@ def _insert_event_tx(
             datetime.now(timezone.utc).isoformat(),
         ),
     )
-    return cursor.lastrowid
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    # PG (RealDictCursor) returns a dict; SQLite (Row factory) is also dict-like.
+    return int(row["id"]) if "id" in row else int(row[0])
 
 
 def record_chatbot_response_generated(
@@ -162,8 +173,7 @@ def record_chatbot_response_generated(
         }
     }
     try:
-        with db_optimizer.get_connection() as conn:
-            cur = conn.cursor()
+        with db_optimizer.transaction() as (conn, cur):
             _insert_event_tx(
                 cur,
                 user_id=user_id,
@@ -204,8 +214,7 @@ def record_chatbot_response_corrected(
     }
     eid = message_id or question[:80]
     try:
-        with db_optimizer.get_connection() as conn:
-            cur = conn.cursor()
+        with db_optimizer.transaction() as (conn, cur):
             _insert_event_tx(
                 cur,
                 user_id=user_id,
@@ -271,8 +280,7 @@ def persist_faq_created(
     now = datetime.now(timezone.utc).isoformat()
     payload = {"snapshot_after": snapshot_after, "vector": {"key": vector_key}}
     try:
-        with db_optimizer.get_connection() as conn:
-            cur = conn.cursor()
+        with db_optimizer.transaction() as (conn, cur):
             eid = _insert_event_tx(
                 cur,
                 user_id=user_id,
@@ -343,8 +351,7 @@ def persist_faq_updated(
         "vector": {"key": vector_key},
     }
     try:
-        with db_optimizer.get_connection() as conn:
-            cur = conn.cursor()
+        with db_optimizer.transaction() as (conn, cur):
             eid = _insert_event_tx(
                 cur,
                 user_id=user_id,
@@ -408,8 +415,7 @@ def persist_faq_deleted(
         return
     payload = {"snapshot_before": snapshot_before}
     try:
-        with db_optimizer.get_connection() as conn:
-            cur = conn.cursor()
+        with db_optimizer.transaction() as (conn, cur):
             _insert_event_tx(
                 cur,
                 user_id=user_id,
@@ -442,8 +448,7 @@ def persist_kb_document_created(
     vid = (snapshot_after.get("metadata") or {}).get("vector_id")
     payload = {"snapshot_after": snapshot_after, "vector": {"key": vid}}
     try:
-        with db_optimizer.get_connection() as conn:
-            cur = conn.cursor()
+        with db_optimizer.transaction() as (conn, cur):
             eid = _insert_event_tx(
                 cur,
                 user_id=user_id,
@@ -523,8 +528,7 @@ def persist_kb_document_updated(
         "vector": {"key": vid},
     }
     try:
-        with db_optimizer.get_connection() as conn:
-            cur = conn.cursor()
+        with db_optimizer.transaction() as (conn, cur):
             eid = _insert_event_tx(
                 cur,
                 user_id=user_id,
@@ -596,8 +600,7 @@ def persist_kb_document_deleted(
         return
     payload = {"snapshot_before": snapshot_before}
     try:
-        with db_optimizer.get_connection() as conn:
-            cur = conn.cursor()
+        with db_optimizer.transaction() as (conn, cur):
             _insert_event_tx(
                 cur,
                 user_id=user_id,
@@ -712,8 +715,7 @@ def record_chatbot_config_updated(
     if snapshot_before is not None:
         payload["snapshot_before"] = snapshot_before
     try:
-        with db_optimizer.get_connection() as conn:
-            cur = conn.cursor()
+        with db_optimizer.transaction() as (conn, cur):
             _insert_event_tx(
                 cur,
                 user_id=user_id,
