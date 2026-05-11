@@ -106,7 +106,7 @@ class SecureSessionManager:
             # Create secure sessions table for tracking
             db_optimizer.execute_query("""
                 CREATE TABLE IF NOT EXISTS secure_sessions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGSERIAL PRIMARY KEY,
                     session_id TEXT NOT NULL UNIQUE,
                     user_id INTEGER,
                     ip_address TEXT,

@@ -44,7 +44,7 @@ def ensure_automation_run_events_table() -> None:
         db_optimizer.execute_query(
             """
             CREATE TABLE IF NOT EXISTS automation_run_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id BIGSERIAL PRIMARY KEY,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 user_id INTEGER NOT NULL,
                 run_id TEXT NOT NULL,

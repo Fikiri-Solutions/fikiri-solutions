@@ -43,7 +43,7 @@ class AIBudgetGuardrails:
             db_optimizer.execute_query(
                 """
                 CREATE TABLE IF NOT EXISTS ai_budget_alerts (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGSERIAL PRIMARY KEY,
                     user_id INTEGER NOT NULL,
                     month TEXT NOT NULL,
                     alert_level REAL NOT NULL,
@@ -58,7 +58,7 @@ class AIBudgetGuardrails:
             db_optimizer.execute_query(
                 f"""
                 CREATE TABLE IF NOT EXISTS ai_budget_approvals (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGSERIAL PRIMARY KEY,
                     user_id INTEGER NOT NULL,
                     month TEXT NOT NULL,
                     approved BOOLEAN NOT NULL DEFAULT {false_lit},

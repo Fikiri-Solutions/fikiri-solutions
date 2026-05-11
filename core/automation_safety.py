@@ -37,7 +37,7 @@ class AutomationSafetyManager:
             # Automation safety config table
             self.db_optimizer.execute_query("""
                 CREATE TABLE IF NOT EXISTS automation_safety_config (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGSERIAL PRIMARY KEY,
                     user_id INTEGER,
                     global_kill_switch BOOLEAN DEFAULT FALSE,
                     max_auto_replies_per_contact_per_day INTEGER DEFAULT 2,
@@ -55,7 +55,7 @@ class AutomationSafetyManager:
             # Automation action tracking table
             self.db_optimizer.execute_query("""
                 CREATE TABLE IF NOT EXISTS automation_action_log (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGSERIAL PRIMARY KEY,
                     user_id INTEGER NOT NULL,
                     rule_id INTEGER NOT NULL,
                     action_type TEXT NOT NULL,
@@ -73,7 +73,7 @@ class AutomationSafetyManager:
             # OAuth failure tracking table
             self.db_optimizer.execute_query("""
                 CREATE TABLE IF NOT EXISTS oauth_failure_log (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGSERIAL PRIMARY KEY,
                     user_id INTEGER NOT NULL,
                     failure_type TEXT NOT NULL,  -- 'refresh_failed', 'token_expired', 'revoked'
                     error_message TEXT,

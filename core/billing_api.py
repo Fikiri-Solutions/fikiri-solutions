@@ -247,7 +247,7 @@ def _test_access_duration_days() -> int:
 def _ensure_test_access_grants_table(db):
     db.execute_query("""
         CREATE TABLE IF NOT EXISTS test_access_grants (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGSERIAL PRIMARY KEY,
             user_id INTEGER NOT NULL UNIQUE,
             code_hint TEXT,
             status TEXT NOT NULL DEFAULT 'active',
@@ -261,7 +261,7 @@ def _ensure_test_access_grants_table(db):
     """, fetch=False)
     db.execute_query("""
         CREATE TABLE IF NOT EXISTS test_access_redemptions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGSERIAL PRIMARY KEY,
             user_id INTEGER NOT NULL,
             code_hint TEXT,
             redeemed_at INTEGER NOT NULL,
@@ -923,9 +923,16 @@ def get_customer_details():
                 'message': 'Could not load billing details from Stripe.',
             })
         return jsonify({'success': True, 'customer': details})
-    except Exception as e:
-        logger.error(f"Failed to get customer details: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+    except Exception:
+        # Avoid 500 + opaque KeyError('0') from DB row shapes or Stripe SDK edge cases;
+        # clients treat billing_unavailable as soft-empty (BillingPage).
+        logger.exception("Unexpected error in get_customer_details")
+        return jsonify({
+            'success': True,
+            'customer': None,
+            'billing_unavailable': True,
+            'message': 'Could not load billing profile.',
+        })
 
 @billing_bp.route('/setup-intent', methods=['POST'])
 @jwt_required()

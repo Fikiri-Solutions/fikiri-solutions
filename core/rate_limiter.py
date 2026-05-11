@@ -133,7 +133,7 @@ class EnhancedRateLimiter:
             # Track all requests when Redis is unavailable so DB fallback can enforce limits.
             db_optimizer.execute_query("""
                 CREATE TABLE IF NOT EXISTS rate_limit_requests (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGSERIAL PRIMARY KEY,
                     rate_limit_key TEXT NOT NULL,
                     limit_name TEXT NOT NULL,
                     identifier TEXT NOT NULL,
@@ -154,7 +154,7 @@ class EnhancedRateLimiter:
             # Create rate limit violations table
             db_optimizer.execute_query("""
                 CREATE TABLE IF NOT EXISTS rate_limit_violations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGSERIAL PRIMARY KEY,
                     limit_name TEXT NOT NULL,
                     limit_type TEXT NOT NULL,
                     identifier TEXT NOT NULL,

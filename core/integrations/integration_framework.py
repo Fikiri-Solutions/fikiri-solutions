@@ -95,7 +95,7 @@ class IntegrationManager:
         # Unified integrations table
         db_optimizer.execute_query("""
             CREATE TABLE IF NOT EXISTS integrations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id BIGSERIAL PRIMARY KEY,
                 user_id INTEGER NOT NULL,
                 provider TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'active',
@@ -112,7 +112,7 @@ class IntegrationManager:
         # expires_at: INTEGER (epoch seconds) for consistency with oauth_states
         db_optimizer.execute_query("""
             CREATE TABLE IF NOT EXISTS integration_tokens (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id BIGSERIAL PRIMARY KEY,
                 integration_id INTEGER NOT NULL UNIQUE,
                 access_token_enc TEXT NOT NULL,
                 refresh_token_enc TEXT,
@@ -128,7 +128,7 @@ class IntegrationManager:
         # Integration sync state - one row per integration+resource
         db_optimizer.execute_query("""
             CREATE TABLE IF NOT EXISTS integration_sync_state (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id BIGSERIAL PRIMARY KEY,
                 integration_id INTEGER NOT NULL,
                 resource TEXT NOT NULL,
                 cursor TEXT,
@@ -145,7 +145,7 @@ class IntegrationManager:
         # Calendar event links (maps internal entities to external events)
         db_optimizer.execute_query(f"""
             CREATE TABLE IF NOT EXISTS calendar_event_links (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id BIGSERIAL PRIMARY KEY,
                 user_id INTEGER NOT NULL,
                 integration_id INTEGER NOT NULL,
                 internal_entity_type TEXT NOT NULL,

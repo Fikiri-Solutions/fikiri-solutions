@@ -287,6 +287,48 @@ Static heuristic flagged two, both verified ❌ false positive: `data_retention_
 
 **Low-severity drift — JSON-named columns declared as TEXT:** 41 columns. Out of scope for this audit (functional today; native JSONB is a future optimization, not a bug).
 
+## Q8 — CI gate + zero-hit scanner (2026-05-11)
+
+`scripts/check_postgres_sql_patterns.py --fail` now runs in Backend CI. Backend workflow path filters were expanded to include `scripts/check_postgres_sql_patterns.py` so scanner-only changes still run the gate.
+
+Local verification: `python3 scripts/check_postgres_sql_patterns.py --fail` returns `OK: no flagged SQLite-centric patterns.`
+
+## Q7 — AUTOINCREMENT source DDL cleanup (2026-05-11)
+
+Replaced all 27 active scanner-visible `id INTEGER PRIMARY KEY AUTOINCREMENT` bootstrap DDLs with `id BIGSERIAL PRIMARY KEY`. This is source-level PG-correct DDL only; it does **not** ALTER production tables.
+
+Because local/unit-test fallback still runs SQLite, `translate_postgres_ddl_to_sqlite()` was added to `core/postgres_compat.py` and `db_optimizer.execute_query()` now applies it only on the SQLite path for DDL. That preserves SQLite auto-id semantics (`INTEGER PRIMARY KEY AUTOINCREMENT`) for tests without keeping SQLite syntax in active runtime modules.
+
+Post-Q7 scanner state:
+
+| Bucket | Hits |
+|---|---:|
+| `AUTOINCREMENT` | 0 |
+| Everything else | 0 |
+
+## Q6 — Second-pass re-audit of Q4 verified-safe claims (2026-05-11)
+
+Re-read the actual code lines behind every Q4 "verified-safe" claim rather than trusting the old table. Most claims still passed, but the second pass found three real issues:
+
+| Finding | Severity | Where | Fix | Status |
+|---|---|---|---|---|
+| `routes/appointments.py` persisted `payload_truncated` into a `BOOLEAN` column as `1 if payload_truncated else 0` in seven best-effort appointment-intake paths. PostgreSQL rejects integer params for boolean columns. | high | `routes/appointments.py` | Pass the Python `bool` directly so psycopg2 binds a PG boolean. | ✅ fixed |
+| `core/webhook_api.py` had the same `payload_truncated` integer-param bug for form/lead/appointment intake persistence. The appointment-intake helper also had an INSERT contract bug: 16 target columns, 15 value expressions, and two extra params (`request_ip`, `user_agent`) for columns that do not exist on `customer_appointment_intake_submissions`. Because persistence is best-effort, the failure was swallowed. | high | `core/webhook_api.py` | Pass `payload_truncated` as `bool`; add the missing value expression; remove the extra params from the appointment-intake insert (no schema change). Added focused tests for bool binding and placeholder/param count. | ✅ fixed |
+| The Q4 `get_database_stats()` PG branch used `information_schema.statistics`, which is MySQL-style and not a PostgreSQL information-schema view. The previous "fix" would still fail on PG. | latent high | `core/database_optimization.py` | Replace with a PG-native `pg_indexes` aggregate joined to `information_schema.tables`. | ✅ fixed |
+
+Second-pass claims still verified safe:
+
+| Claim | Verdict |
+|---|---|
+| `INSERT OR REPLACE` branches | PASS — the four active sites remain SQLite-only `else` branches, with PG using `ON CONFLICT`. |
+| `sqlite_master` usage | PASS after correcting stats query above — remaining active PG paths branch to `information_schema` / `pg_indexes`; SQLite catalog queries stay SQLite-only. |
+| PRAGMA setup | PASS — runtime PRAGMA statements are SQLite-only connection setup or bootstrap `PRAGMA table_info` calls handled by `PostgresBootstrapCursor`. |
+| `json_extract` | PASS — only emitted by `json_field_expr()` on SQLite; PG emits `(<col>::jsonb->>'key')`. |
+| `ALTER TABLE ... BOOLEAN DEFAULT 0` | PASS — active calls route through `db_optimizer.execute_query()` and DDL translation rewrites defaults to `TRUE`/`FALSE` on PG. |
+| `refresh_tokens.device_id` migration | PASS — uses `db_optimizer.list_table_columns()` and `db_optimizer.execute_query()`; SQL is PG-valid. |
+| Raw cursor usage in appointments/chatbot transactions | PASS — inside `db_optimizer.transaction()` with PG cursor wrapping. |
+| Identifier casing / advanced SQL features | PASS — no mixed-case quoted identifiers or unsupported PG/SQLite divergence surfaced in active backend code. |
+
 ## Q5 — Closer audit of the 22 "vetted" FPs (2026-05-11)
 
 Re-vetted every advisory hit I'd previously labeled as a false positive. **The previous pass was too generous — one site labeled "shape-tolerant" actually was not.**
@@ -323,10 +365,10 @@ Re-vetted every advisory hit I'd previously labeled as a false positive. **The p
 
 | Bucket | Hits | Status |
 |---|---|---|
-| `AUTOINCREMENT` | 27 | Open. Runtime-safe today (DDL translator rewrites `INTEGER PRIMARY KEY AUTOINCREMENT` → `SERIAL PRIMARY KEY` on PG). Source-level cleanup deferred per `phase2_autoincrement`. |
+| `AUTOINCREMENT` | 0 | Closed in Q7. Active scanner-visible bootstrap DDL now uses `BIGSERIAL PRIMARY KEY`. |
 | Everything else | 0 | Closed. |
 
-**Real-bug count remaining after Q5: 0** (excluding the cosmetic AUTOINCREMENT bucket).
+**Real-bug count remaining after Q8: 0** (scanner gate is now zero-hit and enforced in Backend CI).
 
 ## Q4 — Broader sweep (things the regex scanner can't catch)
 
@@ -350,7 +392,7 @@ The following patterns initially looked suspicious but turned out to be correctl
 | `PRAGMA journal_mode=WAL` / `synchronous=NORMAL` / `foreign_keys=ON` | `core/database_optimization.py:198, 2052-2056, 2513` | All inside SQLite-only connection setup (the `else` branch of the connection-pool guard). PG connections never see PRAGMA. |
 | `json_extract(col, '$.path')` | `core/database_optimization.json_field_expr()` (only call site) | Helper branches: PG returns `(col::jsonb->>'path')`, SQLite returns `json_extract(col, '$.path')`. |
 | `ALTER TABLE ... ADD COLUMN ... BOOLEAN DEFAULT 0` (multiple sites) | `core/database_optimization.py:341, 195, …`, `email_automation/gmail_sync_jobs.py:195, 210` | All route through `db_optimizer.execute_query()` → `should_translate_sqlite_ddl()` → `translate_sqlite_ddl_to_postgres()` which rewrites `BOOLEAN DEFAULT 0` to `BOOLEAN DEFAULT FALSE`. |
-| `payload_truncated BOOLEAN` value inserts | `routes/appointments.py::_stringify_payload()` returns `(str, bool)` — a Python `bool` | psycopg2 maps Python `bool` → PG `boolean` natively; SQLite stores 0/1. Both correct. |
+| `payload_truncated BOOLEAN` value inserts | `routes/appointments.py`, `core/webhook_api.py` | Q4 claim was wrong. Q6 fixed all active appointment/webhook intake paths to pass Python `bool` instead of `1/0`; focused webhook tests pin this. |
 | `ALTER TABLE refresh_tokens ADD COLUMN device_id TEXT` | `core/jwt_auth.py:106` | Routes through `db_optimizer.execute_query()`. PG accepts the statement unchanged. |
 | Raw `cursor.execute(...)` calls outside `db_optimizer` | `core/appointments_service.py:105/118/228`, `core/chatbot_content_events.py` | All inside `db_optimizer.transaction()` context manager, which on PG wraps the cursor with `PostgresBootstrapCursor` (translates `?` → `%s` and inline DDL). |
 | Identifier casing | full source tree | Consistent `lower_snake_case` throughout. No quoted mixed-case identifiers. Zero PG-vs-SQLite case-folding risk. |
@@ -388,12 +430,12 @@ In order from lowest-risk and highest-blast-radius down to riskiest. Each PR clo
 | 3 | `pg-audit(strftime): replace with to_char/EXTRACT` | Investigated. **No work needed.** Whole-tree audit (`(?<!\.)strftime\(` across `.py/.sql/.sh/.js/.ts/.yml`) finds exactly 1 non-method `strftime(` occurrence — and it's the literal pattern definition inside `scripts/check_postgres_sql_patterns.py:144`. The 22 scanner hits were 100% Python `datetime.strftime()` / `time.strftime()` method calls producing strings used as filenames, dict keys, log paths, and parameterized SQL values. None embed into a SQL `strftime()` function call. Scanner tightened to skip the method-call form. ✅ | no | 22 (all FP — closed by scanner-regex fix) |
 | 4 | `pg-audit(prestart): replace raw sqlite path` | Done. Rewrote `scripts/prestart.py` as a thin Postgres-aware shim that delegates schema bootstrap to `db_optimizer` (which already runs the bootstrap synchronously on import). Dropped `import sqlite3`, `sqlite3.connect(...)`, three `PRAGMA` statements, and six `CREATE TABLE ... AUTOINCREMENT` blocks. Lockfile (`data/.db_init_lock`) interface preserved. **Note** — script was never wired into production (`render.yaml`/`Dockerfile`/`app.py` don't invoke it). It's a manual dev/orchestrator hook now, made PG-safe. ✅ | no | 11 (6 AUTOINCREMENT, 3 PRAGMA, 1 sqlite3.connect, 1 raw import) |
 | 5 | `pg-audit(feedback-router): route through db_optimizer` | Done. Dropped `import sqlite3` from `core/user_feedback_router.py`. Replaced the driver-specific `except sqlite3.OperationalError` in the retry loop with a portable message-based check that also matches psycopg2's `deadlock detected` / `lock timeout` messages. `db_optimizer.execute_query()` already handles `?`→`%s` adaptation, so no SQL changes were needed. ✅ | no | 1 |
-| 6 | `pg-audit(autoincrement): PG-correct DDL` | Replace `AUTOINCREMENT` with `BIGSERIAL` in 27 remaining CREATE TABLE statements per Q1.a. No ALTERs to prod. | yes (idempotent DDL only) | 27 |
-| 7 | `pg-audit(ci-gate)` | Promote `scripts/check_postgres_sql_patterns.py --fail` into CI. Add `# noqa: pg-audit` suppressions to the 3 advisory `SELECT DISTINCT` hits (verified clean) so CI stays green. | no | 3 |
+| 6 | `pg-audit(autoincrement): PG-correct DDL` | Done. Replaced 27 scanner-visible `AUTOINCREMENT` DDLs with `BIGSERIAL PRIMARY KEY`. Added SQLite fallback translation for local/unit tests. ✅ | no prod ALTER | 27 |
+| 7 | `pg-audit(ci-gate)` | Done. Backend CI runs `python3 scripts/check_postgres_sql_patterns.py --fail`; workflow path filters include the scanner. ✅ | no | scanner gate |
 
 After all PRs land:
-- Re-run scanner → expect **0** hits (with FPs suppressed).
-- Promote scanner to CI (`--fail`) so we don't regress.
+- Re-run scanner → **0 hits**.
+- Scanner is now in CI (`--fail`) so we don't regress.
 
 ## Change log
 
@@ -401,6 +443,9 @@ After all PRs land:
 
 | Date (UTC) | Commit | Feature area | File(s) | What | Why |
 |---|---|---|---|---|---|
+| 2026-05-11 | _(pending)_ | Audit infra / CI | `.github/workflows/backend.yml`, `scripts/check_postgres_sql_patterns.py` | Promote the PG safety scanner to Backend CI with `python3 scripts/check_postgres_sql_patterns.py --fail`; backend workflow path filters now include the scanner file. Local scanner state is zero-hit. | Prevent regressions. The audit only matters if new SQLite-only SQL cannot quietly re-enter the backend. |
+| 2026-05-11 | _(pending)_ | DDL / Bootstrap | `core/postgres_compat.py`, `core/database_optimization.py`, 14 scanner-visible runtime modules | Replace the 27 active scanner-visible `id INTEGER PRIMARY KEY AUTOINCREMENT` DDLs with `id BIGSERIAL PRIMARY KEY`. Added `translate_postgres_ddl_to_sqlite()` and wired it into the SQLite `execute_query()` DDL path so local/unit-test fallback preserves SQLite auto-id behavior. | Q1 decision was `fix_only`: source DDL should be PG-correct. The SQLite fallback translation is only to keep local tests from losing auto-increment semantics (`BIGSERIAL PRIMARY KEY` stores NULL ids in SQLite). No prod ALTERs. |
+| 2026-05-11 | _(pending)_ | Q6 broader audit fixes | `core/database_optimization.py`, `core/webhook_api.py`, `routes/appointments.py`, `tests/test_webhook_form_intake_persistence.py` | Second-pass re-audit of Q4 verified-safe claims found 3 real issues: (1) `get_database_stats()` used non-existent PG `information_schema.statistics`, corrected to `pg_indexes`; (2) appointment/webhook intake paths inserted integer `1/0` params into PG BOOLEAN `payload_truncated` columns, corrected to Python `bool`; (3) `_persist_appointment_intake_submission()` had mismatched INSERT columns/values and extra params for absent columns, corrected without schema changes. Added focused tests for bool binding and placeholder/param count. | This is the direct consequence of the user's "remember the rules" reminder: don't trust a previous verified-safe label; read the line. These were silent best-effort persistence failures and a latent stats-route failure. |
 | 2026-05-11 | `04f8ce73` | DB infra (refactor) | `core/database_optimization.py`, `core/billing_api.py` | Promote shape-tolerance helper. `_db_row_scalar()` was a private helper in `core/billing_api.py` that read one column from a row returned by `execute_query()` while staying tolerant of dict (psycopg2 RealDict), tuple, and `sqlite3.Row` shapes. Moved it as `query_row_scalar()` into `core/database_optimization.py` so any module that touches `execute_query()` can import it instead of re-implementing the dict/tuple branching. Three billing call sites updated to use the new import. Carryover from an earlier turn that wasn't committed at the time. Behavior unchanged. | The same KeyError that 500'd billing on PG (`row[0]` on a RealDict, fixed in `2e643832`) is a class of bug, not a one-off — any module that reads `execute_query()` results without `query_row_scalar()` is one PG run away from the same crash. Having the helper one import from anywhere lowers the cost of fixing the next instance to zero. |
 | 2026-05-10 | `0c1e42ff` | DB infra / Audit | `core/database_optimization.py`, `docs/POSTGRES_MIGRATION_AUDIT.md` | Q4 broader sweep landed. (1) Fixed `get_database_stats()` — old code unconditionally queried `sqlite_master` and ran `PRAGMA page_count/page_size`, which would 500 on PG. Added a PG branch using `information_schema.tables`, `information_schema.statistics`, and `pg_total_relation_size()` aggregated over `pg_class`. SQLite path preserved for local dev. Smoke test: 88 tables, 36 MB on local SQLite. (2) Audited everything the regex scanner can't see — branched DDL paths, raw cursor leaks, `sqlite_master` queries, `INSERT OR REPLACE` paths, PRAGMA setup, JSON access, identifier casing, transaction isolation, `FOR UPDATE` / `LISTEN/NOTIFY` / `pg_advisory_lock` / `EXTRACT(EPOCH FROM ...)` / `NULLS FIRST/LAST` / `ARRAY[]` / `regexp_*` / `julianday()` — codebase is **clean** on every one of these. Logged the verified-safe inventory in the audit doc so future audits don't redo the work. (3) Pulled live Supabase advisor data: 86 `rls_enabled_no_policy` INFO findings (backend uses service-role, so no immediate impact) and 158 perf advisories (132 unused indexes on near-empty tables + 26 unindexed FKs). Both filed as parallel concerns, NOT in PG-migration scope. Confirmed installed PG extensions: `pgcrypto`, `uuid-ossp`, `pg_stat_statements`, `supabase_vault`, `plpgsql`. | "No workarounds" rule says: prove the codebase is clean for every PG-vs-SQLite divergence we know about. The scanner catches pattern-grep-able diffs; the broader sweep catches structural ones (branched paths, helper escapes, surrounding platform state). Net: one real latent bug fixed, dozens of patterns verified-safe, parallel Supabase-platform concerns surfaced for follow-up. |
 | 2026-05-11 | `0156009c` | Appointments / Audit infra | `core/appointments_service.py`, `core/expert_escalation.py`, `core/smart_faq_system.py`, `crm/completion_api.py`, `routes/appointments.py`, `routes/integrations.py`, `services/business_operations.py`, `core/kpi_tracker.py`, `core/workflow_followups.py`, `crm/service.py`, `scripts/check_postgres_sql_patterns.py`, `docs/POSTGRES_MIGRATION_AUDIT.md` | Q5 closer audit of the 22 "vetted" advisory FPs. **Found 1 real bug I had previously labeled as a FP.** `_sync_to_calendar()` was reading `appointment['start_time']` / `['end_time']` from a DB row via `datetime.fromisoformat(...)` with no `isinstance` guard. On PG, `appointments.start_time` is a native `datetime` post-fetch, so `fromisoformat()` raises `TypeError` and the whole calendar create/update/cancel path silently fails (the surrounding `try/except` logs "Calendar sync failed" and moves on, so users see "appointment created" but no Google-Calendar event ever appears). Fix: shape-tolerant guard matching the pattern used 3× elsewhere in the same file. The other 21 hits really were FPs — request-JSON inputs (HTTP body, always ISO string by API contract), in-memory dicts (`BusinessAnalytics.metrics`), or already isinstance-guarded — and got `# noqa: pg-audit` (Python) or `-- noqa: pg-audit` (SQL inside string literals) with one-line justifications. Scanner's `SUPPRESS_RE` widened from `#` only to `(?:#\|--)` so SQL-line suppression works inline. 40 unit tests pass. **Net scanner state**: 27 hits remaining, all `AUTOINCREMENT` (cosmetic — translator handles them at runtime); 0 non-AUTOINCREMENT bugs left. | The previous "all 22 are FPs" claim was based on pattern names, not on actually reading each line. Re-reading caught the miss. Logged the honesty note in the doc so future audits aren't tempted to trust a "vetted" label without re-grep evidence. Per "no workarounds": the bug was a true silent failure (try/except masks the trace), not a noisy crash, which is exactly the kind of thing the audit was supposed to catch. |

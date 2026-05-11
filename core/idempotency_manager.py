@@ -78,7 +78,7 @@ class IdempotencyManager:
             # Create idempotency keys table
             db_optimizer.execute_query("""
                 CREATE TABLE IF NOT EXISTS idempotency_keys (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGSERIAL PRIMARY KEY,
                     key_hash TEXT NOT NULL UNIQUE,
                     operation_type TEXT NOT NULL,
                     user_id INTEGER,

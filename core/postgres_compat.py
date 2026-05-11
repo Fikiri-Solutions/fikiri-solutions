@@ -50,6 +50,24 @@ def translate_sqlite_ddl_to_postgres(sql: str) -> str:
     return s
 
 
+def translate_postgres_ddl_to_sqlite(sql: str) -> str:
+    """Mechanical DDL tweaks for PostgreSQL-oriented bootstrap DDL in SQLite fallback."""
+    s = sql
+    s = re.sub(
+        r"\bBIGSERIAL\s+PRIMARY\s+KEY\b",
+        "INTEGER PRIMARY KEY AUTOINCREMENT",
+        s,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(
+        r"\bSERIAL\s+PRIMARY\s+KEY\b",
+        "INTEGER PRIMARY KEY AUTOINCREMENT",
+        s,
+        flags=re.IGNORECASE,
+    )
+    return s
+
+
 def should_translate_sqlite_ddl(stripped_sql: str) -> bool:
     head = stripped_sql.split(None, 1)[0].upper() if stripped_sql else ""
     return head in ("CREATE", "DROP") or (head == "ALTER" and "TABLE" in stripped_sql.upper())

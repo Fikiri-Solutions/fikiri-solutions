@@ -36,6 +36,7 @@ from core.postgres_compat import (
     PostgresBootstrapCursor,
     adapt_qmark_params_to_psycopg2,
     is_postgresql_dsn,
+    translate_postgres_ddl_to_sqlite,
     translate_sqlite_ddl_to_postgres,
     should_translate_sqlite_ddl,
 )
@@ -2319,6 +2320,8 @@ class DatabaseOptimizer:
                     else:
                         cursor.execute(q_pg)
                 else:
+                    if should_translate_sqlite_ddl(q_strip):
+                        query = translate_postgres_ddl_to_sqlite(query)
                     cursor = conn.cursor()
                     if params:
                         cursor.execute(query, params)
@@ -2661,17 +2664,19 @@ class DatabaseOptimizer:
         if self.db_type == "postgresql":
             tables_rows = self.execute_query(
                 """
-                SELECT table_name,
-                       (
-                           SELECT COUNT(*)
-                           FROM information_schema.statistics s
-                           WHERE s.table_schema = t.table_schema
-                             AND s.table_name = t.table_name
-                       ) AS index_count
+                SELECT t.table_name,
+                       COALESCE(i.index_count, 0) AS index_count
                 FROM information_schema.tables t
+                LEFT JOIN (
+                    SELECT schemaname, tablename, COUNT(*) AS index_count
+                    FROM pg_indexes
+                    GROUP BY schemaname, tablename
+                ) i
+                  ON i.schemaname = t.table_schema
+                 AND i.tablename = t.table_name
                 WHERE t.table_schema = 'public'
                   AND t.table_type = 'BASE TABLE'
-                ORDER BY table_name
+                ORDER BY t.table_name
                 """
             ) or []
             stats["tables"] = [

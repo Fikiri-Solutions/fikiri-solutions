@@ -8,10 +8,10 @@ name: Backend CI
 on:
   push:
     branches: [ main, develop ]
-    paths: [ 'core/**', 'routes/**', 'app.py', 'requirements.txt', 'services/**', 'crm/**', 'analytics/**', 'email_automation/**' ]
+    paths: [ 'core/**', 'routes/**', 'app.py', 'requirements.txt', 'services/**', 'crm/**', 'analytics/**', 'email_automation/**', 'scripts/check_postgres_sql_patterns.py' ]
   pull_request:
     branches: [ main, develop ]
-    paths: [ 'core/**', 'routes/**', 'app.py', 'requirements.txt', 'services/**', 'crm/**', 'analytics/**', 'email_automation/**' ]
+    paths: [ 'core/**', 'routes/**', 'app.py', 'requirements.txt', 'services/**', 'crm/**', 'analytics/**', 'email_automation/**', 'scripts/check_postgres_sql_patterns.py' ]
 
 jobs:
   test:
@@ -45,6 +45,9 @@ jobs:
         pip install mypy
         mypy core/ app.py --ignore-missing-imports --explicit-package-bases --namespace-packages
       continue-on-error: true
+
+    - name: Run Postgres migration safety scan
+      run: python3 scripts/check_postgres_sql_patterns.py --fail
     
     - name: Run tests
       run: |

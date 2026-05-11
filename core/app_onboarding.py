@@ -47,7 +47,7 @@ def save_onboarding():
         # Create onboarding_info table if it doesn't exist
         create_table_sql = """
         CREATE TABLE IF NOT EXISTS onboarding_info (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGSERIAL PRIMARY KEY,
             user_id INTEGER UNIQUE,
             name TEXT NOT NULL,
             company TEXT NOT NULL,

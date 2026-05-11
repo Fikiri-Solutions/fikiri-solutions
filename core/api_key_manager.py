@@ -36,7 +36,7 @@ class APIKeyManager:
             # API keys table with tenant isolation
             db_optimizer.execute_query(f"""
                 CREATE TABLE IF NOT EXISTS api_keys (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGSERIAL PRIMARY KEY,
                     user_id INTEGER NOT NULL,
                     key_hash TEXT NOT NULL UNIQUE,
                     key_prefix TEXT NOT NULL,  -- First 8 chars for identification
@@ -59,7 +59,7 @@ class APIKeyManager:
             # API key usage tracking for rate limiting
             db_optimizer.execute_query("""
                 CREATE TABLE IF NOT EXISTS api_key_usage (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGSERIAL PRIMARY KEY,
                     api_key_id INTEGER NOT NULL,
                     endpoint TEXT NOT NULL,
                     ip_address TEXT,

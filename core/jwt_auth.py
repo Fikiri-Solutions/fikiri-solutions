@@ -84,7 +84,7 @@ class JWTAuthManager:
             # Create refresh tokens table
             db_optimizer.execute_query("""
                 CREATE TABLE IF NOT EXISTS refresh_tokens (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGSERIAL PRIMARY KEY,
                     user_id INTEGER NOT NULL,
                     token_hash TEXT NOT NULL UNIQUE,
                     expires_at DATETIME NOT NULL,

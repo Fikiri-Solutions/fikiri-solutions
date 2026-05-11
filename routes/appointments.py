@@ -87,7 +87,7 @@ def create_appointment():
                         'failed',
                         str(e)[:5000],
                         payload_json,
-                        1 if payload_truncated else 0,
+                        payload_truncated,
                     ),
                     fetch=False,
                 )
@@ -142,7 +142,7 @@ def create_appointment():
                     'completed',
                     None,
                     payload_json,
-                    1 if payload_truncated else 0,
+                    payload_truncated,
                 ),
                 fetch=False,
             )
@@ -179,7 +179,7 @@ def create_appointment():
                     'failed',
                     str(e)[:5000],
                     payload_json,
-                    1 if payload_truncated else 0,
+                    payload_truncated,
                 ),
                 fetch=False,
             )
@@ -298,7 +298,7 @@ def update_appointment(appointment_id):
                     status,
                     None,
                     payload_json,
-                    1 if payload_truncated else 0,
+                    payload_truncated,
                 ),
                 fetch=False,
             )
@@ -338,7 +338,7 @@ def update_appointment(appointment_id):
                     'failed',
                     str(e)[:5000],
                     payload_json,
-                    1 if payload_truncated else 0,
+                    payload_truncated,
                 ),
                 fetch=False,
             )
@@ -393,7 +393,7 @@ def cancel_appointment(appointment_id):
                     'cancelled',
                     None,
                     payload_json,
-                    1 if payload_truncated else 0,
+                    payload_truncated,
                 ),
                 fetch=False,
             )
@@ -433,7 +433,7 @@ def cancel_appointment(appointment_id):
                     'failed',
                     str(e)[:5000],
                     payload_json,
-                    1 if payload_truncated else 0,
+                    payload_truncated,
                 ),
                 fetch=False,
             )

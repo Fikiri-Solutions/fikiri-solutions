@@ -71,7 +71,7 @@ class OAuthTokenManager:
             # OAuth tokens table with encryption
             self.db_optimizer.execute_query("""
                 CREATE TABLE IF NOT EXISTS oauth_tokens (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGSERIAL PRIMARY KEY,
                     user_id INTEGER NOT NULL,
                     service TEXT NOT NULL,  -- 'gmail', 'outlook', etc.
                     access_token_encrypted TEXT NOT NULL,
@@ -92,7 +92,7 @@ class OAuthTokenManager:
             # OAuth refresh failures table
             self.db_optimizer.execute_query("""
                 CREATE TABLE IF NOT EXISTS oauth_refresh_failures (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGSERIAL PRIMARY KEY,
                     user_id INTEGER NOT NULL,
                     service TEXT NOT NULL,
                     failure_type TEXT NOT NULL,  -- 'refresh_failed', 'token_expired', 'revoked'

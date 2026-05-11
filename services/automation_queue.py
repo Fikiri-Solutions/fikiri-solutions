@@ -103,7 +103,7 @@ class AutomationJobManager:
         try:
             db_optimizer.execute_query("""
                 CREATE TABLE IF NOT EXISTS automation_jobs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGSERIAL PRIMARY KEY,
                     job_id TEXT NOT NULL UNIQUE,
                     user_id INTEGER NOT NULL,
                     payload_type TEXT NOT NULL,

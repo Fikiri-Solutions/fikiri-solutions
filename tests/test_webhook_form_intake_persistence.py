@@ -10,6 +10,7 @@ from flask import Flask
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import core.webhook_api as webhook_api
 from core.webhook_api import webhook_bp
 
 
@@ -89,6 +90,61 @@ class TestWebhookFormIntakePersistence(unittest.TestCase):
             if "customer_form_intake_submissions" in c[0][0]
         ]
         self.assertTrue(len(insert_calls) >= 1)
+
+    @patch("core.webhook_api.db_optimizer")
+    def test_form_intake_insert_uses_boolean_payload_truncated(self, mock_db):
+        mock_db.execute_insert_returning_id.return_value = 123
+
+        result = webhook_api._insert_customer_form_intake(
+            user_id=1,
+            api_key_id="kid1",
+            form_id="contact",
+            source="website",
+            email="jane@example.com",
+            name="Jane",
+            phone=None,
+            company=None,
+            subject=None,
+            payload_json="{}",
+            payload_truncated=True,
+            status="completed",
+            error=None,
+            lead_id="L42",
+            request_ip="127.0.0.1",
+            user_agent="pytest",
+        )
+
+        self.assertEqual(result, 123)
+        params = mock_db.execute_insert_returning_id.call_args[0][1]
+        self.assertIs(params[10], True)
+
+    @patch("core.webhook_api.db_optimizer")
+    def test_appointment_intake_insert_matches_columns_and_uses_boolean(self, mock_db):
+        webhook_api._persist_appointment_intake_submission(
+            user_id=1,
+            api_key_id="kid1",
+            source="booking",
+            appointment_id=99,
+            customer_name="Jane",
+            customer_email="jane@example.com",
+            customer_phone=None,
+            service_type="consultation",
+            requested_date="2026-05-11",
+            requested_time="16:00:00",
+            timezone="UTC",
+            status="completed",
+            error_message=None,
+            payload_json="{}",
+            payload_truncated=True,
+            request_ip="127.0.0.1",
+            user_agent="pytest",
+        )
+
+        query, params = mock_db.execute_query.call_args[0][:2]
+        self.assertIn("payload_truncated", query)
+        self.assertEqual(query.count("?"), len(params))
+        self.assertEqual(len(params), 14)
+        self.assertIs(params[13], True)
 
     @patch("crm.service.enhanced_crm_service")
     @patch("core.idempotency_manager.generate_deterministic_key")

@@ -87,7 +87,7 @@ def _insert_customer_form_intake(
                 company,
                 subject,
                 payload_json,
-                1 if payload_truncated else 0,
+                payload_truncated,
                 status,
                 error,
                 lead_id,
@@ -224,7 +224,7 @@ def _persist_appointment_intake_submission(
                 payload_json, payload_truncated,
                 created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             """,
             (
                 user_id,
@@ -240,9 +240,7 @@ def _persist_appointment_intake_submission(
                 status,
                 error_message,
                 payload_json,
-                1 if payload_truncated else 0,
-                request_ip,
-                user_agent,
+                payload_truncated,
             ),
             fetch=False,
         )
@@ -1493,7 +1491,7 @@ def handle_lead_capture():
                         data.get('phone'),
                         company,
                         payload_json,
-                        1 if payload_truncated else 0,
+                        payload_truncated,
                         'failed',
                         'honeypot_filled',
                         None,
@@ -1560,7 +1558,7 @@ def handle_lead_capture():
                         data.get('phone'),
                         company,
                         payload_json,
-                        1 if payload_truncated else 0,
+                        payload_truncated,
                         'deduplicated',
                         None,
                         lead_id,
@@ -1633,7 +1631,7 @@ def handle_lead_capture():
                             data.get('phone'),
                             company,
                             payload_json,
-                            1 if payload_truncated else 0,
+                            payload_truncated,
                             'failed',
                             result.get('error') or 'lead_create_failed',
                             None,
@@ -1689,7 +1687,7 @@ def handle_lead_capture():
                         data.get('phone'),
                         company,
                         payload_json,
-                        1 if payload_truncated else 0,
+                        payload_truncated,
                         'completed',
                         None,
                         lead_id,
@@ -1741,7 +1739,7 @@ def handle_lead_capture():
                         data.get('phone'),
                         company,
                         payload_json,
-                        1 if payload_truncated else 0,
+                        payload_truncated,
                         'failed',
                         str(e)[:5000],
                         None,

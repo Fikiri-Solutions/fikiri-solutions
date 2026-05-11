@@ -138,7 +138,7 @@ class GmailSyncJobManager:
             # Create Gmail sync jobs table
             db_optimizer.execute_query("""
                 CREATE TABLE IF NOT EXISTS gmail_sync_jobs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGSERIAL PRIMARY KEY,
                     user_id INTEGER NOT NULL,
                     job_id TEXT NOT NULL UNIQUE,
                     status TEXT DEFAULT 'pending',
@@ -158,7 +158,7 @@ class GmailSyncJobManager:
             # Create synced emails table (supports multiple providers)
             db_optimizer.execute_query("""
                 CREATE TABLE IF NOT EXISTS synced_emails (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGSERIAL PRIMARY KEY,
                     user_id INTEGER NOT NULL,
                     gmail_id TEXT,  -- Legacy Gmail ID (for backward compatibility)
                     external_id TEXT,  -- Generic external ID (Gmail, Outlook, etc.)
@@ -223,7 +223,7 @@ class GmailSyncJobManager:
             # Create contacts table
             db_optimizer.execute_query("""
                 CREATE TABLE IF NOT EXISTS contacts (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGSERIAL PRIMARY KEY,
                     user_id INTEGER NOT NULL,
                     email TEXT NOT NULL,
                     name TEXT,
@@ -259,7 +259,7 @@ class GmailSyncJobManager:
             # Create user_sync_status table for tracking sync state
             db_optimizer.execute_query("""
                 CREATE TABLE IF NOT EXISTS user_sync_status (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGSERIAL PRIMARY KEY,
                     user_id INTEGER NOT NULL UNIQUE,
                     last_sync DATETIME,
                     sync_status TEXT DEFAULT 'connected_pending_sync',
