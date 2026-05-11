@@ -33,6 +33,7 @@ def get_jwt_identity():
     except Exception:
         return None
 from config import Config
+from core.database_optimization import query_row_scalar
 from core.fikiri_stripe_manager import FikiriStripeManager
 from core.stripe_webhooks import StripeWebhookHandler
 
@@ -107,20 +108,6 @@ def retry_stripe_api(max_retries=3, delay=1, backoff=2):
     return decorator
 
 
-def _db_row_scalar(row, column_name: str):
-    """One column from execute_query row: PostgreSQL RealDict is a dict; SQLite may be tuple or Row."""
-    if row is None:
-        return None
-    if isinstance(row, dict):
-        return row.get(column_name)
-    if isinstance(row, (list, tuple)):
-        return row[0] if len(row) > 0 else None
-    try:
-        return row[column_name]
-    except (KeyError, TypeError):
-        return None
-
-
 def get_user_email(user_id):
     """Get user email from database"""
     from core.database_optimization import DatabaseOptimizer
@@ -128,7 +115,7 @@ def get_user_email(user_id):
     user_data = db.execute_query("SELECT email FROM users WHERE id = ?", (user_id,))
     if not user_data:
         return None
-    return _db_row_scalar(user_data[0], "email")
+    return query_row_scalar(user_data[0], "email")
 
 
 def get_user_name(user_id):
@@ -138,7 +125,7 @@ def get_user_name(user_id):
     user_data = db.execute_query("SELECT name FROM users WHERE id = ?", (user_id,))
     if not user_data:
         return None
-    return _db_row_scalar(user_data[0], "name")
+    return query_row_scalar(user_data[0], "name")
 
 
 def _stripe_dashboard_message(exc: BaseException) -> str:
@@ -339,7 +326,7 @@ def get_stripe_customer_id(user_email, user_id=None):
                 (user_id,)
             )
             if cached and len(cached) > 0 and cached[0]:
-                cid = _db_row_scalar(cached[0], "stripe_customer_id")
+                cid = query_row_scalar(cached[0], "stripe_customer_id")
                 if cid:
                     return cid
         except Exception as e:

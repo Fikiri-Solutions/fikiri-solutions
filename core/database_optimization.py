@@ -82,6 +82,26 @@ def safe_json_serialize(obj):
         logger.warning("⚠️ Auto-converted non-serializable DB result to dict")
         return str(obj)
 
+
+def query_row_scalar(row: Any, column_name: str) -> Any:
+    """
+    Read one column from a row returned by execute_query.
+
+    PostgreSQL uses dict-shaped rows (RealDictCursor); SQLite often returns tuples
+    or sqlite3.Row. Never index rows with [0] unless the row is sequence-shaped.
+    """
+    if row is None:
+        return None
+    if isinstance(row, dict):
+        return row.get(column_name)
+    if isinstance(row, (list, tuple)):
+        return row[0] if len(row) > 0 else None
+    try:
+        return row[column_name]
+    except (KeyError, TypeError):
+        return None
+
+
 @dataclass
 class QueryMetrics:
     """Database query performance metrics"""
