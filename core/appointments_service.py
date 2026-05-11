@@ -218,8 +218,8 @@ class AppointmentsService:
         start_time = start_time_str if isinstance(start_time_str, datetime) else datetime.fromisoformat(start_time_str)
         end_time = end_time_str if isinstance(end_time_str, datetime) else datetime.fromisoformat(end_time_str)
         
-        appointment_start = appointment['start_time'] if isinstance(appointment['start_time'], datetime) else datetime.fromisoformat(appointment['start_time'])
-        appointment_end = appointment['end_time'] if isinstance(appointment['end_time'], datetime) else datetime.fromisoformat(appointment['end_time'])
+        appointment_start = appointment['start_time'] if isinstance(appointment['start_time'], datetime) else datetime.fromisoformat(appointment['start_time'])  # noqa: pg-audit (shape-tolerant)
+        appointment_end = appointment['end_time'] if isinstance(appointment['end_time'], datetime) else datetime.fromisoformat(appointment['end_time'])  # noqa: pg-audit (shape-tolerant)
         
         if start_time != appointment_start or end_time != appointment_end:
             # Time changed, check conflicts atomically within transaction.
@@ -423,8 +423,8 @@ class AppointmentsService:
         current = start
         
         for busy in busy_sorted:
-            busy_start = datetime.fromisoformat(busy['start']) if isinstance(busy['start'], str) else busy['start']
-            busy_end = datetime.fromisoformat(busy['end']) if isinstance(busy['end'], str) else busy['end']
+            busy_start = datetime.fromisoformat(busy['start']) if isinstance(busy['start'], str) else busy['start']  # noqa: pg-audit (shape-tolerant)
+            busy_end = datetime.fromisoformat(busy['end']) if isinstance(busy['end'], str) else busy['end']  # noqa: pg-audit (shape-tolerant)
             
             # Add free slots before this busy period
             while current + timedelta(minutes=slot_duration_minutes) <= busy_start and len(free_slots) < max_slots:
@@ -456,9 +456,13 @@ class AppointmentsService:
             return
         
         calendar_manager = CalendarManager(self.user_id)
-        
-        start_time = datetime.fromisoformat(appointment['start_time'])
-        end_time = datetime.fromisoformat(appointment['end_time'])
+
+        # appointment is a row from get_appointment(); on PostgreSQL the TIMESTAMP
+        # columns come back as native datetime, on SQLite they are ISO strings.
+        start_raw = appointment['start_time']
+        end_raw = appointment['end_time']
+        start_time = start_raw if isinstance(start_raw, datetime) else datetime.fromisoformat(start_raw)
+        end_time = end_raw if isinstance(end_raw, datetime) else datetime.fromisoformat(end_raw)
         
         if action == 'create':
             # Create calendar event

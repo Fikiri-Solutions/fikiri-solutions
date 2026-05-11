@@ -13,7 +13,8 @@ five-pattern check we had before by:
   * emitting JSON or Markdown so the audit doc / CI can consume it
     without human reformatting,
   * grouping by feature area (the unit of work in the audit's PR plan),
-  * honoring an inline `# noqa: pg-audit` suppression for vetted lines.
+  * honoring an inline `# noqa: pg-audit` (Python) or `-- noqa: pg-audit`
+    (inside SQL string literals) suppression marker on vetted lines.
 
 Default human output exits 0 (advisory). Use --fail for CI.
 
@@ -303,7 +304,7 @@ class Hit:
     feature: str
 
 
-SUPPRESS_RE = re.compile(r"#\s*noqa\s*:\s*pg-audit\b", re.IGNORECASE)
+SUPPRESS_RE = re.compile(r"(?:#|--)\s*noqa\s*:\s*pg-audit\b", re.IGNORECASE)
 
 
 def should_skip_path(rel: str) -> bool:

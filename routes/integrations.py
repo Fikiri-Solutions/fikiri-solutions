@@ -243,8 +243,8 @@ def create_calendar_event():
         manager = CalendarManager(user['id'])
         
         try:
-            start = datetime.fromisoformat(data['start'])
-            end = datetime.fromisoformat(data['end'])
+            start = datetime.fromisoformat(data['start'])  # noqa: pg-audit (request JSON, not DB row)
+            end = datetime.fromisoformat(data['end'])  # noqa: pg-audit (request JSON, not DB row)
         except (ValueError, TypeError) as e:
             return jsonify({'error': f'Invalid date format: {e}'}), 400
         
@@ -280,9 +280,9 @@ def update_calendar_event(entity_type: str, entity_id: int):
         
         updates = {}
         if 'start' in data:
-            updates['start'] = datetime.fromisoformat(data['start'])
+            updates['start'] = datetime.fromisoformat(data['start'])  # noqa: pg-audit (request JSON, not DB row)
         if 'end' in data:
-            updates['end'] = datetime.fromisoformat(data['end'])
+            updates['end'] = datetime.fromisoformat(data['end'])  # noqa: pg-audit (request JSON, not DB row)
         if 'summary' in data:
             updates['summary'] = data['summary']
         if 'description' in data:

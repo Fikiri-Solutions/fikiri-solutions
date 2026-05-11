@@ -107,7 +107,7 @@ def create_reminder():
         
         # Parse due_date
         try:
-            due_date = datetime.fromisoformat(data['due_date'].replace('Z', '+00:00'))
+            due_date = datetime.fromisoformat(data['due_date'].replace('Z', '+00:00'))  # noqa: pg-audit (request JSON, not DB row)
         except ValueError:
             return jsonify({"success": False, "error": "Invalid due_date format"}), 400
         

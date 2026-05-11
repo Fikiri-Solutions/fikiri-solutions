@@ -249,7 +249,7 @@ def update_appointment(appointment_id):
         for field in ['start_time', 'end_time']:
             if field in data:
                 try:
-                    updates[field] = datetime.fromisoformat(data[field].replace('Z', '+00:00'))
+                    updates[field] = datetime.fromisoformat(data[field].replace('Z', '+00:00'))  # noqa: pg-audit (request JSON, not DB row)
                 except ValueError:
                     return create_error_response(f"Invalid {field} format", 400, 'INVALID_DATE')
         

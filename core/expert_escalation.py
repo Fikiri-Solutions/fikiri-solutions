@@ -254,9 +254,9 @@ class ExpertEscalationEngine:
                 team_id=row['team_id'],
                 status=EscalationStatus(row['status']),
                 resolution=row['resolution'],
-                created_at=datetime.fromisoformat(row['created_at']) if isinstance(row['created_at'], str) else row['created_at'],
-                assigned_at=datetime.fromisoformat(row['assigned_at']) if row['assigned_at'] and isinstance(row['assigned_at'], str) else row['assigned_at'],
-                resolved_at=datetime.fromisoformat(row['resolved_at']) if row['resolved_at'] and isinstance(row['resolved_at'], str) else row['resolved_at']
+                created_at=datetime.fromisoformat(row['created_at']) if isinstance(row['created_at'], str) else row['created_at'],  # noqa: pg-audit (shape-tolerant)
+                assigned_at=datetime.fromisoformat(row['assigned_at']) if row['assigned_at'] and isinstance(row['assigned_at'], str) else row['assigned_at'],  # noqa: pg-audit (shape-tolerant)
+                resolved_at=datetime.fromisoformat(row['resolved_at']) if row['resolved_at'] and isinstance(row['resolved_at'], str) else row['resolved_at']  # noqa: pg-audit (shape-tolerant)
             )
         except Exception as e:
             logger.error(f"Failed to get escalated question: {e}")

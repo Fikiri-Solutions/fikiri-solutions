@@ -869,10 +869,10 @@ class KPITracker:
         """Calculate revenue from new customers acquired in period"""
         try:
             new_customers = db_optimizer.execute_query(
-                """SELECT DISTINCT s.user_id, s.tier, s.billing_period 
+                """SELECT DISTINCT s.user_id, s.tier, s.billing_period -- noqa: pg-audit (no ORDER BY — portable)
                    FROM subscriptions s
                    JOIN users u ON s.user_id = u.id
-                   WHERE s.status IN ('active', 'trialing') 
+                   WHERE s.status IN ('active', 'trialing')
                    AND u.created_at >= ?""",
                 (start_date.isoformat(),)
             )

@@ -953,9 +953,9 @@ class SmartFAQSystem:
                 try:
                     # Convert data to FAQEntry
                     if 'created_at' in data and isinstance(data['created_at'], str):
-                        data['created_at'] = datetime.fromisoformat(data['created_at'])
+                        data['created_at'] = datetime.fromisoformat(data['created_at'])  # noqa: pg-audit (import path; isinstance-guarded)
                     if 'updated_at' in data and isinstance(data['updated_at'], str):
-                        data['updated_at'] = datetime.fromisoformat(data['updated_at'])
+                        data['updated_at'] = datetime.fromisoformat(data['updated_at'])  # noqa: pg-audit (import path; isinstance-guarded)
                     if 'category' in data and isinstance(data['category'], str):
                         data['category'] = FAQCategory(data['category'])
                     

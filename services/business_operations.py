@@ -142,8 +142,8 @@ class BusinessAnalytics:
         # Process all events
         for event_type, events in self.metrics.items():
             recent_events = [
-                event for event in events 
-                if datetime.fromisoformat(event['timestamp']) > cutoff_date
+                event for event in events
+                if datetime.fromisoformat(event['timestamp']) > cutoff_date  # noqa: pg-audit (in-memory dict, never DB)
             ]
             
             summary['total_events'] += len(recent_events)
@@ -156,7 +156,7 @@ class BusinessAnalytics:
             
             # Daily breakdown
             for event in recent_events:
-                event_date = datetime.fromisoformat(event['timestamp']).date()
+                event_date = datetime.fromisoformat(event['timestamp']).date()  # noqa: pg-audit (in-memory dict, never DB)
                 if event_date not in summary['daily_breakdown']:
                     summary['daily_breakdown'][event_date.isoformat()] = 0
                 summary['daily_breakdown'][event_date.isoformat()] += 1

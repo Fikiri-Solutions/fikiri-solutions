@@ -369,7 +369,7 @@ def run_due_follow_ups_for_all_users(now_iso: Optional[str] = None) -> Dict[str,
     now_iso = now_iso or datetime.utcnow().isoformat()
     rows = db_optimizer.execute_query(
         """
-        SELECT DISTINCT user_id
+        SELECT DISTINCT user_id -- noqa: pg-audit (no ORDER BY — portable)
         FROM scheduled_follow_ups
         WHERE status = 'scheduled' AND follow_up_date <= ?
         """,

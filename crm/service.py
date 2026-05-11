@@ -724,7 +724,7 @@ class EnhancedCRMService:
                 }
             
             # Get recent email activities, one row per lead, newest first.
-            # Postgres rejects `SELECT DISTINCT ... ORDER BY la.timestamp` because
+            # Postgres rejects `SELECT DISTINCT ... ORDER BY la.timestamp` because  # noqa: pg-audit (explainer comment)
             # the ORDER BY column is not in the SELECT list (the DISTINCT result
             # would otherwise be non-deterministic). Group by lead and order by
             # the max activity timestamp instead — portable across SQLite and PG.
