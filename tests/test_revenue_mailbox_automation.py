@@ -38,6 +38,14 @@ def test_mailbox_flow_idempotent_and_logged():
     ai_assistant = MagicMock()
     ai_assistant.classify_email_intent.return_value = {"intent": "lead_inquiry"}
     ai_assistant.generate_reply.return_value = "Thanks"
+    # orchestrate_incoming calls analyze_incoming_email; policy needs a real dict
+    # (confidence + should_auto_send) or it returns draft_only and never runs _auto_reply.
+    ai_assistant.analyze_incoming_email.return_value = {
+        "intent": "lead_inquiry",
+        "confidence": 0.95,
+        "should_auto_send": True,
+        "suggested_reply": "Thanks for reaching out.",
+    }
 
     actions = MinimalEmailActions(services={"ai_assistant": ai_assistant})
     actions.db_optimizer = MagicMock()

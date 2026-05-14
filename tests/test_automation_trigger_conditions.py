@@ -146,57 +146,57 @@ class TestEngineTriggerIntegration(unittest.TestCase):
     def test_check_trigger_if_group_runs_before_legacy(self):
         from unittest.mock import patch
 
-        with patch("services.automation_engine.db_optimizer") as mock_db:
-            with patch("services.automation_engine.enhanced_crm_service"):
-                with patch("services.automation_engine.MinimalEmailParser"):
-                    mock_db.execute_query.return_value = []
-                    from services.automation_engine import (
-                        AutomationEngine,
-                        AutomationRule,
-                        AutomationStatus,
-                        ActionType,
-                        TriggerType,
-                    )
-                    from datetime import datetime
+        with patch("services.automation_engine.db_optimizer") as mock_db, patch(
+            "services.automation_engine.MinimalEmailParser"
+        ):
+            mock_db.execute_query.return_value = []
+            from services.automation_engine import (
+                AutomationEngine,
+                AutomationRule,
+                AutomationStatus,
+                ActionType,
+                TriggerType,
+            )
+            from datetime import datetime
 
-                    eng = AutomationEngine()
-                    rule = AutomationRule(
-                        id=1,
-                        user_id=1,
-                        name="t",
-                        description="",
-                        trigger_type=TriggerType.EMAIL_RECEIVED,
-                        trigger_conditions={
-                            "slug": "x",
-                            "if": {
-                                "match": "all",
-                                "conditions": [
-                                    {"field": "subject", "op": "contains", "value": "invoice"}
-                                ],
-                            },
-                        },
-                        action_type=ActionType.UPDATE_CRM_FIELD,
-                        action_parameters={"slug": "inbound_crm_sync"},
-                        status=AutomationStatus.ACTIVE,
-                        created_at=datetime.now(),
-                        updated_at=datetime.now(),
-                        last_executed=None,
-                        execution_count=0,
-                        success_count=0,
-                        error_count=0,
-                    )
-                    self.assertTrue(
-                        eng._check_trigger_conditions(
-                            rule,
-                            {"sender_email": "a@b.com", "subject": "Pay this invoice"},
-                        )
-                    )
-                    self.assertFalse(
-                        eng._check_trigger_conditions(
-                            rule,
-                            {"sender_email": "a@b.com", "subject": "Hello"},
-                        )
-                    )
+            eng = AutomationEngine()
+            rule = AutomationRule(
+                id=1,
+                user_id=1,
+                name="t",
+                description="",
+                trigger_type=TriggerType.EMAIL_RECEIVED,
+                trigger_conditions={
+                    "slug": "x",
+                    "if": {
+                        "match": "all",
+                        "conditions": [
+                            {"field": "subject", "op": "contains", "value": "invoice"}
+                        ],
+                    },
+                },
+                action_type=ActionType.UPDATE_CRM_FIELD,
+                action_parameters={"slug": "inbound_crm_sync"},
+                status=AutomationStatus.ACTIVE,
+                created_at=datetime.now(),
+                updated_at=datetime.now(),
+                last_executed=None,
+                execution_count=0,
+                success_count=0,
+                error_count=0,
+            )
+            self.assertTrue(
+                eng._check_trigger_conditions(
+                    rule,
+                    {"sender_email": "a@b.com", "subject": "Pay this invoice"},
+                )
+            )
+            self.assertFalse(
+                eng._check_trigger_conditions(
+                    rule,
+                    {"sender_email": "a@b.com", "subject": "Hello"},
+                )
+            )
 
 
 if __name__ == "__main__":
