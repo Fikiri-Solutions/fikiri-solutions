@@ -246,7 +246,7 @@ def email_sync_status():
             sync_data = None
             try:
                 sync_data = db_optimizer.execute_query(
-                    "SELECT last_sync, sync_status, total_emails FROM user_sync_status WHERE user_id = ?",
+                    "SELECT last_sync, sync_status, total_emails, syncing FROM user_sync_status WHERE user_id = ?",
                     (user_id,)
                 )
             except Exception as query_ex:
@@ -274,13 +274,30 @@ def email_sync_status():
                     last_sync = sync_record.get('last_sync')
                     sync_status = sync_record.get('sync_status', 'connected_pending_sync')
                     total_emails = sync_record.get('total_emails', 0)
+                    try:
+                        syncing_col = int(sync_record.get('syncing', 0) or 0)
+                    except (TypeError, ValueError):
+                        syncing_col = 0
                 else:
                     last_sync = sync_record[0] if len(sync_record) > 0 else None
                     sync_status = sync_record[1] if len(sync_record) > 1 else 'connected_pending_sync'
                     total_emails = sync_record[2] if len(sync_record) > 2 else 0
-                
-                # Determine if syncing is in progress
-                is_syncing = sync_status in ['in_progress', 'processing', 'pending']
+                    try:
+                        syncing_col = int(sync_record[3] if len(sync_record) > 3 else 0)
+                    except (TypeError, ValueError):
+                        syncing_col = 0
+
+                # In-flight: worker claimed the row (syncing=1), explicit job states,
+                # or 'queued' after POST /crm/sync-gmail (job not started yet — not 1% forever).
+                # Never treat sync_status 'pending' alone as in-flight: that is the idle
+                # "connected, no job yet" / placeholder state.
+                is_syncing = bool(syncing_col) or sync_status in (
+                    'in_progress',
+                    'processing',
+                    'queued',
+                )
+                if sync_status in ('completed', 'failed'):
+                    is_syncing = False
                 
                 # Get progress from job (whether syncing or just completed)
                 # This ensures we show the final progress even after completion
@@ -333,20 +350,15 @@ def email_sync_status():
                                 
                                 logger.info(f"Found sync job {job_id_found}: progress={progress}%, emails={emails_synced_this_job}, status={job_status}")
                                 
-                                # Use job progress based on status
-                                if job_status in ('processing', 'in_progress', 'pending'):
-                                    # Use the actual progress from the job, but ensure it's at least 1% if job is active
-                                    if progress == 0:
-                                        progress = 1  # Show 1% minimum for active jobs
-                                elif job_status == 'completed':
-                                    # Job completed - use 100% progress or the actual final progress
+                                # pending/processing/in_progress: use stored progress (0 = not started yet).
+                                if job_status == 'completed':
                                     if progress == 0:
                                         progress = 100  # Completed jobs should show 100%
-                                    # Keep the actual progress value if it's > 0
-                                else:
-                                    # Job failed or other status
-                                    logger.debug(f"Job {job_id_found} status is {job_status}, progress={progress}")
-                                    # Keep progress as is (might be partial progress before failure)
+                                elif job_status == 'failed':
+                                    logger.debug(
+                                        f"Job {job_id_found} status is failed, progress={progress}"
+                                    )
+                                    # Keep progress as-is (partial progress before failure)
                         
                         # If no progress yet but syncing, try to estimate from synced emails
                         # But don't override progress if job is completed (should be 100%)
@@ -369,16 +381,10 @@ def email_sync_status():
                             except Exception as estimate_error:
                                 logger.debug(f"Could not estimate progress: {estimate_error}")
                             
-                            # If still no progress, show minimal progress to indicate activity
-                            if progress is None or progress == 0:
-                                progress = 1  # Show 1% to indicate activity started
                     except Exception as job_error:
                         logger.warning(f"Could not get sync job progress: {job_error}")
                         import traceback
                         logger.debug(f"Job progress error traceback: {traceback.format_exc()}")
-                        # If syncing but can't get progress, show minimal progress
-                        if is_syncing:
-                            progress = 1
                 
                 # Ensure progress is always a number, never None
                 # If sync is completed, show 100% progress (or the actual final progress if available)
@@ -387,7 +393,7 @@ def email_sync_status():
                 elif progress is not None:
                     final_progress = progress
                 elif is_syncing:
-                    final_progress = 1  # Show 1% minimum when syncing
+                    final_progress = 0  # Client shows indeterminate UI; avoid lying at 1%
                 else:
                     final_progress = 0
                 

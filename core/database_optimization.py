@@ -2972,11 +2972,17 @@ class DatabaseOptimizer:
             )
 
     def upsert_user_sync_status_pending(self, user_id: int) -> None:
-        """Mark sync as pending for user (portable upsert on user_id)."""
+        """
+        Mark that a sync was requested and is waiting to run.
+
+        Must not set syncing=1 while the Gmail job is still only queued — that
+        made /email/sync/status report syncing:true with 0% job progress, which
+        the UI mapped to a stuck 'Syncing… 1%' spinner.
+        """
         self.execute_query(
             """
             INSERT INTO user_sync_status (user_id, last_sync, sync_status, syncing, updated_at)
-            VALUES (?, CURRENT_TIMESTAMP, 'pending', 1, CURRENT_TIMESTAMP)
+            VALUES (?, CURRENT_TIMESTAMP, 'queued', 0, CURRENT_TIMESTAMP)
             ON CONFLICT (user_id) DO UPDATE SET
                 last_sync = EXCLUDED.last_sync,
                 sync_status = EXCLUDED.sync_status,

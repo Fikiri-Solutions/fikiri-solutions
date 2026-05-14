@@ -35,28 +35,32 @@ export const GmailConnect: React.FC = () => {
     staleTime: 0, // Always consider data stale to get fresh progress
     gcTime: 5 * 60 * 1000, // 5 minutes
     // Dynamic refetch interval: faster when syncing, slower when idle.
-    // Trust `syncing: boolean` from the backend; `sync_status === 'pending'`
-    // alone is the default idle/no-record state and must not trigger 1Hz polling.
+    // Trust `syncing` and explicit statuses; `sync_status === 'pending'` with
+    // syncing false is idle — must not trigger 1Hz polling.
     refetchInterval: (query) => {
       if (!gmailStatus?.connected) return false
       const data = query.state.data as EmailSyncStatus | undefined
       const isSyncing = data?.syncing === true ||
                        data?.sync_status === 'in_progress' ||
-                       data?.sync_status === 'processing'
+                       data?.sync_status === 'processing' ||
+                       data?.sync_status === 'queued'
       return isSyncing ? 1 * 1000 : 10 * 1000
     },
   })
 
   /**
-   * Sync is actively in flight. `sync_status === 'pending'` on its own does
-   * NOT count: the backend returns 'pending' as a fallback for "Gmail
-   * connected, no sync record yet" with `syncing: false`. Trust the explicit
-   * boolean so the spinner only appears once the user clicks "Sync inbox".
+   * Sync is actively in flight: explicit syncing flag, job states, or `queued`
+   * after POST /crm/sync-gmail (waiting for worker / thread). `sync_status ===
+   * 'pending'` with `syncing: false` is idle "connected, no job yet" — not here.
    */
   const isActivelySyncing =
     syncStatus?.syncing === true ||
     syncStatus?.sync_status === 'in_progress' ||
-    syncStatus?.sync_status === 'processing'
+    syncStatus?.sync_status === 'processing' ||
+    syncStatus?.sync_status === 'queued'
+
+  const hasDefiniteProgress =
+    typeof syncStatus?.progress === 'number' && syncStatus.progress > 0
 
   // Track previous sync status to detect when sync completes
   const prevSyncStatusRef = React.useRef<EmailSyncStatus | undefined>(syncStatus)
@@ -68,7 +72,8 @@ export const GmailConnect: React.FC = () => {
     if (prev && current) {
       const wasSyncing = prev.syncing === true ||
                         prev.sync_status === 'in_progress' ||
-                        prev.sync_status === 'processing'
+                        prev.sync_status === 'processing' ||
+                        prev.sync_status === 'queued'
       const isCompleted = current.sync_status === 'completed' &&
                          !current.syncing &&
                          current.last_sync
@@ -173,12 +178,20 @@ export const GmailConnect: React.FC = () => {
       label: 'Sync status',
       value: (() => {
         if (isActivelySyncing) {
-          const progress = syncStatus?.progress ?? 0
+          const progress = typeof syncStatus?.progress === 'number' ? syncStatus.progress : 0
           const emailsCount = syncStatus?.emails_synced_this_job ?? 0
+          if (syncStatus?.sync_status === 'queued') {
+            return emailsCount > 0
+              ? `In queue… (${emailsCount} emails so far)`
+              : 'In queue — starting soon…'
+          }
           if (progress > 0) {
             return `Syncing... ${progress}%${emailsCount > 0 ? ` (${emailsCount} emails)` : ''}`
           }
-          return 'Syncing in progress...'
+          if (emailsCount > 0) {
+            return `Syncing… (${emailsCount} emails)`
+          }
+          return 'Syncing in progress…'
         }
         if (syncStatus?.sync_status === 'completed') return 'Sync completed'
         if (syncStatus?.sync_status === 'failed') return 'Sync failed'
@@ -196,7 +209,7 @@ export const GmailConnect: React.FC = () => {
               ? 'text-yellow-600 dark:text-yellow-400'
               : 'text-red-600 dark:text-red-400',
       showProgress: isActivelySyncing,
-      progress: syncStatus?.progress ?? (isActivelySyncing ? 1 : 0)
+      progress: typeof syncStatus?.progress === 'number' ? syncStatus.progress : 0
     }
   ]
 
@@ -293,27 +306,33 @@ export const GmailConnect: React.FC = () => {
                       <div className="flex items-center justify-between text-xs text-brand-text/60 dark:text-gray-400 mb-1.5">
                         <span className="font-medium">Progress</span>
                         <span className="font-semibold text-blue-600 dark:text-blue-400">
-                          {item.progress !== undefined && item.progress > 0 
-                            ? `${item.progress}%` 
-                            : 'Syncing...'}
+                          {hasDefiniteProgress
+                            ? `${syncStatus?.progress}%`
+                            : syncStatus?.sync_status === 'queued'
+                              ? 'Queued…'
+                              : 'Working…'}
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden relative">
-                        <div
-                          className="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out"
-                          style={{ width: `${Math.max(item.progress || 1, 1)}%` }}
-                        />
-                        {(!item.progress || item.progress === 0 || item.progress === 1) && (
-                          <div className="absolute inset-0 bg-gradient-to-r from-blue-400 via-blue-500 to-blue-400 animate-pulse opacity-50" 
-                               style={{ 
-                                 backgroundSize: '200% 100%',
-                                 animation: 'shimmer 2s infinite'
-                               }} 
+                        {hasDefiniteProgress ? (
+                          <div
+                            className="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out"
+                            style={{ width: `${Math.min(100, syncStatus?.progress ?? 0)}%` }}
                           />
+                        ) : (
+                          <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-blue-500/20">
+                            <div
+                              className="absolute inset-0 bg-gradient-to-r from-blue-400/50 via-blue-500/90 to-blue-400/50"
+                              style={{
+                                backgroundSize: '200% 100%',
+                                animation: 'gmailSyncShimmer 2s linear infinite'
+                              }}
+                            />
+                          </div>
                         )}
                       </div>
                       <style>{`
-                        @keyframes shimmer {
+                        @keyframes gmailSyncShimmer {
                           0% { background-position: -200% 0; }
                           100% { background-position: 200% 0; }
                         }
