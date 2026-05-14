@@ -107,6 +107,17 @@ frontend/lhr-*.report.html
 
 # Local / CI artifacts (not source)
 artifacts/
+k6-results/
+
+# CASA / security tooling outputs (regenerate via scripts/casa_workbench.py and gitleaks)
+security-reports/*.zip
+security-reports/gitleaks.json
+
+# FP&A charts (regenerate: python3 scripts/plot_revenue_investor_projection.py)
+docs/plots/*.png
+
+# Optional local experiments (not the main web app)
+notion-worker/
 
 # Large media not needed in repo (use CDN or LFS if required)
 frontend/public/*.mp4

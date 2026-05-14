@@ -1,8 +1,10 @@
 # Fikiri Documentation
 
-Quick reference for project documentation. Root-level: [`README.md`](../README.md), [`AGENTS.md`](../AGENTS.md), [`COORDINATION.md`](../COORDINATION.md) (Cursor + Codex), [`SIMPLICITY_RULE.md`](../SIMPLICITY_RULE.md), [`GOOGLE_APIS_REQUIRED.md`](../GOOGLE_APIS_REQUIRED.md), [`PINECONE_SETUP.md`](../PINECONE_SETUP.md).
+Quick reference for project documentation. Repo root (tooling / onboarding): [`README.md`](../README.md), [`AGENTS.md`](../AGENTS.md), [`COORDINATION.md`](../COORDINATION.md) (Cursor + Codex), [`SIMPLICITY_RULE.md`](../SIMPLICITY_RULE.md).
 
 **Multi-tool:** [`COORDINATION.md`](../COORDINATION.md) — shared rules for Cursor and Codex.
+
+**Business / GTM playbooks** (consultation, intake, pricing copy) live under [`docs/archive/business/`](archive/business/README.md), not in the tables below.
 
 ## Setup & Configuration
 
@@ -15,6 +17,8 @@ Quick reference for project documentation. Root-level: [`README.md`](../README.m
 | [DOMAIN_SSL_SETUP.md](DOMAIN_SSL_SETUP.md) | Domain and SSL configuration |
 | [DEV_SMTP_VERIFICATION.md](DEV_SMTP_VERIFICATION.md) | Dev SMTP and transactional email verification |
 | [CONNECT_GMAIL_OUTLOOK.md](CONNECT_GMAIL_OUTLOOK.md) | Connecting Gmail and Outlook in the product |
+| [GOOGLE_APIS_REQUIRED.md](GOOGLE_APIS_REQUIRED.md) | Google Cloud project and APIs required for Gmail |
+| [PINECONE_SETUP.md](PINECONE_SETUP.md) | Pinecone vector index setup |
 
 ## Architecture & Planning
 
@@ -31,7 +35,6 @@ Quick reference for project documentation. Root-level: [`README.md`](../README.m
 |-----|-------------|
 | [FRONTEND_UX_PATTERNS.md](FRONTEND_UX_PATTERNS.md) | Tooltips, modals, scroll—consistent UX patterns |
 | [FRONTEND_AUTH_CHECKLIST.md](FRONTEND_AUTH_CHECKLIST.md) | Frontend auth checklist |
-| [SERVICES_PRICING_PAGE_COPY.md](SERVICES_PRICING_PAGE_COPY.md) | Services / pricing page copy |
 
 ## Testing
 
@@ -82,8 +85,6 @@ Quick reference for project documentation. Root-level: [`README.md`](../README.m
 | [BACKGROUND_JOBS_ARCHITECTURE.md](BACKGROUND_JOBS_ARCHITECTURE.md) | Background jobs architecture |
 | [BACKUP_STRATEGY.md](BACKUP_STRATEGY.md) | Backup strategy |
 | [CI_CD_STRATEGY.md](CI_CD_STRATEGY.md) | CI/CD strategy |
-| [LAUNCH_CRITICAL_FIXES.md](LAUNCH_CRITICAL_FIXES.md) | Launch-critical fixes |
-| [LAUNCH_SAFE_REMAINING.md](LAUNCH_SAFE_REMAINING.md) | Post-launch safe remaining work |
 | [OPERATIONAL_SAFEGUARDS.md](OPERATIONAL_SAFEGUARDS.md) | Operational safeguards |
 | [SLOs.md](SLOs.md) | Service level objectives |
 | [STAGING_AND_PROVIDER_READINESS.md](STAGING_AND_PROVIDER_READINESS.md) | Staging and provider readiness |
@@ -107,7 +108,6 @@ Quick reference for project documentation. Root-level: [`README.md`](../README.m
 |-----|-------------|
 | [CRUD_RAG_ARCHITECTURE.md](CRUD_RAG_ARCHITECTURE.md) | CRUD, RAG flow, identity/merge policy |
 | [MUTEX_CONTENTION_MITIGATION.md](MUTEX_CONTENTION_MITIGATION.md) | Mutex contention fixes |
-| [CLIENT_ONBOARDING_GUIDE.md](CLIENT_ONBOARDING_GUIDE.md) | Client onboarding flow |
 | [CORRELATION_AND_EVENTS.md](CORRELATION_AND_EVENTS.md) | Correlation IDs and events |
 | [SQLITE_DATETIME_COMPARISONS.md](SQLITE_DATETIME_COMPARISONS.md) | SQLite datetime comparisons |
 | [MIGRATIONS.md](MIGRATIONS.md) | Database migrations |
@@ -125,3 +125,10 @@ Quick reference for project documentation. Root-level: [`README.md`](../README.m
 | Doc | Description |
 |-----|-------------|
 | [COMING_SOON.md](COMING_SOON.md) | Features not guaranteed / coming soon (UI and backend) |
+
+## Migrations & dependency audits
+
+| Doc | Description |
+|-----|-------------|
+| [POSTGRES_MIGRATION_AUDIT.md](POSTGRES_MIGRATION_AUDIT.md) | Postgres migration audit |
+| [LEGACY_DEPENDENCY_AUDIT.md](LEGACY_DEPENDENCY_AUDIT.md) | Legacy dependency audit |

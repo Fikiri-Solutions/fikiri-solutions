@@ -75,7 +75,7 @@ def main():
         print(f"   Deleted: {token_file}")
     
     print("")
-    print("✅ Ready! Now run: python main_minimal.py setup")
+    print("✅ Ready! Reconnect Gmail in the app (Integrations) or see docs/CONNECT_GMAIL_OUTLOOK.md")
     return True
 
 if __name__ == "__main__":

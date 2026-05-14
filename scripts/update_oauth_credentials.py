@@ -71,6 +71,6 @@ if __name__ == "__main__":
     if update_credentials(new_file):
         print("")
         print("✅ Credentials updated! Now run:")
-        print("   python main_minimal.py setup")
+        print("   Reconnect Gmail in the app (Integrations) or see docs/CONNECT_GMAIL_OUTLOOK.md")
     else:
         sys.exit(1)

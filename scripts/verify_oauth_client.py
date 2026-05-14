@@ -76,7 +76,7 @@ def main():
                 print("   1. Make sure your .env has the NEW client ID from Google Cloud Console")
                 print("   2. Run: python3 scripts/sync_oauth_from_env.py")
                 print("   3. Delete any old token files: rm -f auth/token*.pkl")
-                print("   4. Run: python3 main_minimal.py setup")
+                print("   4. Reconnect Gmail in the app (Integrations) or see docs/CONNECT_GMAIL_OUTLOOK.md")
     else:
         print("❌ auth/credentials.json not found")
         print("")
@@ -94,7 +94,7 @@ def main():
     print("   4. Update .env with the NEW values")
     print("   5. Run: python3 scripts/sync_oauth_from_env.py")
     print("   6. Delete old tokens: rm -f auth/token*.pkl")
-    print("   7. Run: python3 main_minimal.py setup")
+    print("   7. Reconnect Gmail in the app (Integrations) or see docs/CONNECT_GMAIL_OUTLOOK.md")
 
 if __name__ == "__main__":
     main()

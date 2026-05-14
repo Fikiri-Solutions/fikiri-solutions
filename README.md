@@ -76,7 +76,7 @@ Fikiri/
 - **Backend:** `PORT=5000 FLASK_ENV=development python app.py` — recommended local API startup.
 - **Frontend:** `cd frontend && npm run dev` — Vite dev server on port 5174.
 - **Tests:** `pytest tests/ -v` (backend); `cd frontend && npm run test` (frontend).
-- **Optional CLI:** `python main_minimal.py setup` / `status` / `config` for Gmail auth and status.
+- **Optional:** `python3 scripts/init_database.py` bootstraps DB tables if needed. **Gmail/Outlook:** connect in the product (Integrations) after the API is running; see [docs/CONNECT_GMAIL_OUTLOOK.md](docs/CONNECT_GMAIL_OUTLOOK.md) and [docs/GOOGLE_OAUTH_SETUP.md](docs/GOOGLE_OAUTH_SETUP.md).
 
 ## ✅ Features
 

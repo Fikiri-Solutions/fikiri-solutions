@@ -1,3 +1,25 @@
+# Scripts
+
+Operational, security, and quality scripts for this repository. **Application runtime** does not import these modules; they are CLI / CI helpers.
+
+## Ad-hoc analysis (not required for app or tests)
+
+| Script | Purpose |
+|--------|---------|
+| [monte_carlo_saas_fpna.py](monte_carlo_saas_fpna.py) | Monte Carlo FP&A scenarios (optional `numpy`) |
+| [plot_revenue_investor_projection.py](plot_revenue_investor_projection.py) | Revenue / payout charts → `docs/plots/` (gitignored PNGs) |
+| [extract_pdf_text.py](extract_pdf_text.py) | Extract text from PDFs for one-off review |
+
+## CLI entrypoints (run from repo root)
+
+| Script | Purpose |
+|--------|---------|
+| [init_database.py](init_database.py) | Bootstrap DB tables: `python3 scripts/init_database.py` |
+
+Gmail and Outlook OAuth run through the **Flask app** (`core/app_oauth.py`, in-app Integrations). See [docs/CONNECT_GMAIL_OUTLOOK.md](../docs/CONNECT_GMAIL_OUTLOOK.md).
+
+---
+
 # Code Quality Checks
 
 Simple syntax and logic checking scripts.

@@ -36,6 +36,10 @@ GMAIL_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
 OPENAI_API_KEY=sk-your-openai-api-key
 OPENAI_MODEL=gpt-4
 OPENAI_MAX_TOKENS=1000
+# Inbound mailbox AI cost gate (default off). When enabled, ``orchestrate_incoming``
+# applies the same ``ai_responses`` tier cap and AI budget guardrails as ``/ai/analyze-email``,
+# and records usage after a successful analyze. See ``core/email_pipeline_ai_gate.py``.
+# FIKIRI_EMAIL_PIPELINE_AI_GATE=1
 
 # =============================================================================
 # REDIS CONFIGURATION
@@ -119,6 +123,9 @@ services:
 | Microsoft Graph | `MICROSOFT_CLIENT_ID` | ❌ Disabled if missing |
 | Sentry Monitoring | `SENTRY_DSN` | ⚠️ Optional | 
 | Rate Limiting | `ENABLE_RATE_LIMITING` | ✅ Enabled by default |
+| Mailbox AI cost gate | `FIKIRI_EMAIL_PIPELINE_AI_GATE` | ⚪ Off unless set to `1` / `true` / `yes` / `on` |
+
+Related AI spend knobs (see `core/ai_budget_guardrails.py`, `core/tier_usage_caps.py`): `AI_BUDGET_*_USD`, `AI_ESTIMATED_COST_PER_RESPONSE_USD`, and model overrides `FIKIRI_LLM_MODEL_*` in `core/ai/model_policy.py`.
 
 ## Required vs Optional Services
 
@@ -134,5 +141,6 @@ services:
 - `SENTRY_DSN` (Monitoring)
 
 ### ❌ Optional
-- `MICREOSOFT_CLIENT_ID` (Office integration)
+- `MICROSOFT_CLIENT_ID` (Office integration)
+- `FIKIRI_EMAIL_PIPELINE_AI_GATE` (inbound mailbox AI tier + budget enforcement; default off)
 - Features fall back gracefully
