@@ -306,9 +306,12 @@ export const CRM: React.FC = () => {
             </button>
             <input
               ref={fileInputRef}
+              id="crm-import-csv-file"
+              name="crm_import_csv"
               type="file"
               accept=".csv"
               className="hidden"
+              aria-label="Import leads CSV file"
               onChange={handleImportCsv}
             />
             <button
@@ -532,11 +535,16 @@ export const CRM: React.FC = () => {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
           <div className="flex-1 max-w-lg">
+            <label htmlFor="crm-leads-search" className="sr-only">
+              Search leads
+            </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Search className="h-5 w-5 text-brand-text/60" />
               </div>
               <input
+                id="crm-leads-search"
+                name="q"
                 type="text"
                 className="bg-white dark:bg-gray-800 text-brand-text dark:text-white placeholder-brand-text/60 dark:placeholder-gray-400 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 pl-10 w-full"
                 placeholder="Search leads by name, email, or company..."
@@ -548,8 +556,13 @@ export const CRM: React.FC = () => {
           
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <Filter className="h-4 w-4 text-brand-text/60" />
+              <Filter className="h-4 w-4 text-brand-text/60" aria-hidden />
+              <label htmlFor="crm-filter-stage" className="sr-only">
+                Filter by pipeline stage
+              </label>
               <select
+                id="crm-filter-stage"
+                name="filter_stage"
                 className="bg-white dark:bg-gray-800 text-brand-text dark:text-white border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2"
                 value={filterStage}
                 onChange={(e) => setFilterStage(e.target.value)}
@@ -696,6 +709,7 @@ export const CRM: React.FC = () => {
                   </label>
                   <input
                     id="new-lead-name"
+                    name="new_lead_name"
                     type="text"
                     className="bg-white dark:bg-gray-800 text-brand-text dark:text-white placeholder-brand-text/60 dark:placeholder-gray-400 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                     value={newLead.name}
@@ -710,6 +724,7 @@ export const CRM: React.FC = () => {
                   </label>
                   <input
                     id="new-lead-email"
+                    name="email"
                     type="email"
                     className="bg-white dark:bg-gray-800 text-brand-text dark:text-white placeholder-brand-text/60 dark:placeholder-gray-400 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                     value={newLead.email}
@@ -724,6 +739,7 @@ export const CRM: React.FC = () => {
                   </label>
                   <input
                     id="new-lead-phone"
+                    name="tel"
                     type="tel"
                     className="bg-white dark:bg-gray-800 text-brand-text dark:text-white placeholder-brand-text/60 dark:placeholder-gray-400 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                     value={newLead.phone}
@@ -738,6 +754,7 @@ export const CRM: React.FC = () => {
                   </label>
                   <input
                     id="new-lead-company"
+                    name="organization"
                     type="text"
                     className="bg-white dark:bg-gray-800 text-brand-text dark:text-white placeholder-brand-text/60 dark:placeholder-gray-400 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                     value={newLead.company}
@@ -752,6 +769,7 @@ export const CRM: React.FC = () => {
                   </label>
                   <select
                     id="new-lead-source"
+                    name="lead_source"
                     className="bg-white text-brand-text border border-brand-text/20 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
                     value={newLead.source}
                     onChange={(e) => setNewLead({...newLead, source: e.target.value})}

@@ -420,6 +420,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             </label>
             <input
               id="account-username"
+              name="username"
               type="text"
               value={accountData.username}
               onChange={(e) => setAccountData(prev => ({ ...prev, username: e.target.value }))}
@@ -434,6 +435,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             </label>
             <input
               id="account-email"
+              name="email"
               type="email"
               value={accountData.email}
               readOnly
@@ -452,6 +454,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             </p>
             <input
               id="account-phone"
+              name="phone"
               type="tel"
               value={accountData.phone}
               onChange={(e) => setAccountData(prev => ({ ...prev, phone: e.target.value }))}
@@ -462,6 +465,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
               <div className="flex items-center h-5">
                 <input
                   id="smsConsent"
+                  name="sms_consent"
                   type="checkbox"
                   checked={smsConsent}
                   onChange={(e) => setSmsConsent(e.target.checked)}
@@ -481,6 +485,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             </label>
             <select
               id="account-timezone"
+              name="timezone"
               value={accountData.timezone}
               onChange={(e) => {
                 setAccountData(prev => ({ ...prev, timezone: e.target.value }))
@@ -507,6 +512,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             </label>
             <input
               id="account-business-name"
+              name="business_name"
               type="text"
               value={accountData.businessName}
               onChange={(e) => setAccountData(prev => ({ ...prev, businessName: e.target.value }))}
@@ -521,6 +527,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             </label>
             <input
               id="account-business-email"
+              name="business_email"
               type="email"
               value={accountData.businessEmail}
               onChange={(e) => setAccountData(prev => ({ ...prev, businessEmail: e.target.value }))}
@@ -535,6 +542,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             </label>
             <select
               id="account-industry"
+              name="industry"
               value={accountData.industry}
               onChange={(e) => {
                 setAccountData(prev => ({ ...prev, industry: e.target.value }))
@@ -555,6 +563,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             </label>
             <select
               id="account-team-size"
+              name="team_size"
               value={accountData.teamSize}
               onChange={(e) => {
                 setAccountData(prev => ({ ...prev, teamSize: e.target.value }))
@@ -638,6 +647,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
               <div className="relative">
                 <input
                   id="account-current-password"
+                  name="current_password"
                   type={showPasswords.current ? "text" : "password"}
                   value={securitySettings.currentPassword}
                   onChange={(e) => setSecuritySettings(prev => ({ ...prev, currentPassword: e.target.value }))}
@@ -660,6 +670,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
               <div className="relative">
                 <input
                   id="account-new-password"
+                  name="new_password"
                   type={showPasswords.new ? "text" : "password"}
                   value={securitySettings.newPassword}
                   onChange={(e) => setSecuritySettings(prev => ({ ...prev, newPassword: e.target.value }))}
@@ -682,6 +693,7 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
               <div className="relative">
                 <input
                   id="account-confirm-password"
+                  name="confirm_password"
                   type={showPasswords.confirm ? "text" : "password"}
                   value={securitySettings.confirmPassword}
                   onChange={(e) => setSecuritySettings(prev => ({ ...prev, confirmPassword: e.target.value }))}
@@ -731,8 +743,10 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
               <h5 className="font-medium text-gray-900 dark:text-white">Enable 2FA</h5>
               <p className="text-sm text-gray-600 dark:text-gray-300">Add an extra layer of security to your account</p>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
+            <label htmlFor="account-two-factor-enabled" className="relative inline-flex items-center cursor-pointer">
               <input
+                id="account-two-factor-enabled"
+                name="two_factor_enabled"
                 type="checkbox"
                 checked={notificationSettings.security.two_factor_enabled}
                 onChange={(e) =>
@@ -761,8 +775,10 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
               <h5 className="font-medium text-gray-900 dark:text-white">Email notifications for new logins</h5>
               <p className="text-sm text-gray-600 dark:text-gray-300">Get notified when someone logs into your account</p>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
+            <label htmlFor="account-login-notifications" className="relative inline-flex items-center cursor-pointer">
               <input
+                id="account-login-notifications"
+                name="login_notifications"
                 type="checkbox"
                 checked={notificationSettings.security.login_notifications}
                 onChange={(e) =>
@@ -842,8 +858,10 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
                     {key === 'weekly' && 'Weekly summary of your account activity'}
                   </p>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
+                <label htmlFor={`account-notif-email-${key}`} className="relative inline-flex items-center cursor-pointer">
                   <input
+                    id={`account-notif-email-${key}`}
+                    name={`notification_email_${key}`}
                     type="checkbox"
                     checked={value}
                     onChange={(e) => setNotificationSettings(prev => ({
@@ -881,8 +899,10 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
                     {key === 'urgent' && 'Urgent notifications that require immediate attention'}
                   </p>
                 </div>
-                <label className={`relative inline-flex items-center cursor-pointer ${!smsConsent ? 'opacity-50' : ''}`}>
+                <label htmlFor={`account-notif-sms-${key}`} className={`relative inline-flex items-center cursor-pointer ${!smsConsent ? 'opacity-50' : ''}`}>
                   <input
+                    id={`account-notif-sms-${key}`}
+                    name={`notification_sms_${key}`}
                     type="checkbox"
                     checked={smsConsent ? value : false}
                     onChange={(e) => smsConsent && setNotificationSettings(prev => ({
@@ -918,8 +938,10 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
                     {key === 'updates' && 'System updates and announcements'}
                   </p>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
+                <label htmlFor={`account-notif-push-${key}`} className="relative inline-flex items-center cursor-pointer">
                   <input
+                    id={`account-notif-push-${key}`}
+                    name={`notification_push_${key}`}
                     type="checkbox"
                     checked={value}
                     onChange={(e) => setNotificationSettings(prev => ({

@@ -466,7 +466,12 @@ export const BillingPage: React.FC = () => {
                 Enter a code shared by the Fikiri team to unlock temporary production testing access.
               </p>
               <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <label htmlFor="billing-test-access-code" className="sr-only">
+                  Test access code
+                </label>
                 <input
+                  id="billing-test-access-code"
+                  name="test_access_code"
                   type="text"
                   value={accessCode}
                   onChange={(e) => setAccessCode(e.target.value)}

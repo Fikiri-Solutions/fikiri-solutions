@@ -263,6 +263,7 @@ export const AutomationSetupCaptureLeadsEmail: React.FC = () => {
             <label htmlFor="capture-leads-target-stage" className="block text-xs font-medium text-brand-text/80 dark:text-gray-300">Pipeline stage</label>
             <select
               id="capture-leads-target-stage"
+              name="target_stage"
               className="w-full max-w-md rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900 text-brand-text dark:text-white"
               value={targetStage}
               onChange={e => setTargetStage(e.target.value)}
@@ -286,6 +287,7 @@ export const AutomationSetupCaptureLeadsEmail: React.FC = () => {
             <label htmlFor="capture-leads-sender-filter" className="block text-xs font-medium text-brand-text/80 dark:text-gray-300">Sender address ends with</label>
             <input
               id="capture-leads-sender-filter"
+              name="sender_email_ends_with"
               type="text"
               className="w-full max-w-md rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900"
               placeholder="e.g. @acme.com or acme.com"

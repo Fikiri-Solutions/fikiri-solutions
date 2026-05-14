@@ -283,6 +283,7 @@ export const ContentMigration: React.FC = () => {
                 <label htmlFor="knowledge-file-upload" className="text-xs font-medium text-brand-text/70 dark:text-gray-400">File</label>
                 <input
                   id="knowledge-file-upload"
+                  name="knowledge_file"
                   type="file"
                   accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.xls,.md,.png,.jpg,.jpeg"
                   onChange={(e) => setFile(e.target.files?.[0] || null)}
@@ -301,19 +302,34 @@ export const ContentMigration: React.FC = () => {
             </div>
             {extracted ? (
               <div className="mt-6 space-y-3">
+                <label htmlFor="import-kb-title" className="sr-only">
+                  Title for this snippet
+                </label>
                 <input
+                  id="import-kb-title"
+                  name="kb_title"
                   className="w-full rounded-xl border border-brand-text/10 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                   placeholder="Title for this snippet"
                   value={kbTitle}
                   onChange={(e) => setKbTitle(e.target.value)}
                 />
+                <label htmlFor="import-kb-category" className="sr-only">
+                  Category
+                </label>
                 <input
+                  id="import-kb-category"
+                  name="kb_category"
                   className="w-full rounded-xl border border-brand-text/10 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                   placeholder="Category (e.g. pricing, services)"
                   value={kbCategory}
                   onChange={(e) => setKbCategory(e.target.value)}
                 />
+                <label htmlFor="import-kb-extracted-body" className="sr-only">
+                  Extracted text to save
+                </label>
                 <textarea
+                  id="import-kb-extracted-body"
+                  name="kb_extracted_text"
                   className="w-full rounded-xl border border-brand-text/10 bg-brand-background/40 p-3 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                   rows={10}
                   value={extracted}
@@ -339,7 +355,12 @@ export const ContentMigration: React.FC = () => {
               <code className="rounded bg-brand-background/80 px-1.5 py-0.5 text-xs">POST /api/chatbot/knowledge/import/bulk</code>
               ).
             </p>
+            <label htmlFor="import-kb-bulk-json" className="sr-only">
+              Bulk JSON documents
+            </label>
             <textarea
+              id="import-kb-bulk-json"
+              name="kb_bulk_json"
               className="mt-4 w-full rounded-xl border border-brand-text/10 bg-brand-background/30 p-3 font-mono text-xs dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
               rows={12}
               placeholder={`{\n  "documents": [\n    { "title": "Pricing", "content": "Starter plan...", "category": "pricing" }\n  ]\n}`}
@@ -462,6 +483,7 @@ export const ContentMigration: React.FC = () => {
                 <label htmlFor="contacts-duplicate-policy" className="text-xs font-medium text-brand-text/70 dark:text-gray-400">On duplicate emails</label>
                 <select
                   id="contacts-duplicate-policy"
+                  name="contacts_duplicate_policy"
                   className="mt-1 w-full rounded-xl border border-brand-text/10 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                   value={onDup}
                   onChange={(e) => setOnDup(e.target.value as 'skip' | 'update' | 'merge')}
@@ -477,6 +499,7 @@ export const ContentMigration: React.FC = () => {
                 <label htmlFor="contacts-csv-file" className="text-xs font-medium text-brand-text/70 dark:text-gray-400">CSV file</label>
                 <input
                   id="contacts-csv-file"
+                  name="contacts_csv"
                   type="file"
                   accept=".csv"
                   onChange={(e) => setCsvFile(e.target.files?.[0] || null)}

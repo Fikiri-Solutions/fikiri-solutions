@@ -156,7 +156,12 @@ export const ChatbotBuilder: React.FC = () => {
               </div>
             </div>
             <div className="space-y-3">
+              <label htmlFor="chatbot-builder-document-upload" className="sr-only">
+                Upload document file
+              </label>
               <input
+                id="chatbot-builder-document-upload"
+                name="document_file"
                 type="file"
                 accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.xls"
                 onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
@@ -173,8 +178,12 @@ export const ChatbotBuilder: React.FC = () => {
             </div>
             {extractedText && (
               <div className="mt-4">
-                <p className="text-sm font-medium text-brand-text dark:text-white mb-2">Extracted text</p>
+                <label htmlFor="chatbot-builder-extracted-text" className="text-sm font-medium text-brand-text dark:text-white mb-2 block">
+                  Extracted text
+                </label>
                 <textarea
+                  id="chatbot-builder-extracted-text"
+                  name="extracted_text"
                   className="w-full rounded-xl border border-brand-text/10 dark:border-gray-700 bg-brand-background/40 dark:bg-gray-900/40 text-sm text-brand-text dark:text-gray-100 p-3"
                   rows={8}
                   value={extractedText}
@@ -194,13 +203,23 @@ export const ChatbotBuilder: React.FC = () => {
                 <h2 className="text-xl font-semibold text-brand-text dark:text-white">Add question & answer</h2>
               </div>
             </div>
+            <label htmlFor="chatbot-builder-faq-question" className="sr-only">
+              FAQ question
+            </label>
             <input
+              id="chatbot-builder-faq-question"
+              name="faq_question"
               className="w-full rounded-xl border border-brand-text/10 dark:border-gray-700 px-3 py-2 bg-white dark:bg-gray-900 text-sm text-brand-text dark:text-gray-100"
               placeholder="Question"
               value={faqForm.question}
               onChange={(e) => setFaqForm({ ...faqForm, question: e.target.value })}
             />
+            <label htmlFor="chatbot-builder-faq-answer" className="sr-only">
+              FAQ answer
+            </label>
             <textarea
+              id="chatbot-builder-faq-answer"
+              name="faq_answer"
               rows={4}
               className="w-full rounded-xl border border-brand-text/10 dark:border-gray-700 px-3 py-2 bg-white dark:bg-gray-900 text-sm text-brand-text dark:text-gray-100"
               placeholder="Answer"
@@ -208,7 +227,12 @@ export const ChatbotBuilder: React.FC = () => {
               onChange={(e) => setFaqForm({ ...faqForm, answer: e.target.value })}
             />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label htmlFor="chatbot-builder-faq-category" className="sr-only">
+                FAQ category
+              </label>
               <select
+                id="chatbot-builder-faq-category"
+                name="faq_category"
                 className="rounded-xl border border-brand-text/10 dark:border-gray-700 px-3 py-2 bg-white dark:bg-gray-900 text-sm text-brand-text dark:text-gray-100"
                 value={faqForm.category}
                 onChange={(e) => setFaqForm({ ...faqForm, category: e.target.value })}
@@ -217,7 +241,12 @@ export const ChatbotBuilder: React.FC = () => {
                   <option key={category} value={category}>{category}</option>
                 ))}
               </select>
+              <label htmlFor="chatbot-builder-faq-keywords" className="sr-only">
+                FAQ keywords
+              </label>
               <input
+                id="chatbot-builder-faq-keywords"
+                name="faq_keywords"
                 className="rounded-xl border border-brand-text/10 dark:border-gray-700 px-3 py-2 bg-white dark:bg-gray-900 text-sm text-brand-text dark:text-gray-100"
                 placeholder="Keywords comma separated"
                 value={faqForm.keywords}
@@ -244,20 +273,35 @@ export const ChatbotBuilder: React.FC = () => {
                 <h2 className="text-xl font-semibold text-brand-text dark:text-white">Add knowledge snippet</h2>
               </div>
             </div>
+            <label htmlFor="chatbot-builder-doc-title" className="sr-only">
+              Knowledge snippet title
+            </label>
             <input
+              id="chatbot-builder-doc-title"
+              name="knowledge_title"
               className="w-full rounded-xl border border-brand-text/10 dark:border-gray-700 px-3 py-2 bg-white dark:bg-gray-900 text-sm text-brand-text dark:text-gray-100"
               placeholder="Title"
               value={docForm.title}
               onChange={(e) => setDocForm({ ...docForm, title: e.target.value })}
             />
+            <label htmlFor="chatbot-builder-doc-summary" className="sr-only">
+              Knowledge snippet summary
+            </label>
             <textarea
+              id="chatbot-builder-doc-summary"
+              name="knowledge_summary"
               rows={3}
               className="w-full rounded-xl border border-brand-text/10 dark:border-gray-700 px-3 py-2 bg-white dark:bg-gray-900 text-sm text-brand-text dark:text-gray-100"
               placeholder="Short summary"
               value={docForm.summary}
               onChange={(e) => setDocForm({ ...docForm, summary: e.target.value })}
             />
+            <label htmlFor="chatbot-builder-doc-content" className="sr-only">
+              Knowledge snippet full content
+            </label>
             <textarea
+              id="chatbot-builder-doc-content"
+              name="knowledge_content"
               rows={5}
               className="w-full rounded-xl border border-brand-text/10 dark:border-gray-700 px-3 py-2 bg-white dark:bg-gray-900 text-sm text-brand-text dark:text-gray-100"
               placeholder="Full content"
@@ -286,7 +330,12 @@ export const ChatbotBuilder: React.FC = () => {
                 <h2 className="text-xl font-semibold text-brand-text dark:text-white">Embed content</h2>
               </div>
             </div>
+            <label htmlFor="chatbot-builder-vector-payload" className="sr-only">
+              Text to vectorize
+            </label>
             <textarea
+              id="chatbot-builder-vector-payload"
+              name="vector_payload"
               className="w-full rounded-xl border border-brand-text/10 dark:border-gray-700 px-3 py-2 bg-white dark:bg-gray-900 text-sm text-brand-text dark:text-gray-100"
               rows={6}
               value={vectorPayload}
@@ -314,7 +363,12 @@ export const ChatbotBuilder: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <label htmlFor="chatbot-builder-preview-query" className="sr-only">
+                Preview question
+              </label>
               <input
+                id="chatbot-builder-preview-query"
+                name="preview_query"
                 className="flex-1 rounded-xl border border-brand-text/10 dark:border-gray-700 px-3 py-2 bg-white dark:bg-gray-900 text-sm text-brand-text dark:text-gray-100"
                 placeholder="Ask a question"
                 value={searchQuery}

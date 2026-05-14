@@ -151,7 +151,12 @@ export const UsageAnalytics: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <label htmlFor="analytics-period" className="sr-only">
+            Analytics time period
+          </label>
           <select
+            id="analytics-period"
+            name="analytics_period"
             value={period}
             onChange={(e) => setPeriod(e.target.value as 'day' | 'week' | 'month')}
             className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-brand-text dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-primary"

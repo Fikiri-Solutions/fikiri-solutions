@@ -236,6 +236,7 @@ export const Intake: React.FC = () => {
 
               <form onSubmit={handleSubmit} className="space-y-8" autoComplete="on">
                 <input
+                  id="intake-honeypot"
                   type="text"
                   name="leave_blank"
                   value={honeypot}

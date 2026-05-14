@@ -663,6 +663,7 @@ export const Automations: React.FC = () => {
       return (
         <select
           id={fieldId}
+          name={field.key}
           className="w-full rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900"
           value={value}
           onChange={(e) => handleConfigChange(presetId, field.key, e.target.value)}
@@ -676,6 +677,7 @@ export const Automations: React.FC = () => {
     return (
       <input
         id={fieldId}
+        name={field.key}
         type={field.type === 'number' ? 'number' : 'text'}
         className="w-full rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900"
         value={value}

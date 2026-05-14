@@ -277,6 +277,7 @@ export const WebhookPayloadBuilder: React.FC<WebhookPayloadBuilderProps> = ({
         {typeof value === 'boolean' ? (
           <select
             id={getFieldId('payload', fullPath)}
+            name={getFieldId('payload', fullPath)}
             className="w-full rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900 text-brand-text dark:text-white"
             value={String(value)}
             onChange={(e) => handleFieldChange(fullPath, e.target.value === 'true')}
@@ -287,6 +288,7 @@ export const WebhookPayloadBuilder: React.FC<WebhookPayloadBuilderProps> = ({
         ) : typeof value === 'number' ? (
           <input
             id={getFieldId('payload', fullPath)}
+            name={getFieldId('payload', fullPath)}
             type="number"
             className="w-full rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900 text-brand-text dark:text-white"
             value={value}
@@ -295,6 +297,7 @@ export const WebhookPayloadBuilder: React.FC<WebhookPayloadBuilderProps> = ({
         ) : (
           <input
             id={getFieldId('payload', fullPath)}
+            name={getFieldId('payload', fullPath)}
             type="text"
             className="w-full rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900 text-brand-text dark:text-white"
             value={String(value)}
@@ -318,6 +321,7 @@ export const WebhookPayloadBuilder: React.FC<WebhookPayloadBuilderProps> = ({
         </label>
         <input
           id="webhook-url"
+          name="webhook_url"
           type="url"
           className="w-full rounded-lg border border-brand-text/20 px-4 py-2 bg-white dark:bg-gray-900 text-brand-text dark:text-white"
           value={webhookUrl}
@@ -394,6 +398,7 @@ export const WebhookPayloadBuilder: React.FC<WebhookPayloadBuilderProps> = ({
           </div>
           <textarea
             id="webhook-payload-json"
+            name="webhook_payload_json"
             className="w-full h-64 font-mono text-sm rounded-lg border border-brand-text/20 px-4 py-3 bg-gray-50 dark:bg-gray-900 text-brand-text dark:text-white"
             value={jsonEditorValue}
             onChange={(e) => handleJsonEditorChange(e.target.value)}
@@ -441,6 +446,7 @@ export const WebhookPayloadBuilder: React.FC<WebhookPayloadBuilderProps> = ({
                       {field.type === 'select' && field.options ? (
                         <select
                           id={fieldId}
+                          name={fieldId}
                           className="w-full rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900 text-brand-text dark:text-white"
                           value={payload[field.key] || field.defaultValue || ''}
                           onChange={(e) => handleFieldChange(field.key, e.target.value)}
@@ -454,6 +460,7 @@ export const WebhookPayloadBuilder: React.FC<WebhookPayloadBuilderProps> = ({
                       ) : (
                         <input
                           id={fieldId}
+                          name={fieldId}
                           type={field.type}
                           className="w-full rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900 text-brand-text dark:text-white"
                           value={payload[field.key] || field.defaultValue || ''}
@@ -488,14 +495,24 @@ export const WebhookPayloadBuilder: React.FC<WebhookPayloadBuilderProps> = ({
               {/* Custom Fields */}
               {customFields.map((field, index) => (
                 <div key={index} className="flex items-center gap-2">
+                  <label htmlFor={`webhook-custom-key-${index}`} className="sr-only">
+                    Custom payload field name
+                  </label>
                   <input
+                    id={`webhook-custom-key-${index}`}
+                    name={`webhook_custom_key_${index}`}
                     type="text"
                     className="flex-1 rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900 text-brand-text dark:text-white"
                     placeholder="Field name"
                     value={field.key}
                     onChange={(e) => handleCustomFieldChange(index, e.target.value, field.value)}
                   />
+                  <label htmlFor={`webhook-custom-value-${index}`} className="sr-only">
+                    Custom payload field value
+                  </label>
                   <input
+                    id={`webhook-custom-value-${index}`}
+                    name={`webhook_custom_value_${index}`}
                     type="text"
                     className="flex-1 rounded-lg border border-brand-text/20 px-3 py-2 bg-white dark:bg-gray-900 text-brand-text dark:text-white"
                     placeholder="Field value"

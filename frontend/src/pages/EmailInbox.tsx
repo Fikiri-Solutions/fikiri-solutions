@@ -889,8 +889,13 @@ export const EmailInbox: React.FC = () => {
 
           {/* Search */}
           <div className="relative mb-3 sm:mb-4">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-text/50 dark:text-gray-500" />
+            <label htmlFor="email-inbox-search" className="sr-only">
+              Search emails
+            </label>
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-text/50 dark:text-gray-500" aria-hidden />
             <input
+              id="email-inbox-search"
+              name="q"
               type="search"
               enterKeyHint="search"
               placeholder="Search emails..."
@@ -939,8 +944,13 @@ export const EmailInbox: React.FC = () => {
           </div>
 
           {showInboxTechnical ? (
-            <label className="mt-2 flex cursor-pointer items-center gap-2 text-[11px] text-amber-900/85 dark:text-amber-200/90">
+            <label
+              htmlFor="email-inbox-show-raw-snippets"
+              className="mt-2 flex cursor-pointer items-center gap-2 text-[11px] text-amber-900/85 dark:text-amber-200/90"
+            >
               <input
+                id="email-inbox-show-raw-snippets"
+                name="show_raw_snippets"
                 type="checkbox"
                 className="rounded border-amber-400 text-amber-700 focus:ring-amber-500 dark:border-amber-600 dark:bg-gray-900"
                 checked={showRawSnippets}
@@ -1189,8 +1199,12 @@ export const EmailInbox: React.FC = () => {
                       Subject: {selectedEmail.subject.startsWith('Re:') ? selectedEmail.subject : `Re: ${selectedEmail.subject}`}
                     </p>
                   </div>
+                  <label htmlFor="email-inbox-reply-body" className="sr-only">
+                    Reply message
+                  </label>
                   <textarea
-                    aria-label="Reply message"
+                    id="email-inbox-reply-body"
+                    name="reply_body"
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
                     placeholder="Type your reply..."

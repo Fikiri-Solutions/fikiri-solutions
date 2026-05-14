@@ -113,6 +113,7 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
             </label>
             <input
               id="chatbot-title"
+              name="chatbot_title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -128,17 +129,25 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
             <div className="flex gap-4 items-center">
               <input
                 id="chatbot-primary-color"
+                name="chatbot_primary_color"
                 type="color"
                 value={primaryColor}
                 onChange={(e) => setPrimaryColor(e.target.value)}
                 className="w-16 h-10 border border-gray-300 dark:border-gray-600 rounded cursor-pointer bg-transparent"
+                aria-label="Primary color picker"
               />
+              <label htmlFor="chatbot-primary-color-hex" className="sr-only">
+                Primary color hex value
+              </label>
               <input
+                id="chatbot-primary-color-hex"
+                name="chatbot_primary_color_hex"
                 type="text"
                 value={primaryColor}
                 onChange={(e) => setPrimaryColor(e.target.value)}
                 className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                 placeholder="#0f766e"
+                autoComplete="off"
               />
             </div>
           </div>
@@ -182,9 +191,15 @@ const ChatbotPreview: React.FC<ChatbotPreviewProps> = ({ apiKey, onCodeGenerated
               
               {/* Chatbot Input */}
               <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-600">
+                <label htmlFor="chatbot-preview-compose" className="sr-only">
+                  Preview chat message
+                </label>
                 <input
+                  id="chatbot-preview-compose"
+                  name="preview_message"
                   type="text"
                   placeholder="Type your message..."
+                  autoComplete="off"
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                   style={{ backgroundColor: theme === 'dark' ? '#374151' : '#ffffff', color: theme === 'dark' ? '#f9fafb' : '#111827' }}
                 />

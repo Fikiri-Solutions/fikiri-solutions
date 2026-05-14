@@ -117,21 +117,23 @@ export const CorrelationDebugPage: React.FC = () => {
       </div>
 
       <div className="mt-6 space-y-4 rounded-xl border border-brand-text/10 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <label className="block text-xs font-medium text-brand-text/70 dark:text-gray-400">
+        <label htmlFor="correlation-trace-id" className="block text-xs font-medium text-brand-text/70 dark:text-gray-400">
           Correlation ID
-          <input
-            type="text"
-            className="mt-1 w-full rounded-lg border border-brand-text/20 bg-white px-3 py-2 font-mono text-sm text-brand-text focus:border-brand-accent focus:ring-brand-accent dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
-            placeholder="Paste UUID or value from API / X-Correlation-ID"
-            value={correlationInput}
-            onChange={(e) => setCorrelationInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && correlationInput.trim() && !loading) {
-                void loadTrace(correlationInput)
-              }
-            }}
-          />
         </label>
+        <input
+          id="correlation-trace-id"
+          name="correlation_id"
+          type="text"
+          className="mt-1 w-full rounded-lg border border-brand-text/20 bg-white px-3 py-2 font-mono text-sm text-brand-text focus:border-brand-accent focus:ring-brand-accent dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
+          placeholder="Paste UUID or value from API / X-Correlation-ID"
+          value={correlationInput}
+          onChange={(e) => setCorrelationInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && correlationInput.trim() && !loading) {
+              void loadTrace(correlationInput)
+            }
+          }}
+        />
 
         <div className="flex flex-wrap gap-2">
           <button

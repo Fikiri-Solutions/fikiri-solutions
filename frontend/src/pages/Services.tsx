@@ -265,6 +265,7 @@ export const Services: React.FC = () => {
               <label htmlFor={`${service.id}-response-tone`} className="block text-sm font-medium text-brand-text dark:text-gray-300">Response Tone</label>
               <select
                 id={`${service.id}-response-tone`}
+                name="response_tone"
                 className="bg-white dark:bg-gray-800 text-brand-text dark:text-gray-100 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.responseTone}
                 onChange={(e) => updateServiceSettings(service.id, 'responseTone', e.target.value)}
@@ -279,6 +280,7 @@ export const Services: React.FC = () => {
               <label htmlFor={`${service.id}-auto-reply-delay`} className="block text-sm font-medium text-brand-text dark:text-gray-300">Auto-reply Delay (minutes)</label>
               <input
                 id={`${service.id}-auto-reply-delay`}
+                name="auto_reply_delay"
                 type="number"
                 className="bg-white dark:bg-gray-800 text-brand-text dark:text-gray-100 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.autoReplyDelay}
@@ -291,6 +293,7 @@ export const Services: React.FC = () => {
               <label htmlFor={`${service.id}-max-responses-per-day`} className="block text-sm font-medium text-brand-text dark:text-gray-300">Max Responses Per Day</label>
               <input
                 id={`${service.id}-max-responses-per-day`}
+                name="max_responses_per_day"
                 type="number"
                 className="bg-white dark:bg-gray-800 text-brand-text dark:text-gray-100 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.maxResponsesPerDay}
@@ -448,6 +451,7 @@ export const Services: React.FC = () => {
               <label htmlFor={`${service.id}-scoring-model`} className="block text-sm font-medium text-brand-text dark:text-gray-300">Scoring Model</label>
               <select
                 id={`${service.id}-scoring-model`}
+                name="scoring_model"
                 className="bg-white dark:bg-gray-800 text-brand-text dark:text-gray-100 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.scoringModel}
                 onChange={(e) => updateServiceSettings(service.id, 'scoringModel', e.target.value)}
@@ -461,6 +465,7 @@ export const Services: React.FC = () => {
               <label htmlFor={`${service.id}-update-frequency`} className="block text-sm font-medium text-brand-text dark:text-gray-300">Update Frequency</label>
               <select
                 id={`${service.id}-update-frequency`}
+                name="update_frequency"
                 className="bg-white dark:bg-gray-800 text-brand-text dark:text-gray-100 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 mt-1 w-full"
                 value={service.settings.updateFrequency}
                 onChange={(e) => updateServiceSettings(service.id, 'updateFrequency', e.target.value)}
@@ -475,6 +480,7 @@ export const Services: React.FC = () => {
               <label htmlFor={`${service.id}-threshold-score`} className="block text-sm font-medium text-brand-text dark:text-gray-300">Threshold Score</label>
               <input
                 id={`${service.id}-threshold-score`}
+                name="threshold_score"
                 type="range"
                 min="0"
                 max="1"

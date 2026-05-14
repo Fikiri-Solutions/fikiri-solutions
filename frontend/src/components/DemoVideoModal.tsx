@@ -165,7 +165,12 @@ export const DemoVideoModal: React.FC<DemoVideoModalProps> = ({
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
                 {/* Progress Bar */}
                 <div className="mb-4">
+                  <label htmlFor="demo-video-progress" className="sr-only">
+                    Video playback position
+                  </label>
                   <input
+                    id="demo-video-progress"
+                    name="video_progress"
                     type="range"
                     min="0"
                     max="100"

@@ -127,6 +127,7 @@ export const CustomizationPanel: React.FC<CustomizationPanelProps> = ({ isOpen, 
                       />
                     )}
                     <label
+                      htmlFor="customization-logo-upload"
                       className={`flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors ${
                         isUploadingLogo ? 'opacity-60 cursor-not-allowed' : ''
                       }`}
@@ -136,6 +137,8 @@ export const CustomizationPanel: React.FC<CustomizationPanelProps> = ({ isOpen, 
                         {isUploadingLogo ? 'Uploading...' : 'Upload Logo'}
                       </span>
                       <input
+                        id="customization-logo-upload"
+                        name="company_logo"
                         type="file"
                         accept="image/*"
                         onChange={handleLogoUpload}
@@ -174,17 +177,24 @@ export const CustomizationPanel: React.FC<CustomizationPanelProps> = ({ isOpen, 
                 <div className="flex items-center space-x-3">
                   <input
                     id="customization-custom-color"
+                    name="accent_color_picker"
                     type="color"
                     value={customColor}
                     onChange={(e) => handleColorChange(e.target.value)}
                     className="h-10 w-16 rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer"
                   />
+                  <label htmlFor="customization-custom-color-hex" className="sr-only">
+                    Custom accent color hex
+                  </label>
                   <input
+                    id="customization-custom-color-hex"
+                    name="accent_color_hex"
                     type="text"
                     value={customColor}
                     onChange={(e) => handleColorChange(e.target.value)}
                     className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono text-sm"
                     placeholder="#3B82F6"
+                    autoComplete="off"
                   />
                 </div>
               </div>

@@ -162,14 +162,17 @@ export const LeadTraceModal: React.FC<Props> = ({ lead, open, onClose }) => {
             </div>
           ) : null}
 
-          <label className="block text-xs font-medium text-brand-text/70 dark:text-gray-400">
+          <label htmlFor="lead-trace-correlation-id" className="block text-xs font-medium text-brand-text/70 dark:text-gray-400">
             Correlation ID
             <input
+              id="lead-trace-correlation-id"
+              name="correlation_id"
               type="text"
               className="mt-1 w-full rounded-lg border border-brand-text/20 bg-white px-3 py-2 font-mono text-xs text-brand-text focus:border-brand-accent focus:ring-brand-accent dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
               placeholder="From CRM events or paste"
               value={correlationInput}
               onChange={(e) => setCorrelationInput(e.target.value)}
+              autoComplete="off"
             />
           </label>
 

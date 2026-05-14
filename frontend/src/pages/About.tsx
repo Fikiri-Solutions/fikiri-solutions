@@ -143,6 +143,7 @@ function SectorFitExplorer() {
             </p>
             <textarea
               id={textareaId}
+              name="business_description"
               aria-describedby={`${textareaId}-hint`}
               rows={5}
               value={query}

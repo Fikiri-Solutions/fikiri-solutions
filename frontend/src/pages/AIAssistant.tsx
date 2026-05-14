@@ -414,7 +414,12 @@ Response should include a next step and keep tone professional but warm.`
                 </div>
               </div>
 
+              <label htmlFor="ai-suggested-reply" className="sr-only">
+                Suggested email reply
+              </label>
               <textarea
+                id="ai-suggested-reply"
+                name="suggested_reply"
                 rows={12}
                 value={suggestedReply}
                 onChange={(e) => setSuggestedReply(e.target.value)}
@@ -514,7 +519,12 @@ Response should include a next step and keep tone professional but warm.`
           </div>
           <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-4">
             <div className="flex flex-col space-y-3">
+              <label htmlFor="ai-console-message" className="sr-only">
+                Message to AI assistant
+              </label>
               <textarea
+                id="ai-console-message"
+                name="ai_message"
                 rows={3}
                 className="w-full rounded-xl border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 p-4 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                 placeholder="Ask the AI assistant anything... e.g., 'Draft a response to Acme Corp lead'"
