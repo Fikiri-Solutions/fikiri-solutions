@@ -10,7 +10,8 @@ from flask import Flask
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from routes.test import test_bp
+from routes import test_bp
+from routes.ai_assistant_demo import ai_assistant_demo_bp
 
 
 class TestTestRoutes(unittest.TestCase):
@@ -18,6 +19,7 @@ class TestTestRoutes(unittest.TestCase):
         self.app = Flask(__name__)
         self.app.config['TESTING'] = True
         self.app.register_blueprint(test_bp)
+        self.app.register_blueprint(ai_assistant_demo_bp)
         self.client = self.app.test_client()
 
     @patch("core.redis_connection_helper.is_redis_available", return_value=True)
@@ -80,7 +82,7 @@ class TestTestRoutes(unittest.TestCase):
         data = json.loads(response.data)
         self.assertEqual(data.get('data', {}).get('action'), 'get_leads')
 
-    @patch("routes.test.MinimalAIEmailAssistant")
+    @patch("routes.ai_assistant_demo.MinimalAIEmailAssistant")
     def test_ai_assistant_no_key(self, mock_ai):
         with patch.dict(os.environ, {}, clear=True):
             response = self.client.post('/api/test/ai-assistant', json={})
@@ -88,6 +90,14 @@ class TestTestRoutes(unittest.TestCase):
         data = json.loads(response.data)
         self.assertTrue(data.get('success'))
         self.assertFalse(data.get('data', {}).get('stats', {}).get('api_key_configured'))
+
+    def test_ai_assistant_options(self):
+        response = self.client.open(
+            '/api/test/ai-assistant',
+            method='OPTIONS',
+            headers={'Origin': 'https://fikirisolutions.com'},
+        )
+        self.assertEqual(response.status_code, 200)
 
     @patch("routes.test.MinimalMLScoring")
     def test_ml_scoring_success(self, mock_scorer):

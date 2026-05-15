@@ -1043,7 +1043,13 @@ def api_logout():
                 (os.getenv('FRONTEND_URL') or 'https://fikirisolutions.com').rstrip('/'),
             )
         response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
+        # Must match flask-cors allow_headers in app.py — apiClient sends Cache-Control, Pragma,
+        # expires, x-cache-version, x-deployment-timestamp on every request.
+        response.headers.add(
+            'Access-Control-Allow-Headers',
+            'Content-Type, Authorization, X-Requested-With, X-CSRFToken, Accept, Cache-Control, '
+            'Pragma, x-cache-version, x-deployment-timestamp, expires, x-correlation-id',
+        )
         response.headers.add('Access-Control-Allow-Credentials', 'true')
         response.headers.add('Access-Control-Max-Age', '3600')
         return response, 200

@@ -6,6 +6,7 @@ Centralized routing for Fikiri Solutions
 
 from .auth import auth_bp
 from .business import business_bp
+from .ai_assistant_demo import ai_assistant_demo_bp
 from .test import test_bp
 from .user import user_bp
 from .monitoring import monitoring_bp
@@ -15,7 +16,8 @@ from .kpi_api import kpi_bp
 
 __all__ = [
     'auth_bp',
-    'business_bp', 
+    'business_bp',
+    'ai_assistant_demo_bp',
     'test_bp',
     'user_bp',
     'monitoring_bp',

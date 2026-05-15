@@ -166,7 +166,17 @@ except ImportError:
     oauth = None
 
 # Route blueprints (extracted modules)
-from routes import auth_bp, business_bp, test_bp, user_bp, monitoring_bp, jobs_bp, expert_bp, kpi_bp
+from routes import (
+    ai_assistant_demo_bp,
+    auth_bp,
+    business_bp,
+    jobs_bp,
+    expert_bp,
+    kpi_bp,
+    monitoring_bp,
+    test_bp,
+    user_bp,
+)
 from routes.integrations import integrations_bp
 from routes.appointments import appointments_bp
 from routes.google_risc import google_risc_bp
@@ -1047,6 +1057,7 @@ def register_blueprints(app):
         (ai_bp, 'ai'),
         (dashboard_bp, 'dashboard'),
         (auth_bp, 'auth'),
+        (ai_assistant_demo_bp, 'ai_assistant_demo'),
         (business_bp, 'routes_business'),
         (jobs_bp, 'routes_jobs'),
         (user_bp, 'routes_user'),
