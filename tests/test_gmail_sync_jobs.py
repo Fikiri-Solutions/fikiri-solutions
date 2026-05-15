@@ -9,7 +9,11 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from email_automation.gmail_sync_jobs import GmailSyncJobManager, should_process_gmail_sync_inline
+from email_automation.gmail_sync_jobs import (
+    GmailSyncJobManager,
+    abort_queued_gmail_sync_job,
+    should_process_gmail_sync_inline,
+)
 
 
 class TestGmailSyncInlinePolicy(unittest.TestCase):
@@ -17,53 +21,23 @@ class TestGmailSyncInlinePolicy(unittest.TestCase):
         with patch.dict(os.environ, {"DATABASE_URL": "sqlite:///data/fikiri.db"}, clear=False):
             self.assertTrue(should_process_gmail_sync_inline())
 
-    def test_inline_false_for_postgres_off_render(self):
+    def test_inline_false_for_postgres(self):
         with patch.dict(
             os.environ,
-            {
-                "DATABASE_URL": "postgresql://user:pass@host:5432/db",
-                "GMAIL_SYNC_FORCE_INLINE": "",
-                "RENDER": "",
-                "RENDER_SERVICE_ID": "",
-                "RENDER_SERVICE_NAME": "",
-                "GMAIL_SYNC_USE_QUEUE": "",
-            },
+            {"DATABASE_URL": "postgresql://user:pass@host:5432/db"},
             clear=False,
         ):
             self.assertFalse(should_process_gmail_sync_inline())
 
-    def test_inline_true_on_render_postgres(self):
-        with patch.dict(
-            os.environ,
-            {
-                "DATABASE_URL": "postgresql://user:pass@host:5432/db",
-                "RENDER": "true",
-                "GMAIL_SYNC_FORCE_INLINE": "",
-                "GMAIL_SYNC_USE_QUEUE": "",
-            },
-            clear=False,
-        ):
-            self.assertTrue(should_process_gmail_sync_inline())
-
-    def test_use_queue_disables_render_inline(self):
-        with patch.dict(
-            os.environ,
-            {
-                "DATABASE_URL": "postgresql://user:pass@host:5432/db",
-                "RENDER": "true",
-                "GMAIL_SYNC_USE_QUEUE": "1",
-            },
-            clear=False,
-        ):
-            self.assertFalse(should_process_gmail_sync_inline())
-
-    def test_force_inline_env(self):
-        with patch.dict(
-            os.environ,
-            {"DATABASE_URL": "postgresql://user:pass@host:5432/db", "GMAIL_SYNC_FORCE_INLINE": "1"},
-            clear=False,
-        ):
-            self.assertTrue(should_process_gmail_sync_inline())
+    @patch("email_automation.gmail_sync_jobs.db_optimizer")
+    def test_abort_queued_gmail_sync_job_marks_failed(self, mock_db):
+        abort_queued_gmail_sync_job("job-1", 42, "queue down")
+        self.assertEqual(mock_db.execute_query.call_count, 1)
+        mock_db.upsert_user_sync_status_merge.assert_called_once_with(
+            42,
+            sync_status="failed",
+            syncing=0,
+        )
 
 
 class TestGmailSyncJobs(unittest.TestCase):

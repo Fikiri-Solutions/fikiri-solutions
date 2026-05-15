@@ -54,7 +54,33 @@ services:
     healthCheckPath: /api/health/live
     autoDeploy: true
     branch: main
-    
+
+  # Processes Gmail sync (and other email-queue jobs) from Redis. Required for Postgres:
+  # the web service only enqueues; this worker must share DATABASE_URL + REDIS_URL.
+  - type: worker
+    name: fikiri-worker
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/rq_worker.py email
+    plan: starter
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: FERNET_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+    autoDeploy: true
+    branch: main
+
   - type: web
     name: fikiri-backend-staging
     env: python

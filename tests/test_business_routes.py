@@ -306,6 +306,39 @@ class TestBusinessRoutes(unittest.TestCase):
         self.assertTrue(data.get("success"))
         self.assertTrue(data.get("data", {}).get("sync_job_queued"))
 
+    @patch.dict(
+        "os.environ",
+        {"DATABASE_URL": "postgresql://user:pass@host:5432/db"},
+        clear=False,
+    )
+    @patch("routes.business.oauth_token_manager")
+    @patch("routes.business.db_optimizer")
+    @patch("routes.business.get_current_user_id")
+    def test_sync_gmail_postgres_without_redis_returns_503(
+        self, mock_get_user, mock_db, mock_oauth
+    ):
+        mock_get_user.return_value = 1
+        mock_db.execute_query.return_value = [{"id": 1}]
+        mock_oauth.get_token_status.return_value = {"success": True}
+
+        mock_queue = MagicMock()
+        mock_queue.is_connected.return_value = False
+
+        with patch("email_automation.gmail_sync_jobs.GmailSyncJobManager") as mock_mgr, patch(
+            "core.redis_queues.get_email_queue", return_value=mock_queue
+        ), patch(
+            "email_automation.gmail_sync_jobs.abort_queued_gmail_sync_job"
+        ) as mock_abort:
+            mock_mgr.return_value.queue_sync_job.return_value = "job1"
+            response = self.client.post(
+                "/api/crm/sync-gmail", json={}, content_type="application/json"
+            )
+
+        self.assertEqual(response.status_code, 503)
+        data = response.get_json()
+        self.assertEqual(data.get("code"), "JOB_QUEUE_UNAVAILABLE")
+        mock_abort.assert_called_once()
+
     @patch("routes.business.get_current_user_id")
     def test_send_email_requires_auth(self, mock_get_user):
         mock_get_user.return_value = None

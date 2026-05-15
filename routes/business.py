@@ -746,46 +746,26 @@ def sync_gmail():
         sync_job_queued = False
         job_id = None
         try:
-            from email_automation.gmail_sync_jobs import GmailSyncJobManager, should_process_gmail_sync_inline
+            from email_automation.gmail_sync_jobs import (
+                GmailSyncJobManager,
+                abort_queued_gmail_sync_job,
+                should_process_gmail_sync_inline,
+            )
             from core.redis_queues import get_email_queue
-            
+
             sync_job_manager = GmailSyncJobManager()
             job_id = sync_job_manager.queue_sync_job(user_id, sync_type='manual')
-            
+
             if job_id:
-                sync_job_queued = True
-                logger.info(f"Queued Gmail sync job {job_id} for user {user_id}")
-                
-                email_queue = get_email_queue()
                 use_inline = should_process_gmail_sync_inline()
-                # SQLite on Render: DB file is on the web disk only—no separate worker can run the job.
-                # Redis enqueue would leave jobs pending forever unless GMAIL_SYNC_FORCE_INLINE=0 and a worker shares Postgres.
-                if email_queue.is_connected() and not use_inline:
-                    # Register the sync job task if not already registered
-                    if 'process_gmail_sync' not in email_queue._registered_tasks:
-                        email_queue.register_task('process_gmail_sync', sync_job_manager.process_sync_job)
-                    
-                    try:
-                        from core.trace_context import get_trace_id
-                        trace_id = get_trace_id()
-                    except ImportError:
-                        trace_id = None
-                    
-                    rq_job_id = email_queue.enqueue_job(
-                        'process_gmail_sync',
-                        {'job_id': job_id, 'trace_id': trace_id},
-                        max_retries=3
+                email_queue = get_email_queue()
+
+                if use_inline:
+                    logger.info(
+                        "Gmail sync: SQLite database — processing in web process thread"
                     )
-                    logger.info(f"✅ Enqueued Gmail sync job {job_id} to Redis queue (job id: {rq_job_id})")
-                else:
-                    if use_inline:
-                        logger.info(
-                            "Gmail sync: processing in web process (inline policy); "
-                            "Redis queue bypassed so the job runs on this service"
-                        )
-                    else:
-                        logger.warning("⚠️ Redis not available, processing sync in background thread")
                     import threading
+
                     def process_in_background():
                         try:
                             result = sync_job_manager.process_sync_job(job_id)
@@ -795,9 +775,60 @@ def sync_gmail():
                                 logger.error(f"❌ Sync job {job_id} failed: {result.get('error')}")
                         except Exception as e:
                             logger.error(f"❌ Sync job {job_id} error: {e}")
-                    thread = threading.Thread(target=process_in_background, daemon=True)
-                    thread.start()
-                    logger.info(f"✅ Started background thread for sync job {job_id}")
+
+                    threading.Thread(target=process_in_background, daemon=True).start()
+                    sync_job_queued = True
+                    logger.info(f"Started inline Gmail sync job {job_id} for user {user_id}")
+                else:
+                    queue_unavailable_msg = (
+                        "Background sync queue is unavailable. "
+                        "Ensure REDIS_URL is set and the email worker is running."
+                    )
+                    if not email_queue.is_connected():
+                        abort_queued_gmail_sync_job(job_id, user_id, queue_unavailable_msg)
+                        return create_error_response(
+                            queue_unavailable_msg,
+                            503,
+                            'JOB_QUEUE_UNAVAILABLE',
+                        )
+
+                    if 'process_gmail_sync' not in email_queue._registered_tasks:
+                        email_queue.register_task(
+                            'process_gmail_sync', sync_job_manager.process_sync_job
+                        )
+
+                    try:
+                        from core.trace_context import get_trace_id
+                        trace_id = get_trace_id()
+                    except ImportError:
+                        trace_id = None
+
+                    try:
+                        rq_job_id = email_queue.enqueue_job(
+                            'process_gmail_sync',
+                            {'job_id': job_id, 'trace_id': trace_id},
+                            max_retries=3,
+                        )
+                    except Exception as enqueue_error:
+                        logger.error(
+                            "Gmail sync Redis enqueue failed for job %s: %s",
+                            job_id,
+                            enqueue_error,
+                        )
+                        abort_queued_gmail_sync_job(job_id, user_id, queue_unavailable_msg)
+                        return create_error_response(
+                            queue_unavailable_msg,
+                            503,
+                            'JOB_QUEUE_UNAVAILABLE',
+                        )
+
+                    sync_job_queued = True
+                    logger.info(
+                        "Enqueued Gmail sync job %s for user %s (redis job %s)",
+                        job_id,
+                        user_id,
+                        rq_job_id,
+                    )
         except Exception as job_error:
             logger.warning(f"Could not queue sync job (will try direct sync): {job_error}")
             import traceback
