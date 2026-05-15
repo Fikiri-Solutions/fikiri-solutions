@@ -7,11 +7,16 @@ Interactive Redis client using Python
 import redis
 import json
 import sys
+import os
 from datetime import datetime
 
 class FikiriRedisCLI:
     def __init__(self):
-        self.redis_url = 'redis://default:fz0wvU6lk68C67y2bMwSrjGC38g3Dh6H@redis-19575.c17.us-east-1-4.ec2.redns.redis-cloud.com:19575'
+        self.redis_url = os.environ.get("REDIS_URL") or os.environ.get("FIKIRI_REDIS_URL")
+        if not self.redis_url:
+            raise ValueError(
+                "Redis URL not configured: set REDIS_URL or FIKIRI_REDIS_URL in your environment."
+            )
         self.r = redis.from_url(self.redis_url, decode_responses=True)
         
     def connect(self):
@@ -258,7 +263,11 @@ class FikiriRedisCLI:
 
 def main():
     """Main function"""
-    cli = FikiriRedisCLI()
+    try:
+        cli = FikiriRedisCLI()
+    except ValueError as e:
+        print(f"❌ {e}")
+        sys.exit(1)
     
     if not cli.connect():
         sys.exit(1)

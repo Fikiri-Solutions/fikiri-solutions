@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 import { RadiantLayout, Gradient, Container, AnimatedBackground } from '../components/radiant';
 import { PublicChatbotWidget } from '../components/PublicChatbotWidget';
+import { TableScroll } from '../components/TableScroll';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../services/apiClient';
 import { useToast } from '../components/Toast';
@@ -530,23 +531,26 @@ const PricingPage: React.FC = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={featuresInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
             transition={{ duration: 0.8 }}
-            className="text-center mb-16"
+            className="text-center mb-8 sm:mb-16"
           >
             <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-foreground">
               Compare Plans
             </h2>
+            <p className="text-sm text-muted-foreground sm:hidden">
+              Swipe horizontally to compare all plans
+            </p>
           </motion.div>
 
           <div className="bg-card/90 backdrop-blur-sm rounded-2xl border border-border shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
+            <TableScroll size="wide" label="Compare plans table">
+              <table className="w-full table-fixed sm:table-auto">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left p-6 text-foreground font-semibold">Features</th>
-                    <th className="text-center p-6 text-foreground font-semibold">Starter</th>
-                    <th className="text-center p-6 text-foreground font-semibold">Growth</th>
-                    <th className="text-center p-6 text-foreground font-semibold">Business</th>
-                    <th className="text-center p-6 text-foreground font-semibold">Enterprise</th>
+                    <th className="text-left p-4 sm:p-6 text-foreground font-semibold whitespace-nowrap w-[38%] sm:w-auto">Features</th>
+                    <th className="text-center p-4 sm:p-6 text-foreground font-semibold whitespace-nowrap">Starter</th>
+                    <th className="text-center p-4 sm:p-6 text-foreground font-semibold whitespace-nowrap">Growth</th>
+                    <th className="text-center p-4 sm:p-6 text-foreground font-semibold whitespace-nowrap">Business</th>
+                    <th className="text-center p-4 sm:p-6 text-foreground font-semibold whitespace-nowrap">Enterprise</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -559,7 +563,7 @@ const PricingPage: React.FC = () => {
                       </tr>
                       {category.features.map((feature, featureIndex) => (
                         <tr key={featureIndex} className="border-b border-border/50">
-                          <td className="p-4 text-foreground">{feature.name}</td>
+                          <td className="table-scroll-cell-wrap p-4 text-foreground min-w-[8rem]">{feature.name}</td>
                           <td className="p-4 text-center text-foreground">
                             {typeof feature.starter === 'boolean' 
                               ? (feature.starter ? <Check className="w-5 h-5 text-green-600 mx-auto" /> : '—')
@@ -590,7 +594,7 @@ const PricingPage: React.FC = () => {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           </div>
         </Container>
       </section>

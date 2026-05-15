@@ -163,23 +163,23 @@ html {
   h1, h2, h3, h4, h5, h6 {
     @apply text-gray-900 dark:text-gray-100;
     transition: color 0.3s ease;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
   }
   
-  p, span, div {
+  p {
     @apply text-gray-700 dark:text-gray-300;
     transition: color 0.3s ease;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
   }
 
-  li, label {
-    overflow-wrap: anywhere;
-  }
+  /* Do not set overflow-wrap on all span/div — it breaks nav, tables, and logos on narrow screens. */
 
-  /* Keep text visually balanced when windows are resized (desktop + mobile). */
+  /* Balance headings on tablet+ only; on phones it can fragment short lines oddly. */
   @supports (text-wrap: balance) {
-    h1, h2, h3 {
-      text-wrap: balance;
+    @media (min-width: 640px) {
+      h1, h2, h3 {
+        text-wrap: balance;
+      }
     }
   }
 
@@ -189,6 +189,18 @@ html {
     }
   }
   
+  /* Long URLs / hashes in dashboard content only — not global span/div */
+  .break-long-words {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  /* Marketing / app shell: clip decorative w-screen bleed (PlusGrid, etc.) */
+  .mobile-layout-root {
+    overflow-x: clip;
+    max-width: 100%;
+  }
+
   /* Default link styling - Fikiri brand colors as subtle accents */
   a {
     @apply text-brand-primary dark:text-brand-secondary hover:text-brand-secondary dark:hover:text-brand-accent;
@@ -429,5 +441,33 @@ html {
     .mobile-nav-spacing {
       padding-bottom: calc(1rem + env(safe-area-inset-bottom));
     }
+  }
+
+  /* Scrollable tables — use with <TableScroll> or class directly */
+  .table-scroll {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-scroll--wide table {
+    min-width: 42rem;
+  }
+
+  .table-scroll--medium table {
+    min-width: 40rem;
+  }
+
+  .table-scroll--full table {
+    min-width: 100%;
+  }
+
+  .table-scroll th {
+    white-space: nowrap;
+  }
+
+  .table-scroll td.table-scroll-cell-wrap {
+    white-space: normal;
+    overflow-wrap: break-word;
   }
 }

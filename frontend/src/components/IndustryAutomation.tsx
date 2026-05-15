@@ -345,7 +345,7 @@ export const IndustryAutomation: React.FC = () => {
                     <h3 className="text-lg font-medium text-brand-text dark:text-white border-b border-brand-text/10 dark:border-gray-700 pb-2">
                       {category}
                     </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
                       {industries.map(({ industry, config }: {industry: string, config: IndustryPromptConfig}) => (
                         <button
                           key={industry}

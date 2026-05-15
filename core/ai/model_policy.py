@@ -8,7 +8,8 @@ LLM model selection — Fikiri standard pair: **gpt-4o-mini** + **gpt-4o**.
 
 Optional env overrides (same IDs or snapshots your org allows):
 FIKIRI_LLM_MODEL_DEFAULT, FIKIRI_LLM_PREMIUM_MODEL, FIKIRI_LLM_FALLBACK_MODEL,
-FIKIRI_LLM_MODEL_CHATBOT, FIKIRI_LLM_MODEL_EMAIL_REPLY, etc.
+FIKIRI_LLM_MODEL_CHATBOT, FIKIRI_LLM_MODEL_EMAIL_REPLY,
+FIKIRI_LLM_MODEL_BUSINESS_EMAIL_ANALYSIS, etc.
 
 Pricing: https://openai.com/api/pricing/
 """
@@ -49,6 +50,11 @@ INTENT_MODEL_CONFIG: Dict[str, Dict[str, Any]] = {
         _env_model("FIKIRI_LLM_MODEL_CLASSIFICATION", _DEFAULT_CHEAP),
         100,
         0.3,
+    ),
+    "business_email_analysis": _cfg(
+        _env_model("FIKIRI_LLM_MODEL_BUSINESS_EMAIL_ANALYSIS", _DEFAULT_CHEAP),
+        800,
+        0.35,
     ),
     "extraction": _cfg(
         _env_model("FIKIRI_LLM_MODEL_EXTRACTION", _DEFAULT_CHEAP),

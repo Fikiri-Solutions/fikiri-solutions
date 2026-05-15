@@ -25,6 +25,7 @@
 - **Gmail SMTP `535 BadCredentials`**: Google rejects normal account passwords for `smtp.gmail.com:587` unless you use an **[App Password](https://support.google.com/accounts/answer/185833)** (2FA required) or OAuth-based sending. Set `SMTP_USERNAME` to the **full Gmail address** and `SMTP_PASSWORD` to the 16-character app password.
 - **Stale `email_jobs` rows**: If you previously queued many pending jobs, they stay in SQLite until sent or failed. After fixing SMTP, you can mark ancient pending rows failed (e.g. via SQL on `email_jobs`) so they are not processed by a manual `process_jobs()` call later.
 - **SQLite time comparisons**: Python often stores datetimes as ISO strings with a **`T`**. Comparing those strings directly to `datetime('now')` (space-separated) can sort wrong. Use `datetime(column)` in SQL (see [docs/SQLITE_DATETIME_COMPARISONS.md](docs/SQLITE_DATETIME_COMPARISONS.md)).
+- **Mailbox AI cost gate**: `FIKIRI_EMAIL_PIPELINE_AI_GATE=1` (or `true`/`yes`/`on`) enforces `ai_responses` tier caps plus `ai_budget_guardrails` on `email_automation.pipeline.orchestrate_incoming` before the first LLM analyze, and records usage after a successful analyze. Unset = legacy behavior (no gate). Tier/budget check **exceptions** fail open with a warning so mail sync is not bricked by accounting errors. See `core/email_pipeline_ai_gate.py` and [docs/ENVIRONMENT_CONFIG.md](docs/ENVIRONMENT_CONFIG.md).
 
 ### E2E tests (Playwright)
 

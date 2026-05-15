@@ -325,36 +325,56 @@ class RemindersAlertsSystem:
             logger.error(f"❌ Failed to get user reminders: {e}")
             return {"success": False, "error": str(e)}
     
-    def mark_alert_read(self, alert_id: str) -> Dict[str, Any]:
-        """Mark an alert as read"""
+    def mark_alert_read(self, alert_id: str, scope_user_id: Optional[int] = None) -> Dict[str, Any]:
+        """Mark an alert as read.
+
+        When scope_user_id is set (API callers), only that user's row is updated.
+        When None (trusted jobs), match by alert id only.
+        """
         try:
-            # Update database
-            query = f"UPDATE alerts SET is_read = {db_optimizer.sql_true_literal()} WHERE id = ?"
-            db_optimizer.execute_query(query, (alert_id,), fetch=False)
-            
-            # Remove from Redis
+            true_lit = db_optimizer.sql_true_literal()
+            if scope_user_id is not None:
+                query = f"UPDATE alerts SET is_read = {true_lit} WHERE id = ? AND user_id = ?"
+                params = (alert_id, scope_user_id)
+            else:
+                query = f"UPDATE alerts SET is_read = {true_lit} WHERE id = ?"
+                params = (alert_id,)
+            rows = db_optimizer.execute_query(query, params, fetch=False)
+            if scope_user_id is not None and rows == 0:
+                return {"success": False, "error": "Alert not found"}
+
             if self.redis_client:
                 self.redis_client.delete(f"alert:{alert_id}")
-            
+
             return {"success": True}
-            
+
         except Exception as e:
             logger.error(f"❌ Failed to mark alert as read: {e}")
             return {"success": False, "error": str(e)}
-    
-    def cancel_reminder(self, reminder_id: str) -> Dict[str, Any]:
-        """Cancel a reminder"""
+
+    def cancel_reminder(self, reminder_id: str, scope_user_id: Optional[int] = None) -> Dict[str, Any]:
+        """Cancel a reminder.
+
+        When scope_user_id is set (API callers), only that user's row is updated.
+        When None (trusted jobs), match by reminder id only.
+        """
         try:
-            # Update database
-            query = f"UPDATE reminders SET is_active = {db_optimizer.sql_false_literal()} WHERE id = ?"
-            db_optimizer.execute_query(query, (reminder_id,), fetch=False)
-            
-            # Remove from Redis
+            false_lit = db_optimizer.sql_false_literal()
+            if scope_user_id is not None:
+                query = f"UPDATE reminders SET is_active = {false_lit} WHERE id = ? AND user_id = ?"
+                params = (reminder_id, scope_user_id)
+            else:
+                query = f"UPDATE reminders SET is_active = {false_lit} WHERE id = ?"
+                params = (reminder_id,)
+            rows = db_optimizer.execute_query(query, params, fetch=False)
+            if scope_user_id is not None and rows == 0:
+                return {"success": False, "error": "Reminder not found"}
+
             if self.redis_client:
                 self.redis_client.delete(f"reminder:{reminder_id}")
-            
+
             return {"success": True}
-            
+
         except Exception as e:
             logger.error(f"❌ Failed to cancel reminder: {e}")
             return {"success": False, "error": str(e)}

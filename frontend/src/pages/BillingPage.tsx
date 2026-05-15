@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { getSubscriptionSignupSteps } from '../content/subscriptionSignupInstructions'
 import { LegalFooterLinks } from '../components/LegalFooterLinks'
+import { TableScroll } from '../components/TableScroll'
 
 export const BillingPage: React.FC = () => {
   const navigate = useNavigate()
@@ -814,8 +815,8 @@ export const BillingPage: React.FC = () => {
             </div>
           ) : invoices.length > 0 ? (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-              <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px]">
+              <TableScroll size="medium" label="Invoice history">
+              <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Invoice</th>
@@ -861,7 +862,7 @@ export const BillingPage: React.FC = () => {
                   ))}
                 </tbody>
               </table>
-              </div>
+              </TableScroll>
             </div>
           ) : (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
@@ -880,11 +881,11 @@ export const BillingPage: React.FC = () => {
               </div>
             ) : testAccessAudit.length > 0 ? (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px]">
+                <TableScroll size="medium" label="Test access audit">
+                <table className="w-full">
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">User</th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">User</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Code</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Redeemed</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Expires</th>
@@ -913,7 +914,7 @@ export const BillingPage: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
-                </div>
+                </TableScroll>
               </div>
             ) : (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">

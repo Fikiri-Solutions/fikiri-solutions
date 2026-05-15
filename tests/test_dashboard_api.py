@@ -23,6 +23,11 @@ class TestDashboardAPI(unittest.TestCase):
         self.app.register_blueprint(dashboard_bp)
         self.client = self.app.test_client()
 
+    @patch("analytics.dashboard_api.get_current_user_id", return_value=None)
+    def test_dashboard_metrics_requires_auth(self, mock_uid):
+        response = self.client.get("/api/dashboard/metrics")
+        self.assertEqual(response.status_code, 401)
+
     @patch("analytics.dashboard_api.get_current_user")
     def test_debug_dashboard_requires_auth(self, mock_user):
         mock_user.return_value = None
@@ -48,7 +53,8 @@ class TestDashboardAPI(unittest.TestCase):
         self.assertIn("queries_tested", data["data"])
 
     @patch("analytics.dashboard_api.db_optimizer")
-    def test_dashboard_metrics_success(self, mock_db):
+    @patch("analytics.dashboard_api.get_current_user_id", return_value=1)
+    def test_dashboard_metrics_success(self, mock_user_id, mock_db):
         # user, leads total, leads recent, oauth gmail, ai total
         mock_db.execute_query.side_effect = [
             [{"id": 1, "email": "u@t.com", "name": "User", "onboarding_completed": 1, "onboarding_step": 2}],
@@ -111,7 +117,8 @@ class TestDashboardAPI(unittest.TestCase):
         self.assertIn("data", data)
 
     @patch("analytics.dashboard_api.db_optimizer")
-    def test_dashboard_timeseries_success(self, mock_db):
+    @patch("analytics.dashboard_api.get_current_user_id", return_value=1)
+    def test_dashboard_timeseries_success(self, mock_user_id, mock_db):
         mock_db.execute_query.side_effect = [
             [{"day": "2026-03-01", "value": 2}],     # leads daily
             [{"day": "2026-03-01", "value": 5}],     # emails daily
@@ -165,7 +172,8 @@ class TestDashboardAPI(unittest.TestCase):
         self.assertEqual(data.get("data", {}).get("recent_responses"), 5)
 
     @patch("analytics.dashboard_api.db_optimizer")
-    def test_dashboard_metrics_includes_ai_total(self, mock_db):
+    @patch("analytics.dashboard_api.get_current_user_id", return_value=1)
+    def test_dashboard_metrics_includes_ai_total(self, mock_user_id, mock_db):
         """Metrics response includes ai.total for frontend mapping."""
         mock_db.execute_query.side_effect = [
             [{"id": 1, "email": "u@t.com", "name": "User", "onboarding_completed": 0, "onboarding_step": 1}],
@@ -183,7 +191,8 @@ class TestDashboardAPI(unittest.TestCase):
         self.assertEqual(metrics["ai"].get("total"), 7)
 
     @patch("analytics.dashboard_api.db_optimizer")
-    def test_dashboard_metrics_handles_db_error_gracefully(self, mock_db):
+    @patch("analytics.dashboard_api.get_current_user_id", return_value=1)
+    def test_dashboard_metrics_handles_db_error_gracefully(self, mock_user_id, mock_db):
         """Metrics endpoint still returns 200 with defaults when a query fails."""
         mock_db.execute_query.side_effect = Exception("DB unavailable")
         response = self.client.get("/api/dashboard/metrics")
@@ -195,14 +204,14 @@ class TestDashboardAPI(unittest.TestCase):
         self.assertIn("timestamp", metrics)
 
     @patch("analytics.dashboard_api.db_optimizer")
-    def test_dashboard_timeseries_accepts_user_id_and_period(self, mock_db):
+    @patch("analytics.dashboard_api.get_current_user_id", return_value=2)
+    def test_dashboard_timeseries_requires_authenticated_user(self, mock_user_id, mock_db):
         mock_db.execute_query.side_effect = [
             [], [], [], [],  # daily rows
             [{"value": 0}], [{"value": 0}], [{"value": 0}], [{"value": 0}],
             [{"value": 0}], [{"value": 0}], [{"value": 0}], [{"value": 0}],
         ]
-        """Timeseries accepts user_id and period query params."""
-        response = self.client.get("/api/dashboard/timeseries?user_id=2&period=month")
+        response = self.client.get("/api/dashboard/timeseries?period=month")
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertTrue(data.get("success"))

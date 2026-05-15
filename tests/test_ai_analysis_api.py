@@ -202,6 +202,74 @@ class TestAIAnalysisAPI(unittest.TestCase):
         self.assertFalse(data['success'])
         self.assertIn('errors', data)
 
+    @patch('core.ai_analysis_api.ai_budget_guardrails.evaluate')
+    @patch('core.ai_analysis_api.check_tier_usage_cap')
+    @patch('core.ai_analysis_api.api_key_manager.validate_api_key')
+    @patch('core.ai_analysis_api.api_key_manager.check_rate_limit')
+    @patch('core.ai_analysis_api.api_key_manager.record_usage')
+    @patch('core.ai_analysis_api.analyze_contact')
+    def test_7_tier_cap_receives_int_from_numeric_string_user_id(
+        self, mock_analyze, mock_record, mock_rate_limit, mock_validate, mock_tier, mock_eval,
+    ):
+        mock_validate.return_value = {**self.mock_api_key_info, 'user_id': '999'}
+        mock_rate_limit.return_value = {'allowed': True, 'remaining': 60, 'limit': 60}
+        mock_tier.return_value = (True, '', '')
+        mock_eval.return_value = MagicMock(allowed=True)
+        mock_analyze.return_value = (
+            {'score': 1, 'engagement_level': 'low', 'recommended_actions': [], 'insights': [],
+             'risk_factors': [], 'opportunities': []},
+            'corr-x',
+        )
+        self.client.post(
+            '/api/public/ai/analyze/contact',
+            json={'name': 'John Doe', 'email': 'john@example.com'},
+            headers={'X-API-Key': 'fik_test_key'},
+        )
+        mock_tier.assert_called_once_with(999, 'ai_responses', projected_increment=1)
+        mock_eval.assert_called_once_with(999, projected_increment=1)
+
+    @patch('core.ai_analysis_api.ai_budget_guardrails.evaluate')
+    @patch('core.ai_analysis_api.ai_budget_guardrails.record_ai_usage')
+    @patch('core.ai_analysis_api.check_tier_usage_cap')
+    @patch('core.ai_analysis_api.api_key_manager.validate_api_key')
+    @patch('core.ai_analysis_api.api_key_manager.check_rate_limit')
+    @patch('core.ai_analysis_api.api_key_manager.record_usage')
+    @patch('core.ai_analysis_api.analyze_contact')
+    def test_8_non_numeric_api_key_user_id_skips_tier_and_ai_usage(
+        self, mock_analyze, mock_record, mock_rate_limit, mock_validate, mock_tier, mock_record_ai, mock_eval,
+    ):
+        mock_validate.return_value = {**self.mock_api_key_info, 'user_id': 'not-numeric'}
+        mock_rate_limit.return_value = {'allowed': True, 'remaining': 60, 'limit': 60}
+        mock_analyze.return_value = (
+            {'score': 1, 'engagement_level': 'low', 'recommended_actions': [], 'insights': [],
+             'risk_factors': [], 'opportunities': []},
+            'corr-y',
+        )
+        self.client.post(
+            '/api/public/ai/analyze/contact',
+            json={'name': 'John Doe', 'email': 'john@example.com'},
+            headers={'X-API-Key': 'fik_test_key'},
+        )
+        mock_tier.assert_not_called()
+        mock_eval.assert_not_called()
+        mock_record_ai.assert_not_called()
+
+
+class TestCallLLMJson(unittest.TestCase):
+    @patch('core.ai_analysis_api.llm_router')
+    def test_returns_none_when_validated_false(self, mock_lr):
+        from core.ai_analysis_api import _call_llm_json
+        mock_lr.client.is_enabled.return_value = True
+        mock_lr.process.return_value = {
+            'success': True,
+            'validated': False,
+            'content': '{}',
+            'correlation_id': 'c99',
+        }
+        out, cid = _call_llm_json('prompt', correlation_id='c0')
+        self.assertIsNone(out)
+        self.assertEqual(cid, 'c99')
+
 
 if __name__ == '__main__':
     unittest.main()

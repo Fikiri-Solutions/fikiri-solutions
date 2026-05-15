@@ -42,6 +42,29 @@ def _clean_text(value: Any) -> str:
     return str(value).strip()
 
 
+def _truncate_email_body_for_analysis(body: str, max_chars: int = 8000) -> str:
+    if not body:
+        return ""
+    if len(body) <= max_chars:
+        return body
+    return body[: max(0, max_chars - 22)] + "\n...[body truncated]"
+
+
+def _compact_thread_history_for_prompt(rows: List[Any], *, max_rows: int = 5, preview_chars: int = 360) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    if not isinstance(rows, list):
+        return out
+    for row in rows[:max_rows]:
+        if not isinstance(row, dict):
+            continue
+        item = dict(row)
+        bp = item.get("body_preview")
+        if isinstance(bp, str) and len(bp) > preview_chars:
+            item["body_preview"] = bp[: max(0, preview_chars - 3)] + "..."
+        out.append(item)
+    return out
+
+
 class MinimalAIEmailAssistant:
     """Minimal AI email assistant with production enhancements."""
     
@@ -207,6 +230,9 @@ class MinimalAIEmailAssistant:
         safe_crm = crm_lead_data if isinstance(crm_lead_data, dict) else {}
         safe_business = business_context if isinstance(business_context, dict) else self._load_business_context()
 
+        compact_thread = _compact_thread_history_for_prompt(safe_thread)
+        analysis_body = _truncate_email_body_for_analysis(safe_body)
+
         if not self.is_enabled():
             return self._fallback_business_analysis(
                 sender_email=safe_sender_email,
@@ -226,10 +252,10 @@ class MinimalAIEmailAssistant:
         {json.dumps({"email": safe_sender_email, "name": safe_sender_name}, default=str)}
 
         EMAIL:
-        {json.dumps({"subject": safe_subject, "body": safe_body}, default=str)}
+        {json.dumps({"subject": safe_subject, "body": analysis_body}, default=str)}
 
         THREAD HISTORY (latest first, may be empty):
-        {json.dumps(safe_thread[:5], default=str)}
+        {json.dumps(compact_thread, default=str)}
 
         CRM LEAD CONTEXT (may be empty):
         {json.dumps(safe_crm, default=str)}
@@ -269,7 +295,7 @@ class MinimalAIEmailAssistant:
         try:
             result = self.router.process(
                 input_data=prompt,
-                intent="classification",
+                intent="business_email_analysis",
                 output_schema=BusinessEmailAnalysisSchema,
                 context=self._llm_context(
                     operation="business_email_analysis",

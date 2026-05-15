@@ -5,6 +5,7 @@ Handles webhook data from Tally, Typeform, Jotform and other form services
 
 import json
 import logging
+import os
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from datetime import datetime
@@ -20,6 +21,43 @@ from core.google_sheets_connector import get_sheets_connector
 # from core.notion_connector import get_notion_connector
 
 logger = logging.getLogger(__name__)
+
+
+def _env_truthy(name: str) -> bool:
+    return (os.getenv(name) or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _parse_positive_int_env(name: str) -> Optional[int]:
+    raw = (os.getenv(name) or "").strip()
+    if not raw:
+        return None
+    try:
+        v = int(raw)
+        return v if v > 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def resolve_webhook_intake_owner_user_id(lead_data: Dict[str, Any]) -> Optional[int]:
+    """
+    CRM owner for inbound webhooks. Never trust request ``user_id`` unless
+    FIKIRI_TRUST_WEBHOOK_BODY_USER_ID is enabled (dev / tightly controlled proxies).
+    Prefer FIKIRI_WEBHOOK_DEFAULT_OWNER_USER_ID, then FIKIRI_DEFAULT_FORM_OWNER_USER_ID.
+    """
+    for key in ("FIKIRI_WEBHOOK_DEFAULT_OWNER_USER_ID", "FIKIRI_DEFAULT_FORM_OWNER_USER_ID"):
+        v = _parse_positive_int_env(key)
+        if v is not None:
+            return v
+    if _env_truthy("FIKIRI_TRUST_WEBHOOK_BODY_USER_ID"):
+        raw = lead_data.get("user_id")
+        if raw is not None:
+            try:
+                u = int(raw)
+                return u if u > 0 else None
+            except (TypeError, ValueError):
+                return None
+    return None
+
 
 @dataclass
 class WebhookConfig:
@@ -201,7 +239,16 @@ class WebhookIntakeService:
             }
             
             lead_data['score'] = self._calculate_lead_score(lead_data)
-            
+            if _env_truthy("FIKIRI_TRUST_WEBHOOK_BODY_USER_ID"):
+                raw_uid = data.get("user_id")
+                if raw_uid is not None:
+                    try:
+                        u = int(raw_uid)
+                        if u > 0:
+                            lead_data["user_id"] = u
+                    except (TypeError, ValueError):
+                        pass
+
             return self._process_lead(lead_data)
             
         except Exception as e:
@@ -216,6 +263,18 @@ class WebhookIntakeService:
             if not lead_data.get('email'):
                 return {"success": False, "error": "Email is required"}
 
+            owner_uid = resolve_webhook_intake_owner_user_id(lead_data)
+            if owner_uid is None:
+                return {
+                    "success": False,
+                    "error": (
+                        "Webhook intake owner not configured. Set FIKIRI_WEBHOOK_DEFAULT_OWNER_USER_ID "
+                        "or FIKIRI_DEFAULT_FORM_OWNER_USER_ID, or enable FIKIRI_TRUST_WEBHOOK_BODY_USER_ID "
+                        "with a trusted proxy that injects user_id."
+                    ),
+                }
+            lead_data["user_id"] = owner_uid
+
             # Idempotency key (prefer submission_id if present)
             metadata = lead_data.get('metadata', {}) or {}
             submission_id = metadata.get('submission_id') or metadata.get('submissionId')
@@ -226,14 +285,14 @@ class WebhookIntakeService:
             }
             key = generate_deterministic_key(
                 'webhook_lead',
-                lead_data.get('user_id', 1),
+                lead_data["user_id"],
                 idempotency_payload
             )
             if key:
                 cached = idempotency_manager.check_key(key)
                 if cached and cached.get('status') == 'completed':
                     return cached.get('response_data') or {"success": True, "lead_id": None}
-                idempotency_manager.store_key(key, 'webhook_lead', lead_data.get('user_id', 1), idempotency_payload)
+                idempotency_manager.store_key(key, 'webhook_lead', lead_data["user_id"], idempotency_payload)
             
             # Generate unique lead ID
             lead_id = f"lead_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{hashlib.md5(lead_data['email'].encode()).hexdigest()[:8]}"
@@ -290,7 +349,7 @@ class WebhookIntakeService:
             # Upsert by email (idempotent for replays)
             existing = db_optimizer.execute_query(
                 "SELECT id FROM leads WHERE user_id = ? AND email = ?",
-                (lead_data.get('user_id', 1), lead_data['email'])
+                (lead_data["user_id"], lead_data['email'])
             )
             if existing:
                 lead_id = existing[0]['id']
@@ -320,7 +379,7 @@ class WebhookIntakeService:
             """
             
             values = (
-                lead_data.get('user_id', 1),
+                lead_data["user_id"],
                 lead_data['email'],
                 lead_data['name'],
                 lead_data['phone'],

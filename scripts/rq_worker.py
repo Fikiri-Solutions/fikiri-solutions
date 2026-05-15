@@ -63,7 +63,15 @@ def register_tasks():
     try:
         from crm.service import enhanced_crm_service
         def update_crm_task(lead_data: dict, **kwargs):
-            user_id = lead_data.get('user_id', 1)
+            raw = (lead_data or {}).get("user_id")
+            if raw is None:
+                return {"success": False, "error": "lead_data must include user_id"}
+            try:
+                user_id = int(raw)
+            except (TypeError, ValueError):
+                return {"success": False, "error": "invalid user_id"}
+            if user_id <= 0:
+                return {"success": False, "error": "invalid user_id"}
             return enhanced_crm_service.create_lead(user_id, lead_data)
         crm_queue.register_task('update_crm', update_crm_task)
     except Exception as e:

@@ -14,6 +14,8 @@ from flask import Flask
 from core.workflow_templates_api import workflow_templates_bp
 from core.workflow_templates_system import WorkflowCategory, WorkflowTemplate
 
+_AUTH_HEADERS = {"Authorization": "Bearer test-token"}
+
 
 def _make_mock_template(tid="t1", name="Test", category=WorkflowCategory.GENERAL):
     return WorkflowTemplate(
@@ -86,26 +88,31 @@ class TestWorkflowTemplatesAPI:
         assert "error" in data
         assert "not found" in data["error"].lower()
 
+    @patch("core.jwt_auth.get_jwt_manager")
     @patch("core.workflow_templates_api.workflow_templates_system")
-    def test_create_automation_from_template_missing_user_id_returns_400(self, mock_sys):
+    def test_create_automation_from_template_missing_auth_returns_401(self, mock_sys, mock_jwt):
+        mock_jwt.return_value.verify_access_token.return_value = {"error": "invalid"}
         response = self.client.post(
             "/api/workflow-templates/templates/t1/create",
             json={},
             content_type="application/json",
+            headers=_AUTH_HEADERS,
         )
-        assert response.status_code == 400
+        assert response.status_code == 401
         data = json.loads(response.data)
         assert "error" in data
-        assert "user_id" in data["error"].lower()
 
+    @patch("core.jwt_auth.get_jwt_manager")
     @patch("core.workflow_templates_api.workflow_templates_system")
-    def test_create_automation_from_template_success(self, mock_sys):
+    def test_create_automation_from_template_success(self, mock_sys, mock_jwt):
+        mock_jwt.return_value.verify_access_token.return_value = {"user_id": 1, "type": "access"}
         mock_sys.create_automation_from_template.return_value = {"success": True, "automation_id": 1}
 
         response = self.client.post(
             "/api/workflow-templates/templates/t1/create",
-            json={"user_id": 1, "customizations": {}},
+            json={"customizations": {}},
             content_type="application/json",
+            headers=_AUTH_HEADERS,
         )
         assert response.status_code == 200
         data = json.loads(response.data)

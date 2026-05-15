@@ -72,11 +72,11 @@ export const FikiriLogo: React.FC<FikiriLogoProps> = ({
             aria-hidden
             className={`h-10 w-10 shrink-0 object-contain sm:h-12 sm:w-12 ${animationClass}`}
           />
-          <div className="flex min-w-0 flex-row flex-wrap items-baseline gap-x-1.5 sm:gap-x-2">
-            <span className={`${textSizeClasses[size]} font-bold tracking-wide text-white drop-shadow-lg`}>
+          <div className="flex min-w-0 flex-row flex-nowrap items-baseline gap-x-1.5 sm:gap-x-2">
+            <span className={`${textSizeClasses[size]} font-bold tracking-wide text-white drop-shadow-lg whitespace-nowrap`}>
               FIKIRI
             </span>
-            <span className={`${subtextSizeClasses[size]} font-medium tracking-wide text-white/95 drop-shadow-lg`}>
+            <span className={`${subtextSizeClasses[size]} font-medium tracking-wide text-white/95 drop-shadow-lg whitespace-nowrap`}>
               SOLUTIONS
             </span>
           </div>
@@ -102,20 +102,20 @@ export const FikiriLogo: React.FC<FikiriLogoProps> = ({
           aria-hidden
           className={`${sizeClasses[size]} shrink-0 object-contain ${animationClass}`}
         />
-        <div className="flex min-w-0 flex-row flex-wrap items-baseline gap-x-1.5 sm:gap-x-2">
+        <div className="flex min-w-0 flex-row flex-nowrap items-baseline gap-x-1.5 sm:gap-x-2">
           {isLightText ? (
             <>
-              <span className={`${textSizeClasses[size]} font-bold tracking-wide text-white drop-shadow-lg`}>
+              <span className={`${textSizeClasses[size]} font-bold tracking-wide text-white drop-shadow-lg whitespace-nowrap`}>
                 FIKIRI
               </span>
-              <span className={`${subtextSizeClasses[size]} font-medium tracking-wide text-white drop-shadow-lg`}>
+              <span className={`${subtextSizeClasses[size]} font-medium tracking-wide text-white drop-shadow-lg whitespace-nowrap`}>
                 SOLUTIONS
               </span>
             </>
           ) : (
             <>
               <span
-                className={`${textSizeClasses[size]} font-bold tracking-wide bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent`}
+                className={`${textSizeClasses[size]} font-bold tracking-wide whitespace-nowrap bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent`}
                 style={{
                   background: 'linear-gradient(to right, #FF6B35, #D2691E, #8B0000)',
                   WebkitBackgroundClip: 'text',
@@ -125,7 +125,7 @@ export const FikiriLogo: React.FC<FikiriLogoProps> = ({
                 FIKIRI
               </span>
               <span
-                className={`${subtextSizeClasses[size]} font-medium tracking-wide bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent`}
+                className={`${subtextSizeClasses[size]} font-medium tracking-wide whitespace-nowrap bg-gradient-to-r from-orange-400 via-orange-500 to-red-600 bg-clip-text text-transparent`}
                 style={{
                   background: 'linear-gradient(to right, #FF6B35, #D2691E, #8B0000)',
                   WebkitBackgroundClip: 'text',

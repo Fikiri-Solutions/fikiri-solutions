@@ -1,0 +1,2 @@
+# Gitleaks v8+ expects fingerprints: path:rule:line (see report JSON "Fingerprint").
+# Path-based skips live in .gitleaks.toml [allowlist] paths — not here.

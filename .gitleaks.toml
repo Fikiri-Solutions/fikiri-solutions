@@ -1,0 +1,20 @@
+title = "Fikiri gitleaks"
+
+[extend]
+useDefault = true
+
+# Illustrative placeholders in docs (curl/JWT examples). Do not put live secrets in these files.
+# Path patterns also skip local-only files picked up by `gitleaks detect --no-git` (see security_pre_lab_gate.sh).
+[allowlist]
+paths = [
+  '''(?i)(^|/)docs/.*\.md$''',
+  '''(?i)^API_DOCUMENTATION\.md$''',
+  '''(?i)^AUTHENTICATION_SETUP\.md$''',
+  '''(?i)^STRIPE_.*\.md$''',
+  '''(?i)^env\.template$''',
+  # Generated reports & local env (gitignored; --no-git still traverses them)
+  '''(?i)(^|/)security-reports/''',
+  '''(?i)\.env(\.[^/]+)?$''',
+  '''(?i)(^|/)auth/credentials\.json$''',
+  '''(?i)(^|/)frontend/playwright/\.auth/''',
+]

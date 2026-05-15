@@ -249,3 +249,4 @@ class TestMinimalAIEmailAssistant:
         )
         assert result["needs_human_review"] is True
         assert result["should_auto_send"] is False
+        assert mock_router.process.call_args[1]["intent"] == "business_email_analysis"

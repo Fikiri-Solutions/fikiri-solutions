@@ -174,7 +174,7 @@ function BentoSection() {
 
 export default function RadiantLandingPage() {
   return (
-    <div className="overflow-hidden bg-background text-foreground relative min-h-screen">
+    <div className="mobile-layout-root overflow-hidden bg-background text-foreground relative min-h-screen">
       {/* Light: animated gradient. Dark: solid dark bg (see .dark .fikiri-gradient-animated in index.css) so text is readable */}
       <div className="absolute inset-0 fikiri-gradient-animated">
         <AnimatedBackground />

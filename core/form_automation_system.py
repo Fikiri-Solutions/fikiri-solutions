@@ -5,6 +5,7 @@ Handles dynamic form generation, validation, and processing
 
 import json
 import logging
+import os
 from typing import Dict, Any, List, Optional, Union
 from dataclasses import dataclass, asdict
 from datetime import datetime
@@ -411,6 +412,28 @@ class FormAutomationSystem:
     def get_form_template(self, template_id: str) -> Optional[FormTemplate]:
         """Get form template by ID"""
         return self.form_templates.get(template_id)
+
+    def resolve_form_owner_user_id(self, form_id: str) -> Optional[int]:
+        """Server-side owner for public submissions: template settings or FIKIRI_DEFAULT_FORM_OWNER_USER_ID."""
+        template = self.get_form_template(form_id)
+        if not template:
+            return None
+        settings = template.settings or {}
+        raw = settings.get("owner_user_id")
+        if raw is not None and str(raw).strip() != "":
+            try:
+                return int(raw)
+            except (TypeError, ValueError):
+                return None
+        env_raw = (os.getenv("FIKIRI_DEFAULT_FORM_OWNER_USER_ID") or "").strip()
+        if env_raw:
+            try:
+                env_uid = int(env_raw)
+            except ValueError:
+                return None
+            if env_uid > 0:
+                return env_uid
+        return None
     
     def list_form_templates(self, industry: Optional[str] = None) -> List[FormTemplate]:
         """List all form templates, optionally filtered by industry"""

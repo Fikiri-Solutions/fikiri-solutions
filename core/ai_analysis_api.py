@@ -12,7 +12,7 @@ from flask import Blueprint, request, jsonify, g
 from marshmallow import Schema, fields, ValidationError, validate
 
 from core.api_key_manager import api_key_manager
-from core.public_chatbot_api import require_api_key, record_api_usage
+from core.public_chatbot_api import require_api_key, record_api_usage, _api_key_user_id_as_int
 from core.api_validation import handle_api_errors, create_error_response
 from core.ai.llm_router import LLMRouter
 from core.ai.schemas import LeadAnalysisSchema as LeadAnalysisOutputSchema
@@ -21,6 +21,18 @@ from core.request_correlation import get_or_create_correlation_id
 from core.tier_usage_caps import check_tier_usage_cap
 
 logger = logging.getLogger(__name__)
+
+
+def _billing_user_id_from_api_key() -> Optional[int]:
+    """Numeric user id for tier caps and ai_responses billing; None if missing or not coercible."""
+    if not hasattr(g, "api_key_info") or not isinstance(getattr(g, "api_key_info", None), dict):
+        return None
+    raw = g.api_key_info.get("user_id")
+    uid = _api_key_user_id_as_int(raw)
+    if uid is None and isinstance(raw, int) and not isinstance(raw, bool):
+        uid = raw
+    return uid
+
 
 # Create Blueprint
 ai_analysis_bp = Blueprint('ai_analysis', __name__, url_prefix='/api/public/ai')
@@ -67,6 +79,10 @@ def _call_llm_json(
 
     if not result.get('success'):
         logger.error("AI analysis LLM failed: %s", result.get('error'))
+        return None, eff_cid
+
+    if not result.get("validated", True):
+        logger.warning("AI analysis LLM output failed schema validation (trace=%s)", result.get("trace_id"))
         return None, eff_cid
 
     try:
@@ -378,15 +394,13 @@ def analyze_contact_endpoint():
     start_time = datetime.utcnow()
 
     try:
-        user_id = None
-        if hasattr(g, 'api_key_info') and isinstance(getattr(g, 'api_key_info'), dict):
-            user_id = g.api_key_info.get('user_id')
-        if user_id is not None:
-            allowed, msg, code = check_tier_usage_cap(user_id, "ai_responses", projected_increment=1)
+        billing_uid = _billing_user_id_from_api_key()
+        if billing_uid is not None:
+            allowed, msg, code = check_tier_usage_cap(billing_uid, "ai_responses", projected_increment=1)
             if not allowed:
                 record_api_usage(response_status=402)
                 return create_error_response(msg, 402, code)
-            budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
+            budget_decision = ai_budget_guardrails.evaluate(billing_uid, projected_increment=1)
             if not budget_decision.allowed:
                 record_api_usage(response_status=402)
                 return create_error_response(
@@ -422,8 +436,8 @@ def analyze_contact_endpoint():
         # Record usage
         response_time_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
         record_api_usage(response_status=200, response_time_ms=response_time_ms)
-        if user_id is not None:
-            ai_budget_guardrails.record_ai_usage(user_id, 1)
+        if billing_uid is not None:
+            ai_budget_guardrails.record_ai_usage(billing_uid, 1)
         
         return jsonify(response_data)
         
@@ -474,15 +488,13 @@ def analyze_lead_endpoint():
     start_time = datetime.utcnow()
 
     try:
-        user_id = None
-        if hasattr(g, 'api_key_info') and isinstance(getattr(g, 'api_key_info'), dict):
-            user_id = g.api_key_info.get('user_id')
-        if user_id is not None:
-            allowed, msg, code = check_tier_usage_cap(user_id, "ai_responses", projected_increment=1)
+        billing_uid = _billing_user_id_from_api_key()
+        if billing_uid is not None:
+            allowed, msg, code = check_tier_usage_cap(billing_uid, "ai_responses", projected_increment=1)
             if not allowed:
                 record_api_usage(response_status=402)
                 return create_error_response(msg, 402, code)
-            budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
+            budget_decision = ai_budget_guardrails.evaluate(billing_uid, projected_increment=1)
             if not budget_decision.allowed:
                 record_api_usage(response_status=402)
                 return create_error_response(
@@ -513,8 +525,8 @@ def analyze_lead_endpoint():
         
         response_time_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
         record_api_usage(response_status=200, response_time_ms=response_time_ms)
-        if user_id is not None:
-            ai_budget_guardrails.record_ai_usage(user_id, 1)
+        if billing_uid is not None:
+            ai_budget_guardrails.record_ai_usage(billing_uid, 1)
         
         return jsonify(response_data)
         
@@ -565,15 +577,13 @@ def analyze_business_endpoint():
     start_time = datetime.utcnow()
 
     try:
-        user_id = None
-        if hasattr(g, 'api_key_info') and isinstance(getattr(g, 'api_key_info'), dict):
-            user_id = g.api_key_info.get('user_id')
-        if user_id is not None:
-            allowed, msg, code = check_tier_usage_cap(user_id, "ai_responses", projected_increment=1)
+        billing_uid = _billing_user_id_from_api_key()
+        if billing_uid is not None:
+            allowed, msg, code = check_tier_usage_cap(billing_uid, "ai_responses", projected_increment=1)
             if not allowed:
                 record_api_usage(response_status=402)
                 return create_error_response(msg, 402, code)
-            budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
+            budget_decision = ai_budget_guardrails.evaluate(billing_uid, projected_increment=1)
             if not budget_decision.allowed:
                 record_api_usage(response_status=402)
                 return create_error_response(
@@ -604,8 +614,8 @@ def analyze_business_endpoint():
         
         response_time_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
         record_api_usage(response_status=200, response_time_ms=response_time_ms)
-        if user_id is not None:
-            ai_budget_guardrails.record_ai_usage(user_id, 1)
+        if billing_uid is not None:
+            ai_budget_guardrails.record_ai_usage(billing_uid, 1)
         
         return jsonify(response_data)
         

@@ -89,16 +89,26 @@ class TestRevenueLeadIntake:
         }
 
         idem = _Idem()
-        with patch('core.webhook_intake_service.idempotency_manager', idem):
-            first = service.process_tally_webhook(payload)
-            second = service.process_tally_webhook(payload)
+        with patch.dict(os.environ, {"FIKIRI_WEBHOOK_DEFAULT_OWNER_USER_ID": "1"}, clear=False):
+            with patch('core.webhook_intake_service.idempotency_manager', idem):
+                first = service.process_tally_webhook(payload)
+                second = service.process_tally_webhook(payload)
 
         assert first["success"] is True
         assert second["success"] is True
         assert calls["inserted"] == 1
 
         # pipeline includes lead (endpoint)
-        response = client.get('/api/crm/pipeline/leads/1')
+        with patch("core.jwt_auth.get_jwt_manager") as mock_jwt:
+            mock_jwt.return_value.verify_access_token.return_value = {
+                "user_id": 1,
+                "type": "access",
+                "role": "user",
+            }
+            response = client.get(
+                "/api/crm/pipeline/leads/1",
+                headers={"Authorization": "Bearer t"},
+            )
         assert response.status_code == 200
         data = response.get_json()
         pipeline = data.get('pipeline', {})

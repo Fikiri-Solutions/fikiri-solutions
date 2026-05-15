@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Mail, RefreshCw, Activity, AlertCircle, Clock, Shield, Loader2 } from 'lucide-react'
 import { GmailConnection } from '../components/GmailConnection'
@@ -6,11 +6,30 @@ import { useAuth } from '../contexts/AuthContext'
 import { apiClient, EmailSyncStatus, GmailConnectionStatus } from '../services/apiClient'
 import { useToast } from '../components/Toast'
 
+/** True when the API says a sync job is in flight (may be stale if worker never ran). */
+function isServerSyncInFlight(data: EmailSyncStatus | undefined): boolean {
+  if (!data) return false
+  return (
+    data.syncing === true ||
+    data.sync_status === 'in_progress' ||
+    data.sync_status === 'processing' ||
+    data.sync_status === 'queued'
+  )
+}
+
+/** Max time to show live progress after user clicks Sync (avoids infinite UI if queue is stuck). */
+const SYNC_UI_SESSION_MAX_MS = 8 * 60 * 1000
+
 export const GmailConnect: React.FC = () => {
   const { user } = useAuth()
   const { addToast } = useToast()
   const queryClient = useQueryClient()
   type SyncResponse = { message?: string; data?: { message?: string } }
+
+  /** Only after "Sync inbox" — avoids showing queue/spinner from a stale DB row on page load. */
+  const [syncUiSession, setSyncUiSession] = useState(false)
+  const syncUiSessionRef = useRef(false)
+  syncUiSessionRef.current = syncUiSession
 
   const {
     data: gmailStatus,
@@ -24,6 +43,43 @@ export const GmailConnect: React.FC = () => {
     gcTime: 10 * 60 * 1000, // 10 minutes
   })
 
+  const mutationPendingRef = useRef(false)
+
+  const syncMutation = useMutation({
+    mutationFn: () => apiClient.triggerGmailSync(),
+    onMutate: () => setSyncUiSession(true),
+    onSuccess: (data: SyncResponse) => {
+      const message = data?.message || data?.data?.message || 'Gmail sync triggered successfully'
+      addToast({
+        type: 'success',
+        title: 'Gmail Sync Started',
+        message: message + ' Check the live logs for progress.'
+      })
+      const uid = user?.id
+      queryClient.invalidateQueries({ queryKey: ['gmail-sync-status', uid] })
+      queryClient.invalidateQueries({ queryKey: ['gmail-connection', uid] })
+      setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey: ['gmail-sync-status', uid] })
+        void queryClient.invalidateQueries({ queryKey: ['gmail-connection', uid] })
+      }, 500)
+      setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey: ['gmail-sync-status', uid] })
+      }, 2000)
+    },
+    onError: (error: any) => {
+      setSyncUiSession(false)
+      const errorMessage =
+        error?.response?.data?.message || error?.message || 'Unable to start Gmail sync. Please try again.'
+      addToast({
+        type: 'error',
+        title: 'Sync Failed',
+        message: errorMessage
+      })
+    }
+  })
+
+  mutationPendingRef.current = syncMutation.isPending
+
   const {
     data: syncStatus,
     isLoading: syncLoading,
@@ -34,50 +90,73 @@ export const GmailConnect: React.FC = () => {
     enabled: !!user && !!gmailStatus?.connected, // Only fetch sync status if Gmail is connected
     staleTime: 0, // Always consider data stale to get fresh progress
     gcTime: 5 * 60 * 1000, // 5 minutes
-    // Dynamic refetch interval: faster when syncing, slower when idle.
-    // Trust `syncing` and explicit statuses; `sync_status === 'pending'` with
-    // syncing false is idle — must not trigger 1Hz polling.
+    // Fast polling only during a user-started sync session (not stale `queued` on load).
     refetchInterval: (query) => {
       if (!gmailStatus?.connected) return false
       const data = query.state.data as EmailSyncStatus | undefined
-      const isSyncing = data?.syncing === true ||
-                       data?.sync_status === 'in_progress' ||
-                       data?.sync_status === 'processing' ||
-                       data?.sync_status === 'queued'
-      return isSyncing ? 1 * 1000 : 10 * 1000
+      const serverBusy = isServerSyncInFlight(data)
+      const session = syncUiSessionRef.current
+      const pending = mutationPendingRef.current
+      const pollFast = session && (pending || serverBusy)
+      return pollFast ? 1 * 1000 : 10 * 1000
     },
   })
 
   /**
-   * Sync is actively in flight: explicit syncing flag, job states, or `queued`
-   * after POST /crm/sync-gmail (waiting for worker / thread). `sync_status ===
-   * 'pending'` with `syncing: false` is idle "connected, no job yet" — not here.
+   * Loading / queue UI only after the user clicks Sync, until the server reports
+   * completion or failure (or the session times out if the queue is stuck).
    */
   const isActivelySyncing =
-    syncStatus?.syncing === true ||
-    syncStatus?.sync_status === 'in_progress' ||
-    syncStatus?.sync_status === 'processing' ||
-    syncStatus?.sync_status === 'queued'
+    syncUiSession &&
+    (syncMutation.isPending || isServerSyncInFlight(syncStatus))
 
   const hasDefiniteProgress =
     typeof syncStatus?.progress === 'number' && syncStatus.progress > 0
+
+  useEffect(() => {
+    if (gmailStatus?.connected === false) {
+      setSyncUiSession(false)
+    }
+  }, [gmailStatus?.connected])
+
+  // End UI session when the server reaches a terminal sync state.
+  useEffect(() => {
+    if (!syncUiSession || !syncStatus) return
+    if (syncStatus.sync_status === 'failed') {
+      setSyncUiSession(false)
+      return
+    }
+    if (syncStatus.sync_status === 'completed' && !syncStatus.syncing) {
+      setSyncUiSession(false)
+    }
+  }, [syncStatus, syncUiSession])
+
+  // Hard stop so the card returns to normal if the job never leaves `queued`.
+  useEffect(() => {
+    if (!syncUiSession) return
+    const t = window.setTimeout(() => {
+      setSyncUiSession(false)
+      addToast({
+        type: 'info',
+        title: 'Sync monitor',
+        message: 'Live progress view closed. A background job may still be running — refresh status in a few minutes.'
+      })
+    }, SYNC_UI_SESSION_MAX_MS)
+    return () => window.clearTimeout(t)
+  }, [syncUiSession, addToast])
 
   // Track previous sync status to detect when sync completes
   const prevSyncStatusRef = React.useRef<EmailSyncStatus | undefined>(syncStatus)
   useEffect(() => {
     const prev = prevSyncStatusRef.current
     const current = syncStatus
-    
+
     // Detect when sync completes (was syncing, now completed)
     if (prev && current) {
-      const wasSyncing = prev.syncing === true ||
-                        prev.sync_status === 'in_progress' ||
-                        prev.sync_status === 'processing' ||
-                        prev.sync_status === 'queued'
-      const isCompleted = current.sync_status === 'completed' &&
-                         !current.syncing &&
-                         current.last_sync
-      
+      const wasSyncing = isServerSyncInFlight(prev)
+      const isCompleted =
+        current.sync_status === 'completed' && !current.syncing && current.last_sync
+
       if (wasSyncing && isCompleted) {
         // Sync just completed - invalidate queries to force fresh data
         queryClient.invalidateQueries({ queryKey: ['gmail-sync-status', user?.id] })
@@ -86,40 +165,9 @@ export const GmailConnect: React.FC = () => {
         refetchGmailStatus()
       }
     }
-    
+
     prevSyncStatusRef.current = syncStatus
   }, [syncStatus, queryClient, user?.id, refetchSyncStatus, refetchGmailStatus])
-
-  const syncMutation = useMutation({
-    mutationFn: () => apiClient.triggerGmailSync(),
-    onSuccess: (data: SyncResponse) => {
-      const message = data?.message || data?.data?.message || 'Gmail sync triggered successfully'
-      addToast({ 
-        type: 'success', 
-        title: 'Gmail Sync Started', 
-        message: message + ' Check the live logs for progress.' 
-      })
-      // Invalidate and refetch immediately to show "syncing" state
-      queryClient.invalidateQueries({ queryKey: ['gmail-sync-status', user?.id] })
-      queryClient.invalidateQueries({ queryKey: ['gmail-connection', user?.id] })
-      // Also refetch after short delays to catch status updates
-      setTimeout(() => {
-        refetchSyncStatus()
-        refetchGmailStatus()
-      }, 500)
-      setTimeout(() => {
-        refetchSyncStatus()
-      }, 2000)
-    },
-    onError: (error: any) => {
-      const errorMessage = error?.response?.data?.message || error?.message || 'Unable to start Gmail sync. Please try again.'
-      addToast({ 
-        type: 'error', 
-        title: 'Sync Failed', 
-        message: errorMessage 
-      })
-    }
-  })
 
   if (!user) {
     return (
@@ -237,7 +285,9 @@ export const GmailConnect: React.FC = () => {
           </button>
           <button
             onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending || gmailStatus?.connected === false}
+            disabled={
+              syncMutation.isPending || gmailStatus?.connected === false || isActivelySyncing
+            }
             className="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-secondary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Activity className="h-4 w-4" />

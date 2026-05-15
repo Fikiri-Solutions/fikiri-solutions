@@ -74,17 +74,24 @@ class TestAIChatAPI:
         assert "response" in data["data"]
         assert "suggested_actions" in data["data"]
 
+    @patch("core.ai_chat_api.check_tier_usage_cap")
     @patch("core.ai_chat_api._get_llm_router")
     @patch("core.ai_chat_api.ai_budget_guardrails.evaluate")
     @patch("core.ai_chat_api.get_current_user_id")
     @patch("core.ai_chat_api.get_current_user")
-    def test_chat_uses_llm_when_available(self, mock_get_user, mock_get_user_id, mock_budget_eval, mock_get_router):
+    def test_chat_uses_llm_when_available(self, mock_get_user, mock_get_user_id, mock_budget_eval, mock_get_router, mock_tier):
         mock_get_user.side_effect = Exception("no jwt")
         mock_get_user_id.return_value = None
+        mock_tier.return_value = (True, "", "")
         mock_budget_eval.return_value = MagicMock(allowed=True)
         router = MagicMock()
         router.client.is_enabled.return_value = True
-        router.process.return_value = {"success": True, "content": "LLM reply"}
+        router.process.return_value = {
+            "success": True,
+            "validated": True,
+            "content": "LLM reply",
+            "correlation_id": "cid-llm",
+        }
         mock_get_router.return_value = router
 
         response = self.client.post(
@@ -97,14 +104,51 @@ class TestAIChatAPI:
         assert data.get("success") is True
         assert data["data"]["response"] == "LLM reply"
         router.process.assert_called_once()
+        mock_tier.assert_called_once_with(1, "ai_responses", projected_increment=1)
 
+    @patch("core.ai_chat_api.ai_budget_guardrails.record_ai_usage")
+    @patch("core.ai_chat_api.check_tier_usage_cap")
     @patch("core.ai_chat_api._get_llm_router")
     @patch("core.ai_chat_api.ai_budget_guardrails.evaluate")
     @patch("core.ai_chat_api.get_current_user_id")
     @patch("core.ai_chat_api.get_current_user")
-    def test_chat_budget_soft_stop_returns_402(self, mock_get_user, mock_get_user_id, mock_budget_eval, mock_get_router):
+    def test_chat_schema_invalid_does_not_record_usage(
+        self, mock_get_user, mock_get_user_id, mock_budget_eval, mock_get_router, mock_tier, mock_record
+    ):
         mock_get_user.side_effect = Exception("no jwt")
         mock_get_user_id.return_value = None
+        mock_tier.return_value = (True, "", "")
+        mock_budget_eval.return_value = MagicMock(allowed=True)
+        router = MagicMock()
+        router.client.is_enabled.return_value = True
+        router.process.return_value = {
+            "success": True,
+            "validated": False,
+            "content": "{}",
+            "correlation_id": "cid-bad",
+        }
+        mock_get_router.return_value = router
+
+        response = self.client.post(
+            "/api/ai/chat",
+            json={"message": "analyze my leads", "user_id": 1},
+            content_type="application/json",
+        )
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data.get("success") is True
+        mock_record.assert_not_called()
+        assert "lead" in data["data"]["response"].lower() or "crm" in data["data"]["response"].lower()
+
+    @patch("core.ai_chat_api.check_tier_usage_cap")
+    @patch("core.ai_chat_api._get_llm_router")
+    @patch("core.ai_chat_api.ai_budget_guardrails.evaluate")
+    @patch("core.ai_chat_api.get_current_user_id")
+    @patch("core.ai_chat_api.get_current_user")
+    def test_chat_budget_soft_stop_returns_402(self, mock_get_user, mock_get_user_id, mock_budget_eval, mock_get_router, mock_tier):
+        mock_get_user.side_effect = Exception("no jwt")
+        mock_get_user_id.return_value = None
+        mock_tier.return_value = (True, "", "")
         mock_budget_eval.return_value = MagicMock(allowed=False)
         router = MagicMock()
         router.client.is_enabled.return_value = True

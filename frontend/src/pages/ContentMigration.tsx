@@ -16,6 +16,7 @@ import {
 import { apiClient } from '../services/apiClient'
 import { useToast } from '../components/Toast'
 import { useAuth } from '../contexts/AuthContext'
+import { TableScroll } from '../components/TableScroll'
 
 type TabId = 'overview' | 'knowledge' | 'documents' | 'forms' | 'contacts'
 
@@ -400,8 +401,8 @@ export const ContentMigration: React.FC = () => {
               These templates support generated documents (e.g. agreements, invoices). Automations and workflow actions can fill{' '}
               <code className="rounded bg-brand-background/80 px-1 text-xs">variables</code> per lead or job.
             </p>
-            <div className="mt-4 overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
+            <TableScroll size="medium" className="mt-4" label="Document templates">
+              <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-brand-text/10 text-brand-text/60 dark:border-gray-600 dark:text-gray-400">
                     <th className="py-2 pr-4 font-medium">ID</th>
@@ -421,7 +422,7 @@ export const ContentMigration: React.FC = () => {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
             <Link
               to={sections.documents.related_ui_path}
               className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-brand-primary hover:underline"
@@ -442,8 +443,8 @@ export const ContentMigration: React.FC = () => {
           <p className="mt-2 text-sm text-brand-text/70 dark:text-gray-300">
             Map fields from your previous provider to these definitions. Embed HTML is available from the API for each template id.
           </p>
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
+          <TableScroll size="medium" className="mt-4" label="Form templates">
+            <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-brand-text/10 text-brand-text/60 dark:border-gray-600 dark:text-gray-400">
                   <th className="py-2 pr-4 font-medium">ID</th>
@@ -463,7 +464,7 @@ export const ContentMigration: React.FC = () => {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         </div>
       )}
 

@@ -7,9 +7,9 @@ import { Footer } from './Footer'
  */
 export function RadiantLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
+    <div className="mobile-layout-root min-h-screen flex flex-col bg-background text-foreground">
       <Navbar />
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 min-w-0">{children}</main>
       <Footer />
     </div>
   )

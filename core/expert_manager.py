@@ -61,6 +61,43 @@ class ExpertManager:
                 'error_code': 'TEAM_CREATE_FAILED'
             }
     
+    def get_expert_team(self, team_id: int) -> Optional[Dict[str, Any]]:
+        """Return expert_teams row or None."""
+        try:
+            rows = db_optimizer.execute_query(
+                "SELECT id, tenant_id, name, description, created_at FROM expert_teams WHERE id = ?",
+                (team_id,),
+            )
+            if not rows:
+                return None
+            return dict(rows[0])
+        except Exception as e:
+            logger.error("Failed to load expert team %s: %s", team_id, e)
+            return None
+
+    def user_may_view_expert_team(self, team_id: int, user_id: int) -> bool:
+        """Tenant owner or active team member may list team metadata/members."""
+        team = self.get_expert_team(team_id)
+        if not team:
+            return False
+        if str(team.get("tenant_id")) == str(user_id):
+            return True
+        try:
+            active = db_optimizer.sql_cast_int_eq_one("etm.is_active")
+            m = db_optimizer.execute_query(
+                f"SELECT 1 AS ok FROM expert_team_members etm WHERE etm.team_id = ? AND etm.user_id = ? AND {active}",
+                (team_id, user_id),
+            )
+            return bool(m)
+        except Exception as e:
+            logger.error("user_may_view_expert_team failed: %s", e)
+            return False
+
+    def user_may_manage_expert_team_members(self, team_id: int, user_id: int) -> bool:
+        """Only the tenant that owns the team may add/remove members (simplified model)."""
+        team = self.get_expert_team(team_id)
+        return bool(team) and str(team.get("tenant_id")) == str(user_id)
+
     def add_team_member(
         self,
         team_id: int,

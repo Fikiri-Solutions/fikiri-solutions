@@ -460,6 +460,40 @@ def setup_socketio_handlers(socketio):
     """Simple WebSocket handlers for real-time updates"""
     from flask import request
     from flask_socketio import emit, join_room
+
+    def _socket_dashboard_user_id(data: dict):
+        """Resolve subscriber from Bearer token (payload) or secure session cookie only."""
+        if isinstance(data, dict):
+            token = (data.get("access_token") or data.get("token") or "").strip()
+            if token:
+                from core.jwt_auth import get_jwt_manager
+
+                payload = get_jwt_manager().verify_access_token(token)
+                if isinstance(payload, dict) and not payload.get("error"):
+                    raw = payload.get("user_id") if payload.get("user_id") is not None else payload.get("id")
+                    if raw is not None:
+                        try:
+                            uid = int(raw)
+                            return uid if uid > 0 else None
+                        except (TypeError, ValueError):
+                            pass
+        try:
+            from core.secure_sessions import secure_session_manager
+
+            session_id = request.cookies.get(secure_session_manager.cookie_name)
+            if session_id:
+                session_data = secure_session_manager.get_session(session_id)
+                if session_data:
+                    raw = session_data.get("user_id")
+                    if raw is not None:
+                        try:
+                            uid = int(raw)
+                            return uid if uid > 0 else None
+                        except (TypeError, ValueError):
+                            return None
+        except Exception:
+            pass
+        return None
     
     @socketio.on('connect')
     def handle_connect():
@@ -467,15 +501,24 @@ def setup_socketio_handlers(socketio):
     
     @socketio.on('subscribe_dashboard')
     def handle_subscribe(*args):
-        """Handle dashboard subscription with flexible argument handling"""
-        # SocketIO may pass data as first arg, or no args at all
+        """Join per-user room only when identity is proven (never default to user 1)."""
         data = args[0] if args and len(args) > 0 else {}
         if not isinstance(data, dict):
             data = {}
-        user_id = data.get('user_id', '1')
+        user_id = _socket_dashboard_user_id(data)
+        if not user_id:
+            emit(
+                "subscribed",
+                {
+                    "room": None,
+                    "authenticated": False,
+                    "error": "authentication_required",
+                },
+            )
+            return
         room = f"user:{user_id}"
         join_room(room)
-        emit('subscribed', {'room': room})
+        emit("subscribed", {"room": room, "authenticated": True})
 
 
 def register_request_middleware(app):
@@ -598,6 +641,9 @@ def setup_routes(app):
     @app.route('/api/test/init-db', methods=['POST'])
     def init_database():
         """Manually initialize database tables"""
+        env = (os.getenv("FLASK_ENV") or "").strip().lower()
+        if env not in ("development", "test"):
+            return jsonify({"success": False, "error": "Not found", "code": "NOT_FOUND"}), 404
         try:
             from core.database_optimization import db_optimizer
             
@@ -770,6 +816,121 @@ def setup_routes(app):
         except Exception as e:
             logger.warning(f"⚠️ Failed to exempt health check routes from rate limiting: {e}")
 
+    @app.route('/api/ai-response', methods=['POST'])
+    def ai_response_direct():
+        """Direct AI response endpoint for frontend (requires auth and respects AI budget)."""
+        try:
+            from core.secure_sessions import get_current_user_id
+            from core.ai_budget_guardrails import ai_budget_guardrails
+            data = request.get_json()
+            if not data:
+                return jsonify({'success': False, 'error': 'Request body cannot be empty'}), 400
+            message = data.get('message', '')
+            if not message:
+                return jsonify({'success': False, 'error': 'Message is required'}), 400
+            user_id = get_current_user_id()
+            if not user_id:
+                return jsonify({'success': False, 'error': 'Authentication required'}), 401
+            from core.tier_usage_caps import check_tier_usage_cap
+
+            tier_ok, tier_msg, tier_code = check_tier_usage_cap(
+                user_id, "ai_responses", projected_increment=1
+            )
+            if not tier_ok:
+                return jsonify(
+                    {
+                        "success": False,
+                        "error": tier_msg,
+                        "error_code": tier_code or "PLAN_LIMIT_EXCEEDED",
+                    }
+                ), 402
+
+            budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
+            if not budget_decision.allowed:
+                msg = ("AI monthly budget cap reached. Upgrade or wait until next billing period."
+                       if budget_decision.reason == "monthly_budget_cap_reached"
+                       else "AI monthly budget approval required.")
+                return jsonify({'success': False, 'error': msg, 'error_code': 'AI_BUDGET_SOFT_STOP'}), 402
+
+            def _demo_fallback_payload(fallback_reason: str, user_message: str):
+                """Placeholder when LLM is off or failed — must not mimic a real model success."""
+                reasons = {
+                    "LLM_DISABLED": (
+                        "The AI model is not enabled or configured; returning a local placeholder response."
+                    ),
+                    "LLM_ERROR": (
+                        "The AI call failed; returning a local placeholder response."
+                    ),
+                    "LLM_UNSUCCESSFUL": (
+                        "The AI did not return a usable response; returning a local placeholder response."
+                    ),
+                }
+                return {
+                    "success": True,
+                    "llm_used": False,
+                    "fallback_reason": fallback_reason,
+                    "data": {
+                        "response_source": "demo_fallback",
+                        "response": (
+                            f"I understand you said: '{user_message}'. "
+                            "This is a local placeholder from the Fikiri assistant while the "
+                            "configured AI model is unavailable."
+                        ),
+                        "confidence": 0.35,
+                        "intent": "general_inquiry",
+                        "suggested_actions": [
+                            "Connect your Gmail account",
+                            "Set up email automation rules",
+                            "View your dashboard analytics",
+                        ],
+                    },
+                    "message": reasons.get(
+                        fallback_reason,
+                        "Returning a local placeholder response.",
+                    ),
+                }
+
+            try:
+                from core.ai.llm_router import LLMRouter
+                router = LLMRouter()
+                if not (router and router.client and router.client.is_enabled()):
+                    return jsonify(_demo_fallback_payload("LLM_DISABLED", message))
+                hdr_cid = request.headers.get("X-Correlation-ID")
+                correlation_id = (
+                    str(hdr_cid).strip() if hdr_cid and str(hdr_cid).strip() else str(uuid.uuid4())
+                )
+                llm_result = router.process(
+                    input_data=message,
+                    intent='general',
+                    context={
+                        'channel': 'ai_response_direct',
+                        'source': 'ai_response_direct',
+                        'user_id': user_id,
+                        'correlation_id': correlation_id,
+                    },
+                )
+                if llm_result.get("success") and llm_result.get("validated", True):
+                    ai_budget_guardrails.record_ai_usage(user_id, 1)
+                    return jsonify({
+                        'success': True,
+                        'llm_used': True,
+                        'fallback_reason': None,
+                        'data': {
+                            'response_source': 'llm',
+                            'response': llm_result.get('content', ''),
+                            'confidence': 0.75,
+                            'intent': 'general_inquiry',
+                            'suggested_actions': [],
+                        },
+                        'message': 'AI response generated successfully',
+                    })
+            except Exception as llm_error:
+                logger.error("AI response direct LLM failed: %s", llm_error)
+                return jsonify(_demo_fallback_payload("LLM_ERROR", message))
+            return jsonify(_demo_fallback_payload("LLM_UNSUCCESSFUL", message))
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
     # Main endpoint
     @app.route('/')
     def home():
@@ -888,7 +1049,6 @@ def register_blueprints(app):
         (auth_bp, 'auth'),
         (business_bp, 'routes_business'),
         (jobs_bp, 'routes_jobs'),
-        (test_bp, 'routes_test'),
         (user_bp, 'routes_user'),
         (monitoring_bp, 'routes_monitoring'),
         (expert_bp, 'routes_expert'),
@@ -902,6 +1062,7 @@ def register_blueprints(app):
     # Add dev test blueprint in development
     if os.getenv('FLASK_ENV') == 'development':
         blueprints.append((dev_tests_bp, 'dev_tests'))
+        blueprints.append((test_bp, 'routes_test'))
     
     # Register blueprints with error handling
     for bp, name in blueprints:
@@ -993,77 +1154,6 @@ if os.getenv('FLASK_ENV') == 'development':
                 'success': False,
                 'error': str(e)
             }), 500
-
-    @app.route('/api/ai-response', methods=['POST'])
-    def ai_response_direct():
-        """Direct AI response endpoint for frontend (requires auth and respects AI budget)."""
-        try:
-            from core.secure_sessions import get_current_user_id
-            from core.ai_budget_guardrails import ai_budget_guardrails
-            data = request.get_json()
-            if not data:
-                return jsonify({'success': False, 'error': 'Request body cannot be empty'}), 400
-            message = data.get('message', '')
-            if not message:
-                return jsonify({'success': False, 'error': 'Message is required'}), 400
-            user_id = get_current_user_id()
-            if not user_id:
-                return jsonify({'success': False, 'error': 'Authentication required'}), 401
-            budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
-            if not budget_decision.allowed:
-                msg = ("AI monthly budget cap reached. Upgrade or wait until next billing period."
-                       if budget_decision.reason == "monthly_budget_cap_reached"
-                       else "AI monthly budget approval required.")
-                return jsonify({'success': False, 'error': msg, 'error_code': 'AI_BUDGET_SOFT_STOP'}), 402
-            try:
-                from core.ai.llm_router import LLMRouter
-                router = LLMRouter()
-                if router and router.client and router.client.is_enabled():
-                    hdr_cid = request.headers.get("X-Correlation-ID")
-                    correlation_id = (
-                        str(hdr_cid).strip() if hdr_cid and str(hdr_cid).strip() else str(uuid.uuid4())
-                    )
-                    llm_result = router.process(
-                        input_data=message,
-                        intent='general',
-                        context={
-                            'channel': 'ai_response_direct',
-                            'source': 'ai_response_direct',
-                            'user_id': user_id,
-                            'correlation_id': correlation_id,
-                        },
-                    )
-                    if llm_result.get('success'):
-                        ai_budget_guardrails.record_ai_usage(user_id, 1)
-                        return jsonify({
-                            'success': True,
-                            'data': {
-                                'response': llm_result.get('content', ''),
-                                'confidence': 0.75,
-                                'intent': 'general_inquiry',
-                                'suggested_actions': []
-                            },
-                            'message': 'AI response generated successfully'
-                        })
-            except Exception as llm_error:
-                logger.error("AI response direct LLM failed: %s", llm_error)
-            response_data = {
-                'success': True,
-                'data': {
-                    'response': f"I understand you said: '{message}'. This is a demo response from the Fikiri AI assistant. The full AI system will be available once authentication is fully configured.",
-                    'confidence': 0.85,
-                    'intent': 'general_inquiry',
-                    'suggested_actions': [
-                        'Connect your Gmail account',
-                        'Set up email automation rules',
-                        'View your dashboard analytics'
-                    ]
-                },
-                'message': 'AI response generated successfully'
-            }
-            return jsonify(response_data)
-        except Exception as e:
-            return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Use app already created at module level (create_app() above) — avoid duplicate init
