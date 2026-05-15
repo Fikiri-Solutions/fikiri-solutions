@@ -780,8 +780,8 @@ def sync_gmail():
                 else:
                     if use_inline:
                         logger.info(
-                            "Gmail sync: processing in web process (SQLite or GMAIL_SYNC_FORCE_INLINE); "
-                            "Redis queue bypassed so the job can access the database"
+                            "Gmail sync: processing in web process (inline policy); "
+                            "Redis queue bypassed so the job runs on this service"
                         )
                     else:
                         logger.warning("⚠️ Redis not available, processing sync in background thread")

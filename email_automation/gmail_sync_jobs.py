@@ -38,19 +38,34 @@ from integrations.gmail.gmail_client import gmail_client
 logger = logging.getLogger(__name__)
 
 
+def _is_render_web_service() -> bool:
+    """True when running on a Render web service (no co-located worker by default)."""
+    return bool(
+        (os.getenv("RENDER") or "").strip()
+        or (os.getenv("RENDER_SERVICE_ID") or "").strip()
+        or (os.getenv("RENDER_SERVICE_NAME") or "").strip()
+    )
+
+
 def should_process_gmail_sync_inline() -> bool:
     """
     Run Gmail sync in the web process (daemon thread) instead of the Redis job queue.
 
     On Render, SQLite lives on the web service disk (`DATABASE_URL=sqlite:///...`).
     A separate background worker cannot mount that disk, so queued jobs are never
-    processed and sync stays at 0–1%. PostgreSQL (or explicit opt-in) can use Redis workers.
+    processed and sync stays at 0%. For Postgres on Render without a dedicated worker,
+    default to inline as well. Set GMAIL_SYNC_USE_QUEUE=1 when a worker shares the DB.
     """
+    use_queue = (os.getenv("GMAIL_SYNC_USE_QUEUE") or "").strip().lower()
+    if use_queue in ("1", "true", "yes", "on"):
+        return False
     db_url = (os.getenv("DATABASE_URL") or "").strip().lower()
     if "sqlite" in db_url:
         return True
     force = (os.getenv("GMAIL_SYNC_FORCE_INLINE") or "").strip().lower()
     if force in ("1", "true", "yes", "on"):
+        return True
+    if _is_render_web_service():
         return True
     return False
 

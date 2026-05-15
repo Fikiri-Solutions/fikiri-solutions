@@ -22,6 +22,63 @@ logger = logging.getLogger(__name__)
 # Create monitoring blueprint
 monitoring_bp = Blueprint("monitoring", __name__, url_prefix="/api")
 
+_STALE_GMAIL_SYNC_ERROR = (
+    "Sync timed out waiting to start. Click Sync inbox to try again."
+)
+
+
+def _reconcile_stale_gmail_sync_queue(user_id: int) -> bool:
+    """
+    Reset user_sync_status when a Gmail job stayed pending (no worker / stuck queue).
+
+    Returns True when orphaned queued state was cleared.
+    """
+    try:
+        stale_minutes = max(1, int(os.getenv("GMAIL_SYNC_STALE_MINUTES", "2")))
+        if not db_optimizer.table_exists("gmail_sync_jobs"):
+            return False
+        older_pred = db_optimizer.sql_column_older_than_n_minutes_ago("created_at", stale_minutes)
+        stale_rows = db_optimizer.execute_query(
+            f"""
+            SELECT job_id FROM gmail_sync_jobs
+            WHERE user_id = ? AND status = 'pending'
+              AND started_at IS NULL
+              AND {older_pred}
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+        if not stale_rows:
+            return False
+        row = stale_rows[0]
+        job_id = row.get("job_id") if isinstance(row, dict) else row[0]
+        db_optimizer.execute_query(
+            """
+            UPDATE gmail_sync_jobs
+            SET status = 'failed',
+                error_message = ?,
+                completed_at = CURRENT_TIMESTAMP
+            WHERE job_id = ?
+            """,
+            (_STALE_GMAIL_SYNC_ERROR, job_id),
+            fetch=False,
+        )
+        db_optimizer.upsert_user_sync_status_merge(
+            user_id,
+            sync_status="connected_pending_sync",
+            syncing=0,
+        )
+        logger.warning(
+            "Reconciled stale Gmail sync queue user_id=%s job_id=%s",
+            user_id,
+            job_id,
+        )
+        return True
+    except Exception as exc:
+        logger.warning("Stale Gmail sync reconciliation failed: %s", exc)
+        return False
+
 @monitoring_bp.route('/health-old')
 @handle_api_errors
 def api_health_old():
@@ -285,6 +342,11 @@ def email_sync_status():
                     try:
                         syncing_col = int(sync_record[3] if len(sync_record) > 3 else 0)
                     except (TypeError, ValueError):
+                        syncing_col = 0
+
+                if sync_status == "queued":
+                    if _reconcile_stale_gmail_sync_queue(user_id):
+                        sync_status = "connected_pending_sync"
                         syncing_col = 0
 
                 # In-flight: worker claimed the row (syncing=1), explicit job states,

@@ -17,8 +17,8 @@ function isServerSyncInFlight(data: EmailSyncStatus | undefined): boolean {
   )
 }
 
-/** Max time to show live progress after user clicks Sync (avoids infinite UI if queue is stuck). */
-const SYNC_UI_SESSION_MAX_MS = 8 * 60 * 1000
+/** Max time to show live progress after user clicks Sync (backend stale reconcile is ~2 min). */
+const SYNC_UI_SESSION_MAX_MS = 4 * 60 * 1000
 
 export const GmailConnect: React.FC = () => {
   const { user } = useAuth()
@@ -124,12 +124,24 @@ export const GmailConnect: React.FC = () => {
     if (!syncUiSession || !syncStatus) return
     if (syncStatus.sync_status === 'failed') {
       setSyncUiSession(false)
+      addToast({
+        type: 'error',
+        title: 'Sync did not complete',
+        message: 'Gmail sync failed or timed out. Try Sync inbox again.'
+      })
+      return
+    }
+    if (
+      syncStatus.sync_status === 'connected_pending_sync' &&
+      !syncStatus.syncing
+    ) {
+      setSyncUiSession(false)
       return
     }
     if (syncStatus.sync_status === 'completed' && !syncStatus.syncing) {
       setSyncUiSession(false)
     }
-  }, [syncStatus, syncUiSession])
+  }, [syncStatus, syncUiSession, addToast])
 
   // Hard stop so the card returns to normal if the job never leaves `queued`.
   useEffect(() => {
@@ -138,8 +150,8 @@ export const GmailConnect: React.FC = () => {
       setSyncUiSession(false)
       addToast({
         type: 'info',
-        title: 'Sync monitor',
-        message: 'Live progress view closed. A background job may still be running — refresh status in a few minutes.'
+        title: 'Sync monitor closed',
+        message: 'No progress was detected. Click Sync inbox again or refresh status.'
       })
     }, SYNC_UI_SESSION_MAX_MS)
     return () => window.clearTimeout(t)

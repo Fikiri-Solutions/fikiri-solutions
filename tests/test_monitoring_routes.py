@@ -84,10 +84,11 @@ class TestMonitoringRoutes(unittest.TestCase):
         self.assertFalse(payload.get("syncing"))
         self.assertEqual(payload.get("progress"), 0)
 
+    @patch("routes.monitoring._reconcile_stale_gmail_sync_queue", return_value=False)
     @patch("routes.monitoring.resolve_request_user_id", return_value=1)
     @patch("routes.monitoring.db_optimizer")
     def test_email_sync_status_queued_is_syncing_without_fake_one_percent(
-        self, mock_db, mock_resolve
+        self, mock_db, mock_resolve, _mock_reconcile
     ):
         """After sync-gmail, row is queued + syncing=0; API still polls as in-flight with progress 0."""
 
@@ -129,6 +130,45 @@ class TestMonitoringRoutes(unittest.TestCase):
         self.assertTrue(payload.get("syncing"))
         self.assertEqual(payload.get("sync_status"), "queued")
         self.assertEqual(payload.get("progress"), 0)
+
+    @patch("routes.monitoring.resolve_request_user_id", return_value=1)
+    @patch("routes.monitoring.db_optimizer")
+    def test_email_sync_status_stale_queued_resets_idle(self, mock_db, mock_resolve):
+        """Orphaned queued + old pending job should not report syncing forever."""
+
+        def exec_side_effect(sql, params=None, fetch=True, **kwargs):
+            s = (sql or "").upper()
+            if "FROM GMAIL_TOKENS" in s:
+                return [{"access_token_enc": "tok", "access_token": None, "is_active": True}]
+            if "FROM USER_SYNC_STATUS" in s and "SELECT" in s:
+                return [
+                    {
+                        "last_sync": None,
+                        "sync_status": "queued",
+                        "total_emails": 0,
+                        "syncing": 0,
+                    }
+                ]
+            if "FROM GMAIL_SYNC_JOBS" in s and "JOB_ID" in s:
+                return [{"job_id": "gmail_sync_1_stale"}]
+            if "UPDATE GMAIL_SYNC_JOBS" in s:
+                return []
+            if "FROM SYNCED_EMAILS" in s and "COUNT" in s:
+                return [{"count": 0}]
+            if "GMAIL_SYNC_JOBS" in s and "PROGRESS" in s:
+                return []
+            return []
+
+        mock_db.execute_query.side_effect = exec_side_effect
+        mock_db.table_exists.return_value = True
+        mock_db.sql_column_older_than_n_minutes_ago.return_value = "1=1"
+
+        response = self.client.get("/api/email/sync/status?user_id=1")
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.data).get("data") or {}
+        self.assertFalse(payload.get("syncing"))
+        self.assertEqual(payload.get("sync_status"), "connected_pending_sync")
+        mock_db.upsert_user_sync_status_merge.assert_called_once()
 
     @patch("routes.monitoring.get_current_user_id", return_value=None)
     def test_rate_limits_requires_auth(self, mock_user_id):

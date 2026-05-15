@@ -17,10 +17,42 @@ class TestGmailSyncInlinePolicy(unittest.TestCase):
         with patch.dict(os.environ, {"DATABASE_URL": "sqlite:///data/fikiri.db"}, clear=False):
             self.assertTrue(should_process_gmail_sync_inline())
 
-    def test_inline_false_for_postgres(self):
+    def test_inline_false_for_postgres_off_render(self):
         with patch.dict(
             os.environ,
-            {"DATABASE_URL": "postgresql://user:pass@host:5432/db", "GMAIL_SYNC_FORCE_INLINE": ""},
+            {
+                "DATABASE_URL": "postgresql://user:pass@host:5432/db",
+                "GMAIL_SYNC_FORCE_INLINE": "",
+                "RENDER": "",
+                "RENDER_SERVICE_ID": "",
+                "RENDER_SERVICE_NAME": "",
+                "GMAIL_SYNC_USE_QUEUE": "",
+            },
+            clear=False,
+        ):
+            self.assertFalse(should_process_gmail_sync_inline())
+
+    def test_inline_true_on_render_postgres(self):
+        with patch.dict(
+            os.environ,
+            {
+                "DATABASE_URL": "postgresql://user:pass@host:5432/db",
+                "RENDER": "true",
+                "GMAIL_SYNC_FORCE_INLINE": "",
+                "GMAIL_SYNC_USE_QUEUE": "",
+            },
+            clear=False,
+        ):
+            self.assertTrue(should_process_gmail_sync_inline())
+
+    def test_use_queue_disables_render_inline(self):
+        with patch.dict(
+            os.environ,
+            {
+                "DATABASE_URL": "postgresql://user:pass@host:5432/db",
+                "RENDER": "true",
+                "GMAIL_SYNC_USE_QUEUE": "1",
+            },
             clear=False,
         ):
             self.assertFalse(should_process_gmail_sync_inline())
