@@ -15,6 +15,7 @@ from functools import wraps
 
 from core.api_key_manager import api_key_manager
 from core.ai_budget_guardrails import ai_budget_guardrails
+from core.tier_usage_caps import check_tier_usage_cap
 from core.vector_search import get_vector_search
 from core.smart_faq_system import get_smart_faq
 from core.knowledge_base_system import get_knowledge_base
@@ -245,7 +246,16 @@ def _sources_to_snippets(sources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 def _build_context_snippets(sources: List[Dict[str, Any]]) -> str:
     """Build prompt context string from retrieval sources (canonical KnowledgeSnippet → string)."""
-    return snippets_to_context_string(_sources_to_snippets(sources))
+    raw = snippets_to_context_string(_sources_to_snippets(sources))
+    try:
+        max_len = int((os.getenv("FIKIRI_CHATBOT_CONTEXT_MAX_CHARS") or "6000").strip() or "6000")
+    except ValueError:
+        max_len = 6000
+    if max_len <= 0:
+        max_len = 6000
+    if len(raw) <= max_len:
+        return raw
+    return raw[: max(0, max_len - 25)] + "\n...[context truncated]"
 
 
 def _safe_fallback_response() -> str:
@@ -456,6 +466,9 @@ def public_chatbot_query():
         
         # Search FAQs + knowledge base (tenant-scoped FAQs when numeric user_id on API key)
         tenant_scope_uid = _api_key_user_id_as_int(user_id)
+        billing_uid = tenant_scope_uid
+        if billing_uid is None and isinstance(user_id, int) and not isinstance(user_id, bool):
+            billing_uid = user_id
         faq_results = faq_system.search_faqs(
             query, max_results=3, user_id=tenant_scope_uid
         )
@@ -506,8 +519,22 @@ def public_chatbot_query():
         fallback_used = True
         llm_trace_id = None
         llm_attempted = False
+        llm_result: Dict[str, Any] = {}
         if allow_llm and not fallback_needed:
-            budget_decision = ai_budget_guardrails.evaluate(user_id, projected_increment=1)
+            if billing_uid is not None:
+                tier_ok, tier_msg, tier_code = check_tier_usage_cap(
+                    billing_uid, "ai_responses", projected_increment=1
+                )
+                if not tier_ok:
+                    record_api_usage(response_status=402)
+                    return jsonify(
+                        _public_error_payload(
+                            tier_msg or "Plan limit exceeded",
+                            tier_code or "PLAN_LIMIT_EXCEEDED",
+                        )
+                    ), 402
+
+            budget_decision = ai_budget_guardrails.evaluate(billing_uid, projected_increment=1)
             if not budget_decision.allowed:
                 record_api_usage(response_status=402)
                 return jsonify(
@@ -541,7 +568,7 @@ def public_chatbot_query():
                 context={
                     "conversation_id": conversation_id,
                     "tenant_id": tenant_id,
-                    "user_id": user_id,
+                    "user_id": billing_uid if billing_uid is not None else user_id,
                     "source": "public_chatbot",
                     "correlation_id": correlation_id,
                 },
@@ -714,9 +741,15 @@ def public_chatbot_query():
         
         # Record usage
         record_api_usage(response_status=200, response_time_ms=response_time_ms)
-        _record_billing_usage(user_id, "chatbot_queries", 1)
-        if llm_attempted and llm_result.get("success"):
-            ai_budget_guardrails.record_ai_usage(user_id, 1)
+        if billing_uid is not None:
+            _record_billing_usage(billing_uid, "chatbot_queries", 1)
+        if (
+            llm_attempted
+            and llm_result.get("success")
+            and llm_result.get("validated")
+            and billing_uid is not None
+        ):
+            ai_budget_guardrails.record_ai_usage(billing_uid, 1)
         
         retrieved_doc_ids, retrieval_scores = _retrieval_metadata(sources)
         
@@ -739,7 +772,12 @@ def public_chatbot_query():
             "lead_id": lead_id,
             "escalated": should_escalate,
             "escalated_question_id": escalated_question_id,
-            "ai_usage_recorded": bool(llm_attempted)
+            "ai_usage_recorded": bool(
+                llm_attempted
+                and llm_result.get("success")
+                and llm_result.get("validated")
+                and billing_uid is not None
+            ),
         }
         if not _is_production_env():
             response["correlation_id"] = correlation_id

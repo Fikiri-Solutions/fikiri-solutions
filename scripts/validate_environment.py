@@ -99,6 +99,10 @@ class EnvironmentValidator:
         }
         
         self.optional_vars = {
+            'FIKIRI_EMAIL_PIPELINE_AI_GATE': (
+                'Inbound mailbox AI: set 1/true/yes/on to enforce ai_responses cap + '
+                'AI budget before analyze (see core/email_pipeline_ai_gate.py)'
+            ),
             'REDIS_URL': 'Redis connection for caching',
             'SMTP_HOST': 'SMTP server for email sending (or use SMTP_SERVER as alias)',
             'SMTP_SERVER': 'Alias for SMTP_HOST used by some mail paths',

@@ -62,18 +62,18 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigation = getDashboardSidebarNav(user)
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
+    <div className="mobile-layout-root min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
       {/* Mobile sidebar */}
       <div className={`fixed inset-0 z-50 lg:hidden ${mobileMenuOpen ? 'block' : 'hidden'}`}>
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-75" onClick={() => setMobileMenuOpen(false)} />
         <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-colors duration-300">
           <div className="flex h-16 items-center justify-between px-4">
-            <Link to="/dashboard" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
+            <Link to="/dashboard" className="flex min-w-0 max-w-[11rem] items-center hover:opacity-80 transition-opacity duration-200">
               <FikiriLogo 
-                size="lg" 
+                size="md" 
                 variant="full" 
                 animated={true}
-                className="hover:scale-105 transition-transform duration-200"
+                className="h-10 w-auto max-w-full hover:scale-105 transition-transform duration-200"
               />
             </Link>
             <button onClick={() => setMobileMenuOpen(false)} className="text-brand-text dark:text-gray-300 hover:text-brand-primary dark:hover:text-white">

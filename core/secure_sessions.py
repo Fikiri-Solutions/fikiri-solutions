@@ -475,6 +475,8 @@ def init_secure_sessions(app):
                 payload = get_jwt_manager().verify_access_token(token)
                 if payload and isinstance(payload, dict) and 'error' not in payload:
                     uid = payload.get('user_id')
+                    if uid is None:
+                        uid = payload.get('id')
                     if uid is not None:
                         try:
                             g.user_id = int(uid)

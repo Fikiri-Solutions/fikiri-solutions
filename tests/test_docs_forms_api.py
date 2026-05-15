@@ -5,13 +5,15 @@ Unit tests for core/docs_forms_api.py (docs & forms REST API).
 import json
 import os
 import sys
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 os.environ.setdefault("FLASK_ENV", "test")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask
 from core.docs_forms_api import docs_forms_bp
+
+_AUTH = {"Authorization": "Bearer test-token"}
 
 
 class TestDocsFormsAPI:
@@ -35,11 +37,26 @@ class TestDocsFormsAPI:
         assert "capabilities" in data
         assert "supported_formats" in data
 
-    def test_process_document_no_file_returns_400(self):
+    @patch("core.jwt_auth.get_jwt_manager")
+    def test_process_document_requires_auth(self, mock_jwt):
+        mock_jwt.return_value.verify_access_token.return_value = {"error": "invalid"}
         response = self.client.post(
             "/api/docs-forms/documents/process",
             data={},
             content_type="multipart/form-data",
+            headers=_AUTH,
+        )
+        assert response.status_code == 401
+
+    @patch("core.docs_forms_api.doc_processor")
+    @patch("core.jwt_auth.get_jwt_manager")
+    def test_process_document_no_file_returns_400(self, mock_jwt, mock_processor):
+        mock_jwt.return_value.verify_access_token.return_value = {"user_id": 1, "type": "access"}
+        response = self.client.post(
+            "/api/docs-forms/documents/process",
+            data={},
+            content_type="multipart/form-data",
+            headers=_AUTH,
         )
         assert response.status_code == 400
         data = json.loads(response.data)
@@ -47,7 +64,9 @@ class TestDocsFormsAPI:
         assert "file" in data.get("error", "").lower() or "no file" in data.get("error", "").lower()
 
     @patch("core.docs_forms_api.doc_processor")
-    def test_process_document_unsupported_format_returns_400(self, mock_processor):
+    @patch("core.jwt_auth.get_jwt_manager")
+    def test_process_document_unsupported_format_returns_400(self, mock_jwt, mock_processor):
+        mock_jwt.return_value.verify_access_token.return_value = {"user_id": 1, "type": "access"}
         mock_processor.is_format_supported.return_value = False
         data = {"file": (b"x", "file.xyz")}
 
@@ -55,8 +74,8 @@ class TestDocsFormsAPI:
             "/api/docs-forms/documents/process",
             data=data,
             content_type="multipart/form-data",
+            headers=_AUTH,
         )
-        # May be 400 (unsupported) or 500 depending on flow; at least not 200 with success
         assert response.status_code in (400, 500)
         data = json.loads(response.data)
         assert data.get("success") is False
@@ -82,21 +101,37 @@ class TestDocsFormsAPI:
         assert data.get("success") is False
         assert "form_id" in data.get("error", "").lower() or "form" in data.get("error", "").lower()
 
+    @patch("core.docs_forms_api.form_automation")
+    def test_submit_form_requires_configured_owner(self, mock_form):
+        mock_form.resolve_form_owner_user_id.return_value = None
+        response = self.client.post(
+            "/api/docs-forms/forms/submit",
+            json={"form_id": "x", "data": {}},
+            content_type="application/json",
+        )
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data.get("success") is False
+
     @patch("core.docs_forms_api.doc_templates")
-    def test_list_document_templates_returns_200(self, mock_templates):
+    @patch("core.jwt_auth.get_jwt_manager")
+    def test_list_document_templates_returns_200(self, mock_jwt, mock_templates):
+        mock_jwt.return_value.verify_access_token.return_value = {"user_id": 1, "type": "access"}
         mock_templates.list_templates.return_value = []
 
-        response = self.client.get("/api/docs-forms/templates")
+        response = self.client.get("/api/docs-forms/templates", headers=_AUTH)
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data.get("success") is True
         assert "templates" in data
 
     @patch("core.docs_forms_api.doc_templates")
-    def test_get_document_template_not_found_returns_404(self, mock_templates):
+    @patch("core.jwt_auth.get_jwt_manager")
+    def test_get_document_template_not_found_returns_404(self, mock_jwt, mock_templates):
+        mock_jwt.return_value.verify_access_token.return_value = {"user_id": 1, "type": "access"}
         mock_templates.get_template.return_value = None
 
-        response = self.client.get("/api/docs-forms/templates/nonexistent")
+        response = self.client.get("/api/docs-forms/templates/nonexistent", headers=_AUTH)
         assert response.status_code == 404
         data = json.loads(response.data)
         assert data.get("success") is False
@@ -124,21 +159,29 @@ class TestDocsFormsAPI:
         assert "systems" in data
 
     @patch("core.docs_forms_api.doc_analytics")
-    def test_get_analytics_report_returns_200(self, mock_analytics):
+    @patch("core.jwt_auth.get_jwt_manager")
+    def test_get_analytics_report_returns_200(self, mock_jwt, mock_analytics):
+        mock_jwt.return_value.verify_access_token.return_value = {"user_id": 1, "type": "access"}
         mock_analytics.get_comprehensive_report.return_value = {}
 
-        response = self.client.get("/api/docs-forms/analytics/report?days=7")
+        response = self.client.get("/api/docs-forms/analytics/report?days=7", headers=_AUTH)
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data.get("success") is True
         assert "report" in data
 
     @patch("core.docs_forms_api.doc_templates")
-    def test_generate_document_missing_format_returns_400(self, mock_templates):
+    @patch("core.jwt_auth.get_jwt_manager")
+    def test_generate_document_missing_format_returns_400(self, mock_jwt, mock_templates):
+        mock_jwt.return_value.verify_access_token.return_value = {"user_id": 1, "type": "access"}
+        from types import SimpleNamespace
+
+        mock_templates.get_generated_document.return_value = SimpleNamespace(user_id=1)
         response = self.client.post(
             "/api/docs-forms/documents/doc123/convert",
             json={},
             content_type="application/json",
+            headers=_AUTH,
         )
         assert response.status_code == 400
         data = json.loads(response.data)

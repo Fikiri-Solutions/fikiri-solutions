@@ -320,6 +320,118 @@ Simplicity:
 - When refactoring legacy code, simplify naming and structure in the same change if it keeps the diff understandable.
 
 # ==========================================================
+# 16. PRE-FLIGHT REASONING CHECKLIST (BEFORE WRITING CODE)
+# ==========================================================
+Before modifying any non-trivial code path, walk through these steps explicitly. Skipping this is the #1 cause of regressions in this repo.
+
+1. Identify the affected module(s) and adjacent callers.
+2. Trace dependencies and imports both ways (who calls this, what does it call).
+3. Identify the API contracts involved (request/response shape, status codes, error envelope).
+4. Identify the database models, schemas, and migrations involved.
+5. Predict side effects (cache invalidation, queued jobs, downstream services, auth state, onboarding step).
+6. State the root cause in one sentence before proposing a change.
+7. Verify whether equivalent logic already exists elsewhere (Grep / SemanticSearch) and reuse it.
+
+If any step is uncertain, inspect existing code first or ask. Do not paper over uncertainty with assumptions.
+
+# ==========================================================
+# 17. ANTI-HALLUCINATION GUARDRAILS
+# ==========================================================
+NEVER invent any of the following. If you cannot find it by reading the repo, it does not exist:
+- API endpoints or route paths
+- Database tables, columns, or indexes
+- Schema fields, Pydantic models, or TypeScript types
+- Import paths or helper function names
+- Environment variables
+- Frontend/backend contract assumptions (request keys, response shape, status codes)
+- Auth / session / JWT claim behavior
+- Redis key formats
+
+Required behavior when uncertain:
+- Inspect existing patterns first (Read / Grep / SemanticSearch).
+- State assumptions explicitly in the response and mark them as assumptions.
+- Ask for clarification when the answer cannot be verified from the repo.
+
+Prefer reusing existing implementations over creating parallel ones. If a similar helper already exists, use it.
+
+# ==========================================================
+# 18. SUPABASE POSTGRES-FIRST DATABASE PHILOSOPHY
+# ==========================================================
+Canonical production database is Supabase Postgres. The Flask app is hosted on Render and connects to Supabase via `DATABASE_URL` (Session pooler URI recommended; see comment in `render.yaml:19` and `core/postgres_compat.py:7`). SQLite is the fallback for local development, tests, and the Render **staging** service (`render.yaml:71-72` sets `DATABASE_URL=sqlite:///data/fikiri_staging.db`); it is NOT the production design target.
+
+Production explicitly refuses SQLite at boot: `core/database_optimization.py:47-55` raises `RuntimeError` when `FLASK_ENV=production` and `DATABASE_URL` is not a Postgres URI. The only escape hatch is the emergency env var `FIKIRI_ALLOW_SQLITE_PRODUCTION=1`. Do not weaken or remove that guard without an explicit instruction.
+
+When writing or modifying DB code:
+- Default to PostgreSQL-compatible SQL: `%s` parameter style, JSONB, `ON CONFLICT`, `RETURNING`, `NOW()`, `gen_random_uuid()`, etc.
+- Do not rely on SQLite-only behavior (implicit type coercion, `datetime()` string functions on raw strings, AUTOINCREMENT semantics, lax type checking).
+- For datetime comparisons that must work on both engines, follow `docs/SQLITE_DATETIME_COMPARISONS.md`.
+- Use indexed columns in WHERE clauses on any potentially large table.
+- Use bulk inserts/updates over per-row loops.
+- Respect transaction boundaries; do not split a logical write across multiple commits.
+- Use the existing connection pooling helpers (`core/database_optimization.py`, `core/postgres_compat.py`); do not open ad-hoc `psycopg2.connect(...)` calls in routes or services.
+
+Supabase-specific notes:
+- The backend primarily talks to Supabase as a vanilla Postgres host via `DATABASE_URL` + psycopg2, NOT via `supabase-py`. The `supabase_client` initialized in `app.py` is currently only used by the `/supabase-todos` sample route — do not migrate production code paths onto it without an explicit instruction.
+- `SUPABASE_URL` / `SUPABASE_KEY` (backend) and `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` (frontend) are separate from `DATABASE_URL` and serve different purposes. Do not conflate them.
+- Pooler choice matters: the **Session pooler** (port 5432) supports prepared statements and is the default for this app; the **Transaction pooler** (port 6543) does not support prepared statements or `LISTEN/NOTIFY` and should only be used with awareness of those limits.
+- The frontend has a Supabase JS client with `supabase.auth.startAutoRefresh()` enabled, but canonical app auth still flows through the Flask JWT system (see `.cursor/rules` §2). Do not assume Supabase Auth is the source of truth for user identity or `onboarding_step`.
+- If you ever add a feature that hits Supabase tables directly from the browser via the anon key, RLS policies become mandatory — flag this explicitly in the change proposal rather than enabling it silently.
+
+This supersedes any older language in `.cursor/rules` framing SQLite as the default; SQLite is a fallback, not the canonical target.
+
+# ==========================================================
+# 19. MIGRATION DISCIPLINE
+# ==========================================================
+Schema changes carry the highest blast radius. Before changing any table:
+
+1. Read existing migrations and `database_init.py` to understand current shape.
+2. Prefer additive changes (new nullable column, new index, new table) over destructive ones.
+3. Never drop or rename a column without an explicit instruction and a documented backfill plan.
+4. Ensure the change works against both PostgreSQL (prod) and SQLite (local) where the local path is exercised.
+5. Update any read paths, write paths, and serializers that touch the changed column in the same change.
+6. If a migration could lock a large table on Postgres, call it out explicitly in the change proposal.
+
+# ==========================================================
+# 20. CHANGE-PROPOSAL OUTPUT FORMAT
+# ==========================================================
+When proposing a non-trivial change, structure the response in this order. Skip sections only when they are genuinely not applicable (and say so).
+
+1. Issue — what is broken or missing, in one or two sentences.
+2. Root cause — why it is broken, traced to a specific file/function/line.
+3. Proposed solution — the minimal change that fixes the root cause.
+4. Files modified — exact paths, one per bullet.
+5. Code changes — only the lines that change, with enough surrounding context to be unambiguous.
+6. Risks & compatibility — what could break (API consumers, migrations, cached data, auth flow, onboarding step).
+7. Why this is the safest approach — one or two sentences contrasting against the obvious alternative.
+
+Do not dump entire files. Do not propose unrelated cleanups in the same change.
+
+# ==========================================================
+# 21. OPERATIONAL MINDSET
+# ==========================================================
+You are operating on a real, production-oriented business system with paying-customer expectations.
+
+Act like:
+- a senior backend engineer who owns the on-call pager
+- a systems architect who has to live with the consequences of today's decisions
+- a production reliability engineer who optimizes for "still works at 3 AM"
+
+Do NOT act like:
+- a code generator that outputs the first plausible answer
+- a tutorial bot that explains concepts the user already knows
+- an experimental framework advocate who rewrites working code for novelty
+
+Priority order, in tie-breaking sequence:
+1. Stability
+2. Backward compatibility
+3. Security
+4. Maintainability
+5. Performance
+6. New features
+
+Reliability and maintainability matter more than novelty. When in doubt, choose the boring option that the next on-call engineer can debug at 3 AM.
+
+# ==========================================================
 # END OF FIKIRI SOLUTIONS RULEPACK (v4.1)
 # ==========================================================
 

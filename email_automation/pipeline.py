@@ -24,6 +24,11 @@ from email_automation.ai_assistant import MinimalAIEmailAssistant
 from email_automation.email_event_log import record_email_event
 from core.automation_safety import automation_safety_manager
 from core.database_optimization import db_optimizer
+from core.email_pipeline_ai_gate import (
+    evaluate_email_pipeline_ai_gate,
+    record_email_pipeline_ai_usage,
+    email_pipeline_ai_gate_enabled,
+)
 from crm.service import enhanced_crm_service
 from services.email_capture_workflow import run_inbound_email_workflow
 from core.ai.policies import evaluate_email_action_policy
@@ -66,6 +71,7 @@ def build_parsed_email_for_pipeline(
         "labels": labels if isinstance(labels, list) else [],
         "attachments": [],
     }
+
 
 # Import trace context
 try:
@@ -335,6 +341,17 @@ def orchestrate_incoming(
             "mailbox_ai_skipped": True,
         }
 
+    gate = evaluate_email_pipeline_ai_gate(user_id)
+    if not gate.allowed:
+        return {
+            "success": True,
+            "parsed": parsed,
+            "inbound_workflow": inbound_workflow,
+            "correlation_id": corr,
+            "mailbox_ai_skipped": True,
+            "mailbox_ai_skip_reason": gate.reason,
+        }
+
     record_email_event(
         user_id,
         "email.parsed",
@@ -390,6 +407,8 @@ def orchestrate_incoming(
             "inbound_workflow": inbound_workflow,
             "correlation_id": corr,
         }
+
+    record_email_pipeline_ai_usage(user_id)
 
     analysis_payload = analysis if isinstance(analysis, dict) else {}
     policy_result = evaluate_email_action_policy(analysis_payload)
@@ -558,6 +577,53 @@ def orchestrate_incoming(
             "correlation_id": corr,
         }
 
+    if email_pipeline_ai_gate_enabled():
+        gate_reply = evaluate_email_pipeline_ai_gate(user_id)
+        if not gate_reply.allowed:
+            logger.info(
+                "email_pipeline_ai_gate: reply path blocked user_id=%s reason=%s",
+                user_id,
+                gate_reply.reason,
+            )
+            record_email_event(
+                user_id,
+                "ai.action_cancelled",
+                provider=provider,
+                message_id=msg_id or None,
+                thread_id=thread_id,
+                lead_id=lead_id,
+                correlation_id=corr,
+                payload={
+                    "reason": "mailbox_ai_gate_reply",
+                    "action_type": action_type,
+                    "code": gate_reply.reason,
+                },
+                status="failed",
+                error_message="mailbox_ai_reply_gated",
+                source="email_automation.pipeline",
+            )
+            return {
+                "success": True,
+                "parsed": parsed,
+                "classification": analysis_payload,
+                "analysis": analysis_payload,
+                "action": {
+                    "success": True,
+                    "action": "draft_only",
+                    "details": {
+                        "should_auto_send": should_auto_send,
+                        "needs_human_review": needs_human_review,
+                        "reason_for_recommendation": policy_result.get("reason"),
+                        "execution_mode": policy_result.get("execution_mode"),
+                        "mailbox_ai_reply_skip_reason": gate_reply.reason,
+                    },
+                },
+                "inbound_workflow": inbound_workflow,
+                "correlation_id": corr,
+                "mailbox_ai_reply_skipped": True,
+                "mailbox_ai_reply_skip_reason": gate_reply.reason,
+            }
+
     try:
         action_result = actions.process_email(
             parsed, action_type=action_type, user_id=user_id
@@ -615,6 +681,16 @@ def orchestrate_incoming(
         }
 
     result_details = _action_result_details(action_result)
+
+    if (
+        email_pipeline_ai_gate_enabled()
+        and user_id
+        and isinstance(ai_assistant, MinimalAIEmailAssistant)
+        and ai_assistant.is_enabled()
+        and action_type == "auto_reply"
+        and action_result.get("success", True)
+    ):
+        record_email_pipeline_ai_usage(user_id, 1)
 
     # Log to CRM (activity) - skip if idempotent result
     try:

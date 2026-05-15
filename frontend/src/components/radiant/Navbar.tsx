@@ -89,11 +89,11 @@ export function Navbar({ banner }: { banner?: React.ReactNode }) {
   return (
     <Disclosure as="header" className="pt-12 sm:pt-16" key={pathname}>
       <PlusGrid>
-        <PlusGridRow className="grid grid-cols-3 items-center gap-4">
-          <div className="flex items-center gap-6">
+        <PlusGridRow className="flex items-center justify-between gap-4 lg:grid lg:grid-cols-3">
+          <div className="flex min-w-0 flex-1 items-center gap-4 sm:gap-6 lg:flex-initial">
             <PlusGridItem className="py-3">
-              <RadiantLink to={homeTo} title="Home" className="inline-flex">
-                <FikiriLogo size="md" variant="full" className="h-12 w-auto sm:h-14" />
+              <RadiantLink to={homeTo} title="Home" className="inline-flex max-w-[min(100%,12rem)] sm:max-w-none">
+                <FikiriLogo size="md" variant="full" className="h-10 w-auto sm:h-12 md:h-14" />
               </RadiantLink>
             </PlusGridItem>
             {banner && (
@@ -105,7 +105,7 @@ export function Navbar({ banner }: { banner?: React.ReactNode }) {
           <div className="hidden lg:flex justify-center">
             <DesktopNav links={links} />
           </div>
-          <div className="flex justify-end">
+          <div className="flex shrink-0 justify-end">
             <MobileNavButton />
           </div>
         </PlusGridRow>

@@ -557,3 +557,20 @@ def get_current_user():
     """Get current user from request context"""
     from flask import request
     return getattr(request, 'current_user', None)
+
+
+def get_jwt_user_id():
+    """
+    Numeric user id from the JWT payload set by @jwt_required.
+    Prefer user_id (canonical); tolerate legacy id if present.
+    """
+    payload = get_current_user()
+    if not isinstance(payload, dict) or payload.get("error"):
+        return None
+    raw = payload.get("user_id")
+    if raw is None:
+        raw = payload.get("id")
+    try:
+        return int(raw) if raw is not None else None
+    except (TypeError, ValueError):
+        return None

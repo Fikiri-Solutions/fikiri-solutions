@@ -580,13 +580,24 @@ def process_ai_request(prompt: str, user_id: str, **kwargs):
     }
 
 @task(crm_queue)
-def update_crm(lead_data: Dict[str, Any], **kwargs):
+def update_crm(lead_data: Dict[str, Any] = None, **kwargs):
     """Update CRM task implementation"""
     # Import your CRM service here
     from crm.service import enhanced_crm_service
-    
-    # Get user_id from lead_data or use default
-    user_id = lead_data.get('user_id', 1)
+
+    lead_data = lead_data or {}
+    raw_uid = lead_data.get("user_id")
+    if raw_uid is None:
+        logger.error("update_crm job rejected: lead_data missing user_id")
+        return {"success": False, "error": "lead_data must include user_id"}
+    try:
+        user_id = int(raw_uid)
+    except (TypeError, ValueError):
+        logger.error("update_crm job rejected: invalid user_id %r", raw_uid)
+        return {"success": False, "error": "invalid user_id"}
+    if user_id <= 0:
+        return {"success": False, "error": "invalid user_id"}
+
     result = enhanced_crm_service.create_lead(user_id, lead_data)
     
     return {

@@ -73,6 +73,24 @@ class TestAppointmentsRoutes(unittest.TestCase):
         # params tuple: (..., timezone, status, error_message, payload_json, payload_truncated)
         self.assertEqual(params[10], "completed")
 
+    @patch("routes.appointments.db_optimizer")
+    @patch("routes.appointments.AppointmentsService")
+    @patch("core.jwt_auth.get_jwt_manager")
+    def test_create_appointment_uses_jwt_user_id_from_payload(self, mock_mgr, mock_service, mock_db):
+        mock_mgr.return_value.verify_access_token.return_value = {"user_id": 99, "type": "access"}
+        mock_service.return_value.create_appointment.return_value = {"id": 10, "title": "Call"}
+        start = (datetime.now() + timedelta(hours=1)).isoformat()
+        end = (datetime.now() + timedelta(hours=2)).isoformat()
+        mock_db.execute_query.return_value = None
+        response = self.client.post(
+            "/api/appointments",
+            headers=_auth_headers(),
+            json={"title": "Call", "start_time": start, "end_time": end},
+        )
+        self.assertEqual(response.status_code, 200)
+        mock_service.assert_called_once()
+        self.assertEqual(mock_service.call_args[0][0], 99)
+
     @patch("routes.appointments.AppointmentsService")
     @patch("core.jwt_auth.get_jwt_manager")
     def test_list_appointments_success(self, mock_mgr, mock_service):

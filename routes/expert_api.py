@@ -102,8 +102,11 @@ def get_team_members(team_id):
     if not user_id:
         return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
     
+    if not expert_manager.user_may_view_expert_team(team_id, user_id):
+        return create_error_response("Forbidden", 403, "FORBIDDEN")
+
     members = expert_manager.get_team_members(team_id)
-    
+
     return create_success_response({
         'team_id': team_id,
         'members': members
@@ -123,7 +126,10 @@ def add_team_member(team_id):
     
     if not member_user_id:
         return create_error_response("user_id is required", 400, 'MISSING_FIELD')
-    
+
+    if not expert_manager.user_may_manage_expert_team_members(team_id, user_id):
+        return create_error_response("Forbidden", 403, "FORBIDDEN")
+
     result = expert_manager.add_team_member(team_id, member_user_id, role)
     
     if not result.get('success'):
@@ -363,7 +369,7 @@ def record_feedback():
     helpful = data.get('helpful', True)
     feedback_text = data.get('feedback_text', '').strip()
     message_id = data.get('message_id')
-    user_id = data.get('user_id')
+    user_id = get_current_user_id()
     
     if not conversation_id:
         if _is_production_env():

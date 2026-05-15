@@ -98,6 +98,31 @@ class TestLoadSecureSessionJwtFallback(unittest.TestCase):
             self.assertEqual(rv.status_code, 200)
             self.assertEqual(rv.get_json().get("user_id"), 99)
 
+    @patch("core.jwt_auth.get_jwt_manager")
+    @patch("core.secure_sessions.db_optimizer")
+    def test_bearer_jwt_legacy_id_claim_sets_g_user_id(self, mock_db, mock_get_jwt):
+        """Legacy access tokens used ``id`` instead of ``user_id``; Bearer path should accept both."""
+        mock_db.execute_query.return_value = None
+        mock_get_jwt.return_value.verify_access_token.return_value = {
+            "id": 42,
+            "type": "access",
+        }
+
+        from core.secure_sessions import init_secure_sessions
+
+        app = Flask(__name__)
+        app.config["TESTING"] = True
+        init_secure_sessions(app)
+
+        @app.route("/probe")
+        def probe():
+            return {"user_id": g.user_id}
+
+        with app.test_client() as client:
+            rv = client.get("/probe", headers={"Authorization": "Bearer legacy"})
+            self.assertEqual(rv.status_code, 200)
+            self.assertEqual(rv.get_json().get("user_id"), 42)
+
 
 if __name__ == "__main__":
     unittest.main()

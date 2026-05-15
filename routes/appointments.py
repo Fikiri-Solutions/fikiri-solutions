@@ -10,7 +10,7 @@ import logging
 import json
 
 from core.appointments_service import AppointmentsService, SUGGESTED_SLOTS_COUNT, DEFAULT_SLOT_DURATION_MINUTES
-from core.jwt_auth import jwt_required, get_current_user
+from core.jwt_auth import jwt_required, get_jwt_user_id
 from core.api_validation import handle_api_errors, create_success_response, create_error_response
 from core.integrations.calendar.calendar_manager import CalendarManager
 from core.integrations.integration_framework import integration_manager
@@ -42,8 +42,9 @@ def _stringify_payload(payload: object) -> tuple[str, bool]:
 def create_appointment():
     """Create new appointment"""
     try:
-        user = get_current_user()
-        user_id = user['id']
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, "AUTHENTICATION_REQUIRED")
         
         data = request.get_json()
         if not data:
@@ -194,8 +195,9 @@ def create_appointment():
 def list_appointments():
     """List appointments with optional filters"""
     try:
-        user = get_current_user()
-        user_id = user['id']
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, "AUTHENTICATION_REQUIRED")
         
         # Parse query parameters
         start_str = request.args.get('start')
@@ -237,8 +239,9 @@ def list_appointments():
 def update_appointment(appointment_id):
     """Update appointment"""
     try:
-        user = get_current_user()
-        user_id = user['id']
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, "AUTHENTICATION_REQUIRED")
         
         data = request.get_json()
         if not data:
@@ -353,8 +356,9 @@ def update_appointment(appointment_id):
 def cancel_appointment(appointment_id):
     """Cancel appointment"""
     try:
-        user = get_current_user()
-        user_id = user['id']
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, "AUTHENTICATION_REQUIRED")
         
         service = AppointmentsService(user_id)
         appointment = service.cancel_appointment(appointment_id)
@@ -448,8 +452,9 @@ def cancel_appointment(appointment_id):
 def get_freebusy():
     """Get free/busy information"""
     try:
-        user = get_current_user()
-        user_id = user['id']
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, "AUTHENTICATION_REQUIRED")
         
         start_str = request.args.get('start')
         end_str = request.args.get('end')
@@ -510,8 +515,9 @@ def get_freebusy():
 def check_conflicts():
     """Check for scheduling conflicts"""
     try:
-        user = get_current_user()
-        user_id = user['id']
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, "AUTHENTICATION_REQUIRED")
         
         data = request.get_json()
         if not data:

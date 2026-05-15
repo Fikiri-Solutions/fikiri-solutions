@@ -13,7 +13,7 @@ from flask import Blueprint, request, jsonify, redirect, session
 from datetime import datetime, timedelta
 from typing import Dict, Any
 
-from core.jwt_auth import jwt_required, get_current_user
+from core.jwt_auth import jwt_required, get_jwt_user_id
 from core.integrations.integration_framework import integration_manager
 from core.integrations.calendar.google_calendar_provider import GoogleCalendarProvider
 from core.integrations.calendar.calendar_manager import CalendarManager
@@ -60,8 +60,9 @@ def verify_oauth_state(state: str) -> Dict:
 def google_calendar_connect():
     """Start Google Calendar OAuth flow"""
     try:
-        user = get_current_user()
-        user_id = user['id']
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
         
         # Generate state
         state = secrets.token_urlsafe(OAUTH_STATE_TOKEN_LENGTH)
@@ -144,8 +145,10 @@ def google_calendar_callback():
 def google_calendar_status():
     """Get Google Calendar integration status"""
     try:
-        user = get_current_user()
-        status = integration_manager.get_status(user['id'], 'google_calendar')
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
+        status = integration_manager.get_status(user_id, 'google_calendar')
         return jsonify(status)
     except Exception as e:
         logger.error(f"Failed to get Google Calendar status: {e}")
@@ -157,8 +160,10 @@ def google_calendar_status():
 def google_calendar_disconnect():
     """Disconnect Google Calendar integration"""
     try:
-        user = get_current_user()
-        result = integration_manager.disconnect(user['id'], 'google_calendar')
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
+        result = integration_manager.disconnect(user_id, 'google_calendar')
         return jsonify(result)
     except Exception as e:
         logger.error(f"Failed to disconnect Google Calendar: {e}")
@@ -174,12 +179,14 @@ def google_calendar_disconnect():
 def list_calendar_events():
     """List calendar events"""
     try:
-        user = get_current_user()
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
         start_date = request.args.get('start')
         end_date = request.args.get('end')
         provider = request.args.get('provider', 'google_calendar')
         
-        manager = CalendarManager(user['id'])
+        manager = CalendarManager(user_id)
         client = manager.get_calendar_client(provider)
         
         if not client:
@@ -202,7 +209,9 @@ def list_calendar_events():
 def get_freebusy():
     """Get free/busy information"""
     try:
-        user = get_current_user()
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
         start_date = request.args.get('start')
         end_date = request.args.get('end')
         provider = request.args.get('provider', 'google_calendar')
@@ -210,7 +219,7 @@ def get_freebusy():
         if not start_date or not end_date:
             return jsonify({'error': 'start and end dates required'}), 400
         
-        manager = CalendarManager(user['id'])
+        manager = CalendarManager(user_id)
         time_min = datetime.fromisoformat(start_date)
         time_max = datetime.fromisoformat(end_date)
         
@@ -228,7 +237,9 @@ def get_freebusy():
 def create_calendar_event():
     """Create calendar event"""
     try:
-        user = get_current_user()
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
         data = request.json
         
         if not data:
@@ -240,7 +251,7 @@ def create_calendar_event():
         if 'summary' not in data:
             return jsonify({'error': 'summary required'}), 400
         
-        manager = CalendarManager(user['id'])
+        manager = CalendarManager(user_id)
         
         try:
             start = datetime.fromisoformat(data['start'])  # noqa: pg-audit (request JSON, not DB row)
@@ -272,11 +283,13 @@ def create_calendar_event():
 def update_calendar_event(entity_type: str, entity_id: int):
     """Update calendar event linked to internal entity"""
     try:
-        user = get_current_user()
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
         data = request.json
         provider = data.get('provider', 'google_calendar')
         
-        manager = CalendarManager(user['id'])
+        manager = CalendarManager(user_id)
         
         updates = {}
         if 'start' in data:
@@ -304,10 +317,12 @@ def update_calendar_event(entity_type: str, entity_id: int):
 def delete_calendar_event(entity_type: str, entity_id: int):
     """Delete calendar event linked to internal entity"""
     try:
-        user = get_current_user()
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
         provider = request.args.get('provider', 'google_calendar')
         
-        manager = CalendarManager(user['id'])
+        manager = CalendarManager(user_id)
         deleted = manager.delete_event(entity_type, entity_id, provider)
         
         return jsonify({'success': deleted})

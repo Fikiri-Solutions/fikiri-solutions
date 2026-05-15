@@ -219,11 +219,10 @@ def debug_dashboard():
 def get_dashboard_metrics():
     """Get dashboard metrics for authenticated user"""
     try:
-        # Prefer authenticated user; fall back to query param or demo user
+        # Authenticated user only (session or Bearer JWT via secure_sessions middleware)
         user_id = get_current_user_id()
         if not user_id:
-            # Allow overriding via query param for debugging, else default to demo user
-            user_id = request.args.get('user_id', type=int) or 1
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
         
         # Default user metadata (used if we can't load from DB)
         user_data = {'user_id': user_id, 'name': 'User', 'email': ''}
@@ -626,7 +625,9 @@ def get_dashboard_kpi():
 def get_dashboard_timeseries():
     """Get dashboard timeseries data backed by DB aggregates."""
     try:
-        user_id = get_current_user_id() or request.args.get('user_id', type=int) or 1
+        user_id = get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
         period = request.args.get('period', 'week', type=str)
 
         period_days = {
@@ -819,7 +820,9 @@ def get_industry_pricing():
 def get_industry_usage():
     """Get usage analytics for industry automation UI."""
     try:
-        user_id = get_current_user_id() or request.args.get('user_id', type=int) or 1
+        user_id = get_current_user_id()
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
         month_start = datetime.utcnow().strftime('%Y-%m-01')
         month_key = datetime.utcnow().strftime('%Y-%m')
 
@@ -895,7 +898,7 @@ def get_email_metrics():
     try:
         user_id = get_current_user_id()
         if not user_id:
-            user_id = request.args.get('user_id', type=int) or 1
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
         
         period = request.args.get('period', 'week', type=str)
         
@@ -980,7 +983,7 @@ def get_ai_metrics():
     try:
         user_id = get_current_user_id()
         if not user_id:
-            user_id = request.args.get('user_id', type=int) or 1
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
         
         # Get AI usage from analytics_events table
         try:
@@ -988,7 +991,7 @@ def get_ai_metrics():
             ai_events_result = db_optimizer.execute_query("""
                 SELECT COUNT(*) as count 
                 FROM analytics_events 
-                WHERE user_id = ? AND event_type LIKE '%ai%' OR event_type LIKE '%llm%' OR event_type LIKE '%response%'
+                WHERE user_id = ? AND (event_type LIKE '%ai%' OR event_type LIKE '%llm%' OR event_type LIKE '%response%')
             """, (user_id,))
             
             total_responses = ai_events_result[0]['count'] if ai_events_result and len(ai_events_result) > 0 else 0

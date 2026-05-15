@@ -3,22 +3,35 @@ CRM Completion API Endpoints for Fikiri Solutions
 Handles automated follow-ups, reminders, alerts, and pipeline management
 """
 
-import json
 import logging
 from flask import Blueprint, request, jsonify
-from datetime import datetime, timedelta
+from datetime import datetime
 from email_automation.followup_system import get_follow_up_system
 from core.reminders_alerts_system import get_reminders_alerts_system
 from core.database_optimization import db_optimizer
-from core.secure_sessions import get_current_user_id
+from core.jwt_auth import jwt_required, get_jwt_user_id, get_current_user
 from crm.service import enhanced_crm_service, lead_dataclass_to_public_dict, _crm_meta_dict
 
 logger = logging.getLogger(__name__)
+
+
+def _jwt_role_is_admin() -> bool:
+    payload = get_current_user()
+    return isinstance(payload, dict) and str(payload.get("role") or "").strip().lower() == "admin"
+
+
+def _forbidden():
+    return jsonify({"success": False, "error": "Forbidden", "error_code": "FORBIDDEN"}), 403
+
+
+def _mismatch_user():
+    return jsonify({"success": False, "error": "User mismatch", "error_code": "USER_MISMATCH"}), 403
 
 # Create blueprint
 crm_bp = Blueprint('crm', __name__, url_prefix='/api/crm')
 
 @crm_bp.route('/follow-ups/create', methods=['POST'])
+@jwt_required
 def create_follow_up():
     """Create a follow-up task for a lead"""
     try:
@@ -26,10 +39,14 @@ def create_follow_up():
         if not data:
             return jsonify({"success": False, "error": "No data provided"}), 400
         
-        required_fields = ['lead_id', 'user_id', 'stage']
+        required_fields = ['lead_id', 'stage']
         for field in required_fields:
             if field not in data:
                 return jsonify({"success": False, "error": f"Missing required field: {field}"}), 400
+        
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
         
         follow_up_system = get_follow_up_system()
         if not follow_up_system:
@@ -37,7 +54,7 @@ def create_follow_up():
         
         result = follow_up_system.create_follow_up_task(
             lead_id=data['lead_id'],
-            user_id=data['user_id'],
+            user_id=user_id,
             stage=data['stage']
         )
         
@@ -53,9 +70,12 @@ def create_follow_up():
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 @crm_bp.route('/follow-ups/process', methods=['POST'])
+@jwt_required
 def process_follow_ups():
     """Process all pending follow-up tasks"""
     try:
+        if not _jwt_role_is_admin():
+            return _forbidden()
         follow_up_system = get_follow_up_system()
         if not follow_up_system:
             return jsonify({"success": False, "error": "Follow-up system not available"}), 500
@@ -74,9 +94,15 @@ def process_follow_ups():
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 @crm_bp.route('/follow-ups/stats/<int:user_id>', methods=['GET'])
+@jwt_required
 def get_follow_up_stats(user_id):
     """Get follow-up statistics for a user"""
     try:
+        uid = get_jwt_user_id()
+        if not uid:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
+        if int(user_id) != int(uid):
+            return _mismatch_user()
         follow_up_system = get_follow_up_system()
         if not follow_up_system:
             return jsonify({"success": False, "error": "Follow-up system not available"}), 500
@@ -89,6 +115,7 @@ def get_follow_up_stats(user_id):
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 @crm_bp.route('/reminders/create', methods=['POST'])
+@jwt_required
 def create_reminder():
     """Create a new reminder"""
     try:
@@ -96,10 +123,14 @@ def create_reminder():
         if not data:
             return jsonify({"success": False, "error": "No data provided"}), 400
         
-        required_fields = ['user_id', 'reminder_type', 'title', 'description', 'due_date']
+        required_fields = ['reminder_type', 'title', 'description', 'due_date']
         for field in required_fields:
             if field not in data:
                 return jsonify({"success": False, "error": f"Missing required field: {field}"}), 400
+        
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
         
         reminders_system = get_reminders_alerts_system()
         if not reminders_system:
@@ -112,7 +143,7 @@ def create_reminder():
             return jsonify({"success": False, "error": "Invalid due_date format"}), 400
         
         result = reminders_system.create_reminder(
-            user_id=data['user_id'],
+            user_id=user_id,
             reminder_type=data['reminder_type'],
             title=data['title'],
             description=data['description'],
@@ -133,9 +164,15 @@ def create_reminder():
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 @crm_bp.route('/reminders/<int:user_id>', methods=['GET'])
+@jwt_required
 def get_user_reminders(user_id):
     """Get user's reminders"""
     try:
+        uid = get_jwt_user_id()
+        if not uid:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
+        if int(user_id) != int(uid):
+            return _mismatch_user()
         upcoming_days = request.args.get('upcoming_days', 7, type=int)
         
         reminders_system = get_reminders_alerts_system()
@@ -150,14 +187,18 @@ def get_user_reminders(user_id):
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 @crm_bp.route('/reminders/<reminder_id>/cancel', methods=['POST'])
+@jwt_required
 def cancel_reminder(reminder_id):
     """Cancel a reminder"""
     try:
+        uid = get_jwt_user_id()
+        if not uid:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
         reminders_system = get_reminders_alerts_system()
         if not reminders_system:
             return jsonify({"success": False, "error": "Reminders system not available"}), 500
         
-        result = reminders_system.cancel_reminder(reminder_id)
+        result = reminders_system.cancel_reminder(reminder_id, scope_user_id=uid)
         return jsonify(result), 200 if result['success'] else 400
         
     except Exception as e:
@@ -165,6 +206,7 @@ def cancel_reminder(reminder_id):
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 @crm_bp.route('/alerts/create', methods=['POST'])
+@jwt_required
 def create_alert():
     """Create a new alert"""
     try:
@@ -172,17 +214,21 @@ def create_alert():
         if not data:
             return jsonify({"success": False, "error": "No data provided"}), 400
         
-        required_fields = ['user_id', 'alert_type', 'title', 'message']
+        required_fields = ['alert_type', 'title', 'message']
         for field in required_fields:
             if field not in data:
                 return jsonify({"success": False, "error": f"Missing required field: {field}"}), 400
+        
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
         
         reminders_system = get_reminders_alerts_system()
         if not reminders_system:
             return jsonify({"success": False, "error": "Alerts system not available"}), 500
         
         result = reminders_system.create_alert(
-            user_id=data['user_id'],
+            user_id=user_id,
             alert_type=data['alert_type'],
             title=data['title'],
             message=data['message'],
@@ -201,9 +247,15 @@ def create_alert():
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 @crm_bp.route('/alerts/<int:user_id>', methods=['GET'])
+@jwt_required
 def get_user_alerts(user_id):
     """Get user's alerts"""
     try:
+        uid = get_jwt_user_id()
+        if not uid:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
+        if int(user_id) != int(uid):
+            return _mismatch_user()
         limit = request.args.get('limit', 50, type=int)
         
         reminders_system = get_reminders_alerts_system()
@@ -218,14 +270,18 @@ def get_user_alerts(user_id):
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 @crm_bp.route('/alerts/<alert_id>/read', methods=['POST'])
+@jwt_required
 def mark_alert_read(alert_id):
     """Mark an alert as read"""
     try:
+        uid = get_jwt_user_id()
+        if not uid:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
         reminders_system = get_reminders_alerts_system()
         if not reminders_system:
             return jsonify({"success": False, "error": "Alerts system not available"}), 500
         
-        result = reminders_system.mark_alert_read(alert_id)
+        result = reminders_system.mark_alert_read(alert_id, scope_user_id=uid)
         return jsonify(result), 200 if result['success'] else 400
         
     except Exception as e:
@@ -233,6 +289,7 @@ def mark_alert_read(alert_id):
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 @crm_bp.route('/pipeline/stages', methods=['GET'])
+@jwt_required
 def get_pipeline_stages():
     """Get all pipeline stages"""
     try:
@@ -264,9 +321,12 @@ def get_pipeline_stages():
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 @crm_bp.route('/pipeline/stages', methods=['POST'])
+@jwt_required
 def create_pipeline_stage():
     """Create a new pipeline stage"""
     try:
+        if not _jwt_role_is_admin():
+            return _forbidden()
         data = request.get_json()
         if not data:
             return jsonify({"success": False, "error": "No data provided"}), 400
@@ -298,9 +358,15 @@ def create_pipeline_stage():
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 @crm_bp.route('/pipeline/leads/<int:user_id>', methods=['GET'])
+@jwt_required
 def get_pipeline_leads(user_id):
     """Get leads organized by pipeline stage with filters and pagination"""
     try:
+        uid = get_jwt_user_id()
+        if not uid:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
+        if int(user_id) != int(uid):
+            return _mismatch_user()
         stage_filter = request.args.get('stage')
         limit = min(max(request.args.get('limit', 100, type=int), 1), 500)
         offset = request.args.get('offset', 0, type=int)
@@ -354,10 +420,11 @@ def get_pipeline_leads(user_id):
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 @crm_bp.route('/pipeline/leads/<int:lead_id>/stage', methods=['PUT'])
+@jwt_required
 def update_lead_stage(lead_id):
     """Update a lead's pipeline stage (delegates to CRM service for scoring, automations, events)."""
     try:
-        user_id = get_current_user_id() or request.args.get('user_id', type=int)
+        user_id = get_jwt_user_id()
         if not user_id:
             return jsonify({
                 "success": False,
@@ -388,9 +455,12 @@ def update_lead_stage(lead_id):
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
 @crm_bp.route('/process/expired-reminders', methods=['POST'])
+@jwt_required
 def process_expired_reminders():
     """Process expired reminders and create alerts"""
     try:
+        if not _jwt_role_is_admin():
+            return _forbidden()
         reminders_system = get_reminders_alerts_system()
         if not reminders_system:
             return jsonify({"success": False, "error": "Reminders system not available"}), 500

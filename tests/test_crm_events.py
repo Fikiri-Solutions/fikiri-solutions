@@ -47,18 +47,25 @@ class TestCompletionAPIStageUpdate(unittest.TestCase):
         self.app.register_blueprint(crm_bp)
         self.client = self.app.test_client()
 
-    @patch("crm.completion_api.get_current_user_id", return_value=None)
-    def test_stage_update_requires_auth(self, _mock_uid):
+    @patch("core.jwt_auth.get_jwt_manager")
+    def test_stage_update_requires_auth(self, mock_mgr):
+        mock_mgr.return_value.verify_access_token.return_value = {"error": "invalid"}
         response = self.client.put(
             "/api/crm/pipeline/leads/1/stage",
             json={"stage": "contacted"},
             content_type="application/json",
+            headers={"Authorization": "Bearer x"},
         )
         self.assertEqual(response.status_code, 401)
 
-    @patch("crm.completion_api.get_current_user_id", return_value=7)
+    @patch("core.jwt_auth.get_jwt_manager")
     @patch("crm.completion_api.enhanced_crm_service")
-    def test_stage_update_delegates_to_service(self, mock_svc, _mock_uid):
+    def test_stage_update_delegates_to_service(self, mock_svc, mock_mgr):
+        mock_mgr.return_value.verify_access_token.return_value = {
+            "user_id": 7,
+            "type": "access",
+            "role": "user",
+        }
         from crm.service import Lead
         from datetime import datetime
 
@@ -89,6 +96,7 @@ class TestCompletionAPIStageUpdate(unittest.TestCase):
             "/api/crm/pipeline/leads/1/stage",
             json={"stage": "contacted"},
             content_type="application/json",
+            headers={"Authorization": "Bearer t"},
         )
         self.assertEqual(response.status_code, 200)
         body = json.loads(response.data)

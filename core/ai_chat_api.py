@@ -16,6 +16,7 @@ from core.ai_budget_guardrails import ai_budget_guardrails
 from core.tier_usage_caps import check_tier_usage_cap
 from core.secure_sessions import get_current_user_id
 from core.jwt_auth import jwt_required, get_current_user
+from core.request_user_id import allow_request_user_id_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -141,15 +142,22 @@ def ai_chat():
                 "Message is required", 400, 'MISSING_MESSAGE', correlation_id=correlation_id
             )
         
-        # Try to get user_id from JWT token first, then fall back to request body
+        # Try to get user_id from JWT token first, then session, then gated body fallback (tests only)
         user_id = None
         user_data = None
         
         try:
-            # Try JWT authentication (optional)
+            # Try JWT authentication (optional) — tolerate legacy ``id`` claim like get_jwt_user_id
             user_data = get_current_user()
-            if user_data:
-                user_id = user_data.get('user_id')
+            if user_data and isinstance(user_data, dict) and not user_data.get("error"):
+                raw = user_data.get("user_id")
+                if raw is None:
+                    raw = user_data.get("id")
+                if raw is not None:
+                    try:
+                        user_id = int(raw)
+                    except (TypeError, ValueError):
+                        user_id = None
         except Exception as auth_error:
             # JWT not available, continue to fallback
             logger.debug("JWT lookup failed, falling back to session auth: %s", auth_error)
@@ -158,9 +166,15 @@ def ai_chat():
         if not user_id:
             user_id = get_current_user_id()
         
-        # Final fallback to request body (for development/testing)
+        # Final fallback: request body user_id only in test / explicit opt-in (never in production)
         if not user_id:
-            user_id = data.get('user_id')
+            if allow_request_user_id_fallback():
+                uid = data.get("user_id")
+                if uid is not None:
+                    try:
+                        user_id = int(uid)
+                    except (TypeError, ValueError):
+                        user_id = None
             if not user_id:
                 return create_error_response(
                     "Authentication required",
@@ -202,7 +216,7 @@ def ai_chat():
                         'suggested_actions': _get_suggested_actions(message),
                     }
                 )
-                if llm_result.get('success'):
+                if llm_result.get('success') and llm_result.get('validated', True):
                     ai_budget_guardrails.record_ai_usage(user_id, 1)
                     response_data = {
                         'response': llm_result.get('content', ''),

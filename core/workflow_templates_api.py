@@ -7,6 +7,7 @@ from flask import Blueprint, request, jsonify
 import logging
 from typing import Dict, Any
 from core.workflow_templates_system import workflow_templates_system, WorkflowCategory
+from core.jwt_auth import jwt_required, get_jwt_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -103,15 +104,16 @@ def get_template(template_id: str):
         return jsonify({'error': str(e)}), 500
 
 @workflow_templates_bp.route('/templates/<template_id>/create', methods=['POST'])
+@jwt_required
 def create_automation_from_template(template_id: str):
     """Create automation rule from template"""
     try:
-        data = request.get_json()
-        user_id = data.get('user_id')
+        data = request.get_json() or {}
+        user_id = get_jwt_user_id()
         customizations = data.get('customizations', {})
         
         if not user_id:
-            return jsonify({'error': 'user_id is required'}), 400
+            return jsonify({'error': 'Authentication required'}), 401
         
         result = workflow_templates_system.create_automation_from_template(
             template_id, user_id, customizations

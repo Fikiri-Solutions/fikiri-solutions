@@ -24,6 +24,7 @@ from core.ai_document_processor import get_document_processor
 from core.form_automation_system import get_form_automation
 from core.document_templates_system import get_document_templates
 from core.document_analytics_system import get_document_analytics
+from core.jwt_auth import jwt_required, get_jwt_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +37,20 @@ form_automation = get_form_automation()
 doc_templates = get_document_templates()
 doc_analytics = get_document_analytics()
 
+
+def _public_form_settings(settings: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Omit server-only keys from template settings returned to clients."""
+    if not isinstance(settings, dict):
+        return {}
+    out = dict(settings)
+    out.pop("owner_user_id", None)
+    return out
+
+
 # Document Processing Endpoints
 
 @docs_forms_bp.route('/documents/process', methods=['POST'])
+@jwt_required
 def process_document():
     """Process uploaded document"""
     try:
@@ -50,8 +62,9 @@ def process_document():
         if file.filename == '':
             return jsonify({"success": False, "error": "No file selected"}), 400
         
-        # Get user ID from request
-        user_id = request.form.get('user_id', 1, type=int)
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
         session_id = request.form.get('session_id')
         
         # Secure filename
@@ -187,7 +200,7 @@ def get_form_template(template_id):
                         "order": f.order
                     } for f in template.fields
                 ],
-                "settings": template.settings,
+                "settings": _public_form_settings(template.settings),
                 "created_at": template.created_at.isoformat()
             }
         })
@@ -215,17 +228,25 @@ def submit_form():
     try:
         # Get form data
         if request.is_json:
-            data = request.json
+            data = request.json or {}
             form_id = data.get('form_id')
             form_data = data.get('data', {})
-            user_id = data.get('user_id', 1)
         else:
             form_id = request.form.get('form_id')
-            user_id = request.form.get('user_id', 1, type=int)
             form_data = {k: v for k, v in request.form.items() if k not in ['form_id', 'user_id']}
         
         if not form_id:
             return jsonify({"success": False, "error": "Form ID is required"}), 400
+
+        user_id = form_automation.resolve_form_owner_user_id(form_id)
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": (
+                    "Form is not configured for public submission. "
+                    "Set owner_user_id on the template or FIKIRI_DEFAULT_FORM_OWNER_USER_ID."
+                ),
+            }), 400
         
         # Track form submission start
         session_id = request.headers.get('X-Session-ID')
@@ -260,10 +281,13 @@ def submit_form():
         return jsonify({"success": False, "error": str(e)}), 500
 
 @docs_forms_bp.route('/forms/<form_id>/submissions', methods=['GET'])
+@jwt_required
 def get_form_submissions(form_id):
     """Get form submissions"""
     try:
-        user_id = request.args.get('user_id', type=int)
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
         submissions = form_automation.get_form_submissions(form_id, user_id)
         
         return jsonify({
@@ -287,6 +311,7 @@ def get_form_submissions(form_id):
 # Document Templates Endpoints
 
 @docs_forms_bp.route('/templates', methods=['GET'])
+@jwt_required
 def list_document_templates():
     """List document templates"""
     try:
@@ -319,6 +344,7 @@ def list_document_templates():
         return jsonify({"success": False, "error": str(e)}), 500
 
 @docs_forms_bp.route('/templates/<template_id>', methods=['GET'])
+@jwt_required
 def get_document_template(template_id):
     """Get specific document template"""
     try:
@@ -347,7 +373,7 @@ def get_document_template(template_id):
                         "options": v.options
                     } for v in template.variables
                 ],
-                "settings": template.settings,
+                "settings": _public_form_settings(template.settings),
                 "created_at": template.created_at.isoformat()
             }
         })
@@ -357,12 +383,15 @@ def get_document_template(template_id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 @docs_forms_bp.route('/templates/<template_id>/generate', methods=['POST'])
+@jwt_required
 def generate_document(template_id):
     """Generate document from template"""
     try:
-        data = request.json
+        data = request.json or {}
         variables = data.get('variables', {})
-        user_id = data.get('user_id', 1)
+        user_id = get_jwt_user_id()
+        if not user_id:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
         
         # Track template usage start
         session_id = request.headers.get('X-Session-ID')
@@ -401,12 +430,18 @@ def generate_document(template_id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 @docs_forms_bp.route('/documents/<doc_id>', methods=['GET'])
+@jwt_required
 def get_generated_document(doc_id):
     """Get generated document"""
     try:
+        uid = get_jwt_user_id()
+        if not uid:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
         document = doc_templates.get_generated_document(doc_id)
         
         if not document:
+            return jsonify({"success": False, "error": "Document not found"}), 404
+        if int(document.user_id) != int(uid):
             return jsonify({"success": False, "error": "Document not found"}), 404
         
         return jsonify({
@@ -426,10 +461,20 @@ def get_generated_document(doc_id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 @docs_forms_bp.route('/documents/<doc_id>/convert', methods=['POST'])
+@jwt_required
 def convert_document_format(doc_id):
     """Convert document to different format"""
     try:
-        data = request.json
+        uid = get_jwt_user_id()
+        if not uid:
+            return jsonify({"success": False, "error": "Authentication required", "error_code": "AUTHENTICATION_REQUIRED"}), 401
+        document = doc_templates.get_generated_document(doc_id)
+        if not document:
+            return jsonify({"success": False, "error": "Document not found"}), 404
+        if int(document.user_id) != int(uid):
+            return jsonify({"success": False, "error": "Document not found"}), 404
+
+        data = request.get_json(silent=True) or {}
         target_format = data.get('format')
         
         if not target_format:
@@ -450,6 +495,7 @@ def convert_document_format(doc_id):
 # Analytics Endpoints
 
 @docs_forms_bp.route('/analytics/report', methods=['GET'])
+@jwt_required
 def get_analytics_report():
     """Get comprehensive analytics report"""
     try:
@@ -466,6 +512,7 @@ def get_analytics_report():
         return jsonify({"success": False, "error": str(e)}), 500
 
 @docs_forms_bp.route('/analytics/real-time', methods=['GET'])
+@jwt_required
 def get_real_time_stats():
     """Get real-time statistics"""
     try:
@@ -481,6 +528,7 @@ def get_real_time_stats():
         return jsonify({"success": False, "error": str(e)}), 500
 
 @docs_forms_bp.route('/analytics/processing', methods=['GET'])
+@jwt_required
 def get_processing_metrics():
     """Get document processing metrics"""
     try:
@@ -505,6 +553,7 @@ def get_processing_metrics():
         return jsonify({"success": False, "error": str(e)}), 500
 
 @docs_forms_bp.route('/analytics/forms', methods=['GET'])
+@jwt_required
 def get_form_metrics():
     """Get form submission metrics"""
     try:
@@ -529,6 +578,7 @@ def get_form_metrics():
         return jsonify({"success": False, "error": str(e)}), 500
 
 @docs_forms_bp.route('/analytics/export', methods=['GET'])
+@jwt_required
 def export_analytics():
     """Export analytics data"""
     try:

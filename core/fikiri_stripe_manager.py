@@ -500,11 +500,6 @@ class FikiriStripeManager:
                 customer_id,
                 expand=["invoice_settings.default_payment_method"],
             )
-        except stripe.error.StripeError as e:
-            logger.error(f"Failed to get customer details: {e}")
-            return {}
-
-        try:
             # StripeObject subclasses dict — use .get() only so missing nested keys never raise.
             inv = customer.get("invoice_settings") or {}
             raw_pm = inv.get("default_payment_method") if inv else None
@@ -519,7 +514,7 @@ class FikiriStripeManager:
 
             addr = customer.get("address")
             address_dict = None
-            if addr:
+            if addr and isinstance(addr, dict):
                 address_dict = {
                     "line1": addr.get("line1"),
                     "line2": addr.get("line2"),
@@ -530,7 +525,12 @@ class FikiriStripeManager:
                 }
 
             meta = customer.get("metadata")
-            meta_dict = dict(meta) if meta else {}
+            meta_dict = {}
+            if meta:
+                try:
+                    meta_dict = dict(meta)
+                except (TypeError, ValueError):
+                    meta_dict = {}
 
             return {
                 "id": customer.get("id"),
@@ -542,12 +542,11 @@ class FikiriStripeManager:
                 "created": customer.get("created"),
                 "metadata": meta_dict,
             }
-        except Exception as e:
-            logger.exception(
-                "Failed to serialize Stripe customer details for %s: %s",
-                customer_id,
-                e,
-            )
+        except stripe.error.StripeError as e:
+            logger.error(f"Failed to get customer details (Stripe): {e}")
+            return {}
+        except Exception:
+            logger.exception("Failed to get or serialize Stripe customer %s", customer_id)
             return {}
 
     def get_customer_limits(self, customer_id: str) -> Dict[str, int]:

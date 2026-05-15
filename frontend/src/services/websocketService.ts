@@ -51,7 +51,11 @@ class WebSocketService {
       this.socket.on('connect', () => {
         this.isConnected = true
         this.reconnectAttempts = 0
-        this.socket?.emit('subscribe_dashboard')
+        const accessToken =
+          typeof window !== 'undefined' ? localStorage.getItem('fikiri-token') : null
+        this.socket?.emit('subscribe_dashboard', {
+          access_token: accessToken || undefined,
+        })
       })
 
       this.socket.on('disconnect', () => {

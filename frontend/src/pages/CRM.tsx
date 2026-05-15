@@ -7,6 +7,7 @@ import { ErrorMessage, getUserFriendlyError } from '../components/ErrorMessage'
 import { FeatureStatus, getFeatureStatus } from '../components/FeatureStatus'
 import { useToast } from '../components/Toast'
 import { LeadTraceModal } from '../components/LeadTraceModal'
+import { TableScroll } from '../components/TableScroll'
 
 /** Must match canonical stages in `crm/service.py` (`lead_stages`). */
 const pipelineStages = [
@@ -590,8 +591,8 @@ export const CRM: React.FC = () => {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-brand-text/10 dark:divide-gray-700">
+          <TableScroll size="medium" label="Leads table">
+            <table className="w-full divide-y divide-brand-text/10 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider">
@@ -685,7 +686,7 @@ export const CRM: React.FC = () => {
                 }}
               />
             )}
-          </div>
+          </TableScroll>
         )}
       </div>
 

@@ -241,6 +241,10 @@ class MinimalVectorSearch:
         try:
             for i, meta in enumerate(self.metadata):
                 if isinstance(meta, dict) and meta.get('document_id') == vector_id:
+                    if self.documents[i] == text:
+                        self.metadata[i].update(metadata or {})
+                        self.metadata[i]['updated_at'] = datetime.now(timezone.utc).isoformat()
+                        return True
                     embedding = self._normalize_vector(self._generate_embedding(text))
                     self.vectors[i] = embedding
                     self.documents[i] = text
@@ -265,6 +269,11 @@ class MinimalVectorSearch:
         try:
             if doc_id < 0 or doc_id >= len(self.documents):
                 return False
+            if self.documents[doc_id] == text:
+                if metadata:
+                    self.metadata[doc_id].update(metadata)
+                self.metadata[doc_id]['updated_at'] = datetime.now(timezone.utc).isoformat()
+                return True
             embedding = self._normalize_vector(self._generate_embedding(text))
             self.vectors[doc_id] = embedding
             self.documents[doc_id] = text
@@ -318,7 +327,8 @@ class MinimalVectorSearch:
             heap = []
             for i, vector in enumerate(self.vectors):
                 if tenant_id is not None:
-                    doc_tenant_id = self.metadata[i].get('tenant_id') if i < len(self.metadata) else None
+                    meta = self.metadata[i] if i < len(self.metadata) else None
+                    doc_tenant_id = meta.get("tenant_id") if isinstance(meta, dict) else None
                     if doc_tenant_id != tenant_id:
                         continue
                 similarity = self._cosine_similarity(query_embedding, vector)
@@ -361,30 +371,48 @@ class MinimalVectorSearch:
         ]
 
     async def search_similar_async(self, query: str, top_k: int = 5, threshold: float = 0.7, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self.search_similar, query, top_k, threshold, tenant_id)
+        return await asyncio.to_thread(self.search_similar, query, top_k, threshold, tenant_id)
 
     def get_context_for_rag(self, query: str, max_context_length: int = 1000, tenant_id: Optional[str] = None) -> str:
         try:
             results = self.search_similar(query, top_k=3, threshold=0.6, tenant_id=tenant_id)
             if not results:
                 return "No relevant context found."
+            try:
+                cap = max(1, int(max_context_length))
+            except (TypeError, ValueError):
+                cap = 1000
+            n = max(1, len(results))
+            overhead = 48
+            per_doc_budget = max(32, (cap - overhead) // n)
             context_parts = []
             current_length = 0
             for result in results:
-                context_part = f"[Similarity: {result['similarity']:.2f}] {result['document']}"
-                if current_length + len(context_part) <= max_context_length:
+                doc = result.get("document") or ""
+                if len(doc) > per_doc_budget:
+                    doc = doc[: max(0, per_doc_budget - 14)] + " [truncated]"
+                sim = float(result.get("similarity") or 0.0)
+                context_part = f"[Similarity: {sim:.2f}] {doc}"
+                if current_length + len(context_part) + 2 <= cap:
                     context_parts.append(context_part)
-                    current_length += len(context_part)
+                    current_length += len(context_part) + 2
                 else:
                     break
-            return "\n\n".join(context_parts)
+            if context_parts:
+                return "\n\n".join(context_parts)
+            r0 = results[0]
+            doc0 = (r0.get("document") or "")[: max(0, cap - 32)]
+            sim0 = float(r0.get("similarity") or 0.0)
+            return f"[Similarity: {sim0:.2f}] {doc0}"
         except Exception:
             return "Error generating context."
 
-    async def get_context_for_rag_async(self, query: str, max_context_length: int = 1000) -> str:
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self.get_context_for_rag, query, max_context_length)
+    async def get_context_for_rag_async(
+        self, query: str, max_context_length: int = 1000, tenant_id: Optional[str] = None
+    ) -> str:
+        return await asyncio.to_thread(
+            self.get_context_for_rag, query, max_context_length, tenant_id
+        )
 
     def _get_sentence_transformer(self):
         if self.sentence_transformer is None and self._SentenceTransformer:
