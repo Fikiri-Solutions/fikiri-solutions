@@ -40,9 +40,13 @@ def _parse_positive_int_env(name: str) -> Optional[int]:
 
 def resolve_webhook_intake_owner_user_id(lead_data: Dict[str, Any]) -> Optional[int]:
     """
-    CRM owner for inbound webhooks. Never trust request ``user_id`` unless
-    FIKIRI_TRUST_WEBHOOK_BODY_USER_ID is enabled (dev / tightly controlled proxies).
+    CRM owner when no authenticated API key establishes tenant.
+
     Prefer FIKIRI_WEBHOOK_DEFAULT_OWNER_USER_ID, then FIKIRI_DEFAULT_FORM_OWNER_USER_ID.
+    If FIKIRI_TRUST_WEBHOOK_BODY_USER_ID is enabled, allow body ``user_id`` (trusted proxies only).
+
+    Provider routes (tally/typeform/jotform/generic) should pass ``owner_user_id`` from ``X-API-Key``
+    validation instead — this resolver is mainly for callers that invoke WebhookIntakeService directly.
     """
     for key in ("FIKIRI_WEBHOOK_DEFAULT_OWNER_USER_ID", "FIKIRI_DEFAULT_FORM_OWNER_USER_ID"):
         v = _parse_positive_int_env(key)
@@ -89,8 +93,10 @@ class WebhookIntakeService:
             logger.error(f"❌ Webhook signature verification failed: {e}")
             return False
     
-    def process_tally_webhook(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process webhook data from Tally forms"""
+    def process_tally_webhook(
+        self, data: Dict[str, Any], owner_user_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Process webhook data from Tally forms. ``owner_user_id`` from API key (preferred)."""
         try:
             # Extract lead data from Tally webhook
             form_data = data.get('data', {})
@@ -113,14 +119,16 @@ class WebhookIntakeService:
                 }
             }
             
-            return self._process_lead(lead_data)
+            return self._process_lead(lead_data, owner_user_id=owner_user_id)
             
         except Exception as e:
             logger.error(f"❌ Failed to process Tally webhook: {e}")
             return {"success": False, "error": str(e)}
     
-    def process_typeform_webhook(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process webhook data from Typeform"""
+    def process_typeform_webhook(
+        self, data: Dict[str, Any], owner_user_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Process webhook data from Typeform. ``owner_user_id`` from API key (preferred)."""
         try:
             # Extract lead data from Typeform webhook
             form_response = data.get('form_response', {})
@@ -163,14 +171,16 @@ class WebhookIntakeService:
             
             lead_data['score'] = self._calculate_lead_score(lead_data)
             
-            return self._process_lead(lead_data)
+            return self._process_lead(lead_data, owner_user_id=owner_user_id)
             
         except Exception as e:
             logger.error(f"❌ Failed to process Typeform webhook: {e}")
             return {"success": False, "error": str(e)}
     
-    def process_jotform_webhook(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process webhook data from Jotform"""
+    def process_jotform_webhook(
+        self, data: Dict[str, Any], owner_user_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Process webhook data from Jotform. ``owner_user_id`` from API key (preferred)."""
         try:
             # Extract lead data from Jotform webhook
             submission = data.get('submission', {})
@@ -212,14 +222,16 @@ class WebhookIntakeService:
             
             lead_data['score'] = self._calculate_lead_score(lead_data)
             
-            return self._process_lead(lead_data)
+            return self._process_lead(lead_data, owner_user_id=owner_user_id)
             
         except Exception as e:
             logger.error(f"❌ Failed to process Jotform webhook: {e}")
             return {"success": False, "error": str(e)}
     
-    def process_generic_webhook(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process generic webhook data"""
+    def process_generic_webhook(
+        self, data: Dict[str, Any], owner_user_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Process generic webhook data. ``owner_user_id`` from API key (preferred)."""
         try:
             # Try to extract common fields
             lead_data = {
@@ -249,13 +261,17 @@ class WebhookIntakeService:
                     except (TypeError, ValueError):
                         pass
 
-            return self._process_lead(lead_data)
+            return self._process_lead(lead_data, owner_user_id=owner_user_id)
             
         except Exception as e:
             logger.error(f"❌ Failed to process generic webhook: {e}")
             return {"success": False, "error": str(e)}
     
-    def _process_lead(self, lead_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _process_lead(
+        self,
+        lead_data: Dict[str, Any],
+        owner_user_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
         """Process and store lead data across all systems"""
         try:
             key = None
@@ -263,17 +279,28 @@ class WebhookIntakeService:
             if not lead_data.get('email'):
                 return {"success": False, "error": "Email is required"}
 
-            owner_uid = resolve_webhook_intake_owner_user_id(lead_data)
-            if owner_uid is None:
-                return {
-                    "success": False,
-                    "error": (
-                        "Webhook intake owner not configured. Set FIKIRI_WEBHOOK_DEFAULT_OWNER_USER_ID "
-                        "or FIKIRI_DEFAULT_FORM_OWNER_USER_ID, or enable FIKIRI_TRUST_WEBHOOK_BODY_USER_ID "
-                        "with a trusted proxy that injects user_id."
-                    ),
-                }
-            lead_data["user_id"] = owner_uid
+            if owner_user_id is not None:
+                lead_data.pop("user_id", None)
+                try:
+                    oid = int(owner_user_id)
+                    if oid <= 0:
+                        return {"success": False, "error": "Invalid owner user id"}
+                    lead_data["user_id"] = oid
+                except (TypeError, ValueError):
+                    return {"success": False, "error": "Invalid owner user id"}
+            else:
+                owner_uid = resolve_webhook_intake_owner_user_id(lead_data)
+                if owner_uid is None:
+                    return {
+                        "success": False,
+                        "error": (
+                            "Webhook intake owner not configured. Set FIKIRI_WEBHOOK_DEFAULT_OWNER_USER_ID "
+                            "or FIKIRI_DEFAULT_FORM_OWNER_USER_ID, or enable FIKIRI_TRUST_WEBHOOK_BODY_USER_ID "
+                            "with a trusted proxy that injects user_id."
+                        ),
+                    }
+                lead_data.pop("user_id", None)
+                lead_data["user_id"] = owner_uid
 
             # Idempotency key (prefer submission_id if present)
             metadata = lead_data.get('metadata', {}) or {}
@@ -354,7 +381,7 @@ class WebhookIntakeService:
             if existing:
                 lead_id = existing[0]['id']
                 db_optimizer.execute_query(
-                    """UPDATE leads SET name = ?, phone = ?, company = ?, source = ?, status = ?, notes = ?, tags = ?, metadata = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    """UPDATE leads SET name = ?, phone = ?, company = ?, source = ?, status = ?, notes = ?, tags = ?, metadata = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?""",
                     (
                         lead_data.get('name'),
                         lead_data.get('phone'),
@@ -364,7 +391,8 @@ class WebhookIntakeService:
                         lead_data.get('notes'),
                         json.dumps(lead_data.get('tags', [])),
                         json.dumps(lead_data.get('metadata', {})),
-                        lead_id
+                        lead_id,
+                        lead_data["user_id"],
                     ),
                     fetch=False
                 )

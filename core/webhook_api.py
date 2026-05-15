@@ -275,6 +275,120 @@ def _check_webhook_rate_limit(key_info: dict, endpoint: str):
     }, 429
 
 
+def _leads_intake_webhook_auth(endpoint_path: str):
+    """
+    Authenticate webhook requests that resolve CRM tenancy via API key — same rules as ``/leads/capture``.
+    Legacy provider routes (Tally, Typeform, Jotform, generic, test) must send ``X-API-Key``.
+
+    Returns (key_info dict, None) on success or (None, (flask_jsonify_response_tuple)) on failure.
+    """
+    from core.api_key_manager import api_key_manager
+
+    api_key = request.headers.get("X-API-Key")
+    if not api_key:
+        return None, (
+            jsonify(
+                {
+                    "success": False,
+                    "error": (
+                        "API key required (X-API-Key header). "
+                        "Use the same webhook API key as /api/webhooks/leads/capture "
+                        "(scopes: webhooks:leads, leads:create, or webhooks:*)."
+                    ),
+                    "error_code": "MISSING_API_KEY",
+                }
+            ),
+            401,
+        )
+
+    key_info = api_key_manager.validate_api_key(api_key)
+    if not key_info:
+        return None, (
+            jsonify(
+                {
+                    "success": False,
+                    "error": "Invalid API key",
+                    "error_code": "INVALID_API_KEY",
+                }
+            ),
+            401,
+        )
+
+    allowed_scopes = set(key_info.get("scopes", []))
+    required_scopes = ["webhooks:leads", "webhooks:*", "leads:create", "leads:*"]
+    if not any(scope in allowed_scopes for scope in required_scopes):
+        return None, (
+            jsonify(
+                {
+                    "success": False,
+                    "error": "Insufficient permissions. Required scope: webhooks:leads or leads:create",
+                    "error_code": "INSUFFICIENT_SCOPE",
+                }
+            ),
+            403,
+        )
+
+    allowed_origins = key_info.get("allowed_origins")
+    if allowed_origins:
+        origin_str = request.headers.get("Origin", "")
+        if origin_str and origin_str not in allowed_origins:
+            logger.warning(
+                "⚠️ Origin not allowed: %s (allowed: %s)", origin_str, allowed_origins
+            )
+            return None, (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": "Origin not allowed",
+                        "error_code": "ORIGIN_NOT_ALLOWED",
+                    }
+                ),
+                403,
+            )
+
+    key_prefix = (key_info.get("key_prefix") or "")[:12] or "unknown"
+    logger.info(
+        "webhook request endpoint=%s api_key_prefix=%s origin=%s",
+        endpoint_path,
+        key_prefix,
+        request.headers.get("Origin") or request.headers.get("Referer") or "-",
+    )
+    err_resp, err_status = _check_webhook_rate_limit(key_info, endpoint_path)
+    if err_resp is not None:
+        resp = jsonify(err_resp)
+        resp.headers["Retry-After"] = str(err_resp.get("retry_after_seconds", 60))
+        return None, (resp, err_status)
+
+    try:
+        api_key_manager.record_usage(
+            key_info["api_key_id"],
+            endpoint_path,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get("User-Agent"),
+        )
+    except Exception:
+        pass
+
+    uid = key_info.get("user_id")
+    try:
+        key_info["_owner_user_id"] = int(uid) if uid is not None else None
+    except (TypeError, ValueError):
+        key_info["_owner_user_id"] = None
+    if not key_info.get("_owner_user_id"):
+        return None, (
+            jsonify(
+                {
+                    "success": False,
+                    "error": "API key missing user association",
+                    "error_code": "INVALID_API_KEY",
+                }
+            ),
+            401,
+        )
+
+    return key_info, None
+
+
 def _validate_webhook_email_and_name(email: str, name: str = None) -> tuple:
     """Validate email and name. Returns (None, None) if valid else (error_message, error_code)."""
     if not email or not email.strip():
@@ -314,33 +428,39 @@ webhook_bp = Blueprint('webhook', __name__, url_prefix='/api/webhooks')
 
 @webhook_bp.route('/tally', methods=['POST'])
 def handle_tally_webhook():
-    """Handle webhook from Tally forms"""
+    """Handle webhook from Tally forms. Requires X-API-Key (same tenancy as /leads/capture)."""
     try:
-        # Set trace ID from header or generate new one
+        key_info, auth_err = _leads_intake_webhook_auth("/api/webhooks/tally")
+        if auth_err is not None:
+            return auth_err
+
         if TRACE_CONTEXT_AVAILABLE:
             trace_id = request.headers.get('X-Trace-ID')
             set_trace_id(trace_id)
-            logger.info(f"Webhook trace ID: {get_trace_id()}", extra={
-                'event': 'webhook_received',
-                'service': 'webhook',
-                'severity': 'INFO',
-                'trace_id': get_trace_id(),
-                'webhook_type': 'tally'
-            })
-        
-        # Get webhook service
+            logger.info(
+                "Webhook trace ID: %s",
+                get_trace_id(),
+                extra={
+                    'event': 'webhook_received',
+                    'service': 'webhook',
+                    'severity': 'INFO',
+                    'trace_id': get_trace_id(),
+                    'webhook_type': 'tally',
+                },
+            )
+
         webhook_service = get_webhook_service()
         if not webhook_service:
             return jsonify({
                 "success": False,
                 "error": "Webhook service not available"
             }), 500
-        
-        # Verify webhook signature if enabled
+
         if webhook_service.config.enable_verification:
+            payload_text = request.get_data(as_text=True)
             signature = request.headers.get('X-Tally-Signature', '')
             if not webhook_service.verify_webhook_signature(
-                request.get_data(as_text=True),
+                payload_text,
                 signature,
                 webhook_service.config.secret_key
             ):
@@ -349,26 +469,25 @@ def handle_tally_webhook():
                     "success": False,
                     "error": "Invalid signature"
                 }), 401
-        
-        # Process webhook data (silent=True so invalid/empty body yields None, not 400 raise)
+
         data = request.get_json(silent=True)
         if not data:
             return jsonify({
                 "success": False,
                 "error": "No data received"
             }), 400
-        
-        result = webhook_service.process_tally_webhook(data)
-        
+
+        owner_uid = key_info["_owner_user_id"]
+        result = webhook_service.process_tally_webhook(data, owner_user_id=owner_uid)
+
         if result['success']:
-            logger.info(f"✅ Tally webhook processed: {result.get('lead_id')}")
+            logger.info("✅ Tally webhook processed: %s", result.get('lead_id'))
             return jsonify(result), 200
-        else:
-            logger.error(f"❌ Tally webhook failed: {result.get('error')}")
-            return jsonify(result), 400
-            
+        logger.error("❌ Tally webhook failed: %s", result.get('error'))
+        return jsonify(result), 400
+
     except Exception as e:
-        logger.error(f"❌ Tally webhook error: {e}")
+        logger.error("❌ Tally webhook error: %s", e)
         return jsonify({
             "success": False,
             "error": "Internal server error"
@@ -376,32 +495,39 @@ def handle_tally_webhook():
 
 @webhook_bp.route('/typeform', methods=['POST'])
 def handle_typeform_webhook():
-    """Handle webhook from Typeform"""
+    """Handle webhook from Typeform. Requires X-API-Key (same tenancy as /leads/capture)."""
     try:
-        # Set trace ID from header or generate new one
+        key_info, auth_err = _leads_intake_webhook_auth("/api/webhooks/typeform")
+        if auth_err is not None:
+            return auth_err
+
         if TRACE_CONTEXT_AVAILABLE:
             trace_id = request.headers.get('X-Trace-ID')
             set_trace_id(trace_id)
-            logger.info(f"Webhook trace ID: {get_trace_id()}", extra={
-                'event': 'webhook_received',
-                'service': 'webhook',
-                'severity': 'INFO',
-                'trace_id': get_trace_id(),
-                'webhook_type': 'typeform'
-            })
-        
+            logger.info(
+                "Webhook trace ID: %s",
+                get_trace_id(),
+                extra={
+                    'event': 'webhook_received',
+                    'service': 'webhook',
+                    'severity': 'INFO',
+                    'trace_id': get_trace_id(),
+                    'webhook_type': 'typeform',
+                },
+            )
+
         webhook_service = get_webhook_service()
         if not webhook_service:
             return jsonify({
                 "success": False,
                 "error": "Webhook service not available"
             }), 500
-        
-        # Verify webhook signature if enabled
+
         if webhook_service.config.enable_verification:
+            payload_text = request.get_data(as_text=True)
             signature = request.headers.get('X-Typeform-Signature', '')
             if not webhook_service.verify_webhook_signature(
-                request.get_data(as_text=True),
+                payload_text,
                 signature,
                 webhook_service.config.secret_key
             ):
@@ -410,26 +536,25 @@ def handle_typeform_webhook():
                     "success": False,
                     "error": "Invalid signature"
                 }), 401
-        
-        # Process webhook data
-        data = request.get_json()
+
+        data = request.get_json(silent=True)
         if not data:
             return jsonify({
                 "success": False,
                 "error": "No data received"
             }), 400
-        
-        result = webhook_service.process_typeform_webhook(data)
-        
+
+        owner_uid = key_info["_owner_user_id"]
+        result = webhook_service.process_typeform_webhook(data, owner_user_id=owner_uid)
+
         if result['success']:
-            logger.info(f"✅ Typeform webhook processed: {result.get('lead_id')}")
+            logger.info("✅ Typeform webhook processed: %s", result.get('lead_id'))
             return jsonify(result), 200
-        else:
-            logger.error(f"❌ Typeform webhook failed: {result.get('error')}")
-            return jsonify(result), 400
-            
+        logger.error("❌ Typeform webhook failed: %s", result.get('error'))
+        return jsonify(result), 400
+
     except Exception as e:
-        logger.error(f"❌ Typeform webhook error: {e}")
+        logger.error("❌ Typeform webhook error: %s", e)
         return jsonify({
             "success": False,
             "error": "Internal server error"
@@ -437,35 +562,42 @@ def handle_typeform_webhook():
 
 @webhook_bp.route('/jotform', methods=['POST'])
 def handle_jotform_webhook():
-    """Handle webhook from Jotform"""
+    """Handle webhook from Jotform. Requires X-API-Key (same tenancy as /leads/capture)."""
     try:
-        # Set trace ID from header or generate new one
+        key_info, auth_err = _leads_intake_webhook_auth("/api/webhooks/jotform")
+        if auth_err is not None:
+            return auth_err
+
         if TRACE_CONTEXT_AVAILABLE:
-            trace_id = request.headers.get('X-Trace-ID')
-            set_trace_id(trace_id)
-            logger.info(f"Webhook trace ID: {get_trace_id()}", extra={
-                'event': 'webhook_received',
-                'service': 'webhook',
-                'severity': 'INFO',
-                'trace_id': get_trace_id(),
-                'webhook_type': 'jotform'
-            })
-    except Exception:
-        pass  # Continue even if trace context fails
-    
-    try:
+            try:
+                trace_id = request.headers.get('X-Trace-ID')
+                set_trace_id(trace_id)
+                logger.info(
+                    "Webhook trace ID: %s",
+                    get_trace_id(),
+                    extra={
+                        'event': 'webhook_received',
+                        'service': 'webhook',
+                        'severity': 'INFO',
+                        'trace_id': get_trace_id(),
+                        'webhook_type': 'jotform',
+                    },
+                )
+            except Exception:
+                pass
+
         webhook_service = get_webhook_service()
         if not webhook_service:
             return jsonify({
                 "success": False,
                 "error": "Webhook service not available"
             }), 500
-        
-        # Verify webhook signature if enabled
+
         if webhook_service.config.enable_verification:
+            payload_text = request.get_data(as_text=True)
             signature = request.headers.get('X-Jotform-Signature', '')
             if not webhook_service.verify_webhook_signature(
-                request.get_data(as_text=True),
+                payload_text,
                 signature,
                 webhook_service.config.secret_key
             ):
@@ -474,26 +606,25 @@ def handle_jotform_webhook():
                     "success": False,
                     "error": "Invalid signature"
                 }), 401
-        
-        # Process webhook data
-        data = request.get_json()
+
+        data = request.get_json(silent=True)
         if not data:
             return jsonify({
                 "success": False,
                 "error": "No data received"
             }), 400
-        
-        result = webhook_service.process_jotform_webhook(data)
-        
+
+        owner_uid = key_info["_owner_user_id"]
+        result = webhook_service.process_jotform_webhook(data, owner_user_id=owner_uid)
+
         if result['success']:
-            logger.info(f"✅ Jotform webhook processed: {result.get('lead_id')}")
+            logger.info("✅ Jotform webhook processed: %s", result.get('lead_id'))
             return jsonify(result), 200
-        else:
-            logger.error(f"❌ Jotform webhook failed: {result.get('error')}")
-            return jsonify(result), 400
-            
+        logger.error("❌ Jotform webhook failed: %s", result.get('error'))
+        return jsonify(result), 400
+
     except Exception as e:
-        logger.error(f"❌ Jotform webhook error: {e}")
+        logger.error("❌ Jotform webhook error: %s", e)
         return jsonify({
             "success": False,
             "error": "Internal server error"
@@ -501,22 +632,29 @@ def handle_jotform_webhook():
 
 @webhook_bp.route('/generic', methods=['POST'])
 def handle_generic_webhook():
-    """Handle generic webhook data"""
+    """Handle generic webhook data. Requires X-API-Key (same tenancy as /leads/capture)."""
+    key_info, auth_err = _leads_intake_webhook_auth("/api/webhooks/generic")
+    if auth_err is not None:
+        return auth_err
+
     try:
-        # Set trace ID from header or generate new one
         if TRACE_CONTEXT_AVAILABLE:
             trace_id = request.headers.get('X-Trace-ID')
             set_trace_id(trace_id)
-            logger.info(f"Webhook trace ID: {get_trace_id()}", extra={
-                'event': 'webhook_received',
-                'service': 'webhook',
-                'severity': 'INFO',
-                'trace_id': get_trace_id(),
-                'webhook_type': 'generic'
-            })
+            logger.info(
+                "Webhook trace ID: %s",
+                get_trace_id(),
+                extra={
+                    'event': 'webhook_received',
+                    'service': 'webhook',
+                    'severity': 'INFO',
+                    'trace_id': get_trace_id(),
+                    'webhook_type': 'generic',
+                },
+            )
     except Exception:
-        pass  # Continue even if trace context fails
-    
+        pass
+
     try:
         webhook_service = get_webhook_service()
         if not webhook_service:
@@ -524,26 +662,25 @@ def handle_generic_webhook():
                 "success": False,
                 "error": "Webhook service not available"
             }), 500
-        
-        # Process webhook data
-        data = request.get_json()
+
+        data = request.get_json(silent=True)
         if not data:
             return jsonify({
                 "success": False,
                 "error": "No data received"
             }), 400
-        
-        result = webhook_service.process_generic_webhook(data)
-        
+
+        owner_uid = key_info["_owner_user_id"]
+        result = webhook_service.process_generic_webhook(data, owner_user_id=owner_uid)
+
         if result['success']:
-            logger.info(f"✅ Generic webhook processed: {result.get('lead_id')}")
+            logger.info("✅ Generic webhook processed: %s", result.get('lead_id'))
             return jsonify(result), 200
-        else:
-            logger.error(f"❌ Generic webhook failed: {result.get('error')}")
-            return jsonify(result), 400
-            
+        logger.error("❌ Generic webhook failed: %s", result.get('error'))
+        return jsonify(result), 400
+
     except Exception as e:
-        logger.error(f"❌ Generic webhook error: {e}")
+        logger.error("❌ Generic webhook error: %s", e)
         return jsonify({
             "success": False,
             "error": "Internal server error"
@@ -551,19 +688,21 @@ def handle_generic_webhook():
 
 @webhook_bp.route('/test', methods=['POST'])
 def test_webhook():
-    """Test webhook endpoint for development"""
+    """Test webhook endpoint; requires X-API-Key (same as /generic)."""
     try:
+        key_info, auth_err = _leads_intake_webhook_auth("/api/webhooks/test")
+        if auth_err is not None:
+            return auth_err
+
         webhook_service = get_webhook_service()
         if not webhook_service:
             return jsonify({
                 "success": False,
                 "error": "Webhook service not available"
             }), 500
-        
-        # Process test data
-        data = request.get_json()
+
+        data = request.get_json(silent=True)
         if not data:
-            # Provide sample data
             data = {
                 "name": "Test Lead",
                 "email": "test@example.com",
@@ -571,8 +710,9 @@ def test_webhook():
                 "company": "Test Company",
                 "message": "This is a test webhook submission"
             }
-        
-        result = webhook_service.process_generic_webhook(data)
+
+        owner_uid = key_info["_owner_user_id"]
+        result = webhook_service.process_generic_webhook(data, owner_user_id=owner_uid)
         
         if result['success']:
             logger.info(f"✅ Test webhook processed: {result.get('lead_id')}")
@@ -1377,75 +1517,14 @@ def handle_lead_capture():
             trace_id = request.headers.get('X-Trace-ID')
             if trace_id:
                 set_trace_id(trace_id)
-        
-        # Get API key from header
-        api_key = request.headers.get('X-API-Key')
-        if not api_key:
-            return jsonify({
-                "success": False,
-                "error": "API key required (X-API-Key header)",
-                "error_code": "MISSING_API_KEY"
-            }), 401
-        
-        # Validate API key
-        from core.api_key_manager import api_key_manager
-        key_info = api_key_manager.validate_api_key(api_key)
-        if not key_info:
-            return jsonify({
-                "success": False,
-                "error": "Invalid API key",
-                "error_code": "INVALID_API_KEY"
-            }), 401
-        
-        # Check scope permissions
-        allowed_scopes = set(key_info.get('scopes', []))
-        required_scopes = ['webhooks:leads', 'webhooks:*', 'leads:create', 'leads:*']
-        has_scope = any(scope in allowed_scopes for scope in required_scopes)
-        if not has_scope:
-            return jsonify({
-                "success": False,
-                "error": "Insufficient permissions. Required scope: webhooks:leads or leads:create",
-                "error_code": "INSUFFICIENT_SCOPE"
-            }), 403
-        
-        # Check origin allowlist (if configured)
-        allowed_origins = key_info.get('allowed_origins')
-        if allowed_origins:
-            origin = request.headers.get('Origin') or request.headers.get('Referer', '').split('/')[0:3]
-            origin_str = request.headers.get('Origin', '')
-            if origin_str and origin_str not in allowed_origins:
-                logger.warning(f"⚠️ Origin not allowed: {origin_str} (allowed: {allowed_origins})")
-                return jsonify({
-                    "success": False,
-                    "error": "Origin not allowed",
-                    "error_code": "ORIGIN_NOT_ALLOWED"
-                }), 403
-        
-        # Request logging
-        key_prefix = (key_info.get('key_prefix') or '')[:12] or 'unknown'
-        logger.info(
-            "webhook request endpoint=%s api_key_prefix=%s origin=%s",
-            "/api/webhooks/leads/capture",
-            key_prefix,
-            request.headers.get('Origin') or request.headers.get('Referer') or '-',
-        )
-        # Rate limit per API key
-        err_resp, err_status = _check_webhook_rate_limit(key_info, '/api/webhooks/leads/capture')
-        if err_resp is not None:
-            resp = jsonify(err_resp)
-            resp.headers['Retry-After'] = str(err_resp.get('retry_after_seconds', 60))
-            return resp, err_status
-        try:
-            api_key_manager.record_usage(
-                key_info['api_key_id'], '/api/webhooks/leads/capture',
-                ip_address=request.remote_addr, user_agent=request.headers.get('User-Agent')
-            )
-        except Exception:
-            pass
-        
+
+        key_info, auth_err = _leads_intake_webhook_auth("/api/webhooks/leads/capture")
+        if auth_err is not None:
+            return auth_err
+
         user_id = key_info.get('user_id')
         tenant_id = key_info.get('tenant_id')
-        
+
         # Get lead data
         data = request.get_json()
         if not data:

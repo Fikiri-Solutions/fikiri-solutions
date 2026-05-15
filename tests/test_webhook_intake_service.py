@@ -20,6 +20,7 @@ class TestWebhookIntakeService(unittest.TestCase):
 
             cfg = WebhookConfig(secret_key="secret", allowed_origins=["*"], enable_verification=True)
             self.service = WebhookIntakeService(cfg)
+            self._tenant_id = 99
 
     def test_verify_webhook_signature_valid_and_invalid(self):
         payload = '{"event":"test"}'
@@ -55,11 +56,12 @@ class TestWebhookIntakeService(unittest.TestCase):
             "company": "ACME",
             "message": "Hi"
         }}
-        result = self.service.process_tally_webhook(data)
+        result = self.service.process_tally_webhook(data, owner_user_id=self._tenant_id)
         self.assertTrue(result.get("success"))
         self.assertIn("lead_id", result)
         self.assertEqual(captured.get("email"), "a@b.com")
         self.assertEqual(captured.get("source"), "tally")
+        self.assertEqual(captured.get("user_id"), self._tenant_id)
 
     def test_process_typeform_webhook_maps_fields(self):
         captured = {}
@@ -83,12 +85,13 @@ class TestWebhookIntakeService(unittest.TestCase):
                 ],
             },
         }
-        result = self.service.process_typeform_webhook(data)
+        result = self.service.process_typeform_webhook(data, owner_user_id=self._tenant_id)
         self.assertTrue(result.get("success"))
         self.assertEqual(captured.get("email"), "x@y.com")
         self.assertEqual(captured.get("name"), "Bob")
         self.assertEqual(captured.get("company"), "Fikiri")
         self.assertEqual(captured.get("source"), "typeform")
+        self.assertEqual(captured.get("user_id"), self._tenant_id)
 
     def test_process_generic_webhook_maps_common_fields(self):
         captured = {}
@@ -105,12 +108,13 @@ class TestWebhookIntakeService(unittest.TestCase):
             "organization": "GenCo",
             "notes": "hello",
         }
-        result = self.service.process_generic_webhook(data)
+        result = self.service.process_generic_webhook(data, owner_user_id=self._tenant_id)
         self.assertTrue(result.get("success"))
         self.assertEqual(captured.get("name"), "Gen Lead")
         self.assertEqual(captured.get("email"), "gen@x.com")
         self.assertEqual(captured.get("company"), "GenCo")
         self.assertEqual(captured.get("source"), "webhook")
+        self.assertEqual(captured.get("user_id"), self._tenant_id)
 
     def test_process_lead_sheets_failure_does_not_block(self):
         def _store(lead_data):
@@ -120,7 +124,7 @@ class TestWebhookIntakeService(unittest.TestCase):
         self.service.sheets_connector = MagicMock(
             add_lead=MagicMock(return_value={"success": False, "error": "sheets down"})
         )
-        result = self.service.process_tally_webhook({"data": {"email": "a@b.com"}})
+        result = self.service.process_tally_webhook({"data": {"email": "a@b.com"}}, owner_user_id=self._tenant_id)
         self.assertTrue(result.get("success"))
 
     def test_webhook_idempotency_prevents_duplicate(self):
@@ -154,8 +158,8 @@ class TestWebhookIntakeService(unittest.TestCase):
         }}
 
         with patch("core.webhook_intake_service.idempotency_manager", new=_Idem()):
-            result1 = self.service.process_tally_webhook(data)
-            result2 = self.service.process_tally_webhook(data)
+            result1 = self.service.process_tally_webhook(data, owner_user_id=self._tenant_id)
+            result2 = self.service.process_tally_webhook(data, owner_user_id=self._tenant_id)
 
         self.assertTrue(result1.get("success"))
         self.assertTrue(result2.get("success"))

@@ -611,8 +611,8 @@ class EnhancedCRMService:
             # Update lead's last contact if it's a contact activity
             if activity_type in ['email_received', 'email_sent', 'call_made', 'meeting_scheduled']:
                 db_optimizer.execute_query(
-                    "UPDATE leads SET last_contact = CURRENT_TIMESTAMP WHERE id = ?",
-                    (lead_id,),
+                    "UPDATE leads SET last_contact = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?",
+                    (lead_id, user_id),
                     fetch=False
                 )
 

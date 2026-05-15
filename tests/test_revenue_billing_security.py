@@ -82,8 +82,18 @@ class TestRevenueBillingSecurity:
         data = json.loads(response.data)
         assert data.get('code') == 'PLAN_LIMIT_EXCEEDED'
 
+    @patch('core.webhook_api._check_webhook_rate_limit')
+    @patch('core.api_key_manager.api_key_manager')
     @patch('core.webhook_api.get_webhook_service')
-    def test_invalid_webhook_signature_rejected(self, mock_service, client, caplog):
+    def test_invalid_webhook_signature_rejected(self, mock_service, mock_api, mock_rl, client, caplog):
+        mock_rl.return_value = (None, None)
+        mock_api.validate_api_key.return_value = {
+            'api_key_id': 1,
+            'user_id': 99,
+            'scopes': ['webhooks:*'],
+            'allowed_origins': None,
+            'key_prefix': 'test',
+        }
         svc = MagicMock()
         svc.config.enable_verification = True
         svc.config.secret_key = "secret"
@@ -91,7 +101,11 @@ class TestRevenueBillingSecurity:
         mock_service.return_value = svc
 
         with caplog.at_level("WARNING"):
-            response = client.post('/api/webhooks/tally', json={"data": {"email": "x@y.com"}})
+            response = client.post(
+                '/api/webhooks/tally',
+                json={"data": {"email": "x@y.com"}},
+                headers={"X-API-Key": "fik_good_key"},
+            )
 
         assert response.status_code == 401
         assert any("Invalid Tally webhook signature" in rec.message for rec in caplog.records)

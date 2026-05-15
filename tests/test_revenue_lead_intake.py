@@ -89,10 +89,9 @@ class TestRevenueLeadIntake:
         }
 
         idem = _Idem()
-        with patch.dict(os.environ, {"FIKIRI_WEBHOOK_DEFAULT_OWNER_USER_ID": "1"}, clear=False):
-            with patch('core.webhook_intake_service.idempotency_manager', idem):
-                first = service.process_tally_webhook(payload)
-                second = service.process_tally_webhook(payload)
+        with patch('core.webhook_intake_service.idempotency_manager', idem):
+            first = service.process_tally_webhook(payload, owner_user_id=1)
+            second = service.process_tally_webhook(payload, owner_user_id=1)
 
         assert first["success"] is True
         assert second["success"] is True
