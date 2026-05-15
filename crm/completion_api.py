@@ -61,9 +61,9 @@ def create_follow_up():
         if result['success']:
             logger.info(f"✅ Follow-up created: {result.get('task_id')}")
             return jsonify(result), 200
-        else:
-            logger.error(f"❌ Failed to create follow-up: {result.get('error')}")
-            return jsonify(result), 400
+        code = 404 if result.get("error_code") == "LEAD_NOT_FOUND" else 400
+        logger.error(f"❌ Failed to create follow-up: {result.get('error')}")
+        return jsonify(result), code
             
     except Exception as e:
         logger.error(f"❌ Create follow-up error: {e}")

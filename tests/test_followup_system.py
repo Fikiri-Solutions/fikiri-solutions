@@ -43,11 +43,27 @@ class TestFollowUpSystem(unittest.TestCase):
 
     @patch("email_automation.followup_system.db_optimizer")
     def test_create_follow_up_task_success(self, mock_db):
-        mock_db.execute_query.return_value = None
-        result = self.system.create_follow_up_task(lead_id="l1", user_id=7, stage="new")
+        mock_db.execute_query.side_effect = [
+            [{"id": 1}],
+            None,
+        ]
+        result = self.system.create_follow_up_task(lead_id=1, user_id=7, stage="new")
         self.assertTrue(result.get("success"))
         self.assertIn("task_id", result)
+        self.assertEqual(mock_db.execute_query.call_count, 2)
+
+    @patch("email_automation.followup_system.db_optimizer")
+    def test_create_follow_up_task_rejects_unknown_lead(self, mock_db):
+        mock_db.execute_query.return_value = []
+        result = self.system.create_follow_up_task(lead_id=99, user_id=7, stage="new")
+        self.assertFalse(result.get("success"))
+        self.assertEqual(result.get("error_code"), "LEAD_NOT_FOUND")
         mock_db.execute_query.assert_called_once()
+
+    def test_create_follow_up_task_invalid_lead_id(self):
+        result = self.system.create_follow_up_task(lead_id="not-int", user_id=7, stage="new")
+        self.assertFalse(result.get("success"))
+        self.assertEqual(result.get("error_code"), "INVALID_LEAD_ID")
 
     def test_prepare_email_content_fallback(self):
         self.system.router = None
@@ -72,8 +88,8 @@ class TestFollowUpSystem(unittest.TestCase):
     @patch("email_automation.followup_system.db_optimizer")
     def test_process_pending_follow_ups_counts(self, mock_db):
         mock_db.execute_query.return_value = [
-            {"id": "t1", "lead_id": "l1", "template_id": "initial_contact", "user_id": 1},
-            {"id": "t2", "lead_id": "l2", "template_id": "initial_contact", "user_id": 1},
+            {"id": "t1", "lead_id": 1, "template_id": "initial_contact", "user_id": 1},
+            {"id": "t2", "lead_id": 2, "template_id": "initial_contact", "user_id": 1},
         ]
 
         self.system._send_follow_up = MagicMock(side_effect=[{"success": True}, {"success": False}])
@@ -95,7 +111,7 @@ class TestFollowUpSystem(unittest.TestCase):
 
         task_data = {
             "id": "t1",
-            "lead_id": "l1",
+            "lead_id": 1,
             "template_id": "initial_contact",
             "user_id": 2,
             "meta": "{}",
@@ -129,7 +145,7 @@ class TestFollowUpSystem(unittest.TestCase):
 
         task_data = {
             "id": "t1",
-            "lead_id": "l1",
+            "lead_id": 1,
             "template_id": "initial_contact",
             "user_id": 2,
             "meta": "{}",
@@ -144,6 +160,19 @@ class TestFollowUpSystem(unittest.TestCase):
         self.assertTrue(result1.get("success"))
         self.assertTrue(result2.get("success"))
         self.assertEqual(self.system.email_handler.send_ai_response.call_count, 1)
+
+    def test_log_follow_up_activity_uses_crm_service(self):
+        with patch("crm.service.enhanced_crm_service") as mock_crm:
+            mock_crm.add_lead_activity.return_value = {"success": True}
+            self.system._log_follow_up_activity(
+                {"id": "task1", "lead_id": 3, "user_id": 9, "template_id": "initial_contact"},
+                {"subject": "Hello lead"},
+            )
+        mock_crm.add_lead_activity.assert_called_once()
+        args, kwargs = mock_crm.add_lead_activity.call_args
+        self.assertEqual(args[0], 3)
+        self.assertEqual(args[1], 9)
+        self.assertEqual(args[2], "follow_up")
 
 
 if __name__ == "__main__":

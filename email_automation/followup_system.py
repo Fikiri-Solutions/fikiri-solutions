@@ -161,9 +161,29 @@ Best regards,
             
             # Calculate scheduled time
             scheduled_for = datetime.now() + timedelta(days=template.delay_days)
-            
+
+            try:
+                lead_pk = int(lead_id)
+            except (TypeError, ValueError):
+                return {
+                    "success": False,
+                    "error": "Invalid lead id",
+                    "error_code": "INVALID_LEAD_ID",
+                }
+
+            owns = db_optimizer.execute_query(
+                "SELECT id FROM leads WHERE id = ? AND user_id = ? LIMIT 1",
+                (lead_pk, int(user_id)),
+            )
+            if not owns:
+                return {
+                    "success": False,
+                    "error": "Lead not found",
+                    "error_code": "LEAD_NOT_FOUND",
+                }
+
             # Generate task ID
-            task_id = f"followup_{lead_id}_{int(scheduled_for.timestamp())}"
+            task_id = f"followup_{lead_pk}_{int(scheduled_for.timestamp())}"
             
             # Store follow-up task
             query = """
@@ -175,7 +195,7 @@ Best regards,
             
             values = (
                 task_id,
-                lead_id,
+                lead_pk,
                 user_id,
                 template.id,
                 scheduled_for.isoformat(),
@@ -199,8 +219,8 @@ Best regards,
             query = """
                 SELECT ft.*, l.email, l.name, l.company, l.stage, l.meta
                 FROM follow_up_tasks ft
-                JOIN leads l ON ft.lead_id = l.id
-                WHERE ft.status = 'pending' 
+                JOIN leads l ON ft.lead_id = l.id AND ft.user_id = l.user_id
+                WHERE ft.status = 'pending'
                 AND ft.scheduled_for <= ?
             """
             
@@ -391,28 +411,31 @@ Best regards,
             logger.error(f"❌ Failed to update task status: {e}")
     
     def _log_follow_up_activity(self, task_data: Dict[str, Any], email_content: Dict[str, Any]):
-        """Log follow-up activity"""
+        """Log follow-up activity (tenant-checked via canonical CRM service)."""
         try:
-            query = """
-                INSERT INTO lead_activities (
-                    lead_id, activity_type, description, timestamp, metadata
-                ) VALUES (?, ?, ?, ?, ?)
-            """
-            
-            values = (
-                task_data['lead_id'],
-                'follow_up_sent',
+            from crm.service import enhanced_crm_service
+
+            lead_pk = int(task_data["lead_id"])
+            uid = int(task_data["user_id"])
+            result = enhanced_crm_service.add_lead_activity(
+                lead_pk,
+                uid,
+                "follow_up",
                 f"Automated follow-up sent: {email_content['subject']}",
-                datetime.now().isoformat(),
-                json.dumps({
-                    'template_id': task_data['template_id'],
-                    'email_subject': email_content['subject'],
-                    'task_id': task_data['id']
-                })
+                metadata={
+                    "template_id": task_data["template_id"],
+                    "email_subject": email_content["subject"],
+                    "task_id": task_data["id"],
+                },
             )
-            
-            db_optimizer.execute_query(query, values, fetch=False)
-            
+            if not result.get("success"):
+                logger.error(
+                    "❌ CRM activity log skipped: lead_id=%s user_id=%s err=%s",
+                    lead_pk,
+                    uid,
+                    result.get("error"),
+                )
+
         except Exception as e:
             logger.error(f"❌ Failed to log follow-up activity: {e}")
     
