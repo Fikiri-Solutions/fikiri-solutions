@@ -20,24 +20,22 @@ interface LayoutProps {
 
 const SIDEBAR_COLLAPSED_KEY = 'fikiri:sidebar-collapsed'
 
+function readSidebarCollapsedFromStorage(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsedFromStorage)
   const [customizationOpen, setCustomizationOpen] = useState(false)
   const [accountManagementOpen, setAccountManagementOpen] = useState(false)
   const location = useLocation()
   const { customization } = useCustomization()
   const { user, logout } = useAuth()
-
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1') {
-        setSidebarCollapsed(true)
-      }
-    } catch {
-      // ignore
-    }
-  }, [])
 
   useEffect(() => {
     try {

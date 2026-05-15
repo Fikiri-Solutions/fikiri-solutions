@@ -7,7 +7,7 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+        sans: ['Plus Jakarta Sans Variable', 'system-ui', 'sans-serif'],
       },
       transitionProperty: {
         'colors': 'background-color, border-color, color, fill, stroke',

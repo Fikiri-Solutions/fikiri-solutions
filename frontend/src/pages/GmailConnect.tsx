@@ -343,7 +343,22 @@ export const GmailConnect: React.FC = () => {
 
           <div className="space-y-4">
             {gmailLoading || syncLoading ? (
-              <div className="text-sm text-brand-text/70 dark:text-gray-300">Loading status…</div>
+              <div className="space-y-4" aria-busy="true" aria-label="Loading Gmail sync status">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="flex flex-col gap-2 rounded-xl border border-brand-text/10 bg-gray-50/80 px-4 py-3 dark:border-gray-700 dark:bg-gray-800/40"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-5 w-5 shrink-0 rounded-full bg-gray-200 dark:bg-gray-600" />
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="h-3 w-28 max-w-[55%] rounded bg-gray-200 dark:bg-gray-600" />
+                        <div className="h-4 w-48 max-w-[85%] rounded bg-gray-200 dark:bg-gray-600" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
               logItems.map(item => (
                 <div
@@ -363,44 +378,48 @@ export const GmailConnect: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  {item.showProgress && (
-                    <div className="w-full mt-2">
-                      <div className="flex items-center justify-between text-xs text-brand-text/60 dark:text-gray-400 mb-1.5">
-                        <span className="font-medium">Progress</span>
-                        <span className="font-semibold text-blue-600 dark:text-blue-400">
-                          {hasDefiniteProgress
-                            ? `${syncStatus?.progress}%`
-                            : syncStatus?.sync_status === 'queued'
-                              ? 'Queued…'
-                              : 'Working…'}
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden relative">
-                        {hasDefiniteProgress ? (
-                          <div
-                            className="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out"
-                            style={{ width: `${Math.min(100, syncStatus?.progress ?? 0)}%` }}
-                          />
-                        ) : (
-                          <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-blue-500/20">
-                            <div
-                              className="absolute inset-0 bg-gradient-to-r from-blue-400/50 via-blue-500/90 to-blue-400/50"
-                              style={{
-                                backgroundSize: '200% 100%',
-                                animation: 'gmailSyncShimmer 2s linear infinite'
-                              }}
-                            />
+                  {item.label === 'Sync status' && gmailStatus?.connected ? (
+                    <div className="mt-2 min-h-[3.25rem]">
+                      {item.showProgress ? (
+                        <>
+                          <div className="flex items-center justify-between text-xs text-brand-text/60 dark:text-gray-400 mb-1.5">
+                            <span className="font-medium">Progress</span>
+                            <span className="font-semibold text-blue-600 dark:text-blue-400">
+                              {hasDefiniteProgress
+                                ? `${syncStatus?.progress}%`
+                                : syncStatus?.sync_status === 'queued'
+                                  ? 'Queued…'
+                                  : 'Working…'}
+                            </span>
                           </div>
-                        )}
-                      </div>
-                      <style>{`
-                        @keyframes gmailSyncShimmer {
-                          0% { background-position: -200% 0; }
-                          100% { background-position: 200% 0; }
-                        }
-                      `}</style>
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden relative">
+                            {hasDefiniteProgress ? (
+                              <div
+                                className="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out"
+                                style={{ width: `${Math.min(100, syncStatus?.progress ?? 0)}%` }}
+                              />
+                            ) : (
+                              <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-blue-500/20">
+                                <div
+                                  className="absolute inset-0 bg-gradient-to-r from-blue-400/50 via-blue-500/90 to-blue-400/50"
+                                  style={{
+                                    backgroundSize: '200% 100%',
+                                    animation: 'gmailSyncShimmer 2s linear infinite'
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <style>{`
+                            @keyframes gmailSyncShimmer {
+                              0% { background-position: -200% 0; }
+                              100% { background-position: 200% 0; }
+                            }
+                          `}</style>
+                        </>
+                      ) : null}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               ))
             )}

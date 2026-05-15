@@ -418,17 +418,6 @@ export const Onboarding: React.FC = () => {
                 </p>
             </div>
             
-              {checkingEmail && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
-                  <div className="flex items-center gap-3">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
-                      Checking email connection...
-                    </p>
-            </div>
-          </div>
-        )}
-
               {emailConnected && (
                 <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-6 border-2 border-green-500 dark:border-green-600">
                   <div className="flex items-center gap-3 mb-2">
@@ -443,9 +432,24 @@ export const Onboarding: React.FC = () => {
                 </div>
               )}
 
-              {!emailConnected && !checkingEmail && (
+              {!emailConnected && (
                 <>
-                  <div className="space-y-4">
+                  <div className="relative space-y-4">
+                    {checkingEmail && (
+                      <div
+                        className="absolute inset-0 z-10 flex items-start justify-center rounded-xl bg-white/70 p-4 pt-6 backdrop-blur-[1px] dark:bg-gray-900/70"
+                        role="status"
+                        aria-live="polite"
+                      >
+                        <div className="flex max-w-md items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm dark:border-blue-800 dark:bg-blue-900/40">
+                          <div className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                          <p className="text-sm text-blue-800 dark:text-blue-200">
+                            Checking email connection…
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    <div className={checkingEmail ? 'space-y-4 pointer-events-none opacity-60' : 'space-y-4'}>
                     <div className="p-6 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-brand-primary dark:hover:border-brand-primary transition-all bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900">
                       <div className="flex items-start justify-between mb-4">
                         <div>
@@ -528,18 +532,22 @@ export const Onboarding: React.FC = () => {
                         <strong>Note:</strong> Email connection is required to continue onboarding. Choose Gmail or Outlook.
                       </p>
                     </div>
+                    </div>
                   </div>
 
                   <div className="flex justify-between gap-4">
                     <button
+                      type="button"
                       onClick={prevStep}
-                      className="px-6 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all font-medium"
+                      disabled={checkingEmail}
+                      className="px-6 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all font-medium disabled:pointer-events-none disabled:opacity-50"
                     >
                       Back
                     </button>
                     <button
+                      type="button"
                       onClick={nextStep}
-                      disabled={!emailConnected}
+                      disabled={!emailConnected || checkingEmail}
                       className="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-xl transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Continue

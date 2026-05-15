@@ -70,6 +70,8 @@ export const FikiriLogo: React.FC<FikiriLogoProps> = ({
             src={logoWhite}
             alt=""
             aria-hidden
+            width={400}
+            height={400}
             className={`h-10 w-10 shrink-0 object-contain sm:h-12 sm:w-12 ${animationClass}`}
           />
           <div className="flex min-w-0 flex-row flex-nowrap items-baseline gap-x-1.5 sm:gap-x-2">
@@ -88,6 +90,8 @@ export const FikiriLogo: React.FC<FikiriLogoProps> = ({
       <img
         src={logoFull}
         alt="Fikiri Solutions"
+        width={400}
+        height={400}
         className={`${sizeClasses[size]} w-auto max-w-full shrink-0 object-contain object-left ${animationClass} ${className}`}
       />
     );
@@ -100,6 +104,8 @@ export const FikiriLogo: React.FC<FikiriLogoProps> = ({
           src={logoCircle}
           alt=""
           aria-hidden
+          width={400}
+          height={400}
           className={`${sizeClasses[size]} shrink-0 object-contain ${animationClass}`}
         />
         <div className="flex min-w-0 flex-row flex-nowrap items-baseline gap-x-1.5 sm:gap-x-2">
@@ -145,7 +151,9 @@ export const FikiriLogo: React.FC<FikiriLogoProps> = ({
     <img
       src={logoSrc[variant]}
       alt="Fikiri Solutions"
-      className={`${sizeClasses[size]} ${animationClass} ${className}`}
+      width={400}
+      height={400}
+      className={`${sizeClasses[size]} w-auto max-w-full shrink-0 object-contain ${animationClass} ${className}`}
     />
   );
 };

@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 // import * as Sentry from '@sentry/react'
+import '@fontsource-variable/plus-jakarta-sans/wght.css'
 import App from './App'
 import './index.css'
 import { registerSupabaseSessionRefresh } from './utils/supabase/middleware'

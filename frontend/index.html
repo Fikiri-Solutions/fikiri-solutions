@@ -54,19 +54,10 @@
     <!-- Preconnect for performance -->
     <link rel="preconnect" href="https://fikirisolutions.onrender.com">
     
-    <!-- Resource hints for performance -->
-    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    
-    <!-- Plus Jakarta Sans - Modern, sleek font for SaaS -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <!-- Critical CSS for above-the-fold content -->
+    <!-- Critical CSS for above-the-fold content (family matches bundled variable font in main.tsx) -->
     <style>
       /* Critical CSS for initial render */
-      body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; margin: 0; }
+      body { font-family: 'Plus Jakarta Sans Variable', system-ui, -apple-system, sans-serif; margin: 0; }
       #root { min-height: 100vh; }
       .loading-spinner { 
         position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);

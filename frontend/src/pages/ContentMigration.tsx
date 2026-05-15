@@ -162,9 +162,26 @@ export const ContentMigration: React.FC = () => {
       </div>
 
       {isLoading && (
-        <div className="flex items-center gap-2 text-brand-text/70 dark:text-gray-400">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          Loading migration map…
+        <div className="space-y-6 pb-6" aria-busy="true" aria-label="Loading import center">
+          <div className="flex flex-wrap gap-2 border-b border-brand-text/10 pb-3 opacity-60 dark:border-gray-700">
+            {tabs.map((t) => (
+              <div
+                key={t.id}
+                className="inline-flex items-center gap-2 rounded-lg bg-gray-200 px-3 py-2 dark:bg-gray-700"
+              >
+                <span className="h-4 w-4 rounded bg-gray-300 dark:bg-gray-600" />
+                <span className="h-4 w-20 rounded bg-gray-300 dark:bg-gray-600" />
+              </div>
+            ))}
+          </div>
+          <div className="grid gap-6 md:grid-cols-2">
+            {[0, 1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-40 rounded-2xl border border-brand-text/10 bg-gray-50/90 dark:border-gray-700 dark:bg-gray-800/50"
+              />
+            ))}
+          </div>
         </div>
       )}
 
@@ -177,6 +194,8 @@ export const ContentMigration: React.FC = () => {
         </div>
       )}
 
+      {!isLoading && (
+        <>
       <div className="flex flex-wrap gap-2 border-b border-brand-text/10 pb-3 dark:border-gray-700">
         {tabs.map((t) => (
           <button
@@ -522,6 +541,8 @@ export const ContentMigration: React.FC = () => {
             Full CRM board & import history <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
+      )}
+        </>
       )}
     </div>
   )

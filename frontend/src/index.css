@@ -141,9 +141,9 @@
   }
 }
 
-/* Font optimization - Plus Jakarta Sans for modern, sleek look */
-html { 
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; 
+/* Font: self-hosted variable cut (main.tsx); stacks match tailwind fontFamily.sans */
+html {
+  font-family: 'Plus Jakarta Sans Variable', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 
 
@@ -232,7 +232,7 @@ html {
 
 @layer base {
   html {
-    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    font-family: 'Plus Jakarta Sans Variable', system-ui, sans-serif;
     /* Mobile optimization */
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;

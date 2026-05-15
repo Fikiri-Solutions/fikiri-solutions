@@ -53,8 +53,8 @@ export const SubscriptionGate: React.FC<SubscriptionGateProps> = ({ children }) 
 
   if (isPending) {
     return (
-      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-brand-text dark:text-gray-300">
-        <Loader2 className="h-10 w-10 animate-spin text-brand-primary" aria-hidden />
+      <div className="flex min-h-[52vh] w-full flex-col items-center justify-center gap-3 px-4 text-brand-text dark:text-gray-300">
+        <Loader2 className="h-10 w-10 shrink-0 animate-spin text-brand-primary" aria-hidden />
         <p className="text-sm">Checking your plan…</p>
       </div>
     )
