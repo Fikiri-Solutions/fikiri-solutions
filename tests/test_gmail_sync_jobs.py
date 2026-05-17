@@ -21,6 +21,10 @@ class TestGmailSyncInlinePolicy(unittest.TestCase):
         with patch.dict(os.environ, {"DATABASE_URL": "sqlite:///data/fikiri.db"}, clear=False):
             self.assertTrue(should_process_gmail_sync_inline())
 
+    def test_inline_true_when_database_url_unset(self):
+        with patch.dict(os.environ, {"DATABASE_URL": ""}, clear=False):
+            self.assertTrue(should_process_gmail_sync_inline())
+
     def test_inline_false_for_postgres(self):
         with patch.dict(
             os.environ,

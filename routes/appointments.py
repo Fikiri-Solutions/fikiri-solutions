@@ -170,7 +170,7 @@ def create_appointment():
                 VALUES (?, ?, NULL, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?)
                 """,
                 (
-                    user.get('id') if isinstance(user, dict) else 0,
+                    user_id,
                     data.get('source') or 'booking',
                     data.get('contact_name'),
                     data.get('contact_email'),
@@ -328,7 +328,7 @@ def update_appointment(appointment_id):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    user.get('id') if isinstance(user, dict) else 0,
+                    user_id,
                     data.get('source') or 'booking',
                     appointment_id,
                     data.get('contact_name'),

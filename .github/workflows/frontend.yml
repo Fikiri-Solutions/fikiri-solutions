@@ -4,10 +4,12 @@ name: Frontend CI
 #
 # Tests and PR preview deploys. Production deploys to Vercel are in ci-cd.yml (main branch).
 
+# PR-only: lint/test/build + Vercel preview. Push to main/develop uses ci-cd.yml frontend job.
+concurrency:
+  group: frontend-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
-  push:
-    branches: [ main, develop ]
-    paths: [ 'frontend/**' ]
   pull_request:
     branches: [ main, develop ]
     paths: [ 'frontend/**' ]

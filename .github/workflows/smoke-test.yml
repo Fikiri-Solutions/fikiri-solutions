@@ -3,9 +3,26 @@ name: Smoke Test Authentication System
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 
 # Run only on main so the gate (ci-cd) stays fast; smoke verifies "app starts" after merge.
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'app.py'
+      - 'wsgi.py'
+      - 'requirements.txt'
+      - 'core/**'
+      - 'routes/**'
+      - 'services/**'
+      - 'crm/**'
+      - 'email_automation/**'
+      - 'integrations/**'
+      - 'scripts/smoke_test.sh'
+      - 'env.template'
+      - '.github/workflows/smoke-test.yml'
   workflow_dispatch:
 
 jobs:

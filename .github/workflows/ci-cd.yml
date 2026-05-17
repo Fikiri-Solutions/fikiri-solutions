@@ -8,6 +8,10 @@ name: CI/CD Pipeline
 # dedicated project: set VERCEL_PROJECT_ID in the staging environment to that project; production environment
 # has the production VERCEL_PROJECT_ID.
 
+concurrency:
+  group: ci-cd-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [ main, develop ]
@@ -111,6 +115,12 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         black --check . || true
         isort --check-only . || true
+
+    - name: Run Postgres migration safety scan
+      run: python3 scripts/check_postgres_sql_patterns.py --fail
+
+    - name: Run AI launch-gate evaluation
+      run: python3 scripts/run_email_triage_eval.py
     
     - name: Run type checking
       run: mypy core/ app.py --ignore-missing-imports --explicit-package-bases --namespace-packages

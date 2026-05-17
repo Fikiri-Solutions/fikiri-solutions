@@ -1,95 +1,23 @@
-name: Comprehensive Testing Suite
+name: Extended QA (nightly)
 
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+#
+# Heavy checks (full-stack integration, optional k6, security artifacts).
+# PR/push gates live in ci-cd.yml; path-scoped PR jobs in frontend.yml / backend.yml.
+
+concurrency:
+  group: extended-qa-${{ github.ref }}
+  cancel-in-progress: true
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main, develop ]
   schedule:
-    - cron: '0 2 * * *'  # Daily at 2 AM
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+  workflow_dispatch:
 
 jobs:
-  frontend-tests:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.18.2'  # Latest LTS with security patches
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
-    
-    - name: Install dependencies
-      working-directory: ./frontend
-      run: npm ci
-    
-    - name: Run unit tests with coverage
-      working-directory: ./frontend
-      run: npm run test:coverage
-    
-    - name: Run accessibility tests (optional)
-      working-directory: ./frontend
-      run: npx vitest run --run 2>/dev/null || echo "Skipping a11y (no dedicated suite)"
-    
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      with:
-        name: frontend-test-results
-        path: frontend/coverage/
-        retention-days: 30
-
-  backend-tests:
-    runs-on: ubuntu-latest
-    env:
-      FLASK_ENV: test
-    
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set CI Fernet key
-      run: |
-        echo "FERNET_KEY=$(python3 -c 'import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())')" >> "$GITHUB_ENV"
-    
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        cache: 'pip'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pytest pytest-cov pytest-mock bandit
-    
-    - name: Run unit tests (excluding integration)
-      run: pytest tests/ -m "not contract and not integration" -v --ignore=tests/integration/ --cov=core --cov=app --cov-report=xml --cov-report=html
-
-    - name: Run AI launch-gate evaluation
-      run: python3 scripts/run_email_triage_eval.py
-    
-    - name: Run security tests (bandit)
-      run: bandit -r core/ app.py -f json -o bandit-report.json || true
-    
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      with:
-        name: backend-test-results
-        path: |
-          coverage.xml
-          htmlcov/
-          bandit-report.json
-        retention-days: 30
-
   integration-tests:
     runs-on: ubuntu-latest
-    needs: [frontend-tests, backend-tests]
-    
+
     services:
       redis:
         image: redis:7-alpine
@@ -100,65 +28,77 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20.18.2'  # Latest LTS with security patches
+        node-version: '20.18.2'
         cache: 'npm'
         cache-dependency-path: frontend/package-lock.json
-    
+
     - name: Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
         cache: 'pip'
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pytest requests python-dotenv
-    
+
     - name: Set up environment
       run: |
         cp env.template .env 2>/dev/null || true
         echo "JWT_SECRET_KEY=$(openssl rand -hex 32)" >> .env
-        echo "FERNET_KEY=$(python3 -c 'import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())')" >> .env
+        echo "FERNET_KEY=$(python3 -c 'import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())')" >> "$GITHUB_ENV"
+        echo "FERNET_KEY=$FERNET_KEY" >> .env
         echo "REDIS_URL=redis://localhost:6379/0" >> .env
         echo "FLASK_ENV=test" >> .env
         echo "PORT=5000" >> .env
         sed -i '/^DATABASE_URL=/d' .env 2>/dev/null || true
         echo "# DATABASE_URL left unset to use SQLite" >> .env
-    
-    - name: Start backend
+
+    - name: Wait for backend health
       run: |
         script -qefc "python app.py" /dev/null &
-        sleep 15
-    
+        for i in $(seq 1 30); do
+          if curl -fsS http://localhost:5000/api/health >/dev/null 2>&1; then
+            echo "Backend ready"
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "Backend failed to become healthy"
+        exit 1
+
     - name: Start frontend
       working-directory: ./frontend
       run: |
         npm ci
         npm run dev &
-        sleep 15
-    
+        for i in $(seq 1 30); do
+          if curl -fsS http://localhost:5174 >/dev/null 2>&1; then
+            echo "Frontend ready"
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "Frontend failed to become healthy"
+        exit 1
+
     - name: Run integration tests
-      run: |
-        pytest tests/integration/ -v --tb=short
+      run: pytest tests/integration/ -v --tb=short
 
   performance-tests:
     runs-on: ubuntu-latest
-    # Informational in CI: k6 thresholds can fail when staging is cold/slow; do not block merges.
     continue-on-error: true
-    # Never default to production. Set GitHub Actions secret PERF_API_BASE_URL to a staging
-    # or dedicated load-test backend (e.g. https://fikiri-backend-staging.onrender.com) to enable k6 in CI.
     env:
       API_BASE_URL: ${{ secrets.PERF_API_BASE_URL }}
-      # k6 only (not read by Render). Default soft caps so CI does not 429/stuff a single-worker staging host.
       K6_PROFILE: ${{ vars.K6_PROFILE || 'soft' }}
 
     steps:
@@ -167,35 +107,29 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20.18.2'  # Latest LTS with security patches
+        node-version: '20.18.2'
 
     - name: Install k6
       uses: grafana/setup-k6-action@v1
 
-    - name: Run k6 performance tests (steady in CI, stress optional)
+    - name: Run k6 performance tests
       run: |
         if [ "${{ vars.K6_CI_ENABLED }}" != "true" ]; then
-          echo "k6 skipped: set GitHub Actions repository variable K6_CI_ENABLED=true to run load tests in CI."
+          echo "k6 skipped: set repository variable K6_CI_ENABLED=true"
           mkdir -p k6-results
           echo '{"skipped":true,"reason":"K6_CI_ENABLED not true"}' > k6-results/skipped.json
           exit 0
         fi
         if [ -z "$API_BASE_URL" ]; then
-          echo "Skipping k6: PERF_API_BASE_URL secret not set (avoids hammering production)."
+          echo "Skipping k6: PERF_API_BASE_URL secret not set"
           mkdir -p k6-results
           echo '{"skipped":true,"reason":"PERF_API_BASE_URL not configured"}' > k6-results/skipped.json
           exit 0
         fi
         mkdir -p k6-results
-        # Always run the contract-aligned performance probe in CI.
         k6 run scripts/k6-performance-test.js
-        # Stress profile is intentionally heavier and often too noisy for per-PR CI.
-        # Enable explicitly with repo variable K6_STRESS_CI_ENABLED=true (or run on schedule/manual workflows).
         if [ "${{ vars.K6_STRESS_CI_ENABLED }}" = "true" ]; then
           k6 run scripts/k6-stress-test.js
-        else
-          echo "Skipping stress profile (set K6_STRESS_CI_ENABLED=true to enable in CI)"
-          echo '{"skipped":true,"reason":"K6_STRESS_CI_ENABLED not true"}' > k6-results/stress-skipped.json
         fi
 
     - name: Upload performance results
@@ -212,10 +146,10 @@ jobs:
       security-events: write
       actions: read
       contents: read
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
       with:
@@ -224,60 +158,27 @@ jobs:
         format: 'sarif'
         output: 'trivy-results.sarif'
         exit-code: '0'
-    
+
     - name: Upload Trivy scan results
       uses: github/codeql-action/upload-sarif@v4
       continue-on-error: true
       with:
         sarif_file: 'trivy-results.sarif'
-    
+
     - name: Run npm audit
       working-directory: ./frontend
-      run: |
-        npm audit --audit-level=high || true
-    
+      run: npm ci && npm audit --audit-level=high || true
+
     - name: Run Python security check
       run: |
-        pip install safety
+        pip install safety bandit
         safety check || true
+        bandit -r core/ app.py -f json -o bandit-report.json || true
 
-  test-summary:
-    runs-on: ubuntu-latest
-    needs: [frontend-tests, backend-tests, integration-tests, performance-tests, security-scan]
-    if: always()
-    
-    steps:
-    - name: Download all test results
-      uses: actions/download-artifact@v4
-      continue-on-error: true
-      with:
-        path: test-results/
-    
-    - name: Generate test summary
-      run: |
-        echo "# Test Results Summary" > test-summary.md
-        echo "" >> test-summary.md
-        echo "## Frontend Tests" >> test-summary.md
-        echo "- Unit tests: ✅ Passed" >> test-summary.md
-        echo "- Accessibility tests: ✅ Passed" >> test-summary.md
-        echo "- E2E tests: ✅ Passed" >> test-summary.md
-        echo "" >> test-summary.md
-        echo "## Backend Tests" >> test-summary.md
-        echo "- Unit tests: ✅ Passed" >> test-summary.md
-        echo "- Integration tests: ✅ Passed" >> test-summary.md
-        echo "- Security tests: ✅ Passed" >> test-summary.md
-        echo "" >> test-summary.md
-        echo "## Performance Tests" >> test-summary.md
-        echo "- k6 perf: requires K6_CI_ENABLED=true and PERF_API_BASE_URL" >> test-summary.md
-        echo "- k6 stress (optional): requires K6_STRESS_CI_ENABLED=true" >> test-summary.md
-        echo "" >> test-summary.md
-        echo "## Security Scan" >> test-summary.md
-        echo "- Vulnerability scan: ✅ Passed" >> test-summary.md
-        echo "- Dependency audit: ✅ Passed" >> test-summary.md
-    
-    - name: Upload test summary
+    - name: Upload security artifacts
       uses: actions/upload-artifact@v4
+      if: always()
       with:
-        name: test-summary
-        path: test-summary.md
+        name: security-scan-results
+        path: bandit-report.json
         retention-days: 30

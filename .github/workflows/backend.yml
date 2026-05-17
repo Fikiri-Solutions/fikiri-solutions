@@ -5,13 +5,15 @@ name: Backend CI
 # Tests and coverage only. Deploys (staging → develop, production → main) live in ci-cd.yml to avoid
 # duplicate Render/Vercel triggers.
 
+# PR-only fast feedback for backend paths. Push to main/develop uses ci-cd.yml (avoids duplicate ~20m pytest).
+concurrency:
+  group: backend-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
-  push:
-    branches: [ main, develop ]
-    paths: [ 'core/**', 'routes/**', 'app.py', 'requirements.txt', 'services/**', 'crm/**', 'analytics/**', 'email_automation/**', 'scripts/check_postgres_sql_patterns.py' ]
   pull_request:
     branches: [ main, develop ]
-    paths: [ 'core/**', 'routes/**', 'app.py', 'requirements.txt', 'services/**', 'crm/**', 'analytics/**', 'email_automation/**', 'scripts/check_postgres_sql_patterns.py' ]
+    paths: [ 'core/**', 'routes/**', 'app.py', 'requirements.txt', 'services/**', 'crm/**', 'analytics/**', 'email_automation/**', 'scripts/check_postgres_sql_patterns.py', 'tests/**' ]
 
 jobs:
   test:

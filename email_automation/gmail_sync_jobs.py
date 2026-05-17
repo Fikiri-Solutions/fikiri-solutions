@@ -45,8 +45,14 @@ def should_process_gmail_sync_inline() -> bool:
     SQLite files are local to the web service; a separate worker cannot share that
     database. Postgres production sync must use Redis + scripts/rq_worker.py.
     """
-    db_url = (os.getenv("DATABASE_URL") or "").strip().lower()
-    return "sqlite" in db_url
+    db_url = (os.getenv("DATABASE_URL") or "").strip()
+    if not db_url:
+        return True
+    if os.getenv("FIKIRI_FORCE_SQLITE", "").strip().lower() in ("1", "true", "yes"):
+        return True
+    from core.postgres_compat import is_postgresql_dsn
+
+    return not is_postgresql_dsn(db_url)
 
 
 def abort_queued_gmail_sync_job(job_id: str, user_id: int, error_message: str) -> None:

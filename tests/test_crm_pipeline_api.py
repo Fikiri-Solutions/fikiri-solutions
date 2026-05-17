@@ -13,6 +13,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from crm.completion_api import crm_bp
 
 
+def _auth_headers():
+    return {"Authorization": "Bearer testtoken"}
+
+
 class TestCRMPipelineAPI(unittest.TestCase):
     def setUp(self):
         self.app = Flask(__name__)
@@ -20,8 +24,14 @@ class TestCRMPipelineAPI(unittest.TestCase):
         self.app.register_blueprint(crm_bp)
         self.client = self.app.test_client()
 
+    @patch("core.jwt_auth.get_jwt_manager")
     @patch("crm.completion_api.db_optimizer")
-    def test_pipeline_leads_with_quality_and_pagination(self, mock_db):
+    def test_pipeline_leads_with_quality_and_pagination(self, mock_db, mock_mgr):
+        mock_mgr.return_value.verify_access_token.return_value = {
+            "user_id": 1,
+            "type": "access",
+            "role": "user",
+        }
         mock_db.execute_query.return_value = [
             {
                 "id": 1,
@@ -44,7 +54,10 @@ class TestCRMPipelineAPI(unittest.TestCase):
             }
         ]
 
-        response = self.client.get('/api/crm/pipeline/leads/1?stage=new&limit=10&offset=0')
+        response = self.client.get(
+            '/api/crm/pipeline/leads/1?stage=new&limit=10&offset=0',
+            headers=_auth_headers(),
+        )
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
         pipeline = data.get('pipeline', {})
