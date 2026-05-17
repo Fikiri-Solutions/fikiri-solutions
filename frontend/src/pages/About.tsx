@@ -3,13 +3,18 @@
  * Tailwind is mobile-first—unprefixed utilities apply to the smallest screens; sm/md/lg add or
  * adjust for larger breakpoints so desktop/content changes stay in sync while mobile stays usable.
  */
-import React, { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import React, { useCallback, useId, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import { ChevronDown, Mail, Sparkles, Users } from 'lucide-react'
 import { RadiantLayout, Container, Gradient, AnimatedBackground } from '../components/radiant'
 import { PublicChatbotWidget } from '../components/PublicChatbotWidget'
-import { getSectorFitPresentation, type FeatureFitId } from '../lib/aboutSectorMatch'
+import {
+  combineSectorQueries,
+  getSectorFitPresentation,
+  MIN_PRIMARY_CHARS_FOR_FOLLOW_UP,
+  type FeatureFitId,
+} from '../lib/aboutSectorMatch'
 import { publicMedia } from '../lib/publicMedia'
 import { cn } from '../lib/utils'
 
@@ -82,8 +87,6 @@ const serviceCards: ServiceCard[] = [
   },
 ]
 
-const SECTOR_DEBOUNCE_MS = 180
-
 /** One-tap probes across different sector templates—click applies instantly */
 const EXAMPLE_BUSINESS_HINTS = [
   'Landscaping and seasonal cleanup',
@@ -96,6 +99,15 @@ const EXAMPLE_BUSINESS_HINTS = [
   'Fitness studio memberships',
 ]
 
+/** Quick adds for Step 2 when the primary description is not sector-specific enough */
+const FOLLOW_UP_CONTEXT_HINTS = [
+  'Automotive — dealership or repair shop, leads by email',
+  'Food & beverage — restaurant vs distribution / CPG',
+  'Field service — dispatch, SLAs, and work orders',
+  'B2B consulting — proposals and client delivery',
+  'Home services / trades — emergency calls and quotes',
+]
+
 const FEATURE_ICONS: Record<FeatureFitId, LucideIcon> = {
   email_automation: Mail,
   crm_management: Users,
@@ -104,19 +116,41 @@ const FEATURE_ICONS: Record<FeatureFitId, LucideIcon> = {
 
 function SectorFitExplorer() {
   const [query, setQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [additionalContext, setAdditionalContext] = useState('')
   const textareaId = useId()
+  const followUpId = useId()
   const resultsId = useId()
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setDebouncedQuery(query.trim())
-    }, SECTOR_DEBOUNCE_MS)
-    return () => window.clearTimeout(timer)
-  }, [query])
+  const trimmedQuery = query.trim()
+  const trimmedAdditional = additionalContext.trim()
+  const combinedQuery = useMemo(
+    () => combineSectorQueries(trimmedQuery, trimmedAdditional),
+    [trimmedQuery, trimmedAdditional]
+  )
+  const fit = useMemo(() => getSectorFitPresentation(combinedQuery), [combinedQuery])
+  const hasTyped = trimmedQuery.length > 0
+  const hasSectorMatch = fit.matchStrength !== 'broad'
+  const showFollowUp =
+    hasTyped &&
+    trimmedQuery.length >= MIN_PRIMARY_CHARS_FOR_FOLLOW_UP &&
+    (fit.needsMoreDetail || (fit.ambiguousAlternates?.length ?? 0) > 0) &&
+    !hasSectorMatch
 
-  const fit = useMemo(() => getSectorFitPresentation(debouncedQuery), [debouncedQuery])
-  const hasTyped = debouncedQuery.length > 0
+  const syncQuery = useCallback((value: string) => {
+    setQuery(value)
+    if (!value.trim()) {
+      setAdditionalContext('')
+    }
+  }, [])
+
+  const appendFollowUp = useCallback((snippet: string) => {
+    setAdditionalContext((prev) => {
+      const next = prev.trim()
+      if (!next) return snippet
+      if (next.includes(snippet)) return prev
+      return `${next} ${snippet}`
+    })
+  }, [])
 
   const strengthNote =
     !hasTyped
@@ -124,8 +158,17 @@ function SectorFitExplorer() {
       : fit.matchStrength === 'high'
         ? 'Closer keyword alignment — suggestions are tuned to sectors like yours.'
         : fit.matchStrength === 'medium'
-          ? 'Partial match — add a bit more sector detail to sharpen suggestions.'
-          : 'General pattern — useful if your niche is uncommon or overlaps several categories.'
+          ? 'Partial match — suggestions reflect the closest sector pattern we detected.'
+          : fit.ambiguousAlternates && fit.ambiguousAlternates.length > 0
+            ? `Could be ${fit.ambiguousAlternates.join(' or ')} — add one specific detail below.`
+            : showFollowUp && !trimmedAdditional
+              ? null
+              : showFollowUp
+                ? 'Still broad — try an example chip above or name your industry in plain language.'
+                : null
+
+  const showFeatureList =
+    hasSectorMatch || (trimmedAdditional.length > 0 && fit.matchStrength === 'broad')
 
   return (
     <div className="rounded-2xl border border-border/80 bg-card/85 backdrop-blur-sm shadow-lg shadow-stone-900/5 overflow-hidden relative max-w-full">
@@ -147,7 +190,8 @@ function SectorFitExplorer() {
               aria-describedby={`${textareaId}-hint`}
               rows={5}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => syncQuery(e.target.value)}
+              onInput={(e) => syncQuery(e.currentTarget.value)}
               placeholder="e.g. we run a small HVAC company…"
               autoComplete="off"
               enterKeyHint="done"
@@ -167,8 +211,8 @@ function SectorFitExplorer() {
                   type="button"
                   aria-label={`Use example: ${hint}`}
                   onClick={() => {
-                    setQuery(hint)
-                    setDebouncedQuery(hint.trim())
+                    syncQuery(hint)
+                    setAdditionalContext('')
                   }}
                   className={cn(
                     'text-xs font-medium px-4 py-2.5 sm:py-1.5 sm:px-3 rounded-full text-left',
@@ -196,31 +240,100 @@ function SectorFitExplorer() {
             aria-live="polite"
             aria-atomic="true"
           >
+            {fit.category && hasSectorMatch ? (
+              <p className="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-400 mb-1">
+                {fit.category}
+              </p>
+            ) : null}
             <p className="text-sm font-semibold text-foreground mb-2 break-words hyphens-none">{fit.headline}</p>
+            {fit.ambiguousAlternates && fit.ambiguousAlternates.length > 0 ? (
+              <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+                Close matches: {fit.ambiguousAlternates.join(' · ')}
+              </p>
+            ) : null}
             {strengthNote !== null ? (
               <p className="text-xs text-muted-foreground mb-3 leading-relaxed">{strengthNote}</p>
-            ) : (
+            ) : !hasTyped ? (
               <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
                 Use an example or type your own description to see where Fikiri can add value first.
               </p>
+            ) : showFollowUp && !trimmedAdditional ? (
+              <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+                We need a little more sector context to map you to the right workflows—not a formal intake, just
+                enough to recognize your industry.
+              </p>
+            ) : null}
+
+            {showFollowUp ? (
+              <div
+                className="rounded-xl border border-amber-500/35 bg-amber-500/[0.06] px-4 py-4 sm:px-5 sm:py-5 mb-6"
+                aria-labelledby={`${followUpId}-label`}
+              >
+                <p id={`${followUpId}-label`} className="text-sm font-semibold text-foreground mb-1">
+                  Tell us a bit more
+                </p>
+                <p id={`${followUpId}-hint`} className="text-xs text-muted-foreground mb-3 leading-relaxed">
+                  What industry are you in, who you serve, and how leads usually find you (email, phone, referrals,
+                  bookings, etc.)? One or two phrases is enough.
+                </p>
+                <textarea
+                  id={followUpId}
+                  name="business_sector_detail"
+                  aria-describedby={`${followUpId}-hint`}
+                  rows={3}
+                  value={additionalContext}
+                  onChange={(e) => setAdditionalContext(e.target.value)}
+                  onInput={(e) => setAdditionalContext(e.currentTarget.value)}
+                  placeholder="e.g. commercial HVAC — emergency calls and quote requests by email"
+                  autoComplete="off"
+                  className={cn(
+                    'w-full max-w-full resize-y rounded-lg border border-border bg-background/90 px-3 py-2.5 text-base sm:text-sm leading-relaxed',
+                    'placeholder:text-muted-foreground/70 touch-manipulation',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background'
+                  )}
+                  spellCheck
+                />
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <span className="text-xs text-muted-foreground w-full sm:inline sm:w-auto sm:mr-1">Try adding:</span>
+                  {FOLLOW_UP_CONTEXT_HINTS.map((hint) => (
+                    <button
+                      key={hint}
+                      type="button"
+                      aria-label={`Add context: ${hint}`}
+                      onClick={() => appendFollowUp(hint)}
+                      className={cn(
+                        'text-xs font-medium px-3 py-2 sm:py-1.5 rounded-full text-left',
+                        'min-h-10 sm:min-h-0 bg-background/80 hover:bg-muted border border-border/80 transition-colors touch-manipulation',
+                        '[-webkit-tap-highlight-color:transparent]'
+                      )}
+                    >
+                      <span className="break-words">{hint}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground leading-relaxed mb-6 break-words">{fit.summary}</p>
             )}
-            <p className="text-sm text-muted-foreground leading-relaxed mb-6 break-words">{fit.summary}</p>
-            <ul className="space-y-5">
-              {fit.featuresOrdered.map((row) => {
-                const Icon = FEATURE_ICONS[row.id]
-                return (
-                  <li key={row.id} className="flex gap-3 min-w-0">
-                    <span className="mt-0.5 flex h-10 w-10 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-orange-500/10 ring-1 ring-orange-500/20">
-                      <Icon className="h-5 w-5 text-orange-600 dark:text-orange-400" aria-hidden />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-foreground break-words">{row.title}</p>
-                      <p className="text-sm text-muted-foreground mt-1 leading-relaxed break-words">{row.fit}</p>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
+
+            {showFeatureList && (
+              <ul className="space-y-5">
+                {fit.featuresOrdered.map((row) => {
+                  const Icon = FEATURE_ICONS[row.id]
+                  return (
+                    <li key={row.id} className="flex gap-3 min-w-0">
+                      <span className="mt-0.5 flex h-10 w-10 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-orange-500/10 ring-1 ring-orange-500/20">
+                        <Icon className="h-5 w-5 text-orange-600 dark:text-orange-400" aria-hidden />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-foreground break-words">{row.title}</p>
+                        <p className="text-sm text-muted-foreground mt-1 leading-relaxed break-words">{row.fit}</p>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
             <div className="mt-8 pt-5 border-t border-border/70">
               <p className="text-sm text-muted-foreground mb-3">
                 Want a tailored game plan for your exact workflow? Speak with our team and get practical next steps.

@@ -1,7 +1,9 @@
 /**
  * Lightweight sector → feature fit matcher for the public About page.
- * Keyword/substring scoring only (no backend, no AI).
- * Keywords are normalized once at load for faster scoring.
+ * Keyword/substring scoring only (no backend, no AI) — recommendations come from
+ * fixed templates per sector, never generated prose (no hallucinated “fits”).
+ * Cast wide via many sector rows + keywords; stay honest via weak-word filters,
+ * score thresholds, and ambiguity detection when two verticals tie.
  */
 
 export type FeatureFitId = 'email_automation' | 'crm_management' | 'ai_assistant'
@@ -22,9 +24,36 @@ type SectorTemplate = {
 }
 
 type SectorScoring = SectorTemplate & {
+  /** Top-level bucket (Automotive, Food & beverage, B2B services, …) */
+  category: string
   /** Pre-normalized keyword phrases (see normalizeQuery) */
   normalizedPhrases: string[]
 }
+
+/** Single words too vague to match alone — avoids “service company” → random vertical */
+const WEAK_SINGLE_WORDS = new Set([
+  'service',
+  'services',
+  'business',
+  'company',
+  'industry',
+  'solutions',
+  'local',
+  'help',
+  'customer',
+  'clients',
+  'sales',
+  'team',
+  'support',
+  'provider',
+  'consulting',
+  'management',
+  'operations',
+  'professional',
+])
+
+/** If the top two sectors score within this margin, ask for detail instead of guessing */
+const AMBIGUITY_SCORE_MARGIN = 3
 
 const FALLBACK_SUMMARY =
   'Most teams we work with live in email for leads, scheduling, quotes, vendors, or renewals. Name your sector (even loosely)—we map it to how inbox automation, CRM structure, and assistant-style help usually land first.'
@@ -38,10 +67,17 @@ const FALLBACK_FITS: Record<FeatureFitId, string> = {
     'Turn long threads into short internal briefs and suggested next steps—your team sends the final message.',
 }
 
+function stripCombiningMarks(value: string): string {
+  try {
+    return value.replace(/\p{M}+/gu, '')
+  } catch {
+    // Older browsers without Unicode property escapes still get NFKD decomposition.
+    return value
+  }
+}
+
 function normalizeQuery(raw: string): string {
-  return raw
-    .normalize('NFKD')
-    .replace(/\p{M}+/gu, '')
+  return stripCombiningMarks(raw.normalize('NFKD'))
     .toLowerCase()
     .replace(/[&]+/g, ' and ')
     .replace(/[^a-z0-9\s-+]+/gi, ' ')
@@ -91,8 +127,13 @@ const SECTOR_SOURCE: SectorTemplate[] = [
   },
   {
     id: 'restaurant-hospitality',
-    displayName: 'Restaurants & food service',
+    displayName: 'Restaurants, catering & hospitality',
     keywords: [
+      'food and beverage',
+      'food beverage',
+      'food service',
+      'food truck',
+      'meal prep',
       'restaurant',
       'cafe',
       'coffee',
@@ -303,6 +344,48 @@ const SECTOR_SOURCE: SectorTemplate[] = [
     },
   },
   {
+    id: 'creator-media',
+    displayName: 'Creators, influencers & digital media',
+    keywords: [
+      'content creator',
+      'content creat',
+      'creator',
+      'creators',
+      'influencer',
+      'influencers',
+      'youtuber',
+      'youtube creator',
+      'youtube channel',
+      'tiktoker',
+      'tiktok creator',
+      'instagram creator',
+      'ugc creator',
+      'brand deal',
+      'sponsorship',
+      'podcast host',
+      'podcaster',
+      'streamer',
+      'twitch',
+      'newsletter',
+      'substack',
+      'course creator',
+      'online course',
+      'digital product',
+      'media kit',
+      'fan mail',
+    ],
+    summary:
+      'Inbox load is brand inquiries, sponsorship terms, collaboration briefs, and audience questions—often mixed with personal mail and hard to triage without a system.',
+    fits: {
+      email_automation:
+        'Separate paid partnerships, gifting, and general audience mail so revenue opportunities do not sit behind newsletters.',
+      crm_management:
+        'Track brands, campaigns, deliverables, and renewal conversations without losing threads across platforms.',
+      ai_assistant:
+        'Summarize long brand threads into deal terms and next steps before you reply on camera or by email.',
+    },
+  },
+  {
     id: 'retail',
     displayName: 'Retail & product brands',
     keywords: [
@@ -362,7 +445,6 @@ const SECTOR_SOURCE: SectorTemplate[] = [
     id: 'fitness-wellness',
     displayName: 'Fitness, salon & recurring appointments',
     keywords: [
-      'gym ',
       'gymnasium',
       'fitness',
       'fitness studio',
@@ -372,6 +454,13 @@ const SECTOR_SOURCE: SectorTemplate[] = [
       'pilates studio',
       'spin studio',
       'personal train',
+      'trainer',
+      'trainers',
+      'fitness coach',
+      'strength coach',
+      'wellness coach',
+      'athletic coach',
+      'gym',
       'salon ',
       'barbershop',
       ' nail salon',
@@ -436,22 +525,41 @@ const SECTOR_SOURCE: SectorTemplate[] = [
   },
   {
     id: 'automotive',
-    displayName: 'Automotive & fleet services',
+    displayName: 'Repair, dealerships & fleet',
     keywords: [
+      'automotive',
       'auto repair',
       'automotive repair',
+      'auto shop',
       'body shop',
-      'collision ',
+      'collision',
+      'collision repair',
+      'mechanic',
       'mechanic shop',
       'fleet maint',
-      'oil change ',
+      'fleet service',
+      'fleet management',
+      'oil change',
       'tire shop',
+      'tires',
+      'brake shop',
+      'transmission shop',
+      'smog check',
+      'quick lube',
       'diesel truck repair',
+      'diesel repair',
       'motorcycle shop',
-      'car dealership ',
-      'used car ',
+      'rv repair',
+      'marine service',
+      'car dealership',
+      'auto dealership',
+      'used car',
+      'auto sales',
+      'parts department',
       'automotive detailing',
+      'detail shop',
       'tow company',
+      'towing',
     ],
     summary:
       'Estimates awaiting approval, OEM bulletins, fleet managers, towing partners, comeback complaints—everything chases bays and advisors.',
@@ -730,6 +838,119 @@ const SECTOR_SOURCE: SectorTemplate[] = [
     },
   },
   {
+    id: 'food-beverage-supply',
+    displayName: 'Distribution, CPG & production',
+    keywords: [
+      'food and beverage',
+      'food beverage',
+      'f b distributor',
+      'beverage distributor',
+      'beverage distribution',
+      'food distributor',
+      'food distribution',
+      'food wholesaler',
+      'food wholesale',
+      'food manufacturing',
+      'food manufacturer',
+      'food processor',
+      'food processing',
+      'bottling',
+      'brewery supply',
+      'cpg',
+      'consumer packaged goods',
+      'snack food',
+      'ingredient supplier',
+      'broadline',
+      'cold chain',
+      'perishable',
+    ],
+    summary:
+      'PO confirmations, lot tracing, retailer chargebacks, and carrier delays stack up in threads—buyers expect same-day answers even when your team is in the plant or on the road.',
+    fits: {
+      email_automation:
+        'Route retailer deductions, sample requests, and carrier updates separately so account reps are not re-triaging the same inbox.',
+      crm_management:
+        'Buyers, distributors, brokers, and plants stay tied to the right SKUs, pricing tiers, and delivery windows.',
+      ai_assistant:
+        'Condense multi-party shortage threads into what changed, who owns next steps, and what to tell the buyer.',
+    },
+  },
+  {
+    id: 'field-service-dispatch',
+    displayName: 'Field crews & dispatch',
+    keywords: [
+      'field service',
+      'field services',
+      'field technician',
+      'service industry',
+      'mobile service',
+      'on site service',
+      'on-site service',
+      'service call',
+      'service calls',
+      'dispatch',
+      'dispatcher',
+      'work order',
+      'work orders',
+      'route ticket',
+      'truck roll',
+      'service van',
+      'installation service',
+      'preventive maintenance',
+      'pm schedule',
+      'break fix',
+    ],
+    summary:
+      'Dispatchers juggle SLA timers, parts availability, and “on my way” updates—most of it still lives in email and texts rather than a clean ticket board.',
+    fits: {
+      email_automation:
+        'Separate emergency dispatches from billing and parts chatter so techs see the next job faster.',
+      crm_management:
+        'Sites, assets, contracts, and revisit intervals stay visible when crews or coordinators change.',
+      ai_assistant:
+        'Turn messy job threads into a short handoff note before the tech arrives on site.',
+    },
+  },
+  {
+    id: 'b2b-business-services',
+    displayName: 'Consulting & outsourced operations',
+    keywords: [
+      'b2b services',
+      'b2b service',
+      'business services',
+      'business service',
+      'consulting firm',
+      'management consulting',
+      'management consult',
+      'strategy consulting',
+      'operations consulting',
+      'advisory firm',
+      'advisory services',
+      'implementation partner',
+      'implementation services',
+      'outsourced operations',
+      'business process outsourcing',
+      'bpo',
+      'fractional coo',
+      'fractional cfo',
+      'fractional executive',
+      'hr consulting',
+      'sales consulting',
+      'revenue operations',
+      'revops',
+    ],
+    summary:
+      'Proposals, SOW changes, stakeholder approvals, and delivery status all ride email—client work breaks when threads are the system of record.',
+    fits: {
+      email_automation:
+        'Separate new business, active engagements, and AR/collections so partners are not context-switching all day.',
+      crm_management:
+        'Accounts, stakeholders, SOW milestones, and renewal risk stay in one place across managers.',
+      ai_assistant:
+        'Prep engagement recaps from long client threads before QBRs—your team approves what goes out.',
+    },
+  },
+  {
     id: 'agriculture',
     displayName: 'Agriculture & producers',
     keywords: [
@@ -760,8 +981,38 @@ const SECTOR_SOURCE: SectorTemplate[] = [
   },
 ]
 
+const SECTOR_CATEGORIES: Record<string, string> = {
+  'landscaping-field': 'Service industry',
+  'restaurant-hospitality': 'Food & beverage',
+  'food-beverage-supply': 'Food & beverage',
+  'medical-clinical': 'Healthcare',
+  'trades-home': 'Service industry',
+  'field-service-dispatch': 'Service industry',
+  'professional-services': 'B2B & professional',
+  'b2b-business-services': 'B2B services',
+  'creative-marketing-agency': 'B2B services',
+  'creator-media': 'Media & creators',
+  retail: 'Retail & commerce',
+  'real-estate': 'Real estate',
+  'fitness-wellness': 'Wellness & fitness',
+  'education-training': 'Education & training',
+  automotive: 'Automotive',
+  insurance: 'Insurance & benefits',
+  nonprofit: 'Nonprofit & civic',
+  'logistics-supply-chain': 'Logistics & supply chain',
+  'manufacturing-industrial': 'Manufacturing',
+  'msp-tech-services': 'Technology services',
+  'staffing-recruiting': 'Staffing & recruiting',
+  'saas-tech-product': 'Software & SaaS',
+  'senior-care': 'Healthcare',
+  'events-venues': 'Events & venues',
+  'cleaning-facilities': 'Service industry',
+  agriculture: 'Agriculture',
+}
+
 const SCORING_SECTORS: SectorScoring[] = SECTOR_SOURCE.map((s) => ({
   ...s,
+  category: SECTOR_CATEGORIES[s.id] ?? 'General business',
   normalizedPhrases: s.keywords.map((k) => normalizeQuery(k)).filter((p) => p.length >= 2),
 }))
 
@@ -773,7 +1024,16 @@ export function scoreSectorMatch(normalizedQuery: string, sector: SectorScoring)
 
   for (const p of sector.normalizedPhrases) {
     if (p.length < 2) continue
+    const isSingleWord = !p.includes(' ')
+    if (isSingleWord && WEAK_SINGLE_WORDS.has(p)) continue
+
+    // Whole-query equals a keyword ("hvac", "trainer", "gym") — strong single-word sector signal
+    if (q === p) {
+      score += 10
+      continue
+    }
     if (q.includes(p)) {
+      if (isSingleWord && WEAK_SINGLE_WORDS.has(p)) continue
       score += Math.min(12, Math.max(3, Math.round(p.length * 1.5)))
       continue
     }
@@ -785,6 +1045,8 @@ export function scoreSectorMatch(normalizedQuery: string, sector: SectorScoring)
       score += 5
       continue
     }
+    if (isSingleWord && WEAK_SINGLE_WORDS.has(p)) continue
+
     const wordHit =
       words.some((w) => w === p) ||
       words.some((w) => w.length >= 4 && (w.startsWith(p) || (p.length >= 4 && w.includes(p))))
@@ -793,9 +1055,24 @@ export function scoreSectorMatch(normalizedQuery: string, sector: SectorScoring)
   return score
 }
 
+function rankSectorMatches(normalized: string): Array<{ sector: SectorScoring; score: number }> {
+  return SCORING_SECTORS.map((sector) => ({
+    sector,
+    score: scoreSectorMatch(normalized, sector),
+  }))
+    .filter((row) => row.score > 0)
+    .sort((a, b) => b.score - a.score)
+}
+
 export type SectorFitPresentation = {
   headline: string
   matchStrength: 'high' | 'medium' | 'broad'
+  /** Top-level bucket when confidently matched */
+  category: string | null
+  /** True when we have input but could not map to a sector template confidently */
+  needsMoreDetail: boolean
+  /** Set when two sectors score similarly — we ask for detail instead of guessing */
+  ambiguousAlternates: ReadonlyArray<string> | null
   summary: string
   featuresOrdered: ReadonlyArray<{
     id: FeatureFitId
@@ -804,39 +1081,78 @@ export type SectorFitPresentation = {
   }>
 }
 
+/** Minimum primary description length before we ask for follow-up context */
+export const MIN_PRIMARY_CHARS_FOR_FOLLOW_UP = 6
+
+export function combineSectorQueries(primary: string, additional: string): string {
+  const parts = [primary.trim(), additional.trim()].filter((p) => p.length > 0)
+  return parts.join(' ')
+}
+
 const FEATURE_ORDER: FeatureFitId[] = ['email_automation', 'crm_management', 'ai_assistant']
 
 /** Slightly tighter than early versions: broader index ⇒ more accidental hits without intent */
 const MIN_SCORE_HIGH = 10
 const MIN_SCORE_MEDIUM = 6
 
+function fallbackPresentation(
+  queryRaw: string,
+  normalized: string,
+  opts?: { ambiguousAlternates?: string[]; summary?: string }
+): SectorFitPresentation {
+  const headline = normalized ? `What could help • “${truncateDisplay(queryRaw.trim(), 48)}”` : 'Tell us what you do'
+  const summary =
+    opts?.summary ??
+    (normalized
+      ? 'Add your industry or how leads reach you in the box below—we’ll map Email Automation, CRM, and AI Assistant to workflows that fit.'
+      : FALLBACK_SUMMARY)
+  return {
+    headline,
+    matchStrength: 'broad',
+    category: null,
+    needsMoreDetail: Boolean(normalized),
+    ambiguousAlternates: opts?.ambiguousAlternates ?? null,
+    summary,
+    featuresOrdered: FEATURE_ORDER.map((id) => ({
+      id,
+      title: FEATURE_LABELS[id],
+      fit: FALLBACK_FITS[id],
+    })),
+  }
+}
+
 export function getSectorFitPresentation(queryRaw: string): SectorFitPresentation {
   const normalized = normalizeQuery(queryRaw)
-  let best: { sector: SectorScoring; score: number } | null = null
-
-  for (const sector of SCORING_SECTORS) {
-    const score = scoreSectorMatch(normalized, sector)
-    if (!best || score > best.score) best = { sector, score }
-  }
+  const ranked = rankSectorMatches(normalized)
+  const best = ranked[0] ?? null
+  const second = ranked[1] ?? null
 
   if (!normalized || !best || best.score < MIN_SCORE_MEDIUM) {
-    const headline = normalized ? `What could help • “${truncateDisplay(queryRaw.trim(), 48)}”` : 'Tell us what you do'
-    return {
-      headline,
-      matchStrength: 'broad',
-      summary: FALLBACK_SUMMARY,
-      featuresOrdered: FEATURE_ORDER.map((id) => ({
-        id,
-        title: FEATURE_LABELS[id],
-        fit: FALLBACK_FITS[id],
-      })),
-    }
+    return fallbackPresentation(queryRaw, normalized)
+  }
+
+  const isAmbiguous =
+    second !== null &&
+    second.score >= MIN_SCORE_MEDIUM &&
+    best.score - second.score < AMBIGUITY_SCORE_MARGIN
+
+  if (isAmbiguous) {
+    const a = best.sector.displayName
+    const b = second.sector.displayName
+    return fallbackPresentation(queryRaw, normalized, {
+      ambiguousAlternates: [a, b],
+      summary: `That could fit ${a} or ${b}. Add one concrete detail—what you sell, who buys it, and how inquiries arrive—so we map the right playbook instead of guessing.`,
+    })
   }
 
   const strength = best.score >= MIN_SCORE_HIGH ? 'high' : 'medium'
+  const category = best.sector.category
   return {
-    headline: `Matched fit • ${best.sector.displayName}`,
+    headline: `Matched fit • ${category} — ${best.sector.displayName}`,
     matchStrength: strength,
+    category,
+    needsMoreDetail: false,
+    ambiguousAlternates: null,
     summary: best.sector.summary,
     featuresOrdered: FEATURE_ORDER.map((id) => ({
       id,
