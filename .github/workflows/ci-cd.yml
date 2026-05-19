@@ -293,7 +293,7 @@ jobs:
       run: |
         if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ]; then
           npm install -g vercel@latest
-          cd frontend
+          # Project root is "frontend" in Vercel settings — run from repo root (not cd frontend).
           vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
           vercel deploy --prod --yes --token "$VERCEL_TOKEN"
         else
@@ -343,7 +343,7 @@ jobs:
       run: |
         if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ]; then
           npm install -g vercel@latest
-          cd frontend
+          # Project root is "frontend" in Vercel settings — run from repo root (not cd frontend).
           vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
           vercel deploy --prod --yes --token "$VERCEL_TOKEN"
         else
@@ -447,10 +447,13 @@ jobs:
       if: github.event.inputs.vercel_deployment_id != ''
       env:
         VERCEL_TOKEN: ${{ secrets['VERCEL_TOKEN'] || '' }}
+        VERCEL_ORG_ID: ${{ secrets['VERCEL_ORG_ID'] || '' }}
+        VERCEL_PROJECT_ID: ${{ secrets['VERCEL_PROJECT_ID'] || '' }}
         VERCEL_DEPLOYMENT_ID: ${{ github.event.inputs.vercel_deployment_id }}
       run: |
-        if [ -n "$VERCEL_TOKEN" ]; then
+        if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ]; then
           npm install -g vercel@latest
+          vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
           vercel rollback "$VERCEL_DEPLOYMENT_ID" --token "$VERCEL_TOKEN" --yes || true
         fi
     
