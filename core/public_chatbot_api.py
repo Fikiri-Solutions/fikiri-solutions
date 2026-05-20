@@ -34,6 +34,10 @@ from core.chatbot_usage_tracking import (
     record_chatbot_billing_usage,
     record_chatbot_request_usage,
 )
+from core.chatbot_conversation_store import (
+    is_public_persistence_enabled,
+    persist_chatbot_turn,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -445,6 +449,23 @@ def public_chatbot_query():
             confidence=confidence,
             fallback_used=fallback_used,
         )
+
+        if is_public_persistence_enabled() and tenant_id:
+            persist_chatbot_turn(
+                tenant_id=str(tenant_id),
+                conversation_id=conversation_id,
+                query=query,
+                answer=answer,
+                assistant_message_id=message_id,
+                sources=sources,
+                fallback_used=fallback_used,
+                confidence=confidence,
+                retrieval_confidence=retrieval_conf,
+                user_id=str(user_id) if user_id is not None else None,
+                session_id=str(context.get("session_id")) if context.get("session_id") else None,
+                channel="public_api",
+                correlation_id=correlation_id,
+            )
 
         response_time_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
 

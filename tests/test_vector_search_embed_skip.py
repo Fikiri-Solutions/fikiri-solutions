@@ -16,7 +16,7 @@ from core.vector_search import MinimalVectorSearch
 class TestVectorSearchEmbedSkip(unittest.TestCase):
     def _new_local_vector_search(self, path):
         with patch.object(MinimalVectorSearch, "_initialize_pinecone"), patch.object(
-            MinimalVectorSearch, "_initialize_embedding_models"
+            MinimalVectorSearch, "_configure_embedding_backend"
         ):
             return MinimalVectorSearch(vector_db_path=path)
 

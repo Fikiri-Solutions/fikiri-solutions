@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from core.chatbot_knowledge_chunking import TextChunk, chunk_text, chunk_vector_id
 from core.chatbot_vector_chunk_cleanup import delete_kb_chunk_vectors
 
+import hashlib
+
 VectorId = Union[str, int]
 
 
@@ -87,6 +89,89 @@ def ingest_kb_text_to_vector_store(
 
     primary = vector_ids[0] if vector_ids else None
     return vector_ids, primary
+
+
+def _content_fingerprint(text: str) -> str:
+    return hashlib.sha256((text or "").encode("utf-8", errors="ignore")).hexdigest()[:16]
+
+
+def ingest_kb_text_to_vector_store_tracked(
+    vector_search: Any,
+    *,
+    text: str,
+    parent_doc_id: str,
+    user_id: Optional[int] = None,
+    base_metadata: Optional[Dict[str, Any]] = None,
+    use_pinecone: bool = False,
+    max_chars: int = 1200,
+    overlap_chars: int = 150,
+    cleanup_metadata: Optional[Dict[str, Any]] = None,
+    correlation_id: Optional[str] = None,
+) -> Tuple[List[VectorId], Optional[VectorId]]:
+    """
+    Same as ingest_kb_text_to_vector_store with durable job lifecycle (inline).
+    Idempotent per (doc_id, content fingerprint) for job rows; vector upsert remains safe to repeat.
+    """
+    from core.durable_jobs import (
+        JOB_KIND_KB_VECTORIZE,
+        build_idempotency_key,
+        enqueue_durable_job,
+        find_active_job_by_idempotency,
+        mark_job_completed,
+        mark_job_failed,
+        mark_job_running,
+        resolve_correlation_id,
+    )
+
+    fingerprint = _content_fingerprint(text)
+    idem = build_idempotency_key("kb_vectorize", user_id, parent_doc_id, fingerprint)
+    existing = find_active_job_by_idempotency(idem, job_kind=JOB_KIND_KB_VECTORIZE)
+    if existing and existing.get("status") == "completed":
+        return ingest_kb_text_to_vector_store(
+            vector_search,
+            text=text,
+            parent_doc_id=parent_doc_id,
+            base_metadata=base_metadata,
+            use_pinecone=use_pinecone,
+            max_chars=max_chars,
+            overlap_chars=overlap_chars,
+            cleanup_metadata=cleanup_metadata,
+        )
+
+    jid = enqueue_durable_job(
+        JOB_KIND_KB_VECTORIZE,
+        user_id=user_id,
+        payload={"doc_id": str(parent_doc_id), "content_hash": fingerprint},
+        idempotency_key=idem,
+        correlation_id=resolve_correlation_id(correlation_id),
+        external_ref=str(parent_doc_id),
+    )
+    if jid:
+        mark_job_running(jid)
+    try:
+        vector_ids, primary = ingest_kb_text_to_vector_store(
+            vector_search,
+            text=text,
+            parent_doc_id=parent_doc_id,
+            base_metadata=base_metadata,
+            use_pinecone=use_pinecone,
+            max_chars=max_chars,
+            overlap_chars=overlap_chars,
+            cleanup_metadata=cleanup_metadata,
+        )
+        if jid:
+            mark_job_completed(
+                jid,
+                {
+                    "vector_ids_count": len(vector_ids or []),
+                    "content_hash": fingerprint,
+                },
+            )
+        return vector_ids, primary
+    except Exception as exc:
+        if jid:
+            mark_job_failed(jid, str(exc), allow_retry=True)
+        raise
 
 
 def sync_kb_document_vectors(
