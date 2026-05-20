@@ -52,8 +52,14 @@ class TestGmailSyncJobs(unittest.TestCase):
         manager = GmailSyncJobManager()
         manager.redis_client = MagicMock()
         mock_time.return_value = 1234567890
-
-        job_id = manager.queue_sync_job(user_id=1, sync_type='full', metadata={'source': 'test'})
+        with patch(
+            "core.durable_jobs.find_active_job_by_idempotency",
+            return_value=None,
+        ), patch(
+            "core.durable_jobs.enqueue_durable_job",
+            return_value="durable-test-1",
+        ):
+            job_id = manager.queue_sync_job(user_id=1, sync_type='full', metadata={'source': 'test'})
 
         self.assertEqual(job_id, 'gmail_sync_1_1234567890')
         self.assertTrue(mock_db.execute_query.called)

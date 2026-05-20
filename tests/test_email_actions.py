@@ -105,8 +105,15 @@ class TestMinimalEmailActions(unittest.TestCase):
 
     def test_persist_action_log_called(self):
         self.actions.db_optimizer.execute_query.return_value = None
-        result = self.actions.process_email(self.sample_email, action_type="mark_read", user_id=1)
+        with patch("email_automation.actions.idempotency_manager") as mock_idem, \
+             patch("email_automation.actions.automation_safety_manager") as mock_safety:
+            mock_idem.check_key.return_value = None
+            mock_safety.check_rate_limits.return_value = {"allowed": True}
+            result = self.actions.process_email(
+                self.sample_email, action_type="mark_read", user_id=1
+            )
         self.assertTrue(result.get("success"))
+        self.assertNotIn("idempotent", result.get("details", {}))
         self.actions.db_optimizer.execute_query.assert_called()
 
     def test_process_email_invalid_parsed(self):

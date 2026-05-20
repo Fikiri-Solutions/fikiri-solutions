@@ -19,6 +19,11 @@ from core.user_services import is_crm_inbound_capture_enabled
 from crm.service import enhanced_crm_service
 from services.automation_engine import automation_engine, TriggerType
 
+try:
+    from email_automation.runtime_context import EmailAutomationRuntimeContext
+except ImportError:
+    EmailAutomationRuntimeContext = None  # type: ignore[misc, assignment]
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,11 +38,19 @@ def run_inbound_email_workflow(
     provider: str,
     correlation_id: Optional[str] = None,
     mailbox_owner_email: Optional[str] = None,
+    runtime_context: Optional["EmailAutomationRuntimeContext"] = None,
 ) -> Dict[str, Any]:
     """
     correlation_id: propagated into CRM events, automation run context, and webhook payloads.
     """
     corr = correlation_id or str(uuid.uuid4())
+
+    if runtime_context is not None and not runtime_context.assert_user_scope(user_id):
+        logger.warning(
+            "run_inbound_email_workflow: runtime_context user_id mismatch job=%s",
+            runtime_context.job_id,
+        )
+        runtime_context = None
 
     if not is_crm_inbound_capture_enabled(user_id):
         lead_res = {
@@ -97,6 +110,7 @@ def run_inbound_email_workflow(
         trigger,
         user_id,
         automation_source=f"{provider}_inbound_workflow",
+        runtime_context=runtime_context,
     )
     out: Dict[str, Any] = {
         "success": bool(auto.get("success")),

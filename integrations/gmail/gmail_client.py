@@ -217,6 +217,20 @@ class GmailClient:
                 "error": "Invalid recipient email",
                 "channel": "gmail",
             }
+        from core.reserved_email_recipients import (
+            gmail_skipped_send_result,
+            log_skipped_gmail_delivery,
+            recipient_domain,
+            should_skip_real_email_delivery,
+        )
+
+        if should_skip_real_email_delivery(to_email):
+            log_skipped_gmail_delivery(
+                user_id=user_id,
+                source="gmail_client.send_plain_text_as_user",
+                domain=recipient_domain(to_email),
+            )
+            return gmail_skipped_send_result(channel="gmail")
         subject = (subject or "").replace("\r", "").replace("\n", "").replace("\x00", "")
         body = body or ""
         try:

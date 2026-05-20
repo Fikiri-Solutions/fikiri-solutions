@@ -258,48 +258,69 @@ class MinimalEmailActions:
             reply_sent = False
             reply_message_id = None
             classification = None
+            delivery_skipped = False
 
             if self.gmail_service:
-                try:
-                    reply_message_id = self._send_gmail_reply(
-                        parsed_email, reply_content, sender_name
+                oh = _parsed_headers(parsed_email)
+                original_sender = oh.get("from", "")
+                if "<" in original_sender and ">" in original_sender:
+                    reply_to = original_sender.split("<")[1].split(">")[0].strip()
+                else:
+                    reply_to = original_sender.strip()
+                from core.reserved_email_recipients import (
+                    log_skipped_gmail_delivery,
+                    recipient_domain,
+                    should_skip_real_email_delivery,
+                )
+
+                if should_skip_real_email_delivery(reply_to):
+                    log_skipped_gmail_delivery(
+                        user_id=user_id,
+                        source="email_automation.actions.auto_reply",
+                        domain=recipient_domain(reply_to),
                     )
-                    reply_sent = True
-                    logger.info(f"✅ Auto-reply sent via Gmail API: {reply_message_id}")
-                    if user_id and reply_message_id:
-                        record_email_event(
-                            user_id,
-                            "email.reply_sent",
-                            provider="gmail",
-                            message_id=message_id or None,
-                            thread_id=parsed_email.get("thread_id"),
-                            correlation_id=parsed_email.get("_correlation_id"),
-                            payload={
-                                "reply_message_id": reply_message_id,
-                                "channel": "auto_reply",
-                            },
-                            status="applied",
-                            source="email_automation.actions",
+                    delivery_skipped = True
+                else:
+                    try:
+                        reply_message_id = self._send_gmail_reply(
+                            parsed_email, reply_content, sender_name
                         )
-                except Exception as e:
-                    classification = self._classify_gmail_error(e)
-                    logger.error(f"❌ Failed to send Gmail reply: {e}")
-                    reply_sent = False
-                    if user_id and not parsed_email.get("_correlation_id"):
-                        record_email_event(
-                            user_id,
-                            "email.failed",
-                            provider="gmail",
-                            message_id=message_id or None,
-                            thread_id=parsed_email.get("thread_id"),
-                            payload={"stage": "send_reply", "classification": classification},
-                            status="failed",
-                            error_message=str(e)[:2000],
-                            source="email_automation.actions",
-                        )
+                        reply_sent = True
+                        logger.info(f"✅ Auto-reply sent via Gmail API: {reply_message_id}")
+                        if user_id and reply_message_id:
+                            record_email_event(
+                                user_id,
+                                "email.reply_sent",
+                                provider="gmail",
+                                message_id=message_id or None,
+                                thread_id=parsed_email.get("thread_id"),
+                                correlation_id=parsed_email.get("_correlation_id"),
+                                payload={
+                                    "reply_message_id": reply_message_id,
+                                    "channel": "auto_reply",
+                                },
+                                status="applied",
+                                source="email_automation.actions",
+                            )
+                    except Exception as e:
+                        classification = self._classify_gmail_error(e)
+                        logger.error(f"❌ Failed to send Gmail reply: {e}")
+                        reply_sent = False
+                        if user_id and not parsed_email.get("_correlation_id"):
+                            record_email_event(
+                                user_id,
+                                "email.failed",
+                                provider="gmail",
+                                message_id=message_id or None,
+                                thread_id=parsed_email.get("thread_id"),
+                                payload={"stage": "send_reply", "classification": classification},
+                                status="failed",
+                                error_message=str(e)[:2000],
+                                source="email_automation.actions",
+                            )
 
             result = {
-                "success": reply_sent if self.gmail_service else True,
+                "success": True if delivery_skipped else (reply_sent if self.gmail_service else True),
                 "action": "auto_reply",
                 "message_id": message_id,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -311,6 +332,8 @@ class MinimalEmailActions:
                     "reply_content": reply_content,
                     "reply_generated": True,
                     "reply_sent": reply_sent,
+                    "delivery_skipped": delivery_skipped,
+                    "skip_reason": "reserved_recipient_domain" if delivery_skipped else None,
                     "reply_message_id": reply_message_id,
                     "error_classification": classification if not reply_sent else None,
                     "reply_generation_mode": reply_mode,

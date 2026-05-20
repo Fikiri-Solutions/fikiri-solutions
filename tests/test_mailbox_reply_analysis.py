@@ -98,9 +98,29 @@ class TestMailboxReplyUsesAnalysis(unittest.TestCase):
 
     @patch("email_automation.pipeline.record_email_pipeline_ai_usage")
     @patch("email_automation.pipeline.email_pipeline_ai_gate_enabled", return_value=True)
+    @patch("email_automation.pipeline.evaluate_email_pipeline_ai_gate")
+    @patch("email_automation.pipeline.should_run_mailbox_ai", return_value=True)
+    @patch("services.email_triage_service.triage_and_store_synced_message")
+    @patch("email_automation.pipeline.evaluate_email_action_policy")
     def test_orchestrate_skips_second_ai_usage_when_reusing_suggested_reply(
-        self, _gate_on, mock_record_usage
+        self,
+        mock_policy,
+        _mock_triage,
+        _mock_should_ai,
+        mock_eval_gate,
+        _gate_on,
+        mock_record_usage,
     ):
+        from core.email_pipeline_ai_gate import EmailPipelineAIGateDecision
+
+        mock_eval_gate.return_value = EmailPipelineAIGateDecision(True, None)
+        mock_policy.return_value = {
+            "recommended_action_type": "auto_reply",
+            "should_auto_send": True,
+            "requires_human_review": False,
+            "execution_mode": "auto_send",
+            "reason": "test",
+        }
         from email_automation.ai_assistant import MinimalAIEmailAssistant
 
         parsed = _parsed_message()
@@ -128,7 +148,9 @@ class TestMailboxReplyUsesAnalysis(unittest.TestCase):
              patch("email_automation.pipeline.automation_safety_manager") as mock_safety, \
              patch("email_automation.pipeline.MinimalEmailParser") as mock_parser_cls, \
              patch("email_automation.pipeline.db_optimizer") as mock_db, \
-             patch("email_automation.pipeline.enhanced_crm_service"):
+             patch("email_automation.pipeline.enhanced_crm_service"), \
+             patch("email_automation.actions.idempotency_manager") as mock_idem:
+            mock_idem.check_key.return_value = None
             mock_safety.check_rate_limits.return_value = {"allowed": True}
             mock_parser = MagicMock()
             mock_parser.get_subject.return_value = parsed["headers"]["subject"]

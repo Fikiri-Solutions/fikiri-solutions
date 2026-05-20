@@ -136,6 +136,40 @@ class EmailActionHandler:
                 "error_code": "MISSING_RECIPIENT",
             }
 
+        from core.reserved_email_recipients import (
+            log_skipped_gmail_delivery,
+            recipient_domain,
+            should_skip_real_email_delivery,
+        )
+
+        if should_skip_real_email_delivery(to_email):
+            rule_id = int(trigger_data.get("_automation_rule_id") or 0)
+            log_skipped_gmail_delivery(
+                user_id=user_id,
+                source="automation_engine.execute_send_email",
+                domain=recipient_domain(to_email),
+            )
+            automation_safety_manager.log_automation_action(
+                user_id=user_id,
+                rule_id=rule_id,
+                action_type="auto_reply",
+                target_contact=to_email,
+                idempotency_key=self.send_email_idempotency_key(
+                    user_id, rule_id, to_email, subject, body, trigger_data
+                ),
+                status="skipped",
+                error_message="reserved_recipient_domain",
+            )
+            return {
+                "success": True,
+                "data": {
+                    "action": "email_skipped",
+                    "recipient": to_email,
+                    "reason": "reserved_recipient_domain",
+                    "skipped": True,
+                },
+            }
+
         if delay_minutes > 0:
             lead_id = trigger_data.get("lead_id")
             if lead_id is None:
