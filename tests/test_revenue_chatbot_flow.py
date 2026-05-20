@@ -23,7 +23,7 @@ def client():
 
 
 class TestRevenueChatbotFlow:
-    @patch('core.public_chatbot_api._check_plan_access')
+    @patch('core.chatbot_usage_tracking.check_plan_access')
     @patch('core.chatbot_retrieval.get_feature_flags')
     @patch('core.chatbot_retrieval.get_vector_search')
     @patch('core.chatbot_response_service.LLMRouter')

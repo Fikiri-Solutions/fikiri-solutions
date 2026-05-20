@@ -16,6 +16,12 @@
 ## Chatbot
 
 - Config, retrieval, vector chunk ingestion/cleanup, preview API, builder UX.
+- **Modular stack** (see `docs/CHATBOT_ARCHITECTURE.md`):
+  - `chatbot_retrieval` + diversity + cross-source dedup
+  - `chatbot_response_service`, `chatbot_config`, `chatbot_lead_capture`, `chatbot_usage_tracking`
+  - Preview `debug: true` → `retrieval_debug` (dashboard only; never on public widget)
+  - Structured logs: `chatbot.retrieval.completed`, `chatbot.lead_capture.*`, `chatbot.usage.*`
+- Production checklist: `docs/CHATBOT_PRODUCTION_CHECKLIST.md`
 
 ## Frontend / dev
 

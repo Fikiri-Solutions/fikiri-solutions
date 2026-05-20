@@ -186,10 +186,13 @@ Rules:
 # ==========================================================
 # 9. DEPLOYMENT, TESTING & CI/CD
 # ==========================================================
+# FULL REGRESSION: See .cursor/rules/regression-testing.mdc — run entire backend + frontend
+# suites on every change; bug fixes require a new regression test; app only gets better.
 - Code must (eventually) pass:
     - static checks (ruff/flake8) for Python
     - type checks (mypy or pyright)
-    - unit tests and integration tests for critical paths
+    - full unit regression (pytest + vitest), not only tests adjacent to edited files
+    - integration tests for critical paths when env allows
 - Docker:
     - Use multi-stage builds.
     - Keep images as lean as possible (no unused tools or dev-only extras).

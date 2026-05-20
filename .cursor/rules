@@ -261,3 +261,42 @@ Primary modules:
 
 Stability is more important than adding new features.
 
+🧪 11. Regression testing (non-negotiable)
+
+The app only gets better when every change is validated against the **whole** codebase, not only files you edited.
+
+11.1 On every change (features, fixes, refactors)
+
+Before calling work done, run **full regression**:
+
+- Backend (repo root): `pytest tests/ -m "not contract and not integration" -q`
+- Frontend: `cd frontend && npx vitest run`
+
+Also run targeted suites when you touch those domains (see `AGENTS.md`).
+
+Do not stop when "my area passed" — inbox changes can break CRM routes. Report pass/fail counts and what you fixed.
+
+11.2 When something breaks
+
+1. Reproduce with a failing test or minimal steps (no "should work" without evidence).
+2. Fix the **root cause** (not a silent workaround).
+3. **Add a regression test** that would have caught the bug.
+4. Re-run **full** backend + frontend regression until green.
+
+Critical paths: success + at least one failure branch (`docs/CURSOR_QUALITY_GATE.md`).
+
+11.3 New code
+
+- New behavior → new tests in the **same** change (not "later").
+- Bug fix → regression test for that scenario.
+- Never delete or weaken tests to go green unless the product contract changed and docs are updated.
+
+11.4 Definition of done
+
+- [ ] Full backend unit suite green (or documented skip with reason)
+- [ ] Full frontend vitest green (or explicit pre-existing failures listed)
+- [ ] New/changed behavior has targeted tests
+- [ ] No unrelated regressions
+
+If tests cannot run, say what was run instead — do not claim "tested" without commands and outcomes.
+

@@ -2,6 +2,7 @@ import {
   apiClient,
   ChatbotPreviewQueryResult,
   ChatbotPreviewSource,
+  ChatbotRetrievalDebug,
   KnowledgeSearchResult,
 } from '../services/apiClient'
 
@@ -14,6 +15,7 @@ export type BotPreview = {
   question?: string
   fallbackUsed?: boolean
   sources?: ChatbotPreviewSource[]
+  retrievalDebug?: ChatbotRetrievalDebug
 }
 
 export function createPreviewConversationId(): string {
@@ -38,6 +40,7 @@ export function mapPreviewQueryResult(result: ChatbotPreviewQueryResult): BotPre
     source: 'production',
     fallbackUsed: result.fallback_used,
     sources: result.sources ?? [],
+    retrievalDebug: result.retrieval_debug,
   }
 }
 
@@ -86,13 +89,14 @@ export async function runLegacyLocalPreview(query: string): Promise<{
 
 export async function runChatbotBuilderPreview(
   query: string,
-  conversationId?: string
+  conversationId?: string,
+  options?: { debug?: boolean }
 ): Promise<{
   botPreview: BotPreview
   searchResults: KnowledgeSearchResult[]
 }> {
   try {
-    const result = await apiClient.previewChatbotQuery(query.trim(), conversationId)
+    const result = await apiClient.previewChatbotQuery(query.trim(), conversationId, options)
     return {
       botPreview: mapPreviewQueryResult(result),
       searchResults: [],

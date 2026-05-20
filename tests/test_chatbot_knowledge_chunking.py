@@ -177,7 +177,7 @@ class TestChatbotRetrievalWithChunkedVectors(unittest.TestCase):
         self.assertEqual(result.sources[0]["type"], "vector")
         self.assertIn("refund policy", result.sources[0]["content"])
         mock_vs.search_similar.assert_called_once_with(
-            "refund policy", top_k=3, threshold=0.6, tenant_id="tenant_a"
+            "refund policy", top_k=12, threshold=0.6, tenant_id="tenant_a"
         )
 
 

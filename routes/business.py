@@ -1115,6 +1115,15 @@ def get_emails():
         use_synced = request.args.get('use_synced', 'true').lower() == 'true'  # Default to synced emails for speed
         # List views should omit full bodies (smaller JSON, faster DB). Detail: GET /email/messages/<id>
         include_body = request.args.get('include_body', 'false').lower() == 'true'
+        from core.email_inbox_search import (
+            gmail_inbox_list_query,
+            sanitize_inbox_search_query,
+            synced_inbox_search_sql_and_params,
+        )
+
+        search_term = sanitize_inbox_search_query(
+            request.args.get('q') or request.args.get('search')
+        )
 
         # Enforce maximum limit to prevent unbounded queries (rulepack compliance)
         if limit > 500:
@@ -1136,6 +1145,10 @@ def get_emails():
                 elif filter_type == 'read':
                     label_filter_sql = " AND (labels IS NULL OR labels = '' OR labels NOT LIKE ?)"
                     label_params = ('%UNREAD%',)
+
+                search_sql, search_params = synced_inbox_search_sql_and_params(search_term)
+                label_filter_sql += search_sql
+                label_params = label_params + search_params
 
                 # List without full body: SUBSTR only (less I/O + smaller payloads). Tests may mock `body` without body_preview.
                 if include_body:
@@ -1241,13 +1254,8 @@ def get_emails():
                 logger.info(f"Gmail not connected for user {user_id}: {e}")
                 return create_success_response({'emails': [], 'message': 'Gmail not connected. Please connect your Gmail account first.'}, 'No emails available')
             
-            # Match Gmail's Inbox tab: scope to in:inbox, then read/unread (same as Gmail UI)
-            if filter_type == 'unread':
-                query = 'in:inbox is:unread'
-            elif filter_type == 'read':
-                query = 'in:inbox is:read'
-            else:
-                query = 'in:inbox'
+            # Match Gmail's Inbox tab + optional user search (same q= syntax as Gmail UI)
+            query = gmail_inbox_list_query(filter_type, search_term)
             
             # Get messages with pagination (rulepack compliance: Gmail API uses pageToken for pagination)
             # Note: Gmail API doesn't support offset directly, but we can use pageToken

@@ -1583,6 +1583,7 @@ def preview_chatbot_query():
         query,
         tenant_id,
         user_id,
+        correlation_id=correlation_id,
     )
 
     config_applied = True
@@ -1620,6 +1621,11 @@ def preview_chatbot_query():
         "config_applied": config_applied,
         "retrieval_confidence": answer_result.retrieval_confidence,
         "llm_confidence": answer_result.llm_confidence,
+        **(
+            {"retrieval_debug": retrieval.retrieval_debug}
+            if bool(data.get("debug"))
+            else {}
+        ),
     })
 
 

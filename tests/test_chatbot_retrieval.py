@@ -97,7 +97,7 @@ class TestChatbotRetrieval(unittest.TestCase):
 
         vs.search_similar.assert_called_once_with(
             "pricing",
-            top_k=3,
+            top_k=12,
             threshold=0.6,
             tenant_id="tenant_xyz",
         )

@@ -65,7 +65,7 @@ function shouldSuppressUnauthorizedRedirect(): boolean {
   if (typeof window === 'undefined') return false
   const p = window.location.pathname
 
-  if (p === '/login' || p === '/inbox' || p === '/install') return true
+  if (p === '/login' || p === '/inbox' || p.startsWith('/inbox/') || p === '/install') return true
 
   const prefixes = [
     '/signup',
@@ -305,6 +305,25 @@ export interface ChatbotPreviewQueryResult {
   config_applied: boolean
   retrieval_confidence?: number
   llm_confidence?: number
+  retrieval_debug?: ChatbotRetrievalDebug
+}
+
+export interface ChatbotRetrievalDebug {
+  raw_faq_count?: number
+  raw_kb_count?: number
+  raw_vector_count?: number
+  post_vector_diversity_count?: number
+  post_cross_source_dedup_count?: number
+  final_source_count?: number
+  context_char_count?: number
+  fallback_needed?: boolean
+  retrieval_confidence?: number
+  collapsed_duplicate_count?: number
+  vector_fetch_top_k?: number
+  max_chunks_per_parent?: number
+  vector_enabled?: boolean
+  vector_search_enabled?: boolean
+  latency_ms?: number
 }
 
 /** GET /api/migration/capabilities — structured import & migration map */
@@ -805,11 +824,13 @@ class ApiClient {
   /** Dashboard preview — same brain as public widget; session auth only. */
   async previewChatbotQuery(
     query: string,
-    conversationId?: string
+    conversationId?: string,
+    options?: { debug?: boolean }
   ): Promise<ChatbotPreviewQueryResult> {
     const response = await this.client.post('/chatbot/preview-query', {
       query,
       ...(conversationId ? { conversation_id: conversationId } : {}),
+      ...(options?.debug ? { debug: true } : {}),
     })
     return response.data as ChatbotPreviewQueryResult
   }
@@ -1369,14 +1390,20 @@ class ApiClient {
   async getEmails(params?: {
     filter?: string
     limit?: number
+    /** Inbox search (Gmail q= / synced SQL); alias of backend `q` */
     query?: string
+    q?: string
+    page_token?: string
+    offset?: number
     use_synced?: boolean
     /** false = list only (snippets); full body via getEmailMessage(id) */
     include_body?: boolean
   }): Promise<any> {
+    const searchQ = params?.q ?? params?.query
     const response = await this.client.get('/email/messages', {
       params: {
         ...params,
+        q: searchQ,
         user_id: this.getUserId() ?? 1,
         use_synced: params?.use_synced ?? true,
         include_body: params?.include_body ?? false
@@ -1393,6 +1420,53 @@ class ApiClient {
     })
     const data = response.data?.data ?? response.data
     return data?.email ?? null
+  }
+
+  /** Classified synced emails for Inbox Command Center (separate from live Gmail list). */
+  async getEmailTriage(params?: {
+    category?: string
+    limit?: number
+    offset?: number
+  }): Promise<{
+    emails: Array<Record<string, unknown>>
+    tabs?: Array<{ id: string; label: string }>
+    pagination?: { total_count?: number; has_more?: boolean }
+  }> {
+    const response = await this.client.get('/email/triage', {
+      params: {
+        category: params?.category,
+        limit: params?.limit ?? 20,
+        offset: params?.offset ?? 0,
+        user_id: this.getUserId() ?? 1,
+      },
+    })
+    return response.data?.data ?? response.data
+  }
+
+  async classifyEmailTriage(emailIds: string[]): Promise<{ classified: unknown[]; count: number }> {
+    const response = await this.client.post('/email/triage/classify', {
+      email_ids: emailIds,
+      user_id: this.getUserId() ?? 1,
+    })
+    return response.data?.data ?? response.data
+  }
+
+  async emailTriageBulkAction(payload: {
+    action: string
+    email_ids: string[]
+    confirm_destructive?: boolean
+    label_names?: string[]
+  }): Promise<{
+    success?: boolean
+    processed?: number
+    errors?: Array<{ email_id: string; error: string }>
+    code?: string
+  }> {
+    const response = await this.client.post('/email/triage/bulk-action', {
+      ...payload,
+      user_id: this.getUserId() ?? 1,
+    })
+    return response.data?.data ?? response.data
   }
 
   async analyzeEmail(emailId: string, subject: string, content: string, from: string): Promise<any> {

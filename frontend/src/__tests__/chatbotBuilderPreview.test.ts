@@ -45,6 +45,55 @@ describe('chatbotBuilderPreview helpers', () => {
     expect(mapped.sources).toHaveLength(1)
   })
 
+  it('mapPreviewQueryResult maps retrieval_debug when present', () => {
+    const mapped = mapPreviewQueryResult({
+      success: true,
+      answer: 'We are open 9-5.',
+      confidence: 0.88,
+      fallback_used: false,
+      sources: [{ type: 'faq', id: 'f1', question: 'Hours?' }],
+      config_applied: true,
+      retrieval_debug: {
+        final_source_count: 1,
+        raw_faq_count: 1,
+        latency_ms: 12,
+      },
+    })
+    expect(mapped.retrievalDebug?.final_source_count).toBe(1)
+    expect(mapped.retrievalDebug?.latency_ms).toBe(12)
+  })
+
+  it('runChatbotBuilderPreview sends debug=true when requested', async () => {
+    apiClientMock.previewChatbotQuery.mockResolvedValue({
+      success: true,
+      answer: 'Debug answer',
+      confidence: 0.9,
+      fallback_used: false,
+      sources: [],
+      config_applied: true,
+      retrieval_debug: { final_source_count: 0 },
+    })
+
+    await runChatbotBuilderPreview('debug me', 'conv-1', { debug: true })
+
+    expect(apiClientMock.previewChatbotQuery).toHaveBeenCalledWith('debug me', 'conv-1', { debug: true })
+  })
+
+  it('runChatbotBuilderPreview does not send debug when disabled', async () => {
+    apiClientMock.previewChatbotQuery.mockResolvedValue({
+      success: true,
+      answer: 'Normal answer',
+      confidence: 0.9,
+      fallback_used: false,
+      sources: [],
+      config_applied: true,
+    })
+
+    await runChatbotBuilderPreview('no debug', undefined, { debug: false })
+
+    expect(apiClientMock.previewChatbotQuery).toHaveBeenCalledWith('no debug', undefined, { debug: false })
+  })
+
   it('previewSourceLabel reflects fallback_used on production preview', () => {
     expect(previewSourceLabel('production', false)).toBe('Production preview')
     expect(previewSourceLabel('production', true)).toBe('Production preview · fallback')
@@ -62,7 +111,7 @@ describe('chatbotBuilderPreview helpers', () => {
 
     const result = await runChatbotBuilderPreview('What are your hours?')
 
-    expect(apiClientMock.previewChatbotQuery).toHaveBeenCalledWith('What are your hours?', undefined)
+    expect(apiClientMock.previewChatbotQuery).toHaveBeenCalledWith('What are your hours?', undefined, undefined)
     expect(result.botPreview.answer).toBe('Live brain answer')
     expect(result.botPreview.source).toBe('production')
   })
@@ -79,7 +128,7 @@ describe('chatbotBuilderPreview helpers', () => {
 
     await runChatbotBuilderPreview('follow up?', 'conv-abc')
 
-    expect(apiClientMock.previewChatbotQuery).toHaveBeenCalledWith('follow up?', 'conv-abc')
+    expect(apiClientMock.previewChatbotQuery).toHaveBeenCalledWith('follow up?', 'conv-abc', undefined)
   })
 
   it('runChatbotBuilderPreview handles fallback_used=true without throwing', async () => {
@@ -106,7 +155,7 @@ describe('chatbotBuilderPreview helpers', () => {
 
     const result = await runChatbotBuilderPreview('hours?', 'conv-persist')
 
-    expect(apiClientMock.previewChatbotQuery).toHaveBeenCalledWith('hours?', 'conv-persist')
+    expect(apiClientMock.previewChatbotQuery).toHaveBeenCalledWith('hours?', 'conv-persist', undefined)
     expect(apiClientMock.searchChatbotFaqs).toHaveBeenCalled()
     expect(result.botPreview.source).toBe('faq')
     expect(result.botPreview.answer).toBe('Legacy FAQ')

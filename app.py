@@ -180,6 +180,7 @@ from routes import (
 from routes.integrations import integrations_bp
 from routes.appointments import appointments_bp
 from routes.google_risc import google_risc_bp
+from routes.email_triage import email_triage_bp
 
 # Global services dictionary
 services = {}
@@ -1065,6 +1066,7 @@ def register_blueprints(app):
         (expert_bp, 'routes_expert'),
         (kpi_bp, 'routes_kpi'),
         (integrations_bp, 'integrations'),
+        (email_triage_bp, 'email_triage'),
     ]
 
     if os.getenv("GOOGLE_RISC_ENABLED", "").strip().lower() in ("1", "true", "yes"):

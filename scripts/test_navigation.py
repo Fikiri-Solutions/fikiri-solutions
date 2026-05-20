@@ -55,7 +55,7 @@ EXPECTED_ROUTES = {
     ]
 }
 
-def test_page_accessible(url):
+def check_page_accessible(url):
     """Test if a page is accessible"""
     try:
         response = requests.get(url, timeout=5, allow_redirects=True)
@@ -78,7 +78,7 @@ def test_page_accessible(url):
             "error": str(e)
         }
 
-def test_backend_health():
+def check_backend_health():
     """Test if backend is running"""
     try:
         response = requests.get(f"{BACKEND_URL}/api/health", timeout=5)
@@ -100,7 +100,7 @@ def main():
     
     # Test backend health
     print("1. Testing Backend Health...")
-    backend_health = test_backend_health()
+    backend_health = check_backend_health()
     if backend_health["running"]:
         print(f"   ✅ Backend is running at {BACKEND_URL}")
     else:
@@ -116,7 +116,7 @@ def main():
     for page in PAGES_TO_TEST:
         url = urljoin(BASE_URL, page)
         print(f"   Testing: {page}")
-        result = test_page_accessible(url)
+        result = check_page_accessible(url)
         results[page] = result
         
         if result["accessible"]:

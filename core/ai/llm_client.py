@@ -30,12 +30,13 @@ DEFAULT_OPENAI_TIMEOUT = int(os.getenv("OPENAI_TIMEOUT", "30"))
 
 def _is_llm_test_mode() -> bool:
     """Disable real OpenAI calls during pytest and explicit test env."""
+    # Pytest always wins so a leaked FIKIRI_TEST_MODE=0 from .env cannot enable live LLMs mid-suite.
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        return True
     explicit = os.getenv("FIKIRI_TEST_MODE", "").strip().lower()
     if explicit in ("0", "false", "no", "off"):
         return False
     if explicit in ("1", "true", "yes", "on"):
-        return True
-    if os.getenv("PYTEST_CURRENT_TEST"):
         return True
     if os.getenv("FLASK_ENV", "").strip().lower() == "test":
         return True

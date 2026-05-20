@@ -81,6 +81,7 @@ export function isDashboardNavItemActive(pathname: string, href: string): boolea
     return pathname === '/ai' || pathname === '/assistant' || pathname.startsWith('/ai/')
   if (href === '/integrations/gmail') return pathname.startsWith('/integrations')
   if (href === '/analytics') return pathname === '/analytics' || pathname === '/industry'
+  if (href === '/inbox') return pathname === '/inbox' || pathname.startsWith('/inbox/')
   return pathname === href
 }
 

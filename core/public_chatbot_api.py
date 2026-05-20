@@ -6,7 +6,6 @@ Provides embeddable chatbot endpoint with API key authentication, CORS, and tena
 import json
 import logging
 import os
-import re
 import uuid
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
@@ -14,14 +13,11 @@ from flask import Blueprint, request, jsonify, g
 from functools import wraps
 
 from core.api_key_manager import api_key_manager
-from core.ai_budget_guardrails import ai_budget_guardrails
-from core.tier_usage_caps import check_tier_usage_cap
 from core.context_aware_responses import get_context_system
 from core.api_validation import handle_api_errors, create_error_response
 from core.database_optimization import db_optimizer
 from core.expert_escalation import get_escalation_engine
 from core.chatbot_feedback import get_feedback_system
-from crm.service import enhanced_crm_service
 from core.chatbot_content_events import (
     content_fingerprint_from_sources,
     record_chatbot_response_generated,
@@ -29,8 +25,15 @@ from core.chatbot_content_events import (
 from core.request_correlation import get_or_create_correlation_id
 from core.user_feedback_router import get_user_feedback_router
 from core.chatbot_config import ChatbotConfig, load_chatbot_config
+from core.chatbot_lead_capture import capture_chatbot_lead
 from core.chatbot_retrieval import retrieve_chatbot_context, retrieval_metadata
 from core.chatbot_response_service import generate_chatbot_answer
+from core.chatbot_usage_tracking import (
+    check_chatbot_usage_allowed,
+    record_chatbot_ai_usage_if_needed,
+    record_chatbot_billing_usage,
+    record_chatbot_request_usage,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,66 +41,6 @@ logger = logging.getLogger(__name__)
 public_chatbot_bp = Blueprint('public_chatbot', __name__, url_prefix='/api/public/chatbot')
 
 context_system = get_context_system()
-
-
-def _extract_lead_info(query: str, lead_payload: Dict[str, Any]) -> Dict[str, Optional[str]]:
-    email = (lead_payload.get("email") or "").strip()
-    phone = (lead_payload.get("phone") or "").strip()
-    name = (lead_payload.get("name") or "").strip()
-
-    if not email:
-        match = re.search(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b", query)
-        email = match.group(0) if match else ""
-    if not phone:
-        match = re.search(r"\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b", query)
-        phone = match.group(0) if match else ""
-    if not name and email:
-        name = email.split("@")[0].replace(".", " ").title()
-
-    return {
-        "email": email or None,
-        "phone": phone or None,
-        "name": name or "Chatbot Lead"
-    }
-
-
-def _record_billing_usage(user_id: Optional[int], usage_type: str, quantity: int = 1):
-    if not user_id:
-        return
-    if os.getenv("FLASK_ENV") == "test" or os.getenv("PYTEST_CURRENT_TEST"):
-        return
-    if not db_optimizer.table_exists("billing_usage"):
-        return
-    try:
-        month = datetime.now(timezone.utc).strftime("%Y-%m")
-        db_optimizer.execute_query(
-            "INSERT INTO billing_usage (user_id, month, usage_type, quantity) VALUES (?, ?, ?, ?)",
-            (user_id, month, usage_type, quantity),
-            fetch=False
-        )
-    except Exception as e:
-        logger.warning("Failed to record billing usage: %s", e)
-
-
-def _check_plan_access(user_id: Optional[int]) -> Dict[str, Any]:
-    if os.getenv("FLASK_ENV") == "test" or os.getenv("PYTEST_CURRENT_TEST"):
-        return {"plan": "test", "allow_llm": True}
-    if not user_id or not db_optimizer.table_exists("subscriptions"):
-        return {"plan": "unknown", "allow_llm": True}
-    try:
-        sub = db_optimizer.execute_query(
-            "SELECT status, tier FROM subscriptions WHERE user_id = ? ORDER BY current_period_end DESC LIMIT 1",
-            (user_id,)
-        )
-        if sub:
-            status = (sub[0].get("status") or "").lower()
-            tier = (sub[0].get("tier") or "starter").lower()
-            is_paid = status in {"active", "trialing"}
-            return {"plan": tier if is_paid else "free", "allow_llm": is_paid}
-        return {"plan": "free", "allow_llm": False}
-    except Exception as e:
-        logger.warning("Plan check failed: %s", e)
-        return {"plan": "unknown", "allow_llm": True}
 
 
 def _api_key_user_id_as_int(user_id: Optional[Any]) -> Optional[int]:
@@ -206,18 +149,17 @@ def require_api_key(f):
 
 def record_api_usage(response_status: int = None, response_time_ms: int = None):
     """Record API usage after request"""
-    try:
-        if hasattr(g, 'api_key_id'):
-            api_key_manager.record_usage(
-                api_key_id=g.api_key_id,
-                endpoint=request.endpoint or request.path,
-                ip_address=request.remote_addr,
-                user_agent=request.headers.get('User-Agent'),
-                response_status=response_status,
-                response_time_ms=response_time_ms
-            )
-    except Exception as e:
-        logger.error(f"Failed to record API usage: {e}")
+    key_info = getattr(g, "api_key_info", None) or {}
+    record_chatbot_request_usage(
+        api_key_id=getattr(g, "api_key_id", None),
+        endpoint=request.endpoint or request.path,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get("User-Agent"),
+        response_status=response_status,
+        response_time_ms=response_time_ms,
+        user_id=key_info.get("user_id"),
+        tenant_id=key_info.get("tenant_id"),
+    )
 
 
 @public_chatbot_bp.route("/key-status", methods=["GET", "OPTIONS"])
@@ -343,6 +285,7 @@ def public_chatbot_query():
             query,
             tenant_id,
             tenant_scope_uid,
+            correlation_id=correlation_id,
         )
 
         try:
@@ -359,45 +302,26 @@ def public_chatbot_query():
             )
             chatbot_config = ChatbotConfig()
 
-        plan_info = _check_plan_access(user_id)
-        allow_llm = plan_info.get("allow_llm", True)
-        if not allow_llm:
-            record_api_usage(response_status=402)
-            return jsonify(_public_error_payload("Plan limit exceeded", "PLAN_LIMIT_EXCEEDED")), 402
+        usage_gate = check_chatbot_usage_allowed(
+            user_id=user_id,
+            billing_uid=billing_uid,
+            fallback_needed=retrieval.fallback_needed,
+            tenant_id=tenant_id,
+        )
+        if not usage_gate.allowed:
+            record_api_usage(response_status=usage_gate.http_status)
+            return jsonify(
+                _public_error_payload(
+                    usage_gate.error_message or "Plan limit exceeded",
+                    usage_gate.error_code,
+                    **usage_gate.error_extra,
+                )
+            ), usage_gate.http_status
+
+        plan_info = usage_gate.plan_info
+        allow_llm = usage_gate.allow_llm
 
         llm_result_meta: Dict[str, Any] = {}
-        if allow_llm and not retrieval.fallback_needed:
-            if billing_uid is not None:
-                tier_ok, tier_msg, tier_code = check_tier_usage_cap(
-                    billing_uid, "ai_responses", projected_increment=1
-                )
-                if not tier_ok:
-                    record_api_usage(response_status=402)
-                    return jsonify(
-                        _public_error_payload(
-                            tier_msg or "Plan limit exceeded",
-                            tier_code or "PLAN_LIMIT_EXCEEDED",
-                        )
-                    ), 402
-
-            budget_decision = ai_budget_guardrails.evaluate(billing_uid, projected_increment=1)
-            if not budget_decision.allowed:
-                record_api_usage(response_status=402)
-                return jsonify(
-                    _public_error_payload(
-                        "AI monthly budget cap reached. Upgrade or wait until next billing period."
-                        if budget_decision.reason == "monthly_budget_cap_reached"
-                        else "AI monthly budget approval required.",
-                        "AI_BUDGET_SOFT_STOP",
-                        tier=budget_decision.tier,
-                        month=budget_decision.month,
-                        budget_cap_usd=budget_decision.budget_cap_usd,
-                        estimated_cost_usd=budget_decision.estimated_cost_usd,
-                        projected_cost_usd=budget_decision.projected_cost_usd,
-                        requires_approval=budget_decision.requires_approval,
-                    )
-                ), 402
-
         answer_result = generate_chatbot_answer(
             query,
             retrieval.context_text,
@@ -422,42 +346,14 @@ def public_chatbot_query():
         llm_attempted = answer_result.response_metadata.get("llm_attempted", False)
         llm_result_meta = answer_result.response_metadata
 
-        lead_info = _extract_lead_info(query, lead_payload)
-        lead_id = None
-        if user_id and (lead_info.get("email") or lead_info.get("phone")):
-            try:
-                if lead_info.get("email"):
-                    existing = db_optimizer.execute_query(
-                        "SELECT id FROM leads WHERE user_id = ? AND email = ?",
-                        (user_id, lead_info["email"])
-                    )
-                    if existing:
-                        lead_id = existing[0]["id"]
-                    else:
-                        created = enhanced_crm_service.create_lead(
-                            user_id,
-                            {
-                                "email": lead_info["email"],
-                                "name": lead_info.get("name") or "Chatbot Lead",
-                                "phone": lead_info.get("phone"),
-                                "source": "chatbot_widget",
-                                "metadata": {
-                                    "conversation_id": conversation_id,
-                                    "tenant_id": tenant_id
-                                }
-                            }
-                        )
-                        lead_id = created.get("data", {}).get("lead_id") if created.get("success") else None
-                if lead_id:
-                    enhanced_crm_service.add_lead_activity(
-                        lead_id,
-                        user_id,
-                        "note_added",
-                        "Chatbot conversation captured lead info",
-                        metadata={"conversation_id": conversation_id, "query": query}
-                    )
-            except Exception as lead_error:
-                logger.warning("Lead capture failed: %s", lead_error)
+        lead_id = capture_chatbot_lead(
+            user_id=user_id,
+            query=query,
+            lead_payload=lead_payload,
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            chatbot_config=chatbot_config,
+        )
 
         escalation_engine = get_escalation_engine()
         should_escalate = escalation_engine.should_escalate(confidence, fallback_used)
@@ -554,14 +450,18 @@ def public_chatbot_query():
 
         record_api_usage(response_status=200, response_time_ms=response_time_ms)
         if billing_uid is not None:
-            _record_billing_usage(billing_uid, "chatbot_queries", 1)
-        if (
-            llm_attempted
-            and llm_result_meta.get("llm_success")
-            and llm_result_meta.get("llm_validated")
-            and billing_uid is not None
-        ):
-            ai_budget_guardrails.record_ai_usage(billing_uid, 1)
+            record_chatbot_billing_usage(
+                billing_uid,
+                "chatbot_queries",
+                1,
+                tenant_id=str(tenant_id) if tenant_id is not None else None,
+            )
+        ai_usage_recorded = record_chatbot_ai_usage_if_needed(
+            billing_uid=billing_uid,
+            llm_attempted=llm_attempted,
+            llm_result_meta=llm_result_meta,
+            tenant_id=str(tenant_id) if tenant_id is not None else None,
+        )
 
         retrieved_doc_ids, retrieval_scores = retrieval_metadata(sources)
 
@@ -584,12 +484,7 @@ def public_chatbot_query():
             "lead_id": lead_id,
             "escalated": should_escalate,
             "escalated_question_id": escalated_question_id,
-            "ai_usage_recorded": bool(
-                llm_attempted
-                and llm_result_meta.get("llm_success")
-                and llm_result_meta.get("llm_validated")
-                and billing_uid is not None
-            ),
+            "ai_usage_recorded": ai_usage_recorded,
         }
         if not _is_production_env():
             response["correlation_id"] = correlation_id
