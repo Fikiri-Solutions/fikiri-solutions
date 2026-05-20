@@ -20,7 +20,11 @@ class TestLLMClient:
         assert client.is_enabled() is False
 
     def test_init_no_api_key_disabled(self):
-        with patch.dict(os.environ, {"FIKIRI_TEST_MODE": "0", "OPENAI_API_KEY": ""}, clear=False):
+        with patch.dict(
+            os.environ,
+            {"FIKIRI_TEST_MODE": "0", "OPENAI_API_KEY": "", "PYTEST_CURRENT_TEST": ""},
+            clear=False,
+        ):
             client = LLMClient(api_key=None)
         assert client.enabled is False
 
