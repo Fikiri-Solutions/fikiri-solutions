@@ -31,25 +31,80 @@ from services.email_triage_service import (
     reclassify_synced_messages,
 )
 
+# Distinct user ids per class avoid cross-test cleanup races on shared SQLite CI DB.
+_USER_WORKFLOW_BASE = 91_001
+
+
+def _ensure_workflow_test_user(user_id: int) -> None:
+    """synced_emails.user_id FK requires a users row."""
+    existing = db_optimizer.execute_query(
+        "SELECT id FROM users WHERE id = ?", (user_id,)
+    )
+    if existing:
+        return
+    db_optimizer.execute_query(
+        "INSERT INTO users (id, email, name, password_hash) VALUES (?, ?, ?, ?)",
+        (user_id, f"wf-test-{user_id}@example.test", "Workflow Test", "hash"),
+        fetch=False,
+    )
+
+
+def _cleanup_workflow_test_user(user_id: int) -> None:
+    """Best-effort teardown; order respects child tables first."""
+    for tbl in ("email_workflow_state", "email_classifications", "synced_emails"):
+        try:
+            db_optimizer.execute_query(
+                f"DELETE FROM {tbl} WHERE user_id = ?",
+                (user_id,),
+                fetch=False,
+            )
+        except Exception:
+            pass
+
+
+def _insert_synced_email_row(
+    user_id: int,
+    external_id: str,
+    *,
+    subject: str = "Hello",
+    sender: str = "a@b.com",
+    body: str = "body",
+    date: str = "2026-05-20",
+    labels: str | None = None,
+) -> None:
+    _ensure_workflow_test_user(user_id)
+    if labels is None:
+        db_optimizer.execute_query(
+            """
+            INSERT INTO synced_emails (
+                user_id, gmail_id, external_id, provider, subject, sender, body, date
+            ) VALUES (?, ?, ?, 'gmail', ?, ?, ?, ?)
+            """,
+            (user_id, external_id, external_id, subject, sender, body, date),
+            fetch=False,
+        )
+    else:
+        db_optimizer.execute_query(
+            """
+            INSERT INTO synced_emails (
+                user_id, gmail_id, external_id, provider, subject, sender, body, date, labels
+            ) VALUES (?, ?, ?, 'gmail', ?, ?, ?, ?, ?)
+            """,
+            (user_id, external_id, external_id, subject, sender, body, date, labels),
+            fetch=False,
+        )
+
 
 class TestEmailWorkflowState(unittest.TestCase):
     def setUp(self):
         ensure_email_workflow_state_table()
         ensure_email_classifications_table()
-        self.user_id = 1
+        self.user_id = _USER_WORKFLOW_BASE
         self.ext_id = "wf-test-msg-001"
+        _ensure_workflow_test_user(self.user_id)
 
     def tearDown(self):
-        db_optimizer.execute_query(
-            "DELETE FROM email_workflow_state WHERE user_id = ?",
-            (self.user_id,),
-            fetch=False,
-        )
-        db_optimizer.execute_query(
-            "DELETE FROM email_classifications WHERE user_id = ?",
-            (self.user_id,),
-            fetch=False,
-        )
+        _cleanup_workflow_test_user(self.user_id)
 
     def test_mark_classified_idempotent(self):
         mark_classified(self.user_id, self.ext_id, provider="gmail", source="test")
@@ -179,36 +234,15 @@ class TestClassifyUnclassifiedWorkflow(unittest.TestCase):
     def setUp(self):
         ensure_email_workflow_state_table()
         ensure_email_classifications_table()
-        self.user_id = 1
+        self.user_id = _USER_WORKFLOW_BASE + 1
         self.ext_id = "wf-unclassified-001"
+        _ensure_workflow_test_user(self.user_id)
 
     def tearDown(self):
-        db_optimizer.execute_query(
-            "DELETE FROM email_workflow_state WHERE user_id = ?",
-            (self.user_id,),
-            fetch=False,
-        )
-        db_optimizer.execute_query(
-            "DELETE FROM email_classifications WHERE user_id = ?",
-            (self.user_id,),
-            fetch=False,
-        )
-        db_optimizer.execute_query(
-            "DELETE FROM synced_emails WHERE user_id = ?",
-            (self.user_id,),
-            fetch=False,
-        )
+        _cleanup_workflow_test_user(self.user_id)
 
     def test_classify_unclassified_returns_counts(self):
-        db_optimizer.execute_query(
-            """
-            INSERT INTO synced_emails (
-                user_id, gmail_id, external_id, provider, subject, sender, body, date
-            ) VALUES (?, ?, ?, 'gmail', 'Hello', 'a@b.com', 'body', '2026-05-20')
-            """,
-            (self.user_id, self.ext_id, self.ext_id),
-            fetch=False,
-        )
+        _insert_synced_email_row(self.user_id, self.ext_id)
         result = classify_unclassified_synced(self.user_id, limit=10)
         self.assertIn("count", result)
         self.assertIn("scanned", result)
@@ -219,47 +253,40 @@ class TestClassifyUnclassifiedWorkflow(unittest.TestCase):
 class TestGmailSyncSkipsClassified(unittest.TestCase):
     def test_sync_guard_does_not_call_triage_when_classified(self):
         """Mirrors gmail_sync_jobs guard: should_classify_email False => no triage."""
-        user_id = 1
+        user_id = _USER_WORKFLOW_BASE + 2
         ext = "wf-sync-skip-001"
         ensure_email_workflow_state_table()
-        db_optimizer.execute_query(
-            "DELETE FROM email_workflow_state WHERE user_id = ? AND external_id = ?",
-            (user_id, ext),
-            fetch=False,
-        )
-        mark_classified(user_id, ext, provider="gmail")
-        with patch(
-            "services.email_triage_service.triage_and_store_synced_message"
-        ) as mock_triage:
-            if should_classify_email(user_id, ext, "gmail", force=False):
-                mock_triage(user_id, external_id=ext, subject="", body="")
-            mock_triage.assert_not_called()
+        _ensure_workflow_test_user(user_id)
+        try:
+            mark_classified(user_id, ext, provider="gmail")
+            with patch(
+                "services.email_triage_service.triage_and_store_synced_message"
+            ) as mock_triage:
+                if should_classify_email(user_id, ext, "gmail", force=False):
+                    mock_triage(user_id, external_id=ext, subject="", body="")
+                mock_triage.assert_not_called()
+        finally:
+            _cleanup_workflow_test_user(user_id)
 
 
 class TestReclassifyService(unittest.TestCase):
     def setUp(self):
         ensure_email_workflow_state_table()
         ensure_email_classifications_table()
-        self.user_id = 1
+        self.user_id = _USER_WORKFLOW_BASE + 3
         self.ext_id = "wf-reclass-001"
+        _ensure_workflow_test_user(self.user_id)
 
     def tearDown(self):
-        for tbl in ("email_workflow_state", "email_classifications", "synced_emails"):
-            db_optimizer.execute_query(
-                f"DELETE FROM {tbl} WHERE user_id = ?",
-                (self.user_id,),
-                fetch=False,
-            )
+        _cleanup_workflow_test_user(self.user_id)
 
     def test_reclassify_overwrites_and_marks_reclassified(self):
-        db_optimizer.execute_query(
-            """
-            INSERT INTO synced_emails (
-                user_id, gmail_id, external_id, provider, subject, sender, body, date
-            ) VALUES (?, ?, ?, 'gmail', 'API usage threshold', 'noreply@openai.com', 'alert', '2026-05-20')
-            """,
-            (self.user_id, self.ext_id, self.ext_id),
-            fetch=False,
+        _insert_synced_email_row(
+            self.user_id,
+            self.ext_id,
+            subject="API usage threshold",
+            sender="noreply@openai.com",
+            body="alert",
         )
         upsert_classification(
             self.user_id,
@@ -290,16 +317,12 @@ class TestPhaseCWorkflowPersistence(unittest.TestCase):
     def setUp(self):
         ensure_email_workflow_state_table()
         ensure_email_classifications_table()
-        self.user_id = 1
+        self.user_id = _USER_WORKFLOW_BASE + 4
         self.ext_id = "wf-phasec-001"
+        _ensure_workflow_test_user(self.user_id)
 
     def tearDown(self):
-        for tbl in ("email_workflow_state", "email_classifications", "synced_emails"):
-            db_optimizer.execute_query(
-                f"DELETE FROM {tbl} WHERE user_id = ?",
-                (self.user_id,),
-                fetch=False,
-            )
+        _cleanup_workflow_test_user(self.user_id)
 
     def _seed_lead(self, ext_id: str, lead_score: int = 70):
         upsert_classification(
@@ -483,17 +506,14 @@ def _business_test_client():
 class TestPhaseCLiveMailArchive(unittest.TestCase):
     def setUp(self):
         ensure_email_workflow_state_table()
-        self.user_id = 1
+        ensure_email_classifications_table()
+        self.user_id = _USER_WORKFLOW_BASE + 5
         self.ext_id = "wf-live-archive-001"
+        _ensure_workflow_test_user(self.user_id)
         self.client = _business_test_client()
 
     def tearDown(self):
-        for tbl in ("email_workflow_state", "synced_emails"):
-            db_optimizer.execute_query(
-                f"DELETE FROM {tbl} WHERE user_id = ?",
-                (self.user_id,),
-                fetch=False,
-            )
+        _cleanup_workflow_test_user(self.user_id)
 
     @patch("integrations.gmail.gmail_client.gmail_client")
     @patch("routes.business.get_current_user_id")
@@ -505,14 +525,11 @@ class TestPhaseCLiveMailArchive(unittest.TestCase):
         gmail_service.users().messages().modify().execute.return_value = {}
         mock_gmail_client.get_gmail_service_for_user.return_value = gmail_service
 
-        db_optimizer.execute_query(
-            """
-            INSERT INTO synced_emails (
-                user_id, gmail_id, external_id, provider, subject, sender, body, date, labels
-            ) VALUES (?, ?, ?, 'gmail', 'Sub', 'a@b.com', 'body', '2026-05-20', ?)
-            """,
-            (self.user_id, self.ext_id, self.ext_id, '["INBOX","UNREAD"]'),
-            fetch=False,
+        _insert_synced_email_row(
+            self.user_id,
+            self.ext_id,
+            subject="Sub",
+            labels='["INBOX","UNREAD"]',
         )
 
         response = self.client.post(
@@ -576,14 +593,11 @@ class TestPhaseCLiveMailArchive(unittest.TestCase):
             },
         )
         mark_classified(self.user_id, ext, provider="gmail")
-        db_optimizer.execute_query(
-            """
-            INSERT INTO synced_emails (
-                user_id, gmail_id, external_id, provider, subject, sender, body, date, labels
-            ) VALUES (?, ?, ?, 'gmail', 'Sub', 'a@b.com', 'body', '2026-05-20', ?)
-            """,
-            (self.user_id, ext, ext, '["INBOX","UNREAD"]'),
-            fetch=False,
+        _insert_synced_email_row(
+            self.user_id,
+            ext,
+            subject="Sub",
+            labels='["INBOX","UNREAD"]',
         )
 
         response = self.client.post(
