@@ -20,6 +20,28 @@ logger = logging.getLogger(__name__)
 pinecone = None
 
 
+class PineconeUnavailableError(RuntimeError):
+    """Raised when PINECONE_API_KEY is set but Pinecone cannot be used for an operation."""
+
+
+def _env_truthy(name: str) -> bool:
+    return (os.getenv(name) or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def prefer_hash_embeddings_at_init() -> bool:
+    """
+    When true, MinimalVectorSearch must not import sentence_transformers/torch at __init__.
+    Used for tests, eval CLI, and SKIP_HEAVY_DEP_CHECKS paths.
+    """
+    if _env_truthy("SKIP_HEAVY_DEP_CHECKS"):
+        return True
+    if _env_truthy("FIKIRI_DISABLE_SENTENCE_TRANSFORMERS"):
+        return True
+    if (os.getenv("FIKIRI_VECTOR_EMBEDDINGS") or "").strip().lower() == "hash":
+        return True
+    return False
+
+
 @dataclass
 class QueryResponse:
     matches: List[Any]
@@ -50,24 +72,58 @@ class MinimalVectorSearch:
 
         self.sentence_transformer = None
         self._SentenceTransformer = None
+        self._sentence_transformers_import_attempted = False
         self._use_embedding_client = False
         self.openai_client = None
         self.embedding_model = "hash"
+        self._pinecone_configured = False
+        self._pinecone_index_ready = False
+        self._pinecone_api_key: Optional[str] = None
+        self._pinecone_index_name: str = "fikiri-vectors"
+        self._pinecone_embedding_model_env: Optional[str] = None
 
         self._initialize_pinecone()
-        self._initialize_embedding_models()
-        if not self.use_pinecone:
+        self._configure_embedding_backend()
+        if not self._pinecone_configured:
             self.load_vector_db()
 
-    def _initialize_pinecone(self):
-        api_key = os.getenv("PINECONE_API_KEY")
+    def _force_local_vector_search(self) -> bool:
+        """In-memory / explicit opt-out paths must not lazy-connect to Pinecone."""
+        path = str(self.vector_db_path)
+        if path in (":memory:", ":mem:"):
+            return True
+        return _env_truthy("FIKIRI_FORCE_LOCAL_VECTOR_SEARCH")
+
+    def _initialize_pinecone(self) -> None:
+        """Parse Pinecone env only — no network I/O at construction time."""
+        api_key = (os.getenv("PINECONE_API_KEY") or "").strip()
         if not api_key:
+            return
+        self._pinecone_api_key = api_key
+        self._pinecone_index_name = os.getenv("PINECONE_INDEX_NAME", "fikiri-vectors")
+        self._pinecone_embedding_model_env = os.getenv("PINECONE_EMBEDDING_MODEL")
+        self._pinecone_configured = True
+
+    def _ensure_pinecone_index(self) -> None:
+        """
+        Lazily connect to Pinecone, ensure index exists, and cache per instance.
+        Raises PineconeUnavailableError when PINECONE_API_KEY is set but init fails.
+        """
+        if not self._pinecone_configured:
+            return
+        if self._pinecone_index_ready:
             return
         try:
             from pinecone import Pinecone, ServerlessSpec
-            index_name = os.getenv("PINECONE_INDEX_NAME", "fikiri-vectors")
-            pinecone_model = os.getenv("PINECONE_EMBEDDING_MODEL")
-            self.pinecone_client = Pinecone(api_key=api_key)
+        except ImportError as exc:
+            raise PineconeUnavailableError(
+                "Pinecone SDK not installed; install pinecone or unset PINECONE_API_KEY"
+            ) from exc
+
+        index_name = self._pinecone_index_name
+        pinecone_model = self._pinecone_embedding_model_env
+        try:
+            self.pinecone_client = Pinecone(api_key=self._pinecone_api_key)
             existing_indexes = [idx.name for idx in self.pinecone_client.list_indexes()]
             if index_name not in existing_indexes:
                 if pinecone_model:
@@ -99,49 +155,94 @@ class MinimalVectorSearch:
             self.use_pinecone = True
             try:
                 index_info = self.pinecone_client.describe_index(index_name)
-                if hasattr(index_info, 'dimension') and index_info.dimension:
+                if hasattr(index_info, "dimension") and index_info.dimension:
                     self.dimension = index_info.dimension
             except Exception:
                 pass
-            if self.use_pinecone and self.dimension:
+            if self.dimension:
                 self.pinecone_dimension = self.dimension
-        except ImportError:
-            logger.info("Pinecone SDK not installed, using local storage")
-        except Exception as e:
-            logger.warning("Pinecone failed: %s, using local storage", e)
+            self._pinecone_index_ready = True
+            logger.info("Pinecone index ready: %s", index_name)
+        except PineconeUnavailableError:
+            raise
+        except Exception as exc:
+            raise PineconeUnavailableError(
+                f"Pinecone initialization failed for index '{index_name}': {exc}"
+            ) from exc
 
-    def _initialize_embedding_models(self):
-        if self.use_pinecone and os.getenv("PINECONE_EMBEDDING_MODEL"):
+    def _pinecone_active(self) -> bool:
+        """True when this instance should route the current call through Pinecone."""
+        if self._force_local_vector_search():
+            return False
+        # Unit tests inject a mock index without going through lazy connect.
+        if self.use_pinecone and self.pinecone_index is not None:
+            return True
+        if not self._pinecone_configured:
+            return False
+        if not self._pinecone_index_ready:
+            self._ensure_pinecone_index()
+        return self.use_pinecone
+
+    def _configure_embedding_backend(self) -> None:
+        """
+        Select embedding backend without importing sentence_transformers/torch.
+        Heavy models load lazily on first _generate_embedding() when needed.
+        """
+        if self._pinecone_configured and self._pinecone_embedding_model_env:
             self._SentenceTransformer = None
             self._use_embedding_client = False
             self.embedding_model = "hash"
             return
 
+        if prefer_hash_embeddings_at_init():
+            self._SentenceTransformer = None
+            self._use_embedding_client = False
+            self.embedding_model = "hash"
+            return
+
+        if not self.dimension:
+            self.dimension = 384
+        self.embedding_model = "sentence_transformers_deferred"
+
+        try:
+            from core.ai.embedding_client import is_embedding_available, get_embedding_dimension
+
+            if is_embedding_available():
+                self._use_embedding_client = True
+                self.dimension = get_embedding_dimension()
+                self.embedding_model = "openai"
+                if self._pinecone_configured and getattr(self, "pinecone_dimension", None) and self.dimension != self.pinecone_dimension:
+                    self._use_embedding_client = False
+                    self.embedding_model = "sentence_transformers_deferred"
+                    self.dimension = self.pinecone_dimension
+        except Exception:
+            pass
+
+    def _resolve_sentence_transformer_class(self):
+        """Lazy import — avoids torch/sentence_transformers at module or __init__ time."""
+        if self._SentenceTransformer is not None:
+            return self._SentenceTransformer
+        if prefer_hash_embeddings_at_init():
+            return None
+        if self._sentence_transformers_import_attempted:
+            return None
+        self._sentence_transformers_import_attempted = True
         try:
             from sentence_transformers import SentenceTransformer
-            self._SentenceTransformer = SentenceTransformer
-            if not self.dimension:
-                self.dimension = 384
-            self.embedding_model = "sentence_transformers"
-            if self.use_pinecone and self.dimension not in (384, None):
-                self._SentenceTransformer = None
-                self.embedding_model = "hash"
-        except Exception:
-            self._SentenceTransformer = None
 
-        if not self._SentenceTransformer:
-            try:
-                from core.ai.embedding_client import is_embedding_available, get_embedding_dimension
-                if is_embedding_available():
-                    self._use_embedding_client = True
-                    self.dimension = get_embedding_dimension()
-                    self.embedding_model = "openai"
-                    if self.use_pinecone and getattr(self, "pinecone_dimension", None) and self.dimension != self.pinecone_dimension:
-                        self._use_embedding_client = False
-                        self.embedding_model = "hash"
-                        self.dimension = self.pinecone_dimension
-            except Exception:
-                pass
+            self._SentenceTransformer = SentenceTransformer
+            if self.embedding_model == "sentence_transformers_deferred":
+                self.embedding_model = "sentence_transformers"
+            return SentenceTransformer
+        except Exception as exc:
+            logger.warning(
+                "sentence_transformers unavailable; using hash embeddings: %s",
+                exc,
+            )
+            self._SentenceTransformer = None
+            if self.embedding_model == "sentence_transformers_deferred":
+                self.embedding_model = "hash"
+            return None
 
     def load_vector_db(self) -> bool:
         try:
@@ -183,7 +284,7 @@ class MinimalVectorSearch:
         doc_text = text if text is not None else content
         if doc_text is None:
             raise ValueError("text/content is required")
-        if self.use_pinecone:
+        if self._pinecone_active():
             return self._add_document_pinecone(doc_text, metadata)
         return self._add_document_local(doc_text, metadata)
 
@@ -218,7 +319,7 @@ class MinimalVectorSearch:
         return hash(doc_id) % (10**9)
 
     def upsert_document(self, vector_id: str, text: str, metadata: Dict[str, Any] = None) -> bool:
-        if self.use_pinecone:
+        if self._pinecone_active():
             return self._upsert_document_pinecone(vector_id, text, metadata)
         return self._upsert_document_local(vector_id, text, metadata)
 
@@ -296,7 +397,7 @@ class MinimalVectorSearch:
             return False
 
     def delete_document_by_id(self, vector_id: str) -> bool:
-        if self.use_pinecone:
+        if self._pinecone_active():
             try:
                 self.pinecone_index.delete(ids=[vector_id])
                 return True
@@ -314,7 +415,7 @@ class MinimalVectorSearch:
             return False
 
     def search_similar(self, query: str, top_k: int = 5, threshold: float = 0.7, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        if self.use_pinecone:
+        if self._pinecone_active():
             return self._search_similar_pinecone(query, top_k, threshold, tenant_id)
         return self._search_similar_local(query, top_k, threshold, tenant_id)
 
@@ -415,16 +516,21 @@ class MinimalVectorSearch:
         )
 
     def _get_sentence_transformer(self):
-        if self.sentence_transformer is None and self._SentenceTransformer:
+        st_class = self._resolve_sentence_transformer_class()
+        if self.sentence_transformer is None and st_class:
             try:
-                self.sentence_transformer = self._SentenceTransformer('all-MiniLM-L6-v2')
-            except Exception:
+                self.sentence_transformer = st_class("all-MiniLM-L6-v2")
+            except Exception as exc:
+                logger.warning("SentenceTransformer model load failed: %s", exc)
                 self.sentence_transformer = None
         return self.sentence_transformer
 
     def _generate_embedding(self, text: str) -> List[float]:
         try:
-            if self._SentenceTransformer:
+            if self.embedding_model in (
+                "sentence_transformers",
+                "sentence_transformers_deferred",
+            ):
                 model = self._get_sentence_transformer()
                 if model:
                     return model.encode(text).tolist()

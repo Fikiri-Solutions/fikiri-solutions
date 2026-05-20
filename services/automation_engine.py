@@ -485,9 +485,23 @@ class AutomationEngine:
         user_id: int,
         *,
         automation_source: str = "engine",
+        runtime_context: Any = None,
     ) -> Dict[str, Any]:
         """Execute automation rules based on trigger"""
         trigger_data = trigger_data or {}
+        if runtime_context is not None:
+            ctx_user = getattr(runtime_context, "user_id", None)
+            if ctx_user is not None and int(ctx_user) != int(user_id):
+                logger.warning(
+                    "execute_automation_rules: runtime_context user_id mismatch job=%s",
+                    getattr(runtime_context, "job_id", None),
+                )
+                runtime_context = None
+            else:
+                job_id = getattr(runtime_context, "job_id", None)
+                if job_id and "sync_job_id" not in trigger_data:
+                    trigger_data = dict(trigger_data)
+                    trigger_data["sync_job_id"] = job_id
         with enter_automation_run_if_missing(trigger_data, automation_source) as created_ctx:
             if created_ctx:
                 record_automation_run_event(
@@ -1094,6 +1108,17 @@ class AutomationEngine:
                  result.get('error')),
                 fetch=False
             )
+            try:
+                from analytics.service_usage_analytics import record_automation_service_usage
+
+                record_automation_service_usage(
+                    user_id,
+                    rule_id=rule_id,
+                    status="success" if result.get("success") else "error",
+                    correlation_id=str(trigger_data.get("synced_email_id") or trigger_data.get("message_id") or ""),
+                )
+            except Exception as analytics_exc:
+                logger.debug("automation service analytics skipped: %s", analytics_exc)
         except Exception as e:
             logger.error(f"Error logging execution: {e}")
 

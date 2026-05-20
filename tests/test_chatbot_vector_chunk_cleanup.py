@@ -184,7 +184,7 @@ class TestKBDeleteChunkLifecycle(unittest.TestCase):
 
 
 class TestRevectorizeRouteMetadata(unittest.TestCase):
-    @patch("core.chatbot_smart_faq_api.ingest_kb_text_to_vector_store")
+    @patch("core.chatbot_smart_faq_api.ingest_kb_text_to_vector_store_tracked")
     def test_ingest_kb_vectors_passes_cleanup_metadata_on_revectorize(self, mock_ingest):
         from core.chatbot_smart_faq_api import _ingest_kb_vectors
 

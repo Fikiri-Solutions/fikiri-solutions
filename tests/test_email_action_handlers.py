@@ -193,7 +193,7 @@ class TestAutomationEmailActionHandler(unittest.TestCase):
 
         out = self.handler.execute_send_email(
             {"subject": "Hi", "body": "Body"},
-            {"sender_email": "Lead <lead@example.com>", "_automation_rule_id": 1},
+            {"sender_email": "Lead <lead@gmail.com>", "_automation_rule_id": 1},
             42,
         )
 
@@ -215,7 +215,7 @@ class TestAutomationEmailActionHandler(unittest.TestCase):
 
         out = self.handler.execute_send_email(
             {"subject": "Hi", "body": "Body"},
-            {"sender_email": "lead@example.com", "_automation_rule_id": 2},
+            {"sender_email": "lead@gmail.com", "_automation_rule_id": 2},
             99,
         )
 
@@ -226,7 +226,7 @@ class TestAutomationEmailActionHandler(unittest.TestCase):
     @patch("services.automation_actions.email_action.automation_safety_manager")
     @patch("services.automation_actions.email_action.db_optimizer")
     def test_delayed_send_safety_blocked(self, mock_db, mock_safety):
-        mock_db.execute_query.return_value = [{"email": "lead@example.com"}]
+        mock_db.execute_query.return_value = [{"email": "lead@gmail.com"}]
         mock_safety.check_rate_limits.return_value = {
             "allowed": False,
             "message": "Global automation kill-switch is enabled",
@@ -234,7 +234,7 @@ class TestAutomationEmailActionHandler(unittest.TestCase):
 
         out = self.handler.execute_send_email(
             {"delay_minutes": 5, "body": "Later"},
-            {"lead_id": 4, "sender_email": "lead@example.com"},
+            {"lead_id": 4, "sender_email": "lead@gmail.com"},
             1,
         )
 

@@ -1,9 +1,11 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Archive, Loader2, RefreshCw, ShieldAlert, Tag } from 'lucide-react'
 import { apiClient } from '../services/apiClient'
+import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/Toast'
 import { EmptyState } from '../components/EmptyState'
+import { loadGmailLookbackId } from '../utils/gmailLookbackStorage'
 import {
   DESTRUCTIVE_TRIAGE_ACTIONS,
   EMAIL_COMMAND_CENTER_TABS,
@@ -24,6 +26,7 @@ export interface TriageListEmail {
 
 const BULK_ACTIONS = [
   { id: 'archive', label: 'Archive' },
+  { id: 'dismiss', label: 'Dismiss' },
   { id: 'mark_read', label: 'Mark read' },
   { id: 'mark_unread', label: 'Mark unread' },
   { id: 'label', label: 'Add Gmail label' },
@@ -49,17 +52,42 @@ function normalizeRow(raw: Record<string, unknown>): TriageListEmail | null {
 }
 
 export const EmailCommandCenter: React.FC = () => {
+  const { user } = useAuth()
   const { addToast } = useToast()
   const queryClient = useQueryClient()
   const [category, setCategory] = useState<TriageCategoryId>('business_lead')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkAction, setBulkAction] = useState<string>('archive')
+  const [syncPending, setSyncPending] = useState(false)
+  const prevSyncingRef = useRef(false)
+
+  const { data: syncStatus } = useQuery({
+    queryKey: ['gmail-sync-status', user?.id],
+    queryFn: () => apiClient.getEmailSyncStatus(),
+    enabled: !!user,
+    staleTime: 10_000,
+    refetchInterval: (query) => (query.state.data?.syncing ? 3000 : 15_000),
+  })
 
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['email-triage', category],
+    queryKey: ['email-triage', category, user?.id],
     queryFn: () => apiClient.getEmailTriage({ category, limit: 20 }),
-    staleTime: 60_000,
+    enabled: !!user,
+    staleTime: 30_000,
   })
+
+  const syncing = Boolean(syncStatus?.syncing)
+  const unclassifiedCount = data?.unclassified_synced_count ?? 0
+  const categoryCounts = data?.category_counts ?? {}
+  const syncedTotal = syncStatus?.total_emails ?? 0
+
+  useEffect(() => {
+    if (prevSyncingRef.current && !syncing) {
+      queryClient.invalidateQueries({ queryKey: ['email-triage'] })
+      void refetch()
+    }
+    prevSyncingRef.current = syncing
+  }, [syncing, queryClient, refetch])
 
   const emails = useMemo(() => {
     const rows = (data?.emails ?? []) as Record<string, unknown>[]
@@ -83,6 +111,40 @@ export const EmailCommandCenter: React.FC = () => {
   }, [emails])
 
   const clearSelection = useCallback(() => setSelected(new Set()), [])
+
+  const classifyUnclassifiedMutation = useMutation({
+    mutationFn: () => apiClient.classifyEmailTriageUnclassified(50),
+    onSuccess: (res) => {
+      addToast({
+        type: 'success',
+        title: 'Synced mail classified',
+        message: `${res.count ?? 0} message(s) triaged. Check other tabs if Leads is empty.`,
+      })
+      queryClient.invalidateQueries({ queryKey: ['email-triage'] })
+      refetch()
+    },
+    onError: () => {
+      addToast({ type: 'error', title: 'Classification failed' })
+    },
+  })
+
+  const runGmailSync = useCallback(async () => {
+    setSyncPending(true)
+    try {
+      await apiClient.triggerGmailSync({ lookback: loadGmailLookbackId('90d') })
+      addToast({
+        type: 'success',
+        title: 'Gmail sync started',
+        message: 'Command Center updates when sync finishes. Try Review Queue or classify synced mail.',
+      })
+      queryClient.invalidateQueries({ queryKey: ['gmail-sync-status', user?.id] })
+      queryClient.invalidateQueries({ queryKey: ['email-triage'] })
+    } catch {
+      addToast({ type: 'error', title: 'Sync failed', message: 'Could not start Gmail sync.' })
+    } finally {
+      setSyncPending(false)
+    }
+  }, [addToast, queryClient, user?.id])
 
   const classifyMutation = useMutation({
     mutationFn: (ids: string[]) => apiClient.classifyEmailTriage(ids),
@@ -161,7 +223,14 @@ export const EmailCommandCenter: React.FC = () => {
     })
   }, [selected, bulkAction, bulkMutation, addToast])
 
-  const busy = isLoading || isFetching || bulkMutation.isPending || classifyMutation.isPending
+  const busy =
+    isLoading ||
+    isFetching ||
+    bulkMutation.isPending ||
+    classifyMutation.isPending ||
+    classifyUnclassifiedMutation.isPending ||
+    syncPending ||
+    syncing
 
   return (
     <div
@@ -174,18 +243,48 @@ export const EmailCommandCenter: React.FC = () => {
           <div>
             <h2 className="text-lg font-bold text-brand-text dark:text-white">Command Center</h2>
             <p className="text-xs text-brand-text/60 dark:text-gray-400">
-              Organize synced mail by AI triage. Nothing is deleted without your confirmation.
+              AI-assisted inbox organization and lead capture from synced mail (not live Gmail).
+              You review bulk actions; nothing is deleted without confirmation.
             </p>
+            {syncing ? (
+              <p className="mt-1 text-xs text-sky-700 dark:text-sky-300">
+                Gmail sync in progress…
+                {syncStatus?.progress != null ? ` ${syncStatus.progress}%` : ''}
+                {syncStatus?.emails_synced_this_job != null
+                  ? ` · ${syncStatus.emails_synced_this_job} imported this run`
+                  : ''}
+              </p>
+            ) : syncedTotal > 0 ? (
+              <p className="mt-1 text-xs text-brand-text/50 dark:text-gray-500">
+                {syncedTotal} synced
+                {unclassifiedCount > 0 ? ` · ${unclassifiedCount} awaiting triage` : ''}
+              </p>
+            ) : null}
           </div>
-          <button
-            type="button"
-            onClick={() => refetch()}
-            disabled={busy}
-            className="flex h-11 w-11 items-center justify-center rounded-lg text-brand-text/70 hover:bg-gray-50 disabled:opacity-50 dark:hover:bg-gray-800"
-            aria-label="Refresh triage list"
-          >
-            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => void runGmailSync()}
+              disabled={busy}
+              className="inline-flex min-h-[44px] items-center gap-1 rounded-lg border border-brand-text/15 px-2.5 text-xs font-medium dark:border-gray-600 sm:text-sm"
+            >
+              {syncPending || syncing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Sync inbox
+            </button>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              disabled={busy}
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-brand-text/70 hover:bg-gray-50 disabled:opacity-50 dark:hover:bg-gray-800"
+              aria-label="Refresh triage list"
+            >
+              <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         </div>
 
         <div
@@ -210,12 +309,17 @@ export const EmailCommandCenter: React.FC = () => {
               }`}
             >
               {tab.label}
+              {categoryCounts[tab.id] != null && categoryCounts[tab.id] > 0
+                ? ` (${categoryCounts[tab.id]})`
+                : ''}
             </button>
           ))}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <select
+            id="email-command-center-bulk-action"
+            name="bulk_action"
             value={bulkAction}
             onChange={(e) => setBulkAction(e.target.value)}
             className="min-h-[44px] rounded-lg border border-brand-text/15 bg-white px-2 text-sm dark:border-gray-600 dark:bg-gray-900"
@@ -249,6 +353,17 @@ export const EmailCommandCenter: React.FC = () => {
             <Tag className="h-4 w-4" />
             Re-classify
           </button>
+          {unclassifiedCount > 0 ? (
+            <button
+              type="button"
+              onClick={() => classifyUnclassifiedMutation.mutate()}
+              disabled={busy}
+              className="inline-flex min-h-[44px] items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-100"
+            >
+              <Tag className="h-4 w-4" />
+              Classify synced ({unclassifiedCount})
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={selectAllVisible}
@@ -274,7 +389,15 @@ export const EmailCommandCenter: React.FC = () => {
           <EmptyState
             icon={ShieldAlert}
             title={`No emails in ${tabLabel}`}
-            description="Run Gmail sync from Live mail, then re-classify messages here. Classifications appear after sync and triage."
+            description={
+              syncing
+                ? 'Gmail sync is running. This list will refresh when import and triage finish.'
+                : unclassifiedCount > 0
+                  ? `${unclassifiedCount} synced message(s) need triage. Click “Classify synced” or try Review Queue.`
+                  : syncedTotal === 0
+                    ? 'Click Sync inbox to import mail from Gmail. Live mail tab does not feed Command Center until sync runs.'
+                    : `No messages in ${tabLabel}. Check other tabs (e.g. Review Queue) or run Sync inbox again.`
+            }
           />
         ) : (
           <ul className="divide-y divide-gray-200/80 dark:divide-gray-700/80">
@@ -286,6 +409,8 @@ export const EmailCommandCenter: React.FC = () => {
                   className={`flex gap-3 px-3 py-3 sm:px-4 ${checked ? 'bg-sky-50/80 dark:bg-sky-950/30' : ''}`}
                 >
                   <input
+                    id={`email-cc-select-${email.id}`}
+                    name="selected_email_ids"
                     type="checkbox"
                     className="mt-1 h-5 w-5 shrink-0 rounded border-gray-300"
                     checked={checked}

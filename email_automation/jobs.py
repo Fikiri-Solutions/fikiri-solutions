@@ -43,20 +43,10 @@ def _frontend_base() -> str:
     return app_config.get_frontend_url().rstrip("/")
 
 
-# IANA example.{com,net,org} publish Null MX — SMTP accept + DSN bounce to FROM.
-# RFC 2606: *.test / *.invalid are reserved; do not attempt real delivery.
-_RESERVED_IANA_EXAMPLE_DOMAINS = frozenset({"example.com", "example.net", "example.org"})
+from core.reserved_email_recipients import should_skip_real_email_delivery
 
-
-def _should_skip_smtp_delivery(to_email: str) -> bool:
-    if not to_email or "@" not in to_email:
-        return False
-    domain = to_email.rsplit("@", 1)[-1].strip().lower()
-    if domain in _RESERVED_IANA_EXAMPLE_DOMAINS:
-        return True
-    if domain.endswith(".test") or domain.endswith(".invalid"):
-        return True
-    return False
+# Backward-compatible alias for SMTP job queue.
+_should_skip_smtp_delivery = should_skip_real_email_delivery
 
 
 def _is_test_mode() -> bool:

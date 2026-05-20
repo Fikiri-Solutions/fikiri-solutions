@@ -153,6 +153,7 @@ from analytics.dashboard_api import (
     get_industry_prompts,
     get_industry_usage,
 )
+from analytics.service_usage_api import service_usage_bp
 
 # Dev test routes (development only)
 if os.getenv('FLASK_ENV') == 'development':
@@ -1057,6 +1058,7 @@ def register_blueprints(app):
         (monitoring_dashboard_bp, 'monitoring_dashboard'),
         (ai_bp, 'ai'),
         (dashboard_bp, 'dashboard'),
+        (service_usage_bp, 'service_usage'),
         (auth_bp, 'auth'),
         (ai_assistant_demo_bp, 'ai_assistant_demo'),
         (business_bp, 'routes_business'),

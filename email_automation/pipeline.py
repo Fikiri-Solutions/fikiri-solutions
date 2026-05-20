@@ -34,6 +34,11 @@ from crm.service import enhanced_crm_service
 from services.email_capture_workflow import run_inbound_email_workflow
 from core.ai.policies import evaluate_email_action_policy
 
+try:
+    from email_automation.runtime_context import EmailAutomationRuntimeContext
+except ImportError:
+    EmailAutomationRuntimeContext = None  # type: ignore[misc, assignment]
+
 __all__ = [
     "MinimalEmailParser",
     "MinimalEmailActions",
@@ -47,6 +52,28 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
+
+
+def _build_mailbox_actions(
+    actions: Optional[MinimalEmailActions],
+    *,
+    gmail_service: Any = None,
+) -> MinimalEmailActions:
+    """
+    Reuse a per-sync (or per-request) MinimalEmailActions stack.
+
+    Call only on the mailbox-AI path — not for inbound-only orchestration.
+    """
+    if actions is not None:
+        if gmail_service is not None:
+            actions.services["gmail"] = gmail_service
+            if getattr(actions, "gmail_service", None) is None:
+                actions.gmail_service = gmail_service
+        return actions
+    services: Dict[str, Any] = {"ai_assistant": MinimalAIEmailAssistant()}
+    if gmail_service is not None:
+        services["gmail"] = gmail_service
+    return MinimalEmailActions(services=services)
 
 
 def build_parsed_email_for_pipeline(
@@ -269,6 +296,7 @@ def orchestrate_incoming(
     provider: str = "gmail",
     mailbox_owner_email: Optional[str] = None,
     run_mailbox_ai: bool = True,
+    runtime_context: Optional["EmailAutomationRuntimeContext"] = None,
 ) -> dict:
     """
     Inbound mailbox path (unified):
@@ -294,11 +322,28 @@ def orchestrate_incoming(
         }
 
     corr = correlation_id or trace_id or str(uuid.uuid4())
+    if runtime_context is not None:
+        if not runtime_context.assert_user_scope(user_id):
+            logger.warning(
+                "runtime_context user_id mismatch job=%s ctx_user=%s caller_user=%s",
+                runtime_context.job_id,
+                runtime_context.user_id,
+                user_id,
+                extra={
+                    "event": "email.sync.runtime_context.user_mismatch",
+                    "service": "email",
+                    "job_id": runtime_context.job_id,
+                },
+            )
+            runtime_context = None
+        elif runtime_context.correlation_id:
+            corr = correlation_id or runtime_context.correlation_id or corr
     parsed["_correlation_id"] = corr
 
-    actions = actions or MinimalEmailActions(services={"ai_assistant": MinimalAIEmailAssistant()})
-
-    parser = MinimalEmailParser()
+    if runtime_context is not None and runtime_context.parser is not None:
+        parser = runtime_context.parser
+    else:
+        parser = MinimalEmailParser()
     subject = parser.get_subject(parsed)
     body_text = parser.get_body_text(parsed) or parsed.get("snippet", "")
     from_header = parser.get_sender(parsed)
@@ -319,6 +364,7 @@ def orchestrate_incoming(
             provider=provider,
             correlation_id=corr,
             mailbox_owner_email=mailbox_owner_email,
+            runtime_context=runtime_context,
         )
     except Exception as exc:
         logger.warning("run_inbound_email_workflow failed in orchestrate_incoming: %s", exc)
@@ -376,7 +422,23 @@ def orchestrate_incoming(
         source="email_automation.pipeline",
     )
 
-    ai_assistant = actions.services.get("ai_assistant") or MinimalAIEmailAssistant()
+    effective_actions = actions
+    if runtime_context is not None and runtime_context.actions is not None:
+        effective_actions = runtime_context.actions
+    gmail_svc = None
+    if effective_actions is not None:
+        gmail_svc = effective_actions.services.get("gmail")
+    actions = _build_mailbox_actions(effective_actions, gmail_service=gmail_svc)
+    ai_assistant = actions.services.get("ai_assistant")
+    if ai_assistant is None and (
+        runtime_context is None or runtime_context.ai_assistant is None
+    ):
+        ai_assistant = MinimalAIEmailAssistant()
+        actions.services["ai_assistant"] = ai_assistant
+    elif ai_assistant is None and runtime_context is not None:
+        ai_assistant = runtime_context.ai_assistant
+        if ai_assistant is not None:
+            actions.services["ai_assistant"] = ai_assistant
     thread_history = _load_thread_history(
         user_id,
         thread_id=thread_id,

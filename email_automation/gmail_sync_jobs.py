@@ -313,6 +313,13 @@ class GmailSyncJobManager:
             """, fetch=False)
             
             logger.info("✅ Gmail sync tables initialized")
+            try:
+                from core.durable_jobs import ensure_background_jobs_table, ensure_gmail_sync_job_durable_columns
+
+                ensure_background_jobs_table()
+                ensure_gmail_sync_job_durable_columns()
+            except Exception as durable_exc:
+                logger.debug("durable jobs ensure skipped: %s", durable_exc)
             
         except Exception as e:
             logger.error(f"❌ Gmail sync table initialization failed: {e}")
@@ -344,6 +351,7 @@ class GmailSyncJobManager:
         metadata: Dict[str, Any] = None,
         *,
         sync_params: Optional[GmailSyncRequestParams] = None,
+        correlation_id: Optional[str] = None,
     ) -> str:
         """Queue a Gmail sync job for a user."""
         try:
@@ -351,6 +359,39 @@ class GmailSyncJobManager:
             job_meta = dict(metadata or {})
             if sync_params is not None:
                 job_meta.update(sync_params_to_job_metadata(sync_params))
+
+            try:
+                from core.durable_jobs import (
+                    JOB_KIND_GMAIL_SYNC,
+                    build_idempotency_key,
+                    enqueue_durable_job,
+                    find_active_job_by_idempotency,
+                    resolve_correlation_id,
+                )
+
+                idem = build_idempotency_key("gmail_sync", "user", user_id, "active")
+                existing = find_active_job_by_idempotency(idem, job_kind=JOB_KIND_GMAIL_SYNC)
+                if existing and existing.get("external_ref"):
+                    logger.info(
+                        "Skipping duplicate Gmail sync for user %s (job %s)",
+                        user_id,
+                        existing.get("external_ref"),
+                    )
+                    return str(existing["external_ref"])
+                cid = resolve_correlation_id(correlation_id)
+                job_meta["correlation_id"] = cid
+                durable_id = enqueue_durable_job(
+                    JOB_KIND_GMAIL_SYNC,
+                    user_id=user_id,
+                    payload={"sync_type": sync_type, "metadata": job_meta},
+                    idempotency_key=idem,
+                    correlation_id=cid,
+                    external_ref=job_id,
+                )
+                if durable_id is None and existing:
+                    return str(existing.get("external_ref") or job_id)
+            except Exception as durable_exc:
+                logger.debug("durable job enqueue skipped for gmail sync: %s", durable_exc)
 
             # Create job record
             db_optimizer.execute_query("""
@@ -403,12 +444,42 @@ class GmailSyncJobManager:
         except ImportError:
             trace_id = trace_id or str(uuid.uuid4())
         
+        durable_bg_id: Optional[str] = None
+        try:
+            from core.durable_jobs import (
+                JOB_KIND_GMAIL_SYNC,
+                find_durable_job_by_external_ref,
+                link_external_ref,
+                mark_job_completed,
+                mark_job_failed,
+                mark_job_running,
+                enqueue_durable_job,
+            )
+
+            bg = find_durable_job_by_external_ref(job_id, job_kind=JOB_KIND_GMAIL_SYNC)
+            if bg:
+                durable_bg_id = bg["job_id"]
+            else:
+                durable_bg_id = enqueue_durable_job(
+                    JOB_KIND_GMAIL_SYNC,
+                    user_id=None,
+                    payload={"gmail_job_id": job_id},
+                    external_ref=job_id,
+                    correlation_id=trace_id,
+                )
+            if durable_bg_id:
+                link_external_ref(durable_bg_id, job_id)
+                mark_job_running(durable_bg_id)
+        except Exception as durable_exc:
+            logger.debug("durable job start tracking skipped: %s", durable_exc)
+
         logger.info(f"🔄 Starting to process sync job: {job_id}", extra={
             'event': 'gmail_sync_started',
             'service': 'email',
             'severity': 'INFO',
             'trace_id': trace_id,
-            'job_id': job_id
+            'job_id': job_id,
+            'correlation_id': trace_id,
         })
         try:
             # Get job details
@@ -516,7 +587,38 @@ class GmailSyncJobManager:
             except Exception as status_error:
                 logger.warning(f"⚠️ Could not update user_sync_status: {status_error}")
             
-            logger.info(f"✅ Completed Gmail sync job: {job_id}")
+            logger.info(
+                "Completed Gmail sync job: %s",
+                job_id,
+                extra={
+                    "event": "gmail_sync_completed",
+                    "service": "email",
+                    "severity": "INFO",
+                    "trace_id": trace_id,
+                    "job_id": job_id,
+                    "user_id": user_id,
+                    "correlation_id": trace_id,
+                    "emails_synced": sync_result.get("emails_synced"),
+                    "sync_status": (
+                        "partial" if completed_meta.get("has_more") else "completed"
+                    ),
+                    "has_more": bool(completed_meta.get("has_more")),
+                },
+            )
+
+            try:
+                if durable_bg_id:
+                    from core.durable_jobs import mark_job_completed
+
+                    mark_job_completed(
+                        durable_bg_id,
+                        {
+                            "emails_synced": sync_result["emails_synced"],
+                            "has_more": bool(completed_meta.get("has_more")),
+                        },
+                    )
+            except Exception:
+                pass
             
             return {
                 'success': True,
@@ -531,6 +633,24 @@ class GmailSyncJobManager:
         except Exception as e:
             logger.error(f"❌ Gmail sync job processing failed: {e}")
             
+            try:
+                if durable_bg_id:
+                    from core.durable_jobs import mark_job_failed
+
+                    fail_info = mark_job_failed(durable_bg_id, str(e), allow_retry=True)
+                    if fail_info.get("will_retry"):
+                        db_optimizer.execute_query(
+                            """
+                            UPDATE gmail_sync_jobs
+                            SET status = 'retrying', error_message = ?
+                            WHERE job_id = ?
+                            """,
+                            (str(e)[:2000], job_id),
+                            fetch=False,
+                        )
+            except Exception:
+                pass
+
             # Update job with error
             try:
                 db_optimizer.execute_query("""
@@ -608,17 +728,22 @@ class GmailSyncJobManager:
             contacts_found = 0
             leads_identified = 0
             mailbox_automation_enabled = os.getenv("MAILBOX_AUTOMATION_ENABLED", "").lower() in {"1", "true", "yes"}
-            actions = None
+            sync_runtime = None
             if mailbox_automation_enabled:
-                try:
-                    from email_automation.actions import MinimalEmailActions
-                    from email_automation.ai_assistant import MinimalAIEmailAssistant
-                    actions = MinimalEmailActions(services={
-                        "gmail": service,
-                        "ai_assistant": MinimalAIEmailAssistant()
-                    })
-                except Exception as init_error:
-                    logger.warning("Mailbox automation init failed: %s", init_error)
+                from email_automation.runtime_context import try_create_gmail_sync_runtime
+
+                sync_runtime = try_create_gmail_sync_runtime(
+                    job_id,
+                    user_id,
+                    gmail_service=service,
+                    mailbox_automation_enabled=True,
+                )
+                if sync_runtime is None:
+                    logger.warning(
+                        "Mailbox automation init failed for Gmail sync job %s (user_id=%s)",
+                        job_id,
+                        user_id,
+                    )
                     mailbox_automation_enabled = False
             
             for message in messages:
@@ -650,27 +775,63 @@ class GmailSyncJobManager:
                             logger.debug("email.received event skipped: %s", ev_err)
 
                         try:
-                            from email_automation.parser import MinimalEmailParser as _TriageParser
+                            from email_automation.email_workflow_state import (
+                                mark_classification_failed,
+                                should_classify_email,
+                            )
                             from services.email_triage_service import triage_and_store_synced_message
 
-                            _tp = _TriageParser()
-                            _parsed_triage = _tp.parse_message(message)
-                            _subj = _tp.get_subject(_parsed_triage)
-                            _body = _tp.get_body_text(_parsed_triage) or ""
-                            _from = _tp.get_sender(_parsed_triage) or ""
-                            _addr = _from
-                            if "<" in _from and ">" in _from:
-                                _addr = _from.split("<")[1].split(">")[0].strip()
-                            triage_and_store_synced_message(
-                                user_id,
-                                external_id=str(message.get("id") or email_id),
-                                subject=_subj or "",
-                                body=_body,
-                                sender_email=_addr,
-                                sender_name=_from.split("<")[0].strip() if "<" in _from else _from,
-                                provider="gmail",
-                                synced_email_id=sid,
-                            )
+                            _ext_id = str(message.get("id") or "")
+                            if _ext_id and should_classify_email(
+                                user_id, _ext_id, "gmail", force=False
+                            ):
+                                from email_automation.parser import MinimalEmailParser
+
+                                _tp = (
+                                    sync_runtime.parser
+                                    if sync_runtime and sync_runtime.parser
+                                    else MinimalEmailParser()
+                                )
+                                _parsed_triage = _tp.parse_message(message)
+                                _subj = _tp.get_subject(_parsed_triage)
+                                _body = _tp.get_body_text(_parsed_triage) or ""
+                                _from = _tp.get_sender(_parsed_triage) or ""
+                                _addr = _from
+                                if "<" in _from and ">" in _from:
+                                    _addr = _from.split("<")[1].split(">")[0].strip()
+                                try:
+                                    triage_and_store_synced_message(
+                                        user_id,
+                                        external_id=_ext_id,
+                                        subject=_subj or "",
+                                        body=_body,
+                                        sender_email=_addr,
+                                        sender_name=_from.split("<")[0].strip()
+                                        if "<" in _from
+                                        else _from,
+                                        provider="gmail",
+                                        synced_email_id=sid,
+                                    )
+                                except Exception as triage_inner:
+                                    logger.debug(
+                                        "email triage failed user=%s id=%s: %s",
+                                        user_id,
+                                        _ext_id,
+                                        triage_inner,
+                                    )
+                                    try:
+                                        mark_classification_failed(
+                                            user_id,
+                                            _ext_id,
+                                            provider="gmail",
+                                            synced_email_id=sid,
+                                            source="gmail_sync",
+                                        )
+                                    except Exception as wf_err:
+                                        logger.debug(
+                                            "mark_classification_failed skipped: %s",
+                                            wf_err,
+                                        )
                         except Exception as triage_err:
                             logger.debug("email triage skipped: %s", triage_err)
 
@@ -694,7 +855,14 @@ class GmailSyncJobManager:
                             from core.request_correlation import get_or_create_correlation_id
                             from core.trace_context import get_trace_id
 
-                            parsed_msg = MinimalEmailParser().parse_message(message)
+                            from email_automation.parser import MinimalEmailParser
+
+                            _msg_parser = (
+                                sync_runtime.parser
+                                if sync_runtime and sync_runtime.parser
+                                else MinimalEmailParser()
+                            )
+                            parsed_msg = _msg_parser.parse_message(message)
                             corr_body = {
                                 "message_id": message.get("id"),
                                 "provider": "gmail",
@@ -709,10 +877,14 @@ class GmailSyncJobManager:
                                 and "core.trace_context" in sys.modules
                                 else None
                             )
-                            orchestrate_incoming(
+                            orch_result = orchestrate_incoming(
                                 parsed_msg,
                                 user_id=user_id,
-                                actions=actions if mailbox_automation_enabled and actions else None,
+                                actions=(
+                                    sync_runtime.actions
+                                    if sync_runtime and sync_runtime.actions
+                                    else None
+                                ),
                                 trace_id=trace_id,
                                 correlation_id=correlation_id,
                                 synced_email_row_id=sid,
@@ -720,10 +892,23 @@ class GmailSyncJobManager:
                                 mailbox_owner_email=owner_email,
                                 provider="gmail",
                                 run_mailbox_ai=bool(
-                                    mailbox_automation_enabled and actions
+                                    mailbox_automation_enabled
+                                    and sync_runtime
+                                    and sync_runtime.mailbox_stack_ready
                                 ),
+                                runtime_context=sync_runtime,
                             )
+                            if sync_runtime is not None:
+                                auto_ran = bool(
+                                    isinstance(orch_result, dict)
+                                    and orch_result.get("inbound_workflow")
+                                )
+                                sync_runtime.record_message_processed(
+                                    automation_ran=auto_ran
+                                )
                         except Exception as automation_error:
+                            if sync_runtime is not None:
+                                sync_runtime.record_message_failed()
                             logger.warning(
                                 "Inbound pipeline failed for message %s: %s",
                                 message.get("id"),
@@ -777,8 +962,13 @@ class GmailSyncJobManager:
                             logger.warning(f"Could not update sync status during progress: {status_update_error}")
                     
                 except Exception as e:
+                    if sync_runtime is not None:
+                        sync_runtime.record_message_failed()
                     logger.warning(f"Failed to process email {message.get('id', 'unknown')}: {e}")
                     continue
+
+            if sync_runtime is not None:
+                sync_runtime.log_job_summary()
             
             return {
                 'emails_synced': emails_synced,

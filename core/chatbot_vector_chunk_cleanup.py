@@ -141,7 +141,29 @@ def delete_kb_chunk_vectors(
         else:
             errors += 1
 
-    return {"deleted": deleted, "errors": errors, "attempted": len(candidates)}
+    result = {"deleted": deleted, "errors": errors, "attempted": len(candidates)}
+    try:
+        from core.durable_jobs import (
+            JOB_KIND_KB_CHUNK_CLEANUP,
+            build_idempotency_key,
+            enqueue_durable_job,
+            mark_job_completed,
+            mark_job_running,
+        )
+
+        idem = build_idempotency_key("kb_cleanup", parent_doc_id, len(candidates))
+        jid = enqueue_durable_job(
+            JOB_KIND_KB_CHUNK_CLEANUP,
+            payload={"doc_id": str(parent_doc_id), "deleted": deleted, "errors": errors},
+            idempotency_key=idem,
+            external_ref=str(parent_doc_id),
+        )
+        if jid:
+            mark_job_running(jid)
+            mark_job_completed(jid, result)
+    except Exception:
+        pass
+    return result
 
 
 def kb_vector_metadata_fields(vector_ids: Sequence[VectorId], primary_vector_id: Optional[VectorId]) -> Dict[str, Any]:

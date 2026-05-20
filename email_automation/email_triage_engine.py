@@ -24,6 +24,10 @@ from email_automation.email_intent_classifier import (
     classify_with_fallback,
     preprocess_email_metadata,
 )
+from email_automation.email_triage_operational_rules import (
+    cap_lead_if_automated,
+    match_operational_notification,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +165,33 @@ def _rule_only_triage(
             classification_source="rules",
         )
 
+    op_match = match_operational_notification(
+        subject=subject,
+        body=body,
+        sender_email=sender_email,
+        sender_name=sender_name,
+    )
+    if op_match:
+        signals.append(op_match.get("signal", "operational_notification"))
+        cat = normalize_triage_category(op_match["category"])
+        lead_score = _clamp_score(op_match["lead_score"])
+        return TriageResult(
+            category=cat,
+            lead_score=lead_score,
+            business_relevance_score=_clamp_score(op_match["business_relevance_score"]),
+            urgency_score=_clamp_score(op_match["urgency_score"]),
+            cleanup_action=normalize_cleanup_action(
+                default_cleanup_for_category(cat, lead_score=lead_score)
+            ),
+            confidence=float(op_match["confidence"]),
+            reason=str(op_match["reason"]),
+            suggested_labels=suggested_gmail_labels(
+                cat, default_cleanup_for_category(cat, lead_score=lead_score)
+            ),
+            classification_source="rules",
+            needs_ai=False,
+        )
+
     # --- Intent hints (existing rule pack) ---
     hints = build_rule_hints(subject=subject, body=body, client_config=client_config or {})
     intent = hints["suggested_intents"][0] if hints.get("suggested_intents") else ""
@@ -196,6 +227,26 @@ def _rule_only_triage(
         urgency = 25
         confidence = 0.45
         reason = "No strong rule match; needs review or AI enrichment."
+
+    category = cap_lead_if_automated(
+        category=category,
+        subject=subject,
+        body=body,
+        sender_email=sender_email,
+    )
+    if category != "business_lead" and category in (
+        "action_needed",
+        "newsletter_marketing",
+        "review_needed",
+    ):
+        lead_score = min(lead_score, 25 if category == "newsletter_marketing" else 20)
+        if category == "action_needed":
+            urgency = max(urgency, 45)
+        confidence = max(confidence, 0.8)
+        reason = (
+            reason
+            + " (automated sender capped — not classified as lead.)"
+        )[:500]
 
     cleanup = default_cleanup_for_category(category, lead_score=lead_score)
     needs_ai = confidence < RULE_CONFIDENCE_LOW or (
@@ -290,8 +341,33 @@ def classify_email_triage(
             )
             result = _enrich_from_analysis(offline, base)
             result.classification_source = "rules+fallback"
+            capped = cap_lead_if_automated(
+                category=result.category,
+                subject=subject,
+                body=body,
+                sender_email=sender_email,
+            )
+            if capped != result.category:
+                result.category = normalize_triage_category(capped)
+                result.lead_score = min(result.lead_score, 25)
+                result.needs_ai = False
             return result.to_dict()
         except Exception as exc:
             logger.warning("triage fallback analysis failed: %s", exc)
 
+    capped = cap_lead_if_automated(
+        category=base.category,
+        subject=subject,
+        body=body,
+        sender_email=sender_email,
+    )
+    if capped != base.category:
+        out = base.to_dict()
+        out["category"] = normalize_triage_category(capped)
+        out["lead_score"] = min(int(out.get("lead_score") or 0), 25)
+        out["cleanup_action"] = default_cleanup_for_category(
+            out["category"], lead_score=out["lead_score"]
+        )
+        out["needs_ai"] = False
+        return out
     return base.to_dict()

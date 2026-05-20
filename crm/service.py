@@ -352,6 +352,20 @@ class EnhancedCRMService:
         )
         
         logger.info(f"Lead created: {lead_data['email']} for user {user_id}")
+        try:
+            from analytics.service_usage_recorders import record_crm_lead_created
+
+            record_crm_lead_created(
+                user_id,
+                lead_id=lead_id,
+                source=lead_data.get("source", "manual"),
+                created=True,
+                has_email=bool(lead_data.get("email")),
+                has_phone=bool(lead_data.get("phone")),
+                correlation_id=correlation_id,
+            )
+        except Exception:
+            pass
         return {
             'success': True,
             'data': {
@@ -505,6 +519,30 @@ class EnhancedCRMService:
                     payload={"from": old_stage, "to": new_stage},
                     correlation_id=correlation_id,
                 )
+                try:
+                    from analytics.service_usage_recorders import record_crm_lead_stage_changed
+
+                    record_crm_lead_stage_changed(
+                        user_id,
+                        lead_id=lead_id,
+                        previous_stage=old_stage,
+                        new_stage=new_stage,
+                        correlation_id=correlation_id,
+                    )
+                except Exception:
+                    pass
+            try:
+                from analytics.service_usage_recorders import record_crm_lead_updated
+
+                record_crm_lead_updated(
+                    user_id,
+                    lead_id=lead_id,
+                    fields_changed=fields_changed,
+                    source=str(updates.get("source") or old_row.get("source") or "manual"),
+                    correlation_id=correlation_id,
+                )
+            except Exception:
+                pass
             if new_stage == 'closed' and old_stage != 'closed':
                 record_crm_event(
                     user_id=user_id,
@@ -627,6 +665,17 @@ class EnhancedCRMService:
                     "description_preview": (description or "")[:500],
                 },
             )
+            try:
+                from analytics.service_usage_recorders import record_crm_activity_added
+
+                record_crm_activity_added(
+                    user_id,
+                    lead_id=lead_id,
+                    activity_id=activity_id,
+                    activity_type=activity_type,
+                )
+            except Exception:
+                pass
             
             return {
                 'success': True,

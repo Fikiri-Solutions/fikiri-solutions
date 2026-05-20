@@ -42,6 +42,12 @@ def register_tasks():
         automation_queue.register_task('process_automation_run', process_automation_run)
     except Exception as e:
         logger.warning("Could not register process_automation_run task: %s", e)
+
+    try:
+        from core.durable_job_processors import process_durable_background_job
+        email_queue.register_task('process_durable_background_job', process_durable_background_job)
+    except Exception as e:
+        logger.warning("Could not register process_durable_background_job: %s", e)
     
     # Register email sending task (if exists)
     try:

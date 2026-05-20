@@ -19,10 +19,10 @@ from core.chatbot_retrieval import (
 class TestChatbotRetrieval(unittest.TestCase):
     @patch("core.chatbot_retrieval.get_feature_flags")
     @patch("core.chatbot_retrieval.get_vector_search")
-    @patch("core.chatbot_retrieval.knowledge_base")
-    @patch("core.chatbot_retrieval.faq_system")
+    @patch("core.chatbot_retrieval._get_knowledge_base")
+    @patch("core.chatbot_retrieval._get_faq_system")
     def test_retrieve_returns_sources_context_and_confidence(
-        self, mock_faq, mock_kb, mock_get_vs, mock_flags
+        self, mock_faq_fn, mock_kb_fn, mock_get_vs, mock_flags
     ):
         mock_flags.return_value.is_enabled.return_value = False
 
@@ -32,14 +32,18 @@ class TestChatbotRetrieval(unittest.TestCase):
         faq_match.faq_entry.answer = "9-5"
         faq_match.confidence = 0.85
         faq_response = Mock(success=True, matches=[faq_match])
+        mock_faq = Mock()
         mock_faq.search_faqs.return_value = faq_response
+        mock_faq_fn.return_value = mock_faq
 
         mock_doc = Mock()
         mock_doc.id = "doc_1"
         mock_doc.title = "Info"
         mock_doc.content = "We are open weekdays."
         kb_entry = Mock(document=mock_doc, relevance_score=0.8)
+        mock_kb = Mock()
         mock_kb.search.return_value = Mock(success=True, results=[kb_entry])
+        mock_kb_fn.return_value = mock_kb
 
         result = retrieve_chatbot_context(
             "What are your hours?",
@@ -63,14 +67,18 @@ class TestChatbotRetrieval(unittest.TestCase):
 
     @patch("core.chatbot_retrieval.get_feature_flags")
     @patch("core.chatbot_retrieval.get_vector_search")
-    @patch("core.chatbot_retrieval.knowledge_base")
-    @patch("core.chatbot_retrieval.faq_system")
+    @patch("core.chatbot_retrieval._get_knowledge_base")
+    @patch("core.chatbot_retrieval._get_faq_system")
     def test_retrieve_fallback_needed_when_no_context(
-        self, mock_faq, mock_kb, mock_get_vs, mock_flags
+        self, mock_faq_fn, mock_kb_fn, mock_get_vs, mock_flags
     ):
         mock_flags.return_value.is_enabled.return_value = False
+        mock_faq = Mock()
         mock_faq.search_faqs.return_value = Mock(success=True, matches=[])
+        mock_faq_fn.return_value = mock_faq
+        mock_kb = Mock()
         mock_kb.search.return_value = Mock(success=True, results=[])
+        mock_kb_fn.return_value = mock_kb
 
         result = retrieve_chatbot_context("unknown topic", None, None)
 
@@ -81,14 +89,18 @@ class TestChatbotRetrieval(unittest.TestCase):
 
     @patch("core.chatbot_retrieval.get_feature_flags")
     @patch("core.chatbot_retrieval.get_vector_search")
-    @patch("core.chatbot_retrieval.knowledge_base")
-    @patch("core.chatbot_retrieval.faq_system")
+    @patch("core.chatbot_retrieval._get_knowledge_base")
+    @patch("core.chatbot_retrieval._get_faq_system")
     def test_vector_search_uses_tenant_id_when_enabled(
-        self, mock_faq, mock_kb, mock_get_vs, mock_flags
+        self, mock_faq_fn, mock_kb_fn, mock_get_vs, mock_flags
     ):
         mock_flags.return_value.is_enabled.return_value = True
+        mock_faq = Mock()
         mock_faq.search_faqs.return_value = Mock(success=True, matches=[])
+        mock_faq_fn.return_value = mock_faq
+        mock_kb = Mock()
         mock_kb.search.return_value = Mock(success=True, results=[])
+        mock_kb_fn.return_value = mock_kb
         vs = MagicMock()
         vs.search_similar.return_value = []
         mock_get_vs.return_value = vs

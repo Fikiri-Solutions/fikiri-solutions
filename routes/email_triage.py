@@ -6,14 +6,14 @@ import logging
 
 from flask import Blueprint, request
 
-from core.database_optimization import db_optimizer
 from core.api_validation import create_error_response, create_success_response, handle_api_errors
 from core.request_user_id import resolve_request_user_id
 from core.secure_sessions import get_current_user_id
 from services.email_triage_service import (
+    classify_unclassified_synced,
     execute_bulk_action,
     list_triage_inbox,
-    triage_and_store_synced_message,
+    reclassify_synced_messages,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,14 +32,38 @@ def list_triage():
     cleanup_action = request.args.get("cleanup_action")
     limit = request.args.get("limit", 50, type=int)
     offset = request.args.get("offset", 0, type=int)
+    include_handled = request.args.get("include_handled", "false").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
     data = list_triage_inbox(
         user_id,
         category=category,
         cleanup_action=cleanup_action,
         limit=limit,
         offset=offset,
+        include_handled=include_handled,
     )
     return create_success_response(data, "Triage inbox retrieved")
+
+
+@email_triage_bp.route("/classify-unclassified", methods=["POST"])
+@handle_api_errors
+def classify_unclassified():
+    """Classify synced emails not yet in email_classifications (up to limit)."""
+    user_id = resolve_request_user_id(request, current_user_id=get_current_user_id(), allow_query=False)
+    if not user_id:
+        return create_error_response("Authentication required", 401, "AUTHENTICATION_REQUIRED")
+
+    body = request.get_json() or {}
+    limit = body.get("limit", 50)
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        limit = 50
+    result = classify_unclassified_synced(user_id, limit=limit)
+    return create_success_response(result, "Unclassified sync messages triaged")
 
 
 @email_triage_bp.route("/classify", methods=["POST"])
@@ -55,40 +79,8 @@ def classify_batch():
     if not isinstance(email_ids, list):
         return create_error_response("email_ids must be a list", 400, "INVALID_PAYLOAD")
 
-    classified = []
-    for eid in email_ids[:50]:
-        rows = db_optimizer.execute_query(
-            """
-            SELECT id, subject, sender, body, COALESCE(external_id, gmail_id) AS external_id, provider
-            FROM synced_emails
-            WHERE user_id = ? AND (external_id = ? OR gmail_id = ?)
-            LIMIT 1
-            """,
-            (user_id, str(eid), str(eid)),
-        )
-        if not rows:
-            continue
-        row = rows[0]
-        sender = row.get("sender") or ""
-        email_addr = sender
-        if "<" in sender and ">" in sender:
-            email_addr = sender.split("<")[1].split(">")[0].strip()
-        triage = triage_and_store_synced_message(
-            user_id,
-            external_id=str(row.get("external_id") or eid),
-            subject=row.get("subject") or "",
-            body=row.get("body") or "",
-            sender_email=email_addr,
-            sender_name=sender.split("<")[0].strip() if "<" in sender else sender,
-            provider=row.get("provider") or "gmail",
-            synced_email_id=int(row["id"]) if row.get("id") is not None else None,
-        )
-        classified.append({"email_id": eid, "triage": triage})
-
-    return create_success_response(
-        {"classified": classified, "count": len(classified)},
-        "Classification complete",
-    )
+    result = reclassify_synced_messages(user_id, [str(x) for x in email_ids])
+    return create_success_response(result, "Classification complete")
 
 
 @email_triage_bp.route("/bulk-action", methods=["POST"])

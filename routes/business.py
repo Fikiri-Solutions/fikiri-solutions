@@ -768,6 +768,22 @@ def sync_gmail():
                 )
         sync_params = parse_sync_params_from_body(body, cursor_metadata=cursor_meta)
 
+        def _record_command_center_sync_analytics(queued: bool) -> None:
+            try:
+                referer = (request.headers.get("Referer") or "").lower()
+                if "command-center" not in referer:
+                    return
+                from analytics.service_usage_recorders import record_command_center_sync_clicked
+
+                record_command_center_sync_clicked(
+                    user_id,
+                    job_id=str(job_id) if job_id else None,
+                    sync_job_queued=queued,
+                    surface="command_center",
+                )
+            except Exception:
+                pass
+
         # Queue Gmail sync job using RQ (Redis Queue)
         sync_job_queued = False
         job_id = None
@@ -875,6 +891,7 @@ def sync_gmail():
             logger.error(f"CRM sync traceback: {traceback.format_exc()}")
             # If we queued a job, that's still success even if CRM sync fails
             if sync_job_queued:
+                _record_command_center_sync_analytics(True)
                 return create_success_response(
                     {
                         'sync_job_queued': True,
@@ -915,6 +932,7 @@ def sync_gmail():
                 except Exception as status_update_error:
                     logger.warning(f"Could not update sync status to completed: {status_update_error}")
             
+            _record_command_center_sync_analytics(sync_job_queued)
             return create_success_response(
                 {
                     'contacts_synced': data.get('count', 0),
@@ -930,6 +948,7 @@ def sync_gmail():
         else:
             # Even if CRM sync fails, if we queued a job, that's still success
             if sync_job_queued:
+                _record_command_center_sync_analytics(True)
                 return create_success_response(
                     {
                         'sync_job_queued': True,
@@ -1228,6 +1247,16 @@ def get_emails():
                         })
                     
                     if emails:
+                        try:
+                            from email_automation.live_mail_overlay import enrich_live_mail_messages
+
+                            enrich_live_mail_messages(user_id, emails, provider='gmail')
+                        except Exception as overlay_err:
+                            logger.warning(
+                                "Live Mail overlay skipped (synced) user=%s: %s",
+                                user_id,
+                                overlay_err,
+                            )
                         return create_success_response({
                             'emails': emails, 
                             'source': 'synced',
@@ -1311,6 +1340,17 @@ def get_emails():
                     except Exception as e:
                         logger.warning(f"Failed to process message {msg.get('id')}: {e}")
                         continue
+
+            try:
+                from email_automation.live_mail_overlay import enrich_live_mail_messages
+
+                enrich_live_mail_messages(user_id, emails, provider='gmail')
+            except Exception as overlay_err:
+                logger.warning(
+                    "Live Mail overlay skipped (gmail_api) user=%s: %s",
+                    user_id,
+                    overlay_err,
+                )
 
             # Return with pagination metadata (Gmail API pagination)
             next_page_token = results.get('nextPageToken')
@@ -1657,6 +1697,28 @@ def send_email():
         if not body:
             return create_error_response("Email body is required", 400, 'MISSING_BODY')
 
+        from core.reserved_email_recipients import (
+            log_skipped_gmail_delivery,
+            recipient_domain,
+            should_skip_real_email_delivery,
+        )
+
+        if should_skip_real_email_delivery(to_email):
+            log_skipped_gmail_delivery(
+                user_id=user_id,
+                source="routes.business.send_email",
+                domain=recipient_domain(to_email),
+            )
+            return create_success_response(
+                {
+                    "skipped": True,
+                    "reason": "reserved_recipient_domain",
+                    "to": to_email,
+                    "subject": subject,
+                },
+                "Delivery skipped for reserved test domain",
+            )
+
         tier_limit_error = _check_tier_usage_cap(user_id, "email_processing", projected_increment=1)
         if tier_limit_error:
             return tier_limit_error
@@ -1922,7 +1984,11 @@ def archive_email():
                 id=email_id,
                 body={'removeLabelIds': ['INBOX']}
             ).execute()
-            
+
+            from email_automation.email_workflow_state import persist_live_mail_archive
+
+            persist_live_mail_archive(user_id, email_id)
+
             logger.info(f"✅ Archived email {email_id} for user {user_id}")
             return create_success_response(
                 {'email_id': email_id, 'archived': True},
@@ -1993,32 +2059,9 @@ def mark_email_read():
             logger.error(f"Failed to mark email read: {e}")
             return create_error_response(f"Failed to mark email read: {str(e)}", 500, 'EMAIL_MARK_READ_ERROR')
 
-        rows = db_optimizer.execute_query(
-            """
-            SELECT labels FROM synced_emails
-            WHERE user_id = ? AND (external_id = ? OR gmail_id = ?) AND COALESCE(provider, 'gmail') = 'gmail'
-            LIMIT 1
-            """,
-            (user_id, email_id, email_id),
-        )
-        if rows:
-            raw = rows[0].get('labels') or '[]'
-            try:
-                labels = json.loads(raw) if isinstance(raw, str) else list(raw)
-            except (json.JSONDecodeError, TypeError):
-                labels = []
-            if not isinstance(labels, list):
-                labels = []
-            labels = [x for x in labels if x != 'UNREAD']
-            db_optimizer.execute_query(
-                """
-                UPDATE synced_emails
-                SET labels = ?, is_read = """ + db_optimizer.sql_true_literal() + """
-                WHERE user_id = ? AND (external_id = ? OR gmail_id = ?)
-                """,
-                (json.dumps(labels), user_id, email_id, email_id),
-                fetch=False,
-            )
+        from email_automation.email_workflow_state import persist_live_mail_mark_read
+
+        persist_live_mail_mark_read(user_id, email_id)
 
         logger.info("Marked email %s as read for user %s", email_id, user_id)
         return create_success_response(

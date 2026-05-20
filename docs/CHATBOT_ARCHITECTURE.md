@@ -249,6 +249,48 @@ Upload / import / edit
 
 ---
 
+## Conversation persistence (additive)
+
+**Module:** `core/chatbot_conversation_store.py`  
+**Tables:** `chatbot_conversations`, `chatbot_messages` (append-only, `UNIQUE(tenant_id, conversation_id)` / per-message id)
+
+- **Public widget:** persists user + assistant turns when `FIKIRI_CHATBOT_CONVERSATION_PERSIST` is on (default). Failures are logged; HTTP response unchanged.
+- **Preview:** off by default (`FIKIRI_CHATBOT_PREVIEW_PERSIST=1` to enable). Optional `retrieval_debug` on assistant rows when `debug=true` and `FIKIRI_CHATBOT_STORE_RETRIEVAL_DEBUG=1`.
+- **Does not** inject conversation history into prompts (no hidden memory).
+
+**Tests:** `pytest tests/test_chatbot_conversation_store.py -v`
+
+---
+
+## Dev eval harness (local only)
+
+**Modules:** `core/chatbot_eval/` (`chatbot_eval_cases`, `chatbot_eval_metrics`, `chatbot_eval_runner`, `live_preflight`)
+
+**Root cause (live hang fix):** `MinimalVectorSearch.__init__` previously ran `from sentence_transformers import SentenceTransformer`, loading PyTorch at import/init and triggering Abseil `RAW: Lock blocking` (worse when multiple Python processes load torch, e.g. `app.py` + eval CLI). Embeddings now load lazily on first `_generate_embedding()`; `SKIP_HEAVY_DEP_CHECKS` / `FIKIRI_VECTOR_EMBEDDINGS=hash` keeps eval on hash path.
+
+**Pinecone:** `PINECONE_API_KEY` is parsed at init; `list_indexes` / index create / `describe_index` run on first Pinecone vector op via `_ensure_pinecone_index()` (per-instance cache). Unavailable Pinecone raises `PineconeUnavailableError` on that op (no silent fallback).
+
+Runs the preview-equivalent library path (`retrieve_chatbot_context` → `generate_chatbot_answer`) with **no** public routes, billing gates, or lead capture. Default `allow_llm=False` for deterministic runs.
+
+```bash
+# Live retrieval (preflight + real FAQ/KB/vector path)
+python scripts/run_chatbot_eval.py \
+  --cases data/evals/chatbot/default_cases.json \
+  --output reports/chatbot_eval_report.json \
+  --trace
+
+# Deterministic smoke (mocks only)
+python scripts/run_chatbot_eval.py --mock --output reports/chatbot_eval_smoke.json
+```
+
+Env: `SKIP_HEAVY_DEP_CHECKS=true` (default in CLI), `FIKIRI_EVAL_TRACE_IMPORTS=1` for checkpoints, `FIKIRI_VECTOR_EMBEDDINGS=hash` to force hash embeddings.
+
+**Tests:** `pytest tests/test_chatbot_eval_harness.py tests/test_vector_search_lazy_init.py -v`
+
+Does not change production routing, prompts, or widget behavior.
+
+---
+
 ## Quick entry points (for Cursor / agents)
 
 ```
@@ -260,4 +302,5 @@ Config:                         core/chatbot_config.py :: load_chatbot_config
 Lead capture:                   core/chatbot_lead_capture.py :: capture_chatbot_lead
 Usage gates + billing:          core/chatbot_usage_tracking.py :: check_chatbot_usage_allowed
 Chunk ingest:                   core/chatbot_vector_chunk_ingestion.py :: ingest_kb_text_to_vector_store
+Dev eval harness:               core/chatbot_eval/chatbot_eval_runner.py :: run_eval_suite
 ```

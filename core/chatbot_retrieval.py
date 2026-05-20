@@ -20,14 +20,47 @@ from core.chatbot_retrieval_diversity import (
 )
 from core.domain.schemas import knowledge_snippet, snippets_to_context_string
 from core.feature_flags import get_feature_flags
-from core.knowledge_base_system import get_knowledge_base
-from core.smart_faq_system import get_smart_faq
 from core.vector_search import get_vector_search
 
 logger = logging.getLogger(__name__)
 
-faq_system = get_smart_faq()
-knowledge_base = get_knowledge_base()
+_faq_system: Optional[Any] = None
+_knowledge_base: Optional[Any] = None
+
+
+def _get_faq_system():
+    """Return FAQ system; prefer unittest.mock patches on module ``faq_system``."""
+    global _faq_system
+    patched = globals().get("faq_system")
+    if patched is not None:
+        return patched
+    if _faq_system is None:
+        from core.smart_faq_system import get_smart_faq
+
+        _faq_system = get_smart_faq()
+    return _faq_system
+
+
+def _get_knowledge_base():
+    """Return KB system; prefer unittest.mock patches on module ``knowledge_base``."""
+    global _knowledge_base
+    patched = globals().get("knowledge_base")
+    if patched is not None:
+        return patched
+    if _knowledge_base is None:
+        from core.knowledge_base_system import get_knowledge_base
+
+        _knowledge_base = get_knowledge_base()
+    return _knowledge_base
+
+
+def __getattr__(name: str):
+    """Backward-compatible lazy aliases for tests and legacy imports."""
+    if name == "faq_system":
+        return _get_faq_system()
+    if name == "knowledge_base":
+        return _get_knowledge_base()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 @dataclass
@@ -236,13 +269,13 @@ def retrieve_chatbot_context(
     max_chunks_per_parent = get_max_chunks_per_parent()
     vector_search_enabled = False
 
-    faq_results = faq_system.search_faqs(query, max_results=3, user_id=user_id)
+    faq_results = _get_faq_system().search_faqs(query, max_results=3, user_id=user_id)
     raw_faq_count = _count_faq_results(faq_results)
 
     kb_filters: Dict[str, Any] = {}
     if tenant_id:
         kb_filters["tenant_id"] = tenant_id
-    kb_results = knowledge_base.search(query, filters=kb_filters, limit=3)
+    kb_results = _get_knowledge_base().search(query, filters=kb_filters, limit=3)
     raw_kb_count = _count_kb_results(kb_results)
 
     vector_results: List[Dict[str, Any]] = []

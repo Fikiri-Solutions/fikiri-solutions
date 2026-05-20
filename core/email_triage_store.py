@@ -9,7 +9,10 @@ from typing import Any, Dict, List, Optional
 
 from core.ai.email_triage_taxonomy import normalize_cleanup_action, normalize_triage_category
 from core.database_optimization import db_optimizer
-from email_automation.email_workflow_state import command_center_workflow_sql
+from email_automation.email_workflow_state import (
+    command_center_workflow_sql,
+    ensure_email_workflow_state_table,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +117,7 @@ def list_classified_emails(
     include_handled: bool = False,
 ) -> Dict[str, Any]:
     ensure_email_classifications_table()
+    ensure_email_workflow_state_table()
     limit = max(1, min(500, limit))
     offset = max(0, offset)
     where = ["c.user_id = ?"]

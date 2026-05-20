@@ -6,6 +6,7 @@ Unified API for chatbot, FAQ, knowledge base, and multi-channel support
 import json
 import logging
 import os
+import uuid
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 from flask import Blueprint, request, jsonify, g
@@ -36,7 +37,10 @@ from core.chatbot_config import (
 )
 from core.chatbot_retrieval import retrieve_chatbot_context
 from core.chatbot_response_service import generate_chatbot_answer
-from core.chatbot_vector_chunk_ingestion import ingest_kb_text_to_vector_store
+from core.chatbot_vector_chunk_ingestion import (
+    ingest_kb_text_to_vector_store,
+    ingest_kb_text_to_vector_store_tracked,
+)
 from core.chatbot_vector_chunk_cleanup import delete_kb_chunk_vectors, kb_vector_metadata_fields
 
 logger = logging.getLogger(__name__)
@@ -127,10 +131,12 @@ def _ingest_kb_vectors(
     """Chunk-aware KB vector ingestion; returns (vector_ids, primary_vector_id)."""
     use_pinecone = getattr(vs, "use_pinecone", False) is True
     cleanup = cleanup_metadata if cleanup_metadata is not None else ({} if replace_existing else None)
-    return ingest_kb_text_to_vector_store(
+    uid = vector_metadata.get("user_id") if isinstance(vector_metadata, dict) else None
+    return ingest_kb_text_to_vector_store_tracked(
         vs,
         text=content,
         parent_doc_id=str(doc_id),
+        user_id=int(uid) if uid is not None and str(uid).isdigit() else None,
         base_metadata=vector_metadata,
         use_pinecone=use_pinecone,
         cleanup_metadata=cleanup,
@@ -1612,6 +1618,37 @@ def preview_chatbot_query():
         chatbot_config=chatbot_config,
     )
 
+    message_id = str(uuid.uuid4())
+    conversation_id = (data.get("conversation_id") or "").strip() or None
+    if not conversation_id:
+        conversation_id = str(uuid.uuid4())
+
+    from core.chatbot_conversation_store import (
+        is_preview_persistence_enabled,
+        persist_chatbot_turn,
+        should_store_retrieval_debug,
+    )
+
+    if is_preview_persistence_enabled():
+        persist_chatbot_turn(
+            tenant_id=tenant_id,
+            conversation_id=conversation_id,
+            query=query,
+            answer=answer_result.answer,
+            assistant_message_id=message_id,
+            sources=retrieval.sources,
+            fallback_used=answer_result.fallback_used,
+            confidence=answer_result.confidence,
+            retrieval_confidence=answer_result.retrieval_confidence,
+            user_id=str(user_id),
+            channel="preview",
+            correlation_id=correlation_id,
+            retrieval_debug=retrieval.retrieval_debug,
+            store_retrieval_debug=should_store_retrieval_debug(
+                channel="preview", debug_requested=bool(data.get("debug"))
+            ),
+        )
+
     return jsonify({
         "success": True,
         "answer": answer_result.answer,
@@ -1621,6 +1658,8 @@ def preview_chatbot_query():
         "config_applied": config_applied,
         "retrieval_confidence": answer_result.retrieval_confidence,
         "llm_confidence": answer_result.llm_confidence,
+        "conversation_id": conversation_id,
+        "message_id": message_id,
         **(
             {"retrieval_debug": retrieval.retrieval_debug}
             if bool(data.get("debug"))
