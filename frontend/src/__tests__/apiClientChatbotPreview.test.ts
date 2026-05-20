@@ -58,6 +58,48 @@ describe('apiClient.previewChatbotQuery', () => {
     expect(result.answer).toBe('ok')
   })
 
+  it('includes debug=true when requested', async () => {
+    postMock.mockResolvedValue({
+      data: {
+        success: true,
+        answer: 'debug',
+        confidence: 1,
+        fallback_used: false,
+        sources: [],
+        config_applied: true,
+        retrieval_debug: { final_source_count: 1 },
+      },
+    })
+
+    const { apiClient } = await import('../services/apiClient')
+    await apiClient.previewChatbotQuery('What are your hours?', undefined, { debug: true })
+
+    expect(postMock).toHaveBeenCalledWith('/chatbot/preview-query', {
+      query: 'What are your hours?',
+      debug: true,
+    })
+  })
+
+  it('does not include debug flag when disabled', async () => {
+    postMock.mockResolvedValue({
+      data: {
+        success: true,
+        answer: 'ok',
+        confidence: 1,
+        fallback_used: false,
+        sources: [],
+        config_applied: true,
+      },
+    })
+
+    const { apiClient } = await import('../services/apiClient')
+    await apiClient.previewChatbotQuery('What are your hours?', undefined, { debug: false })
+
+    expect(postMock).toHaveBeenCalledWith('/chatbot/preview-query', {
+      query: 'What are your hours?',
+    })
+  })
+
   it('includes conversation_id when provided', async () => {
     postMock.mockResolvedValue({
       data: {

@@ -79,7 +79,83 @@ describe('ChatbotBuilder preview', () => {
       const [, conversationId] = runPreviewMock.mock.calls[0]
       expect(conversationId).toEqual(expect.any(String))
       expect(String(conversationId).length).toBeGreaterThan(8)
+      expect(runPreviewMock.mock.calls[0][2]).toEqual({ debug: false })
     })
+  })
+
+  it('requests debug when Show retrieval debug is enabled', async () => {
+    const user = userEvent.setup()
+    renderBuilder()
+
+    await user.click(screen.getByRole('checkbox', { name: 'Show retrieval debug' }))
+    await user.type(screen.getByPlaceholderText('Ask a question'), 'hours?')
+    await user.click(screen.getByRole('button', { name: 'Test reply' }))
+
+    await waitFor(() => {
+      expect(runPreviewMock).toHaveBeenCalledWith(
+        'hours?',
+        expect.any(String),
+        { debug: true }
+      )
+    })
+  })
+
+  it('renders retrieval debug panel when debug data is returned', async () => {
+    runPreviewMock.mockResolvedValueOnce({
+      botPreview: {
+        answer: 'Debug preview answer',
+        confidence: 0.91,
+        source: 'production',
+        fallbackUsed: false,
+        sources: [],
+        retrievalDebug: {
+          final_source_count: 2,
+          raw_faq_count: 1,
+          raw_kb_count: 1,
+          raw_vector_count: 3,
+          post_vector_diversity_count: 2,
+          post_cross_source_dedup_count: 2,
+          collapsed_duplicate_count: 1,
+          retrieval_confidence: 0.8,
+          context_char_count: 300,
+          latency_ms: 42,
+        },
+      },
+      searchResults: [],
+    })
+
+    const user = userEvent.setup()
+    renderBuilder()
+
+    await user.click(screen.getByRole('checkbox', { name: 'Show retrieval debug' }))
+    await user.type(screen.getByPlaceholderText('Ask a question'), 'hours?')
+    await user.click(screen.getByRole('button', { name: 'Test reply' }))
+
+    expect(await screen.findByText('Retrieval debug')).toBeInTheDocument()
+    expect(screen.getByText('Final sources')).toBeInTheDocument()
+    expect(screen.getByText('42')).toBeInTheDocument()
+  })
+
+  it('missing retrieval_debug does not crash when debug toggle is on', async () => {
+    runPreviewMock.mockResolvedValueOnce({
+      botPreview: {
+        answer: 'No debug payload',
+        confidence: 0.5,
+        source: 'production',
+        fallbackUsed: false,
+        sources: [],
+      },
+      searchResults: [],
+    })
+
+    const user = userEvent.setup()
+    renderBuilder()
+
+    await user.click(screen.getByRole('checkbox', { name: 'Show retrieval debug' }))
+    await user.type(screen.getByPlaceholderText('Ask a question'), 'hours?')
+    await user.click(screen.getByRole('button', { name: 'Test reply' }))
+
+    expect(await screen.findByText(/No retrieval debug data returned/)).toBeInTheDocument()
   })
 
   it('reuses the same conversation_id on follow-up preview turns', async () => {

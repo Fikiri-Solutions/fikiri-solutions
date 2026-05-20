@@ -11,6 +11,7 @@ import {
   previewSourceLabel,
   runChatbotBuilderPreview,
 } from './chatbotBuilderPreview'
+import { ChatbotRetrievalDebugPanel } from '../components/ChatbotRetrievalDebugPanel'
 
 export const ChatbotBuilder: React.FC = () => {
   const { addToast } = useToast()
@@ -25,6 +26,7 @@ export const ChatbotBuilder: React.FC = () => {
   const [botPreview, setBotPreview] = useState<BotPreview | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewConversationId, setPreviewConversationId] = useState<string | null>(null)
+  const [showRetrievalDebug, setShowRetrievalDebug] = useState(false)
 
   const { data: faqStats } = useQuery({
     queryKey: ['faq-stats'],
@@ -144,7 +146,8 @@ export const ChatbotBuilder: React.FC = () => {
     try {
       const { botPreview: preview, searchResults: kbResults } = await runChatbotBuilderPreview(
         searchQuery.trim(),
-        conversationId
+        conversationId,
+        { debug: showRetrievalDebug }
       )
       setBotPreview(preview)
       setSearchResults(kbResults)
@@ -424,6 +427,15 @@ export const ChatbotBuilder: React.FC = () => {
                 </button>
               )}
             </div>
+            <label className="flex items-center gap-2 text-xs text-brand-text/70 dark:text-gray-300 cursor-pointer w-fit">
+              <input
+                type="checkbox"
+                checked={showRetrievalDebug}
+                onChange={(e) => setShowRetrievalDebug(e.target.checked)}
+                className="rounded border-brand-text/30 text-brand-primary focus:ring-brand-primary/40"
+              />
+              Show retrieval debug
+            </label>
             <div className="space-y-3">
               {botPreview ? (
                 <div className="rounded-xl border border-brand-primary/30 bg-brand-primary/5 dark:bg-brand-primary/10 p-4">
@@ -458,6 +470,9 @@ export const ChatbotBuilder: React.FC = () => {
                   description="Ask a question to preview the same reply path as your live website chatbot."
                 />
               ) : null}
+              {showRetrievalDebug && botPreview && (
+                <ChatbotRetrievalDebugPanel debug={botPreview.retrievalDebug} />
+              )}
               {searchResults.length > 1 && (
                 <div className="space-y-2">
                   <p className="text-xs text-brand-text/60 dark:text-gray-400">Other knowledge matches</p>

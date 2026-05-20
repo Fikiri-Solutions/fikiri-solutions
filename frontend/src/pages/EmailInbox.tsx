@@ -19,7 +19,8 @@ import {
   ExternalLink,
   FileText,
 } from 'lucide-react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { useAuth } from '../contexts/AuthContext'
 import { apiClient, EmailSyncStatus } from '../services/apiClient'
 import { useToast } from '../components/Toast'
@@ -390,8 +391,8 @@ export const EmailInbox: React.FC = () => {
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [loadingAttachments, setLoadingAttachments] = useState(false)
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string | null>(null)
-  const [emailLimit, setEmailLimit] = useState(50) // Initial page size; use "Load more" for additional pages
-  const [loadingMore, setLoadingMore] = useState(false)
+  const debouncedSearch = useDebouncedValue(searchQuery.trim(), 400)
+  const INBOX_PAGE_SIZE = 50
   const [syncInboxPending, setSyncInboxPending] = useState(false)
   const [gmailLookbackId, setGmailLookbackId] = useState(() => loadGmailLookbackId('90d'))
   const [isNarrowViewport, setIsNarrowViewport] = useState(false)
@@ -578,54 +579,67 @@ export const EmailInbox: React.FC = () => {
         ? selectedEmail.body
         : ''
 
-  // Load emails with React Query caching - prefer synced emails for speed
-  const { 
-    data: emailsData, 
-    isLoading: loading, 
+  // Live Gmail (use_synced: false) + server-side search via q=; paginate with page_token
+  const {
+    data: emailsInfiniteData,
+    isLoading: loading,
     isFetching,
-    refetch: refetchEmails 
-  } = useQuery({
-    queryKey: ['emails', user?.id, filter, emailLimit],
-    queryFn: async () => {
-      // Live Gmail API (use_synced: false) so read/unread matches Gmail; local DB can lag until sync
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage,
+    refetch: refetchEmails,
+  } = useInfiniteQuery({
+    queryKey: ['emails', user?.id, filter, debouncedSearch],
+    queryFn: async ({ pageParam }) => {
       const data = await apiClient.getEmails({
         filter,
-        limit: emailLimit,
+        limit: INBOX_PAGE_SIZE,
         use_synced: false,
         include_body: false,
+        q: debouncedSearch || undefined,
+        page_token: pageParam as string | undefined,
       })
       return { ...data, source: data?.source ?? 'gmail_api' }
     },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage?.pagination?.next_page_token ?? undefined,
     enabled: !!user && gmailConnected === true,
-    staleTime: 1 * 60 * 1000, // 1 minute - emails are fresh for 1 minute
-    gcTime: 15 * 60 * 1000, // 15 minutes - keep in cache for 15 minutes
-    refetchInterval: 2 * 60 * 1000, // Auto-refresh every 2 minutes
+    staleTime: 1 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    refetchInterval: 2 * 60 * 1000,
     refetchOnWindowFocus: true,
     refetchOnMount: true,
-    refetchOnReconnect: true, // Refetch if network reconnected
-    placeholderData: (previousData) => previousData, // Show cached data while fetching
+    refetchOnReconnect: true,
   })
 
-  const emails = emailsData?.emails || emailsData || []
-  const hasMore = emailsData?.pagination?.has_more || (emails.length >= emailLimit && emails.length % emailLimit === 0)
-  
-  // Load more emails function
-  const loadMoreEmails = useCallback(async () => {
-    if (loadingMore || !hasMore) return
-    
-    setLoadingMore(true)
-    try {
-      const newLimit = emailLimit + 25
-      setEmailLimit(newLimit)
-      // Query will automatically refetch with new limit
-      await refetchEmails()
-    } catch (error) {
-      console.error('Failed to load more emails:', error)
-      addToast({ type: 'error', title: 'Failed to load more emails' })
-    } finally {
-      setLoadingMore(false)
+  const emails = useMemo(
+    () => emailsInfiniteData?.pages.flatMap((page) => page.emails ?? []) ?? [],
+    [emailsInfiniteData]
+  )
+  const searchActive = debouncedSearch.length > 0
+  const typingAheadOfSearch =
+    searchQuery.trim().length > 0 && searchQuery.trim() !== debouncedSearch
+
+  const searchFooterMessage = useMemo(() => {
+    if (!searchActive || typingAheadOfSearch) return null
+    const matchCount = emails.length
+    if (hasNextPage) {
+      if (matchCount === 0) {
+        return 'No matches in this batch. Load more to search further in your inbox.'
+      }
+      if (matchCount === 1) {
+        return '1 match so far. Load more if you expect additional emails from this search.'
+      }
+      return `${matchCount} matches loaded. Load more if you need older matching emails.`
     }
-  }, [emailLimit, hasMore, loadingMore, refetchEmails, addToast])
+    if (matchCount === 0) {
+      return `No emails in your inbox match "${debouncedSearch}".`
+    }
+    if (matchCount === 1) {
+      return `Only 1 email in your inbox matches "${debouncedSearch}".`
+    }
+    return `All ${matchCount} matching emails are shown.`
+  }, [searchActive, typingAheadOfSearch, emails.length, hasNextPage, debouncedSearch])
 
   // Manual refresh function
   const handleRefresh = useCallback(() => {
@@ -832,26 +846,25 @@ export const EmailInbox: React.FC = () => {
     }
   }
 
-  // Optimized: memoize filter results and toLowerCase() calls
   const filteredEmails = useMemo(() => {
-    if (!searchQuery && filter === 'all') return emails
-    
-    const searchLower = searchQuery.toLowerCase()
-    return emails.filter((email: Email) => {
-      const snippetPlain = emailSnippetToCustomerPlainText(email.snippet || '', { maxLen: 50_000 })
-      const matchesSearch = !searchQuery || 
-        email.subject.toLowerCase().includes(searchLower) ||
-        email.from.toLowerCase().includes(searchLower) ||
-        snippetPlain.toLowerCase().includes(searchLower) ||
-        email.snippet.toLowerCase().includes(searchLower)
-      
-      const matchesFilter = filter === 'all' || 
-        (filter === 'unread' && email.unread) ||
-        (filter === 'read' && !email.unread)
-      
-      return matchesSearch && matchesFilter
-    })
-  }, [emails, searchQuery, filter])
+    let list = emails
+    if (typingAheadOfSearch) {
+      const searchLower = searchQuery.toLowerCase()
+      list = emails.filter((email: Email) => {
+        const snippetPlain = emailSnippetToCustomerPlainText(email.snippet || '', { maxLen: 50_000 })
+        return (
+          email.subject.toLowerCase().includes(searchLower) ||
+          email.from.toLowerCase().includes(searchLower) ||
+          snippetPlain.toLowerCase().includes(searchLower) ||
+          email.snippet.toLowerCase().includes(searchLower)
+        )
+      })
+    }
+    if (filter === 'all') return list
+    return list.filter((email: Email) =>
+      filter === 'unread' ? email.unread : !email.unread
+    )
+  }, [emails, searchQuery, typingAheadOfSearch, filter])
 
   const getAttachmentDownloadUrl = useCallback(
     (attachmentId: string) => {
@@ -1063,16 +1076,54 @@ export const EmailInbox: React.FC = () => {
               <Loader2 className="h-6 w-6 animate-spin text-brand-primary" />
             </div>
           ) : filteredEmails.length === 0 ? (
-            <EmptyState
-              icon={Mail}
-              title={emails.length === 0 && gmailConnected === true ? "No emails yet" : emails.length === 0 ? "No emails found" : "No emails match your search"}
-              description={emails.length === 0 && gmailConnected === true
-                ? "Your inbox is empty. New emails will appear here once they arrive."
-                : emails.length === 0
-                ? "No emails found. Make sure Gmail is connected and synced."
-                : "Try adjusting your search or filter criteria."
-              }
-            />
+            <div>
+              <EmptyState
+                icon={Mail}
+                title={
+                  searchActive
+                    ? `No matches for "${debouncedSearch}"`
+                    : emails.length === 0 && gmailConnected === true
+                      ? 'No emails yet'
+                      : emails.length === 0
+                        ? 'No emails found'
+                        : 'No emails match your filter'
+                }
+                description={
+                  searchActive && hasNextPage
+                    ? 'Nothing matched in the messages loaded so far. Load more to search deeper in your inbox.'
+                    : searchActive
+                      ? 'Gmail did not find any inbox messages for that search.'
+                      : emails.length === 0 && gmailConnected === true
+                        ? 'Your inbox is empty. New emails will appear here once they arrive.'
+                        : emails.length === 0
+                          ? 'No emails found. Make sure Gmail is connected and synced.'
+                          : 'Try adjusting your search or filter criteria.'
+                }
+              />
+              {hasNextPage ? (
+                <div className="border-t border-brand-text/10 p-4 dark:border-gray-700">
+                  <button
+                    type="button"
+                    onClick={() => fetchNextPage()}
+                    disabled={isFetchingNextPage}
+                    className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg bg-gray-50 px-4 py-3 text-brand-text transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 touch-manipulation"
+                  >
+                    {isFetchingNextPage ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Searching further…</span>
+                      </>
+                    ) : (
+                      <span>Load more to continue search</span>
+                    )}
+                  </button>
+                </div>
+              ) : searchFooterMessage ? (
+                <p className="border-t border-brand-text/10 px-4 py-3 text-center text-sm text-gray-600 dark:border-gray-700 dark:text-gray-400">
+                  {searchFooterMessage}
+                </p>
+              ) : null}
+            </div>
           ) : (
             <>
               <div className="divide-y divide-gray-200/80 dark:divide-gray-700/80">
@@ -1151,26 +1202,34 @@ export const EmailInbox: React.FC = () => {
                 })}
               </div>
               
-              {/* Load More Button */}
-              {hasMore && (
-                <div className="p-4 border-t border-brand-text/10 dark:border-gray-700">
+              {hasNextPage ? (
+                <div className="border-t border-brand-text/10 p-4 dark:border-gray-700">
                   <button
                     type="button"
-                    onClick={loadMoreEmails}
-                    disabled={loadingMore || isFetching}
+                    onClick={() => fetchNextPage()}
+                    disabled={isFetchingNextPage}
                     className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg bg-gray-50 px-4 py-3 text-brand-text transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 touch-manipulation"
                   >
-                    {loadingMore || isFetching ? (
+                    {isFetchingNextPage ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Loading more...</span>
+                        <span>{searchActive ? 'Searching further…' : 'Loading more…'}</span>
                       </>
                     ) : (
-                      <span>Load More Emails</span>
+                      <span>{searchActive ? 'Load more search results' : 'Load more emails'}</span>
                     )}
                   </button>
+                  {searchFooterMessage && !isFetchingNextPage ? (
+                    <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
+                      {searchFooterMessage}
+                    </p>
+                  ) : null}
                 </div>
-              )}
+              ) : searchFooterMessage ? (
+                <p className="border-t border-brand-text/10 px-4 py-3 text-center text-sm text-gray-600 dark:border-gray-700 dark:text-gray-400">
+                  {searchFooterMessage}
+                </p>
+              ) : null}
             </>
           )}
         </div>

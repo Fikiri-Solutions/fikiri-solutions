@@ -650,6 +650,31 @@ class GmailSyncJobManager:
                             logger.debug("email.received event skipped: %s", ev_err)
 
                         try:
+                            from email_automation.parser import MinimalEmailParser as _TriageParser
+                            from services.email_triage_service import triage_and_store_synced_message
+
+                            _tp = _TriageParser()
+                            _parsed_triage = _tp.parse_message(message)
+                            _subj = _tp.get_subject(_parsed_triage)
+                            _body = _tp.get_body_text(_parsed_triage) or ""
+                            _from = _tp.get_sender(_parsed_triage) or ""
+                            _addr = _from
+                            if "<" in _from and ">" in _from:
+                                _addr = _from.split("<")[1].split(">")[0].strip()
+                            triage_and_store_synced_message(
+                                user_id,
+                                external_id=str(message.get("id") or email_id),
+                                subject=_subj or "",
+                                body=_body,
+                                sender_email=_addr,
+                                sender_name=_from.split("<")[0].strip() if "<" in _from else _from,
+                                provider="gmail",
+                                synced_email_id=sid,
+                            )
+                        except Exception as triage_err:
+                            logger.debug("email triage skipped: %s", triage_err)
+
+                        try:
                             owner_rows = db_optimizer.execute_query(
                                 "SELECT email FROM users WHERE id = ? LIMIT 1", (user_id,)
                             )

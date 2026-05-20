@@ -73,11 +73,10 @@ class TestChatbotPreviewQuery(unittest.TestCase):
         self.assertTrue(data["config_applied"])
         self.assertFalse(data["fallback_used"])
 
-        mock_retrieve.assert_called_once_with(
-            "What are your hours?",
-            "42",
-            42,
-        )
+        mock_retrieve.assert_called_once()
+        retrieve_args = mock_retrieve.call_args
+        self.assertEqual(retrieve_args[0], ("What are your hours?", "42", 42))
+        self.assertIn("correlation_id", retrieve_args[1])
         mock_load_cfg.assert_called_once_with(42, tenant_id="42")
         mock_generate.assert_called_once()
         gen_kwargs = mock_generate.call_args[1]
@@ -132,7 +131,7 @@ class TestChatbotPreviewQuery(unittest.TestCase):
     @patch("core.public_chatbot_api.api_key_manager.validate_api_key")
     @patch("core.public_chatbot_api.api_key_manager.check_rate_limit")
     @patch("core.public_chatbot_api.api_key_manager.record_usage")
-    @patch("core.public_chatbot_api._check_plan_access")
+    @patch("core.chatbot_usage_tracking.check_plan_access")
     @patch("core.public_chatbot_api.context_system.start_conversation")
     def test_public_query_unchanged_alongside_preview(
         self,

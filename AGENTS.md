@@ -33,6 +33,14 @@
 - If you can’t change the backend env, the 429 fallback in auth setup (log in as default test user and save that state) still avoids failing the run when the limit is hit.
 - Auth env: set `TEST_USER_EMAIL` and `TEST_USER_PASSWORD` to a valid user, or unset them to use defaults (`test@example.com` / `TestPassword123!`). See [docs/E2E_TEST_PLAN.md](docs/E2E_TEST_PLAN.md).
 
+### Regression testing (required on every change)
+
+See `.cursor/rules/regression-testing.mdc`. Summary:
+
+- Run **full** backend + frontend test suites before marking work done — not only tests near edited files.
+- Any bug fix: reproduce → fix root cause → **add a regression test** → re-run full suite.
+- New features: tests in the same change; critical paths need success + at least one failure branch (`docs/CURSOR_QUALITY_GATE.md`).
+
 ### Lint / Test / Build commands
 
 See `README.md` for canonical commands. Quick reference:

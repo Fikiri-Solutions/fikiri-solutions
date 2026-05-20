@@ -425,6 +425,22 @@ def orchestrate_incoming(
     record_email_pipeline_ai_usage(user_id)
 
     analysis_payload = analysis if isinstance(analysis, dict) else {}
+    try:
+        from services.email_triage_service import triage_and_store_synced_message
+
+        triage_and_store_synced_message(
+            user_id,
+            external_id=str(external_message_id or msg_id or ""),
+            subject=subject or "",
+            body=body_text,
+            sender_email=sender_email,
+            sender_name=from_header or "",
+            provider=provider,
+            synced_email_row_id=synced_email_row_id,
+            analysis=analysis_payload,
+        )
+    except Exception as triage_exc:
+        logger.debug("pipeline triage store skipped: %s", triage_exc)
     policy_result = evaluate_email_action_policy(analysis_payload)
     action_type = policy_result.get("recommended_action_type", "auto_reply")
     _apply_crm_recommendations(

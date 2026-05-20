@@ -305,6 +305,25 @@ export interface ChatbotPreviewQueryResult {
   config_applied: boolean
   retrieval_confidence?: number
   llm_confidence?: number
+  retrieval_debug?: ChatbotRetrievalDebug
+}
+
+export interface ChatbotRetrievalDebug {
+  raw_faq_count?: number
+  raw_kb_count?: number
+  raw_vector_count?: number
+  post_vector_diversity_count?: number
+  post_cross_source_dedup_count?: number
+  final_source_count?: number
+  context_char_count?: number
+  fallback_needed?: boolean
+  retrieval_confidence?: number
+  collapsed_duplicate_count?: number
+  vector_fetch_top_k?: number
+  max_chunks_per_parent?: number
+  vector_enabled?: boolean
+  vector_search_enabled?: boolean
+  latency_ms?: number
 }
 
 /** GET /api/migration/capabilities — structured import & migration map */
@@ -805,11 +824,13 @@ class ApiClient {
   /** Dashboard preview — same brain as public widget; session auth only. */
   async previewChatbotQuery(
     query: string,
-    conversationId?: string
+    conversationId?: string,
+    options?: { debug?: boolean }
   ): Promise<ChatbotPreviewQueryResult> {
     const response = await this.client.post('/chatbot/preview-query', {
       query,
       ...(conversationId ? { conversation_id: conversationId } : {}),
+      ...(options?.debug ? { debug: true } : {}),
     })
     return response.data as ChatbotPreviewQueryResult
   }
@@ -1369,14 +1390,20 @@ class ApiClient {
   async getEmails(params?: {
     filter?: string
     limit?: number
+    /** Inbox search (Gmail q= / synced SQL); alias of backend `q` */
     query?: string
+    q?: string
+    page_token?: string
+    offset?: number
     use_synced?: boolean
     /** false = list only (snippets); full body via getEmailMessage(id) */
     include_body?: boolean
   }): Promise<any> {
+    const searchQ = params?.q ?? params?.query
     const response = await this.client.get('/email/messages', {
       params: {
         ...params,
+        q: searchQ,
         user_id: this.getUserId() ?? 1,
         use_synced: params?.use_synced ?? true,
         include_body: params?.include_body ?? false

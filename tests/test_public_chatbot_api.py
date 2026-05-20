@@ -127,7 +127,7 @@ class TestPublicChatbotAPI(unittest.TestCase):
         self.assertFalse(data['success'])
         self.assertEqual(data['error_code'], 'INVALID_API_KEY')
     
-    @patch('core.public_chatbot_api._check_plan_access')
+    @patch('core.chatbot_usage_tracking.check_plan_access')
     @patch('core.chatbot_retrieval.get_feature_flags')
     @patch('core.chatbot_response_service.LLMRouter')
     @patch('core.chatbot_retrieval.get_vector_search')
@@ -206,7 +206,7 @@ class TestPublicChatbotAPI(unittest.TestCase):
         mock_record.assert_called_once()
 
     @patch('core.public_chatbot_api.load_chatbot_config')
-    @patch('core.public_chatbot_api._check_plan_access')
+    @patch('core.chatbot_usage_tracking.check_plan_access')
     @patch('core.chatbot_retrieval.get_feature_flags')
     @patch('core.chatbot_response_service.LLMRouter')
     @patch('core.chatbot_retrieval.get_vector_search')
@@ -319,7 +319,7 @@ class TestPublicChatbotAPI(unittest.TestCase):
         self.assertFalse(data['success'])
         self.assertEqual(data['error_code'], 'MISSING_QUERY')
 
-    @patch('core.public_chatbot_api.ai_budget_guardrails.evaluate')
+    @patch('core.chatbot_usage_tracking.ai_budget_guardrails.evaluate')
     @patch('core.chatbot_retrieval.get_feature_flags')
     @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
     @patch('core.public_chatbot_api.api_key_manager.check_rate_limit')
@@ -374,8 +374,8 @@ class TestPublicChatbotAPI(unittest.TestCase):
         self.assertFalse(data['success'])
         self.assertEqual(data['error_code'], 'AI_BUDGET_SOFT_STOP')
 
-    @patch("core.public_chatbot_api.check_tier_usage_cap")
-    @patch("core.public_chatbot_api._check_plan_access")
+    @patch("core.chatbot_usage_tracking.check_tier_usage_cap")
+    @patch("core.chatbot_usage_tracking.check_plan_access")
     @patch("core.chatbot_retrieval.get_feature_flags")
     @patch("core.public_chatbot_api.api_key_manager.validate_api_key")
     @patch("core.public_chatbot_api.api_key_manager.check_rate_limit")
@@ -431,8 +431,8 @@ class TestPublicChatbotAPI(unittest.TestCase):
         self.assertFalse(data["success"])
         self.assertEqual(data["error_code"], "PLAN_LIMIT_EXCEEDED")
 
-    @patch("core.public_chatbot_api.ai_budget_guardrails.record_ai_usage")
-    @patch("core.public_chatbot_api._check_plan_access")
+    @patch("core.chatbot_usage_tracking.ai_budget_guardrails.record_ai_usage")
+    @patch("core.chatbot_usage_tracking.check_plan_access")
     @patch("core.chatbot_retrieval.get_feature_flags")
     @patch("core.chatbot_response_service.LLMRouter")
     @patch("core.chatbot_retrieval.get_vector_search")
@@ -606,9 +606,9 @@ class TestPublicChatbotAPI(unittest.TestCase):
         mock_vector_search.return_value.search_similar.assert_called_once()
 
     @patch('core.chatbot_retrieval.get_feature_flags')
-    @patch('core.public_chatbot_api.enhanced_crm_service.create_lead')
-    @patch('core.public_chatbot_api.enhanced_crm_service.add_lead_activity')
-    @patch('core.public_chatbot_api.db_optimizer.execute_query')
+    @patch('core.chatbot_lead_capture.enhanced_crm_service.create_lead')
+    @patch('core.chatbot_lead_capture.enhanced_crm_service.add_lead_activity')
+    @patch('core.chatbot_lead_capture.db_optimizer.execute_query')
     @patch('core.chatbot_response_service.LLMRouter')
     @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
     @patch('core.public_chatbot_api.api_key_manager.check_rate_limit')
@@ -661,6 +661,148 @@ class TestPublicChatbotAPI(unittest.TestCase):
         self.assertEqual(data.get("lead_id"), 123)
         mock_create_lead.assert_called_once()
         mock_add_activity.assert_called_once()
+
+    @patch('core.chatbot_retrieval.get_feature_flags')
+    @patch('core.chatbot_lead_capture.enhanced_crm_service.create_lead')
+    @patch('core.chatbot_lead_capture.enhanced_crm_service.add_lead_activity')
+    @patch('core.chatbot_lead_capture.db_optimizer.execute_query')
+    @patch('core.chatbot_response_service.LLMRouter')
+    @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
+    @patch('core.public_chatbot_api.api_key_manager.check_rate_limit')
+    @patch('core.chatbot_retrieval.faq_system.search_faqs')
+    @patch('core.chatbot_retrieval.knowledge_base.search')
+    @patch('core.public_chatbot_api.context_system.start_conversation')
+    def test_10b_lead_capture_from_explicit_payload(self, mock_start_conv, mock_kb_search, mock_faq_search,
+                                                    mock_rate_limit, mock_validate, mock_llm_router,
+                                                    mock_execute, mock_add_activity, mock_create_lead,
+                                                    mock_flags):
+        mock_validate.return_value = self.mock_api_key_info
+        mock_rate_limit.return_value = {'allowed': True, 'remaining': 60, 'limit': 60}
+        mock_flags.return_value.is_enabled.return_value = False
+        mock_faq_search.return_value = Mock(success=True, matches=[])
+        mock_kb_search.return_value = Mock(success=True, results=[])
+        mock_start_conv.return_value = Mock(conversation_id="conv_payload")
+        mock_llm_router.return_value.process.return_value = {
+            "success": True,
+            "validated": True,
+            "content": json.dumps({
+                "answer": "Thanks",
+                "confidence": 0.9,
+                "fallback_used": False,
+                "sources": [],
+            }),
+        }
+        mock_execute.return_value = []
+        mock_create_lead.return_value = {"success": True, "data": {"lead_id": 456}}
+
+        response = self.client.post(
+            '/api/public/chatbot/query',
+            json={
+                'query': 'I want a demo',
+                'lead': {'email': 'payload@example.com', 'name': 'Sam'},
+            },
+            headers={'X-API-Key': 'fik_test_key'},
+        )
+
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data.get("lead_id"), 456)
+        mock_create_lead.assert_called_once()
+
+    @patch('core.chatbot_retrieval.get_feature_flags')
+    @patch('core.chatbot_lead_capture.enhanced_crm_service.create_lead')
+    @patch('core.public_chatbot_api.load_chatbot_config')
+    @patch('core.chatbot_response_service.LLMRouter')
+    @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
+    @patch('core.public_chatbot_api.api_key_manager.check_rate_limit')
+    @patch('core.chatbot_retrieval.faq_system.search_faqs')
+    @patch('core.chatbot_retrieval.knowledge_base.search')
+    @patch('core.public_chatbot_api.context_system.start_conversation')
+    def test_10c_lead_capture_disabled_in_config_skips_creation(
+        self, mock_start_conv, mock_kb_search, mock_faq_search, mock_rate_limit, mock_validate,
+        mock_llm_router, mock_load_cfg, mock_create_lead, mock_flags,
+    ):
+        from core.chatbot_config import ChatbotConfig
+
+        mock_validate.return_value = self.mock_api_key_info
+        mock_rate_limit.return_value = {'allowed': True, 'remaining': 60, 'limit': 60}
+        mock_flags.return_value.is_enabled.return_value = False
+        mock_faq_search.return_value = Mock(success=True, matches=[])
+        mock_kb_search.return_value = Mock(success=True, results=[])
+        mock_start_conv.return_value = Mock(conversation_id="conv_disabled")
+        mock_load_cfg.return_value = ChatbotConfig(lead_capture_enabled=False)
+        mock_llm_router.return_value.process.return_value = {
+            "success": True,
+            "validated": True,
+            "content": json.dumps({
+                "answer": "Thanks",
+                "confidence": 0.9,
+                "fallback_used": False,
+                "sources": [],
+            }),
+        }
+
+        response = self.client.post(
+            '/api/public/chatbot/query',
+            json={'query': 'Email me at skip@example.com'},
+            headers={'X-API-Key': 'fik_test_key'},
+        )
+
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(data.get("lead_id"))
+        mock_create_lead.assert_not_called()
+
+
+    @patch('core.chatbot_retrieval.get_feature_flags')
+    @patch('core.chatbot_lead_capture.logger.warning')
+    @patch('core.chatbot_lead_capture.db_optimizer.execute_query')
+    @patch('core.chatbot_response_service.LLMRouter')
+    @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
+    @patch('core.public_chatbot_api.api_key_manager.check_rate_limit')
+    @patch('core.chatbot_retrieval.faq_system.search_faqs')
+    @patch('core.chatbot_retrieval.knowledge_base.search')
+    @patch('core.public_chatbot_api.context_system.start_conversation')
+    def test_10d_crm_failure_logs_failed_and_response_still_succeeds(
+        self, mock_start_conv, mock_kb_search, mock_faq_search, mock_rate_limit, mock_validate,
+        mock_llm_router, mock_execute, mock_log_warning, mock_flags,
+    ):
+        mock_validate.return_value = self.mock_api_key_info
+        mock_rate_limit.return_value = {'allowed': True, 'remaining': 60, 'limit': 60}
+        mock_flags.return_value.is_enabled.return_value = False
+        mock_faq_search.return_value = Mock(success=True, matches=[])
+        mock_kb_search.return_value = Mock(success=True, results=[])
+        mock_start_conv.return_value = Mock(conversation_id="conv_fail")
+        mock_llm_router.return_value.process.return_value = {
+            "success": True,
+            "validated": True,
+            "content": json.dumps({
+                "answer": "Thanks",
+                "confidence": 0.9,
+                "fallback_used": False,
+                "sources": [],
+            }),
+        }
+        mock_execute.side_effect = RuntimeError("db down")
+
+        response = self.client.post(
+            '/api/public/chatbot/query',
+            json={'query': 'Email me at fail@example.com'},
+            headers={'X-API-Key': 'fik_test_key'},
+        )
+
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data.get("success"))
+        self.assertIsNone(data.get("lead_id"))
+        failed_calls = [
+            call
+            for call in mock_log_warning.call_args_list
+            if call[1].get("extra", {}).get("event") == "chatbot.lead_capture.failed"
+        ]
+        self.assertEqual(len(failed_calls), 1)
+        extra_blob = str(failed_calls[0][1]["extra"])
+        self.assertNotIn("fail@example.com", extra_blob)
 
 
 if __name__ == '__main__':
