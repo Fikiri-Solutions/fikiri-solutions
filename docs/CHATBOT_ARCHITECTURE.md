@@ -4,6 +4,8 @@ Canonical reference for Fikiri’s modular chatbot stack. Use this document when
 
 **Related (legacy / supplementary):** [CHATBOT_KB_PIPELINE_MAP.md](./CHATBOT_KB_PIPELINE_MAP.md) (older pipeline notes; some retrieval steps are outdated), [CHATBOT_EMBED.md](./CHATBOT_EMBED.md), [EMAIL_REPLY_GENERATION.md](./EMAIL_REPLY_GENERATION.md) (separate email path).
 
+For tenant launch/runbook steps, see [CHATBOT_PRODUCTION_GO_LIVE_CHECKLIST.md](./CHATBOT_PRODUCTION_GO_LIVE_CHECKLIST.md).
+
 ---
 
 ## 1. High-level flows

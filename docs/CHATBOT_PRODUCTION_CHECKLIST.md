@@ -2,6 +2,8 @@
 
 Use with [CHATBOT_ARCHITECTURE.md](./CHATBOT_ARCHITECTURE.md) before merging to `main` and deploying Render + Vercel.
 
+For per-tenant SMB go-live and ops runbook, see [CHATBOT_PRODUCTION_GO_LIVE_CHECKLIST.md](./CHATBOT_PRODUCTION_GO_LIVE_CHECKLIST.md).
+
 ## Pre-merge verification (local / CI)
 
 ```bash
