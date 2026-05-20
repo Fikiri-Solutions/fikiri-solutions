@@ -362,6 +362,48 @@ class DatabaseOptimizer:
                         "ALTER TABLE synced_emails ADD COLUMN is_read BOOLEAN DEFAULT 0"
                     )
                     logger.info("✅ Added is_read column to synced_emails table")
+                cursor.execute(
+                    """
+                    UPDATE synced_emails
+                    SET external_id = gmail_id
+                    WHERE (external_id IS NULL OR external_id = '')
+                      AND gmail_id IS NOT NULL
+                    """
+                )
+                cursor.execute(
+                    """
+                    UPDATE synced_emails
+                    SET provider = 'gmail'
+                    WHERE provider IS NULL OR provider = ''
+                    """
+                )
+                cursor.execute(
+                    """
+                    DELETE FROM synced_emails
+                    WHERE id IN (
+                        SELECT id FROM (
+                            SELECT id,
+                                   ROW_NUMBER() OVER (
+                                       PARTITION BY user_id, external_id, provider
+                                       ORDER BY id DESC
+                                   ) AS rn
+                            FROM synced_emails
+                            WHERE external_id IS NOT NULL AND TRIM(external_id) <> ''
+                              AND provider IS NOT NULL AND TRIM(provider) <> ''
+                        ) ranked
+                        WHERE rn > 1
+                    )
+                    """
+                )
+                cursor.execute(
+                    """
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_synced_emails_user_external_provider
+                    ON synced_emails (user_id, external_id, provider)
+                    """
+                )
+                logger.info(
+                    "✅ synced_emails upsert key ready (user_id, external_id, provider)"
+                )
 
             cursor.execute("PRAGMA table_info(crm_events)")
             crm_event_columns = [row[1] for row in cursor.fetchall()]
@@ -398,6 +440,21 @@ class DatabaseOptimizer:
                             "WHERE created_at IS NULL"
                         )
                     logger.info("✅ Added created_at column to crm_events")
+                if "tenant_user_id" in crm_event_columns and "user_id" in crm_event_columns:
+                    cursor.execute(
+                        """
+                        UPDATE crm_events
+                        SET tenant_user_id = user_id
+                        WHERE tenant_user_id IS NULL AND user_id IS NOT NULL
+                        """
+                    )
+                    cursor.execute(
+                        """
+                        UPDATE crm_events
+                        SET user_id = tenant_user_id
+                        WHERE user_id IS NULL AND tenant_user_id IS NOT NULL
+                        """
+                    )
                 if "occurred_at" in crm_event_columns:
                     cursor.execute(
                         "UPDATE crm_events SET created_at = occurred_at "
@@ -3034,6 +3091,83 @@ class DatabaseOptimizer:
         """
         self.execute_query(sql, params, fetch=False)
 
+    def _dedupe_synced_emails_for_upsert_key(self) -> int:
+        """
+        Drop duplicate rows that would block UNIQUE(user_id, external_id, provider).
+
+        Keeps the newest row (highest id) per key.
+        """
+        if not self.table_exists("synced_emails"):
+            return 0
+        before = self.execute_query("SELECT COUNT(*) AS c FROM synced_emails")
+        before_count = int((before[0].get("c") if isinstance(before[0], dict) else before[0][0]) or 0)
+        self.execute_query(
+            """
+            DELETE FROM synced_emails
+            WHERE id IN (
+                SELECT id FROM (
+                    SELECT id,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY user_id, external_id, provider
+                               ORDER BY id DESC
+                           ) AS rn
+                    FROM synced_emails
+                    WHERE external_id IS NOT NULL AND TRIM(external_id) <> ''
+                      AND provider IS NOT NULL AND TRIM(provider) <> ''
+                ) ranked
+                WHERE rn > 1
+            )
+            """,
+            fetch=False,
+        )
+        after = self.execute_query("SELECT COUNT(*) AS c FROM synced_emails")
+        after_count = int((after[0].get("c") if isinstance(after[0], dict) else after[0][0]) or 0)
+        removed = max(0, before_count - after_count)
+        if removed:
+            logger.info(
+                "synced_emails dedupe removed %s duplicate row(s) before upsert unique index",
+                removed,
+            )
+        return removed
+
+    def ensure_synced_emails_upsert_constraint(self) -> None:
+        """
+        Ensure UNIQUE(user_id, external_id, provider) exists for synced_emails upserts.
+
+        Legacy SQLite DBs only had UNIQUE(user_id, gmail_id); column adds alone do not
+        satisfy ON CONFLICT (user_id, external_id, provider).
+        """
+        if not self.table_exists("synced_emails"):
+            return
+        try:
+            self.execute_query(
+                """
+                UPDATE synced_emails
+                SET external_id = gmail_id
+                WHERE (external_id IS NULL OR external_id = '')
+                  AND gmail_id IS NOT NULL
+                """,
+                fetch=False,
+            )
+            self.execute_query(
+                """
+                UPDATE synced_emails
+                SET provider = 'gmail'
+                WHERE provider IS NULL OR provider = ''
+                """,
+                fetch=False,
+            )
+            self._dedupe_synced_emails_for_upsert_key()
+            self.execute_query(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_synced_emails_user_external_provider
+                ON synced_emails (user_id, external_id, provider)
+                """,
+                fetch=False,
+            )
+        except Exception as e:
+            logger.warning("synced_emails upsert constraint ensure failed: %s", e)
+
     def upsert_synced_email_from_gmail(
         self,
         user_id: int,
@@ -3051,6 +3185,7 @@ class DatabaseOptimizer:
         Upsert a Gmail row into synced_emails using UNIQUE(user_id, external_id, provider).
         external_id is set to gmail_id so Postgres ON CONFLICT matches the schema.
         """
+        self.ensure_synced_emails_upsert_constraint()
         params = (
             user_id,
             gmail_id,

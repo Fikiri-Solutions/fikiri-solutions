@@ -99,7 +99,28 @@ export const ContentMigration: React.FC = () => {
   })
 
   const [csvFile, setCsvFile] = useState<File | null>(null)
+  const [csvPreview, setCsvPreview] = useState<{
+    rows: Array<{ row: number; email: string; name: string; status: string; reason?: string }>
+    summary: { ok: number; duplicate: number; invalid: number }
+  } | null>(null)
   const [onDup, setOnDup] = useState<'skip' | 'update' | 'merge'>('update')
+
+  const previewCsvMut = useMutation({
+    mutationFn: (f: File) => apiClient.previewLeadsCsv(f),
+    onSuccess: (data) => {
+      setCsvPreview({
+        rows: data.rows || [],
+        summary: data.summary || { ok: 0, duplicate: 0, invalid: 0 },
+      })
+      addToast({
+        type: 'info',
+        title: 'Preview ready',
+        message: `${data.summary?.ok ?? 0} new, ${data.summary?.duplicate ?? 0} duplicate, ${data.summary?.invalid ?? 0} invalid.`,
+      })
+    },
+    onError: () =>
+      addToast({ type: 'error', title: 'Preview failed', message: 'CSV needs email and name columns.' }),
+  })
 
   const importCsvMut = useMutation({
     mutationFn: (f: File) => apiClient.importLeadsCsv(f, { onDuplicate: onDup }),
@@ -110,6 +131,7 @@ export const ContentMigration: React.FC = () => {
         message: `Created ${r.created}, updated ${r.updated}, skipped ${r.skipped} rows.`,
       })
       setCsvFile(null)
+      setCsvPreview(null)
     },
     onError: () =>
       addToast({
@@ -146,8 +168,7 @@ export const ContentMigration: React.FC = () => {
           <p className="text-sm uppercase tracking-wide text-brand-text/60 dark:text-gray-400">Import center</p>
           <h1 className="text-3xl font-bold text-brand-text dark:text-white">Content migration</h1>
           <p className="mt-2 max-w-3xl text-brand-text/70 dark:text-gray-300">
-            Move marketing copy, documents, forms, and contacts into Fikiri in one place. Keep sources as-is or refine
-            after import—your choice.
+            Import knowledge articles and CRM contacts here. Documents and forms tabs list server templates for reference—use Automations or Chatbot Builder for live content.
           </p>
         </div>
         <button
@@ -415,10 +436,9 @@ export const ContentMigration: React.FC = () => {
       {tab === 'documents' && sections && (
         <div className="space-y-6">
           <div className="rounded-2xl border border-brand-text/10 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-            <h2 className="text-xl font-semibold text-brand-text dark:text-white">Merge templates</h2>
+            <h2 className="text-xl font-semibold text-brand-text dark:text-white">Merge templates (reference)</h2>
             <p className="mt-2 text-sm text-brand-text/70 dark:text-gray-300">
-              These templates support generated documents (e.g. agreements, invoices). Automations and workflow actions can fill{' '}
-              <code className="rounded bg-brand-background/80 px-1 text-xs">variables</code> per lead or job.
+              Template catalog for document generation in Automations. Upload and extract text on the Knowledge tab—not here.
             </p>
             <TableScroll size="medium" className="mt-4" label="Document templates">
               <table className="w-full text-left text-sm">
@@ -458,9 +478,9 @@ export const ContentMigration: React.FC = () => {
 
       {tab === 'forms' && sections && (
         <div className="rounded-2xl border border-brand-text/10 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <h2 className="text-xl font-semibold text-brand-text dark:text-white">Form templates</h2>
+          <h2 className="text-xl font-semibold text-brand-text dark:text-white">Form templates (reference)</h2>
           <p className="mt-2 text-sm text-brand-text/70 dark:text-gray-300">
-            Map fields from your previous provider to these definitions. Embed HTML is available from the API for each template id.
+            Server-defined form definitions. Field mapping and embed setup are not available on this page yet.
           </p>
           <TableScroll size="medium" className="mt-4" label="Form templates">
             <table className="w-full text-left text-sm">
@@ -522,23 +542,61 @@ export const ContentMigration: React.FC = () => {
                   name="contacts_csv"
                   type="file"
                   accept=".csv"
-                  onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    setCsvFile(e.target.files?.[0] || null)
+                    setCsvPreview(null)
+                  }}
                   className="mt-1 block w-full text-sm text-brand-text file:mr-4 file:rounded-full file:border-0 file:bg-brand-accent/20 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-brand-primary dark:text-gray-100"
                 />
               </div>
             </div>
-            <button
-              type="button"
-              disabled={!csvFile || importCsvMut.isPending}
-              onClick={() => csvFile && importCsvMut.mutate(csvFile)}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-secondary disabled:opacity-50"
-            >
-              {importCsvMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
-              Import leads
-            </button>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                disabled={!csvFile || previewCsvMut.isPending}
+                onClick={() => csvFile && previewCsvMut.mutate(csvFile)}
+                className="inline-flex items-center gap-2 rounded-xl border border-brand-primary/40 bg-brand-primary/10 px-5 py-2.5 text-sm font-medium text-brand-primary hover:bg-brand-primary/20 disabled:opacity-50 dark:text-teal-200"
+              >
+                {previewCsvMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+                Preview CSV
+              </button>
+              <button
+                type="button"
+                disabled={!csvFile || !csvPreview || importCsvMut.isPending}
+                onClick={() => csvFile && importCsvMut.mutate(csvFile)}
+                className="inline-flex items-center gap-2 rounded-xl bg-brand-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-secondary disabled:opacity-50"
+              >
+                {importCsvMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+                Confirm import
+              </button>
+            </div>
+            {csvPreview && csvPreview.rows.length > 0 && (
+              <TableScroll size="medium" className="mt-4" label="CSV preview">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-brand-text/10 text-brand-text/60 dark:border-gray-600 dark:text-gray-400">
+                      <th className="py-2 pr-3 font-medium">Row</th>
+                      <th className="py-2 pr-3 font-medium">Email</th>
+                      <th className="py-2 pr-3 font-medium">Name</th>
+                      <th className="py-2 font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {csvPreview.rows.slice(0, 50).map((row) => (
+                      <tr key={row.row} className="border-b border-brand-text/5 dark:border-gray-700/80">
+                        <td className="py-2 pr-3 text-brand-text/80 dark:text-gray-300">{row.row}</td>
+                        <td className="py-2 pr-3 text-brand-text dark:text-gray-100">{row.email}</td>
+                        <td className="py-2 pr-3 text-brand-text dark:text-gray-100">{row.name}</td>
+                        <td className="py-2 text-brand-text/80 dark:text-gray-400 capitalize">{row.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TableScroll>
+            )}
           </div>
           <Link to="/crm" className="inline-flex items-center gap-1 text-sm font-medium text-brand-primary hover:underline">
-            Full CRM board & import history <ArrowRight className="h-4 w-4" />
+            Open CRM board <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       )}

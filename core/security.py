@@ -194,8 +194,10 @@ def init_security(app: Flask):
     @app.after_request
     def add_security_headers(response):
         """Add security headers to all responses"""
-        
-        # Content Security Policy
+        content_type = (response.content_type or '').lower()
+        is_html = 'text/html' in content_type
+
+        # Content Security Policy (HTML only — JSON/API responses are not documents)
         csp_policy = (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com; "
@@ -208,8 +210,9 @@ def init_security(app: Flask):
             "base-uri 'self'; "
             "form-action 'self'"
         )
-        response.headers['Content-Security-Policy'] = csp_policy
-        
+        if is_html:
+            response.headers['Content-Security-Policy'] = csp_policy
+
         # Security headers
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['X-Frame-Options'] = 'DENY'

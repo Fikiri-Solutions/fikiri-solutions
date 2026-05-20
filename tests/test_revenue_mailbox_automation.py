@@ -81,3 +81,44 @@ def test_mailbox_flow_idempotent_and_logged():
     assert second.get("success") is True
     assert actions._auto_reply.call_count == 1
     mock_crm.add_lead_activity.assert_called_once()
+
+
+def test_auto_reply_reuses_analysis_with_real_handler():
+    """Real _auto_reply path: analysis on parsed email flows into reply generation."""
+    parsed = {
+        "message_id": "m2",
+        "headers": {"from": "Lead <lead@example.com>", "subject": "Partnership"},
+        "body": {"text": "Interested in partnering.", "html": ""},
+        "snippet": "Interested in partnering.",
+        "labels": [],
+        "_analysis": {
+            "intent": "partnership_request",
+            "confidence": 0.95,
+            "urgency": "medium",
+            "lead_score": 80,
+            "suggested_reply": "Thank you for your partnership interest.",
+            "reply_guidance": {"tone": "professional_warm"},
+        },
+        "_mailbox_user_id": 1,
+    }
+
+    ai_assistant = MagicMock()
+    ai_assistant.generate_reply_with_metadata.return_value = (
+        "Thank you for your partnership interest.",
+        "reused_suggested_reply",
+    )
+
+    actions = MinimalEmailActions(services={"ai_assistant": ai_assistant})
+    actions.gmail_service = None
+    actions.db_optimizer = MagicMock()
+
+    result = actions._auto_reply(parsed, user_id=1)
+
+    assert result["success"] is True
+    assert result["details"]["reply_generation_mode"] == "reused_suggested_reply"
+    assert result["details"]["analysis_reused"] is True
+    assert result["details"]["intent"] == "partnership_request"
+    ai_assistant.generate_reply_with_metadata.assert_called_once()
+    assert ai_assistant.generate_reply_with_metadata.call_args.kwargs["analysis"]["intent"] == (
+        "partnership_request"
+    )

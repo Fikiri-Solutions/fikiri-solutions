@@ -83,7 +83,44 @@ class TestOnboardingJobManager:
         assert result.get("success") is True
         assert "first_sync_fallback" in result.get("job_id", "")
         assert "background fallback" in result.get("message", "").lower()
-        mock_run.assert_called_once_with(1)
+        mock_run.assert_called_once_with(1, lookback_days=90)
+
+    @patch("core.onboarding_jobs.run_first_sync")
+    @patch("core.redis_connection_helper.get_redis_client")
+    @patch("core.redis_connection_helper._resolve_redis_url")
+    def test_queue_first_sync_job_passes_lookback_days_to_thread(
+        self, mock_url, mock_client, mock_run
+    ):
+        mock_url.return_value = None
+        mock_client.return_value = None
+        mgr = OnboardingJobManager()
+        result = mgr.queue_first_sync_job(user_id=1, lookback_days=365)
+        assert result.get("success") is True
+        mock_run.assert_called_once_with(1, lookback_days=365)
+
+    @patch("core.onboarding_jobs.REDIS_QUEUE_AVAILABLE", True)
+    @patch("core.redis_connection_helper.get_redis_client")
+    @patch("core.redis_connection_helper._resolve_redis_url")
+    def test_queue_first_sync_job_rq_enqueue_passes_lookback(self, mock_url, mock_client):
+        mock_url.return_value = "redis://localhost"
+        mock_redis = MagicMock()
+        mock_client.return_value = mock_redis
+        mock_queue = MagicMock()
+        mock_job = MagicMock()
+        mock_job.id = "rq_job_1"
+        mock_queue.enqueue.return_value = mock_job
+
+        mgr = OnboardingJobManager()
+        mgr.redis_client = mock_redis
+        mgr.queue = mock_queue
+        result = mgr.queue_first_sync_job(user_id=5, lookback_days=365)
+
+        assert result.get("success") is True
+        mock_queue.enqueue.assert_called_once()
+        _args, kwargs = mock_queue.enqueue.call_args
+        assert _args[0] is run_first_sync
+        assert _args[1] == 5
+        assert kwargs.get("lookback_days") == 365
 
 
 class TestRunFirstSync:
@@ -93,3 +130,15 @@ class TestRunFirstSync:
         assert result.get("success") is False
         assert result.get("status") == "failed"
         assert "error" in result
+
+    @patch("core.onboarding_jobs.gmail_client", None)
+    def test_run_first_sync_lookback_days_kwarg(self):
+        with patch("core.onboarding_jobs.logger"):
+            result = run_first_sync(user_id=1, lookback_days=365)
+        assert result.get("success") is False
+
+    @patch("core.onboarding_jobs.gmail_client", None)
+    def test_run_first_sync_invalid_lookback_falls_back_to_90(self):
+        with patch("core.onboarding_jobs.logger"):
+            result = run_first_sync(user_id=1, lookback_days=999)
+        assert result.get("success") is False

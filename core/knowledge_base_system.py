@@ -1454,14 +1454,23 @@ Need help setting up? Contact our landscaping specialists at info@fikirisolution
             if isinstance(meta, dict):
                 vector_id = meta.get("vector_id")
 
-            if vector_id is not None:
+            if isinstance(meta, dict) and (
+                vector_id is not None or meta.get("chunk_vector_ids") or meta.get("chunk_count")
+            ):
                 try:
+                    from core.chatbot_vector_chunk_cleanup import delete_kb_chunk_vectors
+
                     vs = _get_vector_search()
-                    if getattr(vs, "use_pinecone", False) is True:
-                        vs.delete_document_by_id(str(vector_id))
-                    else:
-                        vs.delete_document(int(vector_id))
-                    logger.info(f"✅ Removed knowledge document {doc_id} from vector index")
+                    use_pinecone = getattr(vs, "use_pinecone", False) is True
+                    delete_kb_chunk_vectors(
+                        vs,
+                        doc_id,
+                        stored_chunk_ids=meta.get("chunk_vector_ids"),
+                        previous_chunk_count=meta.get("chunk_count"),
+                        prior_vector_id=vector_id,
+                        use_pinecone=use_pinecone,
+                    )
+                    logger.info("✅ Removed knowledge document %s chunk vectors from vector index", doc_id)
                 except Exception as ve:
                     logger.warning("Vector index delete failed for doc %s: %s", doc_id, ve)
 

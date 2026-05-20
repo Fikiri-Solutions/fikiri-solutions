@@ -827,14 +827,21 @@ class TestBusinessRoutes(unittest.TestCase):
         response = self.client.post("/api/ai/generate-reply", json={}, content_type="application/json")
         self.assertEqual(response.status_code, 400)
 
+    @patch("routes.business.ai_budget_guardrails.record_ai_usage")
     @patch("routes.business.get_current_user_id")
-    def test_generate_reply_success(self, mock_get_user):
+    def test_generate_reply_success(self, mock_get_user, mock_record_usage):
         mock_get_user.return_value = 1
         with patch("email_automation.ai_assistant.MinimalAIEmailAssistant") as mock_ai:
             instance = mock_ai.return_value
             instance.is_enabled.return_value = True
-            instance.classify_email_intent.return_value = {"intent": "general"}
+            instance.analyze_incoming_email.return_value = {
+                "intent": "unknown_business_relevant",
+                "legacy_intent": "general_info",
+                "suggested_reply": "Thanks for reaching out.",
+                "classification_source": "manual_api",
+            }
             instance.generate_response.return_value = "Thanks for reaching out."
+            instance._last_reply_generation_mode = "reused_suggested_reply"
             response = self.client.post(
                 "/api/ai/generate-reply",
                 json={"content": "Hello", "from": "User <u@example.com>", "subject": "Hi"},
@@ -844,6 +851,63 @@ class TestBusinessRoutes(unittest.TestCase):
         data = response.get_json()
         self.assertTrue(data.get("success"))
         self.assertIn("reply", data.get("data", {}))
+        mock_record_usage.assert_called_once()
+
+    @patch("routes.business.ai_budget_guardrails.record_ai_usage")
+    @patch("routes.business.get_current_user_id")
+    def test_generate_reply_skips_second_usage_when_reusing_suggested_reply(
+        self, mock_get_user, mock_record_usage
+    ):
+        mock_get_user.return_value = 1
+        with patch("email_automation.ai_assistant.MinimalAIEmailAssistant") as mock_ai:
+            instance = mock_ai.return_value
+            instance.is_enabled.return_value = True
+            instance.generate_response.return_value = "Pre-drafted reply"
+            instance._last_reply_generation_mode = "reused_suggested_reply"
+            response = self.client.post(
+                "/api/ai/generate-reply",
+                json={
+                    "content": "Hello",
+                    "from": "User <u@example.com>",
+                    "subject": "Hi",
+                    "analysis": {
+                        "intent": "service_inquiry",
+                        "suggested_reply": "Pre-drafted reply",
+                    },
+                },
+                content_type="application/json",
+            )
+        self.assertEqual(response.status_code, 200)
+        mock_record_usage.assert_not_called()
+        instance.analyze_incoming_email.assert_not_called()
+
+    @patch("routes.business.ai_budget_guardrails.record_ai_usage")
+    @patch("routes.business.get_current_user_id")
+    def test_generate_reply_records_usage_for_llm_reply_path(
+        self, mock_get_user, mock_record_usage
+    ):
+        mock_get_user.return_value = 1
+        with patch("email_automation.ai_assistant.MinimalAIEmailAssistant") as mock_ai:
+            instance = mock_ai.return_value
+            instance.is_enabled.return_value = True
+            instance.generate_response.return_value = "LLM composed reply"
+            instance._last_reply_generation_mode = "llm_with_analysis_context"
+            response = self.client.post(
+                "/api/ai/generate-reply",
+                json={
+                    "content": "Need pricing details",
+                    "from": "User <u@example.com>",
+                    "subject": "Pricing",
+                    "analysis": {
+                        "intent": "pricing_request",
+                        "suggested_reply": "",
+                    },
+                },
+                content_type="application/json",
+            )
+        self.assertEqual(response.status_code, 200)
+        mock_record_usage.assert_called_once_with(1, 1)
+        instance.analyze_incoming_email.assert_not_called()
 
     @patch("routes.business.db_optimizer")
     @patch("routes.business.get_current_user_id")

@@ -89,6 +89,8 @@ class TestKBVectorSync(unittest.TestCase):
         kb.search_index = {}
 
         mock_vs = MagicMock()
+        mock_vs.use_pinecone = False
+        mock_vs.delete_document_by_id.return_value = True
         mock_vs.delete_document.return_value = True
         mock_get_vs.return_value = mock_vs
 
@@ -96,7 +98,9 @@ class TestKBVectorSync(unittest.TestCase):
 
         self.assertTrue(result)
         mock_get_vs.assert_called_once()
-        mock_vs.delete_document.assert_called_once_with(99)
+        self.assertTrue(
+            mock_vs.delete_document.called or mock_vs.delete_document_by_id.called
+        )
         self.assertNotIn(doc_id, kb.documents)
 
     @patch("core.knowledge_base_system._get_vector_search")

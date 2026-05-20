@@ -4,6 +4,7 @@ OAuth Blueprint Unit Tests
 Tests for core/app_oauth.py
 """
 
+import json
 import unittest
 import os
 import sys
@@ -81,6 +82,104 @@ class TestAppOAuth(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         args = mock_db.upsert_oauth_state_row.call_args.args
         self.assertEqual(args[1], 7)
+
+    def test_gmail_start_stores_lookback_days_query_param(self):
+        app = _create_app()
+        with patch("core.app_oauth.GOOGLE_CLIENT_ID", "client"), patch(
+            "core.app_oauth.GOOGLE_CLIENT_SECRET", "secret"
+        ), patch("core.app_oauth.secrets.token_urlsafe", return_value="state_days"), patch(
+            "core.database_optimization.db_optimizer"
+        ) as mock_db:
+            client = app.test_client()
+            resp = client.get(
+                "/api/oauth/gmail/start?redirect=/integrations/gmail&lookback_days=365"
+            )
+
+        self.assertEqual(resp.status_code, 200)
+        metadata_json = mock_db.upsert_oauth_state_row.call_args.kwargs.get("metadata_json")
+        if metadata_json is None:
+            metadata_json = mock_db.upsert_oauth_state_row.call_args.args[5]
+        metadata = json.loads(metadata_json)
+        self.assertEqual(metadata.get("lookback_days"), 365)
+        self.assertEqual(metadata.get("lookback_preset"), "1y")
+
+    def test_gmail_start_stores_lookback_in_oauth_metadata(self):
+        app = _create_app()
+        with patch("core.app_oauth.GOOGLE_CLIENT_ID", "client"), patch(
+            "core.app_oauth.GOOGLE_CLIENT_SECRET", "secret"
+        ), patch("core.app_oauth.secrets.token_urlsafe", return_value="state_lb"), patch(
+            "core.database_optimization.db_optimizer"
+        ) as mock_db:
+            client = app.test_client()
+            resp = client.get("/api/oauth/gmail/start?redirect=/integrations/gmail&lookback=1y")
+
+        self.assertEqual(resp.status_code, 200)
+        metadata_json = mock_db.upsert_oauth_state_row.call_args.kwargs.get("metadata_json")
+        if metadata_json is None:
+            metadata_json = mock_db.upsert_oauth_state_row.call_args.args[5]
+        metadata = json.loads(metadata_json)
+        self.assertEqual(metadata.get("lookback_days"), 365)
+        self.assertEqual(metadata.get("lookback_preset"), "1y")
+
+    def test_gmail_start_invalid_lookback_defaults_to_90d(self):
+        app = _create_app()
+        with patch("core.app_oauth.GOOGLE_CLIENT_ID", "client"), patch(
+            "core.app_oauth.GOOGLE_CLIENT_SECRET", "secret"
+        ), patch("core.app_oauth.secrets.token_urlsafe", return_value="state_def"), patch(
+            "core.database_optimization.db_optimizer"
+        ) as mock_db:
+            client = app.test_client()
+            resp = client.get("/api/oauth/gmail/start?lookback=not-a-preset")
+
+        self.assertEqual(resp.status_code, 200)
+        metadata_json = mock_db.upsert_oauth_state_row.call_args.kwargs.get("metadata_json")
+        if metadata_json is None:
+            metadata_json = mock_db.upsert_oauth_state_row.call_args.args[5]
+        metadata = json.loads(metadata_json)
+        self.assertEqual(metadata.get("lookback_days"), 90)
+        self.assertEqual(metadata.get("lookback_preset"), "90d")
+
+    def test_gmail_callback_passes_lookback_to_first_sync_queue(self):
+        app = _create_app()
+        oauth_metadata = json.dumps(
+            {"user_id": 42, "lookback_days": 365, "lookback_preset": "1y"}
+        )
+        token_response = MagicMock()
+        token_response.json.return_value = {
+            "access_token": "access",
+            "refresh_token": "refresh",
+            "expires_in": 3600,
+        }
+        userinfo_response = MagicMock()
+        userinfo_response.status_code = 200
+        userinfo_response.json.return_value = {"id": "google-sub", "email": "u@example.com"}
+
+        with patch("core.app_oauth.GOOGLE_CLIENT_ID", "client"), patch(
+            "core.app_oauth.GOOGLE_CLIENT_SECRET", "secret"
+        ), patch("core.app_oauth.encrypt", side_effect=lambda x: x), patch(
+            "core.app_oauth.upsert_gmail_tokens"
+        ), patch("core.app_oauth.merge_user_google_sub"), patch(
+            "core.database_optimization.db_optimizer"
+        ) as mock_db, patch("requests.post", return_value=token_response), patch(
+            "requests.get", return_value=userinfo_response
+        ), patch("core.onboarding_jobs.onboarding_job_manager") as mock_jobs:
+            mock_db.execute_query.side_effect = [
+                [
+                    {
+                        "state": "expected",
+                        "redirect_url": "/integrations/gmail",
+                        "user_id": 42,
+                        "metadata": oauth_metadata,
+                    }
+                ],
+                None,
+                [{"onboarding_step": 2, "onboarding_completed": False}],
+            ]
+            client = app.test_client()
+            resp = client.get("/api/oauth/gmail/callback?state=expected&code=abc")
+
+        self.assertEqual(resp.status_code, 302)
+        mock_jobs.queue_first_sync_job.assert_called_once_with(42, lookback_days=365)
 
     def test_outlook_start_persists_bearer_user_id(self):
         app = _create_app()

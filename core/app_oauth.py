@@ -195,19 +195,37 @@ def gmail_start():
             g.session_data['oauth_state'] = state
             g.session_data['post_connect_redirect'] = request.args.get("redirect", "/onboarding/2")
 
+        from core.gmail_sync_options import lookback_from_start_params
+
+        lookback_days, lookback_preset = lookback_from_start_params(
+            lookback=request.args.get("lookback"),
+            lookback_days=request.args.get("lookback_days"),
+        )
+
         # Always persist state in DB to survive missing/cleared sessions
         from core.database_optimization import db_optimizer
+        oauth_metadata = {
+            "oauth_state": state,
+            "onboarding": user_id is None,
+            "user_id": user_id,
+            "lookback_days": lookback_days,
+            "lookback_preset": lookback_preset,
+        }
         db_optimizer.upsert_oauth_state_row(
             state,
             user_id,
             "gmail",
             request.args.get("redirect", "/onboarding/2"),
             int(time.time()) + 600,
-            metadata_json=json.dumps(
-                {"oauth_state": state, "onboarding": user_id is None, "user_id": user_id}
-            ),
+            metadata_json=json.dumps(oauth_metadata),
         )
-        logger.info("🧪 OAuth state persisted (gmail) state=%s user_id=%s", state, user_id)
+        logger.info(
+            "🧪 OAuth state persisted (gmail) state=%s user_id=%s lookback_days=%s preset=%s",
+            state,
+            user_id,
+            lookback_days,
+            lookback_preset,
+        )
 
         # Use manual URL construction for full control over OAuth parameters
         # This ensures we send exactly what Google expects
@@ -241,41 +259,52 @@ def gmail_callback():
         expected_state = None
         redirect_url = "/onboarding/2"
         stored_user_id = None
+        oauth_metadata: Dict[str, Any] = {}
         
         from flask import g
         if hasattr(g, 'session_data') and g.session_data:
             expected_state = g.session_data.get('oauth_state')
             redirect_url = g.session_data.get('post_connect_redirect', "/onboarding/2")
 
-        # Fallback: check database for OAuth state if session missing/empty
-        if not expected_state:
-            from core.database_optimization import db_optimizer
-            state_data = db_optimizer.execute_query("""
-                SELECT state, redirect_url, user_id, metadata FROM oauth_states 
+        from core.database_optimization import db_optimizer
+
+        if state:
+            state_data = db_optimizer.execute_query(
+                """
+                SELECT state, redirect_url, user_id, metadata FROM oauth_states
                 WHERE state = ? AND expires_at > ?
-            """, (state, int(time.time())))
-            
+                """,
+                (state, int(time.time())),
+            )
             if state_data:
                 row = state_data[0]
-                expected_state = row["state"]
+                if not expected_state:
+                    expected_state = row["state"]
                 redirect_url = row.get("redirect_url") or redirect_url
                 stored_user_id = row.get("user_id")
                 metadata_str = row.get("metadata", "{}")
                 try:
-                    metadata = json.loads(metadata_str) if isinstance(metadata_str, str) else metadata_str
-                    if metadata and (stored_user_id is None or stored_user_id == 0):
-                        uid = metadata.get("user_id")
-                        if uid:
-                            stored_user_id = uid
+                    parsed_meta = (
+                        json.loads(metadata_str)
+                        if isinstance(metadata_str, str)
+                        else metadata_str
+                    )
+                    if isinstance(parsed_meta, dict):
+                        oauth_metadata = parsed_meta
+                        if stored_user_id is None or stored_user_id == 0:
+                            uid = parsed_meta.get("user_id")
+                            if uid:
+                                stored_user_id = uid
                 except Exception as parse_error:
                     logger.debug("Failed to parse oauth state metadata: %s", parse_error)
                 logger.info(
-                    "🧪 OAuth state loaded (gmail) state=%s user_id=%s redirect=%s",
+                    "🧪 OAuth state loaded (gmail) state=%s user_id=%s redirect=%s lookback_days=%s",
                     expected_state,
                     stored_user_id,
                     redirect_url,
+                    oauth_metadata.get("lookback_days"),
                 )
-            else:
+            elif not expected_state:
                 logger.warning("🧪 OAuth state not found in DB (gmail) state=%s", state)
         
         if not state or state != expected_state:
@@ -481,11 +510,28 @@ def gmail_callback():
 
         # 3) Kick off first sync (RQ)
         try:
+            from core.gmail_sync_options import lookback_days_from_oauth_metadata
             from core.onboarding_jobs import onboarding_job_manager
-            result = onboarding_job_manager.queue_first_sync_job(user_id)
+
+            first_sync_lookback_days = lookback_days_from_oauth_metadata(oauth_metadata)
+            logger.info(
+                "📅 Gmail OAuth first sync: user_id=%s lookback_days=%s preset=%s",
+                user_id,
+                first_sync_lookback_days,
+                oauth_metadata.get("lookback_preset"),
+            )
+            result = onboarding_job_manager.queue_first_sync_job(
+                user_id,
+                lookback_days=first_sync_lookback_days,
+            )
             job_id = result.get('job_id')
             job = type('MockJob', (), {'id': job_id}) if job_id else None
-            logger.info(f"✅ Queued first sync job {job_id} for user {user_id}")
+            logger.info(
+                "✅ Queued first sync job %s for user %s (lookback_days=%s)",
+                job_id,
+                user_id,
+                first_sync_lookback_days,
+            )
         except Exception as e:
             logger.warning(f"⚠️ Failed to queue sync job: {e}")
             job = None

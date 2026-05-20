@@ -5,6 +5,13 @@ import { GmailConnection } from '../components/GmailConnection'
 import { useAuth } from '../contexts/AuthContext'
 import { apiClient, EmailSyncStatus, GmailConnectionStatus } from '../services/apiClient'
 import { useToast } from '../components/Toast'
+import { DEFAULT_GMAIL_LOOKBACK_PRESETS, GmailSyncOptions } from '../components/GmailSyncOptions'
+import {
+  labelForLookbackId,
+  loadGmailLookbackId,
+  lookbackIdFromDays,
+  saveGmailLookbackId,
+} from '../utils/gmailLookbackStorage'
 
 /** True when the API says a sync job is in flight (may be stale if worker never ran). */
 function isServerSyncInFlight(data: EmailSyncStatus | undefined): boolean {
@@ -28,6 +35,7 @@ export const GmailConnect: React.FC = () => {
 
   /** Only after "Sync inbox" — avoids showing queue/spinner from a stale DB row on page load. */
   const [syncUiSession, setSyncUiSession] = useState(false)
+  const [gmailLookbackId, setGmailLookbackId] = useState(() => loadGmailLookbackId('90d'))
   const syncUiSessionRef = useRef(false)
   syncUiSessionRef.current = syncUiSession
 
@@ -46,7 +54,11 @@ export const GmailConnect: React.FC = () => {
   const mutationPendingRef = useRef(false)
 
   const syncMutation = useMutation({
-    mutationFn: () => apiClient.triggerGmailSync(),
+    mutationFn: (opts?: { continue_sync?: boolean }) =>
+      apiClient.triggerGmailSync({
+        lookback: gmailLookbackId,
+        continue_sync: opts?.continue_sync,
+      }),
     onMutate: () => setSyncUiSession(true),
     onSuccess: (data: SyncResponse) => {
       const message = data?.message || data?.data?.message || 'Gmail sync triggered successfully'
@@ -78,8 +90,6 @@ export const GmailConnect: React.FC = () => {
     }
   })
 
-  mutationPendingRef.current = syncMutation.isPending
-
   const {
     data: syncStatus,
     isLoading: syncLoading,
@@ -101,6 +111,38 @@ export const GmailConnect: React.FC = () => {
       return pollFast ? 1 * 1000 : 10 * 1000
     },
   })
+
+  mutationPendingRef.current = syncMutation.isPending
+
+  const gmailLookbackPresets =
+    syncStatus?.lookback_presets?.length
+      ? syncStatus.lookback_presets
+      : DEFAULT_GMAIL_LOOKBACK_PRESETS
+
+  const activeLookbackLabel = React.useMemo(() => {
+    const days = syncStatus?.sync_cursor?.lookback_days ?? syncStatus?.lookback_days
+    const id = lookbackIdFromDays(days, gmailLookbackPresets)
+    return id ? labelForLookbackId(id, gmailLookbackPresets) : null
+  }, [syncStatus, gmailLookbackPresets])
+
+  useEffect(() => {
+    const days = syncStatus?.sync_cursor?.lookback_days ?? syncStatus?.lookback_days
+    const fromApi = lookbackIdFromDays(days, gmailLookbackPresets)
+    if (fromApi) setGmailLookbackId(fromApi)
+  }, [syncStatus?.sync_cursor?.lookback_days, syncStatus?.lookback_days, gmailLookbackPresets])
+
+  const handleLookbackChange = React.useCallback(
+    (id: string) => {
+      setGmailLookbackId(id)
+      saveGmailLookbackId(id)
+      addToast({
+        type: 'info',
+        title: 'Import range updated',
+        message: `Selected ${labelForLookbackId(id, gmailLookbackPresets)}. Click Sync inbox to apply.`,
+      })
+    },
+    [gmailLookbackPresets, addToast]
+  )
 
   /**
    * Loading / queue UI only after the user clicks Sync, until the server reports
@@ -138,7 +180,10 @@ export const GmailConnect: React.FC = () => {
       setSyncUiSession(false)
       return
     }
-    if (syncStatus.sync_status === 'completed' && !syncStatus.syncing) {
+    if (
+      (syncStatus.sync_status === 'completed' || syncStatus.sync_status === 'partial') &&
+      !syncStatus.syncing
+    ) {
       setSyncUiSession(false)
     }
   }, [syncStatus, syncUiSession, addToast])
@@ -283,28 +328,40 @@ export const GmailConnect: React.FC = () => {
             Connect your inbox, monitor sync health, and trigger AI automations without leaving the dashboard.
           </p>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => {
-              refetchGmailStatus()
-              refetchSyncStatus()
-              addToast({ type: 'info', title: 'Status refreshed' })
-            }}
-            className="inline-flex items-center gap-2 rounded-lg border border-brand-text/20 dark:border-gray-600 px-4 py-2 text-sm font-medium text-brand-text hover:bg-brand-accent/10 dark:text-gray-200 dark:hover:bg-gray-700"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Refresh
-          </button>
-          <button
-            onClick={() => syncMutation.mutate()}
-            disabled={
-              syncMutation.isPending || gmailStatus?.connected === false || isActivelySyncing
-            }
-            className="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-secondary disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Activity className="h-4 w-4" />
-            Sync inbox
-          </button>
+        <div className="flex flex-col items-end gap-2">
+          <GmailSyncOptions
+            presets={gmailLookbackPresets}
+            lookbackId={gmailLookbackId}
+            onLookbackChange={handleLookbackChange}
+            syncCursor={syncStatus?.sync_cursor}
+            activeLookbackLabel={activeLookbackLabel}
+            disabled={gmailStatus?.connected === false}
+            pending={syncMutation.isPending || isActivelySyncing}
+            onContinue={() => syncMutation.mutate({ continue_sync: true })}
+          />
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                refetchGmailStatus()
+                refetchSyncStatus()
+                addToast({ type: 'info', title: 'Status refreshed' })
+              }}
+              className="inline-flex items-center gap-2 rounded-lg border border-brand-text/20 dark:border-gray-600 px-4 py-2 text-sm font-medium text-brand-text hover:bg-brand-accent/10 dark:text-gray-200 dark:hover:bg-gray-700"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </button>
+            <button
+              onClick={() => syncMutation.mutate()}
+              disabled={
+                syncMutation.isPending || gmailStatus?.connected === false || isActivelySyncing
+              }
+              className="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Activity className="h-4 w-4" />
+              Sync inbox
+            </button>
+          </div>
         </div>
       </div>
 

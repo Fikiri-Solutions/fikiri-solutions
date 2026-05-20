@@ -82,7 +82,10 @@ export const Services: React.FC = () => {
           if (apiService) {
             return {
               ...service,
-              enabled: apiService.status === 'active' || apiService.status === 'healthy',
+              enabled:
+                typeof apiService.enabled === 'boolean'
+                  ? apiService.enabled
+                  : apiService.status === 'active' || apiService.status === 'healthy',
               // Merge saved settings into defaults so we don't silently clobber user configuration.
               settings: {
                 ...service.settings,
@@ -202,27 +205,25 @@ export const Services: React.FC = () => {
       // Testing service
       
       let result
-      switch (serviceId) {
-        case 'ai-assistant':
-          result = await apiClient.testAIAssistant()
-          break
-        case 'email-parser':
-          result = await apiClient.testEmailParser()
-          break
-        case 'email-actions':
-          result = await apiClient.testEmailActions()
-          break
-        case 'crm':
-          result = await apiClient.testCRM()
-          break
-        case 'ml-scoring':
-          result = await apiClient.testMLScoring()
-          break
-        case 'vector-search':
-          result = await apiClient.testVectorSearch()
-          break
-        default:
-          throw new Error(`Unknown service: ${serviceId}`)
+      try {
+        result = await apiClient.testServiceById(serviceId)
+      } catch (primaryError) {
+        switch (serviceId) {
+          case 'ai-assistant':
+            result = await apiClient.testAIAssistant()
+            break
+          case 'email-parser':
+            result = await apiClient.testEmailParser()
+            break
+          case 'crm':
+            result = await apiClient.testCRM()
+            break
+          case 'ml-scoring':
+            result = await apiClient.testMLScoring()
+            break
+          default:
+            throw primaryError
+        }
       }
       
       // Service test result
@@ -308,14 +309,10 @@ export const Services: React.FC = () => {
       case 'crm':
         return (
           <div className="space-y-4">
-            <p className="text-xs text-amber-800 dark:text-amber-200/90 rounded-md bg-amber-500/10 border border-amber-500/25 px-2 py-1.5">
-              Partial · These switches are saved but <strong className="font-medium">not read by CRM or email workers</strong> in this
-              codebase yet — they will not enable or disable ingestion by themselves.
-            </p>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-brand-text dark:text-gray-300">Auto Lead Creation</p>
-                <p className="text-xs text-brand-text/60 dark:text-gray-400">Preference only (requires Gmail/integration path)</p>
+                <p className="text-xs text-brand-text/60 dark:text-gray-400">Creates or updates leads when mail sync runs (requires connected Gmail or Outlook)</p>
               </div>
               <button
                 type="button"
@@ -442,11 +439,6 @@ export const Services: React.FC = () => {
       case 'ml-scoring':
         return (
           <div className="space-y-4">
-            <p className="text-xs text-blue-800 dark:text-blue-200/90 rounded-md bg-blue-500/10 border border-blue-500/25 px-2 py-1.5">
-              Partial · Live scoring uses the server&apos;s <code className="text-[10px]">MinimalMLScoring</code> diagnostics. Model
-              dropdowns are <strong className="font-medium">not wired</strong> into that engine — they are placeholders for future
-              tuning.
-            </p>
             <div>
               <label htmlFor={`${service.id}-scoring-model`} className="block text-sm font-medium text-brand-text dark:text-gray-300">Scoring Model</label>
               <select
@@ -505,20 +497,12 @@ export const Services: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 dark:bg-amber-500/15 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
-        <strong className="font-semibold">Honest scope:</strong>{' '}
-        Toggles and settings here are stored per user via <code className="text-xs">POST /api/services</code>.
-        They are <em>preferences</em> — Gmail sync, CRM lead creation, parsing, and scoring are driven by integrations
-        and server jobs unless noted on each card. Use <strong>Test Service</strong> to verify live behavior (
-        <code className="text-xs">/api/test/*</code> uses HTTP&nbsp;200 with a <code className="text-xs">success</code>{' '}
-        field — the UI treats <code className="text-xs">success: false</code> as failure).
-      </div>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-brand-text dark:text-white">🚀 Strategic Service Dashboard</h1>
           <p className="mt-1 text-sm text-brand-text/70 dark:text-gray-400">
-            Test integrations and persist UI preferences — confirm with “Test Service” instead of assuming toggles enforce behavior.
+            Enable services, save settings, then use Test Service to verify each integration. CRM and AI assistant toggles apply on the next mailbox sync.
           </p>
         </div>
         <div className="flex space-x-3">

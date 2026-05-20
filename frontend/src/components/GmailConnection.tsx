@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from './Toast'
 import { apiClient } from '../services/apiClient'
+import { loadGmailLookbackId } from '../utils/gmailLookbackStorage'
 
 interface GmailConnectionProps {
   userId: number
@@ -208,7 +209,8 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
       // Use new proven OAuth endpoint - GET request with redirect parameter
       // Determine appropriate redirect based on user context
       const redirectUri = getOAuthRedirectUrl()
-      const data = await apiClient.startGmailOAuth(redirectUri)
+      const lookbackId = loadGmailLookbackId()
+      const data = await apiClient.startGmailOAuth(redirectUri, lookbackId)
 
       clearTimeout(timeoutId)
 

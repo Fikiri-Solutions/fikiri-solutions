@@ -21,15 +21,22 @@ import {
 } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
-import { apiClient } from '../services/apiClient'
+import { apiClient, EmailSyncStatus } from '../services/apiClient'
 import { useToast } from '../components/Toast'
 import { EmptyState } from '../components/EmptyState'
+import { DEFAULT_GMAIL_LOOKBACK_PRESETS, GmailSyncOptions } from '../components/GmailSyncOptions'
 import DOMPurify from 'dompurify'
 import {
   canShowInboxTechnicalDetails,
   emailPlainBodyForCustomerDisplay,
   emailSnippetToCustomerPlainText,
 } from '../utils/emailPlainText'
+import {
+  labelForLookbackId,
+  loadGmailLookbackId,
+  lookbackIdFromDays,
+  saveGmailLookbackId,
+} from '../utils/gmailLookbackStorage'
 
 interface Attachment {
   id: number
@@ -386,6 +393,7 @@ export const EmailInbox: React.FC = () => {
   const [emailLimit, setEmailLimit] = useState(50) // Initial page size; use "Load more" for additional pages
   const [loadingMore, setLoadingMore] = useState(false)
   const [syncInboxPending, setSyncInboxPending] = useState(false)
+  const [gmailLookbackId, setGmailLookbackId] = useState(() => loadGmailLookbackId('90d'))
   const [isNarrowViewport, setIsNarrowViewport] = useState(false)
   const [aiPanelExpanded, setAiPanelExpanded] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -484,6 +492,48 @@ export const EmailInbox: React.FC = () => {
   })
 
   const gmailConnected = gmailStatus?.connected ?? null
+
+  const { data: emailSyncStatus } = useQuery<EmailSyncStatus>({
+    queryKey: ['gmail-sync-status', user?.id],
+    queryFn: () => apiClient.getEmailSyncStatus(),
+    enabled: !!user && gmailConnected === true,
+    staleTime: 30_000,
+  })
+
+  const gmailLookbackPresets =
+    emailSyncStatus?.lookback_presets?.length
+      ? emailSyncStatus.lookback_presets
+      : DEFAULT_GMAIL_LOOKBACK_PRESETS
+
+  const activeLookbackLabel = useMemo(() => {
+    const days =
+      emailSyncStatus?.sync_cursor?.lookback_days ??
+      emailSyncStatus?.lookback_days
+    const id = lookbackIdFromDays(days, gmailLookbackPresets)
+    return id ? labelForLookbackId(id, gmailLookbackPresets) : null
+  }, [emailSyncStatus, gmailLookbackPresets])
+
+  useEffect(() => {
+    const days =
+      emailSyncStatus?.sync_cursor?.lookback_days ??
+      emailSyncStatus?.lookback_days
+    const fromApi = lookbackIdFromDays(days, gmailLookbackPresets)
+    if (fromApi) setGmailLookbackId(fromApi)
+  }, [emailSyncStatus?.sync_cursor?.lookback_days, emailSyncStatus?.lookback_days, gmailLookbackPresets])
+
+  const handleLookbackChange = useCallback(
+    (id: string) => {
+      setGmailLookbackId(id)
+      saveGmailLookbackId(id)
+      const label = labelForLookbackId(id, gmailLookbackPresets)
+      addToast({
+        type: 'info',
+        title: 'Import range updated',
+        message: `Selected ${label}. Click Sync inbox to import mail from that period.`,
+      })
+    },
+    [gmailLookbackPresets, addToast]
+  )
 
   // Mark as read in Gmail when opening an unread message (gmail.modify scope demo)
   useEffect(() => {
@@ -584,39 +634,59 @@ export const EmailInbox: React.FC = () => {
     refetchEmails()
   }, [queryClient, user?.id, refetchEmails])
 
-  const handleSyncInbox = useCallback(async () => {
-    if (!gmailConnected) {
-      addToast({
-        type: 'info',
-        title: 'Gmail not connected',
-        message: 'Connect Gmail under Integrations to sync your inbox.',
-      })
-      return
-    }
-    setSyncInboxPending(true)
-    try {
-      await apiClient.triggerGmailSync()
-      addToast({
-        type: 'success',
-        title: 'Gmail sync started',
-        message: 'New messages will appear after sync completes.',
-      })
-      queryClient.invalidateQueries({ queryKey: ['emails', user?.id] })
-      queryClient.invalidateQueries({ queryKey: ['gmail-sync-status', user?.id] })
-      setTimeout(() => refetchEmails(), 3000)
-      setTimeout(() => refetchEmails(), 15000)
-    } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string } }; message?: string }
-      const message =
-        err?.response?.data?.message || err?.message || 'Could not start Gmail sync.'
-      addToast({ type: 'error', title: 'Sync failed', message })
-    } finally {
-      setSyncInboxPending(false)
-    }
-  }, [gmailConnected, addToast, queryClient, user?.id, refetchEmails])
+  const runGmailSync = useCallback(
+    async (opts?: { continue_sync?: boolean }) => {
+      if (!gmailConnected) {
+        addToast({
+          type: 'info',
+          title: 'Gmail not connected',
+          message: 'Connect Gmail under Integrations to sync your inbox.',
+        })
+        return
+      }
+      setSyncInboxPending(true)
+      try {
+        await apiClient.triggerGmailSync({
+          lookback: gmailLookbackId,
+          continue_sync: opts?.continue_sync,
+        })
+        const preset = gmailLookbackPresets.find((p) => p.id === gmailLookbackId)
+        addToast({
+          type: 'success',
+          title: opts?.continue_sync ? 'Loading next batch' : 'Gmail sync started',
+          message: opts?.continue_sync
+            ? 'Fetching the next page of messages from Gmail.'
+            : `Importing mail from ${preset?.label ?? gmailLookbackId}. Messages appear as each batch finishes.`,
+        })
+        queryClient.invalidateQueries({ queryKey: ['emails', user?.id] })
+        queryClient.invalidateQueries({ queryKey: ['gmail-sync-status', user?.id] })
+        setTimeout(() => refetchEmails(), 3000)
+        setTimeout(() => refetchEmails(), 15000)
+      } catch (error: unknown) {
+        const err = error as { response?: { data?: { message?: string } }; message?: string }
+        const message =
+          err?.response?.data?.message || err?.message || 'Could not start Gmail sync.'
+        addToast({ type: 'error', title: 'Sync failed', message })
+      } finally {
+        setSyncInboxPending(false)
+      }
+    },
+    [
+      gmailConnected,
+      gmailLookbackId,
+      gmailLookbackPresets,
+      addToast,
+      queryClient,
+      user?.id,
+      refetchEmails,
+    ]
+  )
+
+  const handleSyncInbox = useCallback(() => runGmailSync(), [runGmailSync])
 
   const analyzeEmail = async (email: Email) => {
-    const content = displayBody || email.body || email.snippet
+    const rawContent = displayBody || email.body || email.snippet
+    const content = emailPlainBodyForCustomerDisplay(rawContent || '') || rawContent
     if (!content?.trim()) {
       addToast({ type: 'error', title: 'No email content to analyze' })
       return
@@ -636,14 +706,26 @@ export const EmailInbox: React.FC = () => {
       setAiPanelExpanded(true)
     } catch (error) {
       console.error('Error analyzing email:', error)
-      addToast({ type: 'error', title: 'AI analysis unavailable', message: 'The AI assistant is currently unavailable.' })
+      const timedOut =
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code?: string }).code === 'ECONNABORTED'
+      addToast({
+        type: 'error',
+        title: 'AI analysis unavailable',
+        message: timedOut
+          ? 'Analysis is taking longer than usual. Try again in a moment, or use a shorter email.'
+          : 'The AI assistant is currently unavailable.',
+      })
     } finally {
       setAiLoading(false)
     }
   }
 
   const generateReply = async (email: Email) => {
-    const content = displayBody || email.body || email.snippet
+    const rawContent = displayBody || email.body || email.snippet
+    const content = emailPlainBodyForCustomerDisplay(rawContent || '') || rawContent
     if (!content?.trim()) {
       addToast({ type: 'error', title: 'No email content to reply to' })
       return
@@ -656,7 +738,8 @@ export const EmailInbox: React.FC = () => {
         email.id,
         email.subject,
         content,
-        email.from
+        email.from,
+        aiAnalysis ?? undefined
       )
       const reply = data?.reply || data?.data?.reply || data?.suggested_reply
       if (reply) {
@@ -886,6 +969,18 @@ export const EmailInbox: React.FC = () => {
               </button>
             </div>
           </div>
+
+          <GmailSyncOptions
+            compact
+            presets={gmailLookbackPresets}
+            lookbackId={gmailLookbackId}
+            onLookbackChange={handleLookbackChange}
+            syncCursor={emailSyncStatus?.sync_cursor}
+            activeLookbackLabel={activeLookbackLabel}
+            disabled={gmailConnected !== true}
+            pending={syncInboxPending}
+            onContinue={() => runGmailSync({ continue_sync: true })}
+          />
 
           {/* Search */}
           <div className="relative mb-3 sm:mb-4">

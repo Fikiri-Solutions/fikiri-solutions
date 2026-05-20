@@ -24,14 +24,14 @@ def client():
 
 class TestRevenueChatbotFlow:
     @patch('core.public_chatbot_api._check_plan_access')
-    @patch('core.public_chatbot_api.get_feature_flags')
-    @patch('core.public_chatbot_api.get_vector_search')
-    @patch('core.public_chatbot_api.LLMRouter')
+    @patch('core.chatbot_retrieval.get_feature_flags')
+    @patch('core.chatbot_retrieval.get_vector_search')
+    @patch('core.chatbot_response_service.LLMRouter')
     @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
     @patch('core.public_chatbot_api.api_key_manager.check_rate_limit')
     @patch('core.public_chatbot_api.api_key_manager.record_usage')
-    @patch('core.public_chatbot_api.faq_system.search_faqs')
-    @patch('core.public_chatbot_api.knowledge_base.search')
+    @patch('core.chatbot_retrieval.faq_system.search_faqs')
+    @patch('core.chatbot_retrieval.knowledge_base.search')
     @patch('core.public_chatbot_api.context_system.start_conversation')
     def test_chatbot_flow_vector_llm_schema(self, mock_start_conv, mock_kb_search,
                                             mock_faq_search, mock_record, mock_rate_limit,

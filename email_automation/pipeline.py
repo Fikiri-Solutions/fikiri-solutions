@@ -29,6 +29,7 @@ from core.email_pipeline_ai_gate import (
     record_email_pipeline_ai_usage,
     email_pipeline_ai_gate_enabled,
 )
+from core.user_services import should_run_mailbox_ai
 from crm.service import enhanced_crm_service
 from services.email_capture_workflow import run_inbound_email_workflow
 from core.ai.policies import evaluate_email_action_policy
@@ -113,12 +114,18 @@ def process_incoming(
 def _determine_action(classification: dict) -> str:
     if not isinstance(classification, dict):
         return "mark_read"
-    intent = (classification.get("intent") or "").lower()
-    if intent == "spam":
-        return "archive"
-    if intent in ["lead_inquiry", "support_request", "general_info", "complaint"]:
-        return "auto_reply"
-    return "mark_read"
+    try:
+        from core.ai.email_intent_taxonomy import normalize_intent, recommended_action_type
+
+        intent = normalize_intent(classification.get("intent"))
+        return recommended_action_type(intent)
+    except Exception:
+        intent = (classification.get("intent") or "").lower()
+        if intent == "spam":
+            return "archive"
+        if intent in ["lead_inquiry", "support_request", "general_info", "complaint"]:
+            return "auto_reply"
+        return "mark_read"
 
 
 def _extract_sender_email(from_header: str) -> str:
@@ -332,13 +339,17 @@ def orchestrate_incoming(
             except (TypeError, ValueError):
                 pass
 
-    if not run_mailbox_ai:
+    ai_assistant_enabled = should_run_mailbox_ai(user_id)
+    if not run_mailbox_ai or not ai_assistant_enabled:
         return {
             "success": True,
             "parsed": parsed,
             "inbound_workflow": inbound_workflow,
             "correlation_id": corr,
             "mailbox_ai_skipped": True,
+            "mailbox_ai_skip_reason": (
+                "ai_assistant_disabled" if not ai_assistant_enabled else "run_mailbox_ai_false"
+            ),
         }
 
     gate = evaluate_email_pipeline_ai_gate(user_id)
@@ -374,6 +385,8 @@ def orchestrate_incoming(
     crm_context = _load_crm_context(user_id, lead_id, sender_email)
     business_context = ai_assistant._load_business_context()
     try:
+        from email_automation.email_classification import SOURCE_MAILBOX_SYNC
+
         analysis = ai_assistant.analyze_incoming_email(
             sender_email=sender_email,
             sender_name=from_header,
@@ -384,6 +397,7 @@ def orchestrate_incoming(
             business_context=business_context,
             correlation_id=corr,
             user_id=user_id,
+            classification_source=SOURCE_MAILBOX_SYNC,
         )
     except Exception as exc:
         logger.warning("Email analysis failed: %s", exc)
@@ -624,9 +638,13 @@ def orchestrate_incoming(
                 "mailbox_ai_reply_skip_reason": gate_reply.reason,
             }
 
+    parsed_for_action = dict(parsed)
+    parsed_for_action["_analysis"] = analysis_payload
+    parsed_for_action["_mailbox_user_id"] = user_id
+
     try:
         action_result = actions.process_email(
-            parsed, action_type=action_type, user_id=user_id
+            parsed_for_action, action_type=action_type, user_id=user_id
         )
     except Exception as exc:
         logger.warning("process_email raised: %s", exc)
@@ -682,6 +700,7 @@ def orchestrate_incoming(
 
     result_details = _action_result_details(action_result)
 
+    reply_mode = result_details.get("reply_generation_mode")
     if (
         email_pipeline_ai_gate_enabled()
         and user_id
@@ -689,6 +708,7 @@ def orchestrate_incoming(
         and ai_assistant.is_enabled()
         and action_type == "auto_reply"
         and action_result.get("success", True)
+        and reply_mode not in ("reused_suggested_reply", "template_fallback", "assistant_disabled")
     ):
         record_email_pipeline_ai_usage(user_id, 1)
 

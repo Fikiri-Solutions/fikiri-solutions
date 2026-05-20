@@ -54,9 +54,9 @@ class TestPublicChatbotTenantIsolation(unittest.TestCase):
         with self.app.test_request_context():
             g.api_key_info = key_info
     
-    @patch('core.public_chatbot_api.get_vector_search')
-    @patch('core.public_chatbot_api.knowledge_base')
-    @patch('core.public_chatbot_api.faq_system')
+    @patch('core.chatbot_retrieval.get_vector_search')
+    @patch('core.chatbot_retrieval.knowledge_base')
+    @patch('core.chatbot_retrieval.faq_system')
     def test_public_chatbot_passes_tenant_id_to_vector_search(self, mock_faq, mock_kb, mock_get_vs):
         """Test that public chatbot passes tenant_id to vector search"""
         # Setup mocks
@@ -88,9 +88,9 @@ class TestPublicChatbotTenantIsolation(unittest.TestCase):
         call_kwargs = mock_vector_search.search_similar.call_args[1]
         self.assertEqual(call_kwargs.get('tenant_id'), 'tenant_test')
     
-    @patch('core.public_chatbot_api.get_vector_search')
-    @patch('core.public_chatbot_api.knowledge_base')
-    @patch('core.public_chatbot_api.faq_system')
+    @patch('core.chatbot_retrieval.get_vector_search')
+    @patch('core.chatbot_retrieval.knowledge_base')
+    @patch('core.chatbot_retrieval.faq_system')
     def test_public_chatbot_passes_tenant_id_to_kb_search(self, mock_faq, mock_kb, mock_get_vs):
         """Test that public chatbot passes tenant_id filter to KB search"""
         # Setup mocks
@@ -124,9 +124,9 @@ class TestPublicChatbotTenantIsolation(unittest.TestCase):
         filters = call_args[1].get('filters', {})
         self.assertEqual(filters.get('tenant_id'), 'tenant_kb_test')
     
-    @patch('core.public_chatbot_api.get_vector_search')
-    @patch('core.public_chatbot_api.knowledge_base')
-    @patch('core.public_chatbot_api.faq_system')
+    @patch('core.chatbot_retrieval.get_vector_search')
+    @patch('core.chatbot_retrieval.knowledge_base')
+    @patch('core.chatbot_retrieval.faq_system')
     def test_public_chatbot_no_tenant_id_when_not_provided(self, mock_faq, mock_kb, mock_get_vs):
         """Test that public chatbot works when tenant_id is not in API key"""
         # Setup mocks
@@ -160,9 +160,9 @@ class TestPublicChatbotTenantIsolation(unittest.TestCase):
         call_kwargs = mock_vector_search.search_similar.call_args[1]
         self.assertIsNone(call_kwargs.get('tenant_id'))
     
-    @patch('core.public_chatbot_api.get_vector_search')
-    @patch('core.public_chatbot_api.knowledge_base')
-    @patch('core.public_chatbot_api.faq_system')
+    @patch('core.chatbot_retrieval.get_vector_search')
+    @patch('core.chatbot_retrieval.knowledge_base')
+    @patch('core.chatbot_retrieval.faq_system')
     def test_public_chatbot_isolates_results_by_tenant(self, mock_faq, mock_kb, mock_get_vs):
         """Test that results are isolated by tenant"""
         # Setup vector search to return tenant-specific results

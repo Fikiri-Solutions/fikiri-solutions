@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import { apiClient } from '../services/apiClient';
+import { loadGmailLookbackId } from '../utils/gmailLookbackStorage';
 import { CheckCircle, Mail, Building, User, ArrowRight, Sparkles, Zap } from 'lucide-react';
 import { EmailVerificationBanner } from '../components/EmailVerificationBanner';
 import { AUTOCOMPLETE } from '../constants/autocomplete';
@@ -217,7 +218,7 @@ export const Onboarding: React.FC = () => {
     const redirectParam = redirectPath ? `?redirect=${encodeURIComponent(redirectPath)}` : ''
     const redirectUri = `${window.location.origin}/onboarding/2${redirectParam}`
     try {
-      const data = await apiClient.startGmailOAuth(redirectUri)
+      const data = await apiClient.startGmailOAuth(redirectUri, loadGmailLookbackId())
       if (data.url) {
         toast.loading('Redirecting to Gmail...', { id: 'oauth-redirect' })
         window.location.href = data.url

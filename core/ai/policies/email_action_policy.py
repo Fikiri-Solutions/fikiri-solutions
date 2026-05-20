@@ -2,23 +2,18 @@
 
 from typing import Any, Dict
 
+from core.ai.email_intent_taxonomy import normalize_intent, recommended_action_type
 from core.ai.policies.auto_send_policy import can_auto_send
 from core.ai.policies.risk_policy import evaluate_email_risk
-
-
-def _recommended_action_type(intent: str) -> str:
-    if intent == "spam":
-        return "archive"
-    return "auto_reply"
 
 
 def evaluate_email_action_policy(analysis: Dict[str, Any]) -> Dict[str, Any]:
     """Return deterministic execution policy from structured AI analysis."""
     payload = analysis if isinstance(analysis, dict) else {}
-    intent = str(payload.get("intent") or "").lower()
+    intent = normalize_intent(payload.get("intent"))
     risk = evaluate_email_risk(payload)
     should_auto_send = can_auto_send(payload, risk)
-    action_type = _recommended_action_type(intent)
+    action_type = payload.get("recommended_action_type") or recommended_action_type(intent)
     execution_mode = "execute" if should_auto_send else "draft_only"
     reason = str(payload.get("reason_for_recommendation") or "").strip()
     if not reason:
