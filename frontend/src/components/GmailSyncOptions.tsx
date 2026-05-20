@@ -52,6 +52,8 @@ export const GmailSyncOptions: React.FC<Props> = ({
         </span>
       )}
       <select
+        id="gmail-sync-lookback"
+        name="gmail_sync_lookback"
         value={lookbackId}
         onChange={(e) => onLookbackChange(e.target.value)}
         disabled={disabled || pending}

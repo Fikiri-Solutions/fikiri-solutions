@@ -1430,6 +1430,8 @@ class ApiClient {
   }): Promise<{
     emails: Array<Record<string, unknown>>
     tabs?: Array<{ id: string; label: string }>
+    category_counts?: Record<string, number>
+    unclassified_synced_count?: number
     pagination?: { total_count?: number; has_more?: boolean }
   }> {
     const response = await this.client.get('/email/triage', {
@@ -1446,6 +1448,15 @@ class ApiClient {
   async classifyEmailTriage(emailIds: string[]): Promise<{ classified: unknown[]; count: number }> {
     const response = await this.client.post('/email/triage/classify', {
       email_ids: emailIds,
+      user_id: this.getUserId() ?? 1,
+    })
+    return response.data?.data ?? response.data
+  }
+
+  /** Triage synced rows missing email_classifications (Command Center after Gmail sync). */
+  async classifyEmailTriageUnclassified(limit = 50): Promise<{ classified: unknown[]; count: number }> {
+    const response = await this.client.post('/email/triage/classify-unclassified', {
+      limit,
       user_id: this.getUserId() ?? 1,
     })
     return response.data?.data ?? response.data

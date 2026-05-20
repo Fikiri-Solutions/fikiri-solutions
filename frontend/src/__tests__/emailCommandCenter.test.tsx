@@ -4,10 +4,24 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { EmailCommandCenter } from '../pages/EmailCommandCenter'
 
-const { getEmailTriage, emailTriageBulkAction, classifyEmailTriage } = vi.hoisted(() => ({
+const {
+  getEmailTriage,
+  emailTriageBulkAction,
+  classifyEmailTriage,
+  getEmailSyncStatus,
+  triggerGmailSync,
+  classifyEmailTriageUnclassified,
+} = vi.hoisted(() => ({
   getEmailTriage: vi.fn(),
   emailTriageBulkAction: vi.fn(),
   classifyEmailTriage: vi.fn(),
+  getEmailSyncStatus: vi.fn(),
+  triggerGmailSync: vi.fn(),
+  classifyEmailTriageUnclassified: vi.fn(),
+}))
+
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 108 } }),
 }))
 
 vi.mock('../services/apiClient', () => ({
@@ -15,6 +29,9 @@ vi.mock('../services/apiClient', () => ({
     getEmailTriage,
     emailTriageBulkAction,
     classifyEmailTriage,
+    getEmailSyncStatus,
+    triggerGmailSync,
+    classifyEmailTriageUnclassified,
   },
 }))
 
@@ -56,8 +73,15 @@ describe('EmailCommandCenter', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     getEmailTriage.mockResolvedValue(sampleEmails)
+    getEmailSyncStatus.mockResolvedValue({
+      syncing: false,
+      total_emails: 5,
+      sync_status: 'completed',
+    })
     emailTriageBulkAction.mockResolvedValue({ processed: 1 })
     classifyEmailTriage.mockResolvedValue({ count: 1, classified: [] })
+    triggerGmailSync.mockResolvedValue({ message: 'ok' })
+    classifyEmailTriageUnclassified.mockResolvedValue({ count: 0, classified: [] })
   })
 
   it('switches tabs and refetches with new category', async () => {

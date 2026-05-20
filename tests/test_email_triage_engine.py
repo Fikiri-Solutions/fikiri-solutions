@@ -11,7 +11,9 @@ from core.ai.email_triage_taxonomy import (
     category_from_intent,
     normalize_triage_category,
 )
+from core.email_triage_store import list_classified_emails, upsert_classification
 from email_automation.email_triage_engine import classify_email_triage
+from services.email_triage_service import triage_and_store_synced_message
 
 
 class TestEmailTriageRules(unittest.TestCase):
@@ -100,6 +102,115 @@ class TestTriageTaxonomyMapping(unittest.TestCase):
 
     def test_normalize_category(self):
         self.assertEqual(normalize_triage_category("spam"), "spam_risk")
+
+
+class TestOperationalNotificationTriage(unittest.TestCase):
+    """Regression: observed Command Center false positives in Leads."""
+
+    def test_stripe_smart_disputes_not_lead(self):
+        result = classify_email_triage(
+            subject="New AI-powered Smart Disputes will be enabled in June 2026",
+            body="Stripe billing product update.",
+            sender_email="notifications@stripe.com",
+        )
+        self.assertNotEqual(result["category"], "business_lead")
+        self.assertIn(result["category"], ("action_needed", "review_needed"))
+
+    def test_openai_api_usage_threshold_action_needed(self):
+        result = classify_email_triage(
+            subject="API usage has reached your notification threshold",
+            body="Your OpenAI API usage notification.",
+            sender_email="noreply@tm.openai.com",
+        )
+        self.assertEqual(result["category"], "action_needed")
+
+    def test_sentry_load_balancer_action_needed(self):
+        result = classify_email_triage(
+            subject="Upcoming Change: Sentry Load Balancer IP Address",
+            body="Infrastructure notice from Sentry.",
+            sender_email="noreply@sentry.io",
+        )
+        self.assertIn(result["category"], ("action_needed", "review_needed"))
+        self.assertNotEqual(result["category"], "business_lead")
+
+    def test_google_search_console_not_lead(self):
+        result = classify_email_triage(
+            subject="Congrats on reaching 5 clicks in 28 days!",
+            body="Google Search Console performance update.",
+            sender_email="sc-noreply@google.com",
+        )
+        self.assertIn(result["category"], ("newsletter_marketing", "review_needed"))
+        self.assertNotEqual(result["category"], "business_lead")
+
+    def test_fau_event_invitation_marketing(self):
+        result = classify_email_triage(
+            subject="Join us Tomorrow - $400M VC Fund Investing in Early-Stage Startups",
+            body="Entrepreneurs XChange event invitation.",
+            sender_email="InnovateFAU@fau.edu",
+        )
+        self.assertIn(
+            result["category"],
+            ("newsletter_marketing", "review_needed"),
+        )
+        self.assertNotEqual(result["category"], "business_lead")
+
+    def test_hihello_welcome_marketing(self):
+        result = classify_email_triage(
+            subject="Hi, Michael welcome to HiHello",
+            body="Welcome to HiHello onboarding.",
+            sender_email="manu@email.hihello.com",
+        )
+        self.assertEqual(result["category"], "newsletter_marketing")
+
+    def test_real_inbound_automation_inquiry_still_lead(self):
+        result = classify_email_triage(
+            subject="Question about your services",
+            body="I need help automating my business emails. Can you help?",
+            sender_email="prospect@acmecorp.com",
+        )
+        self.assertEqual(result["category"], "business_lead")
+        self.assertGreaterEqual(result["lead_score"], 45)
+
+    def test_pricing_service_request_still_lead(self):
+        result = classify_email_triage(
+            subject="Pricing request",
+            body="We would like a quote and consultation for email automation pricing.",
+            sender_email="buyer@company.com",
+        )
+        self.assertEqual(result["category"], "business_lead")
+        self.assertIn(result["cleanup_action"], ("keep", "label"))
+
+    def test_reclassify_updates_existing_classification(self):
+        """Simulates Command Center Re-classify: upsert overwrites prior business_lead."""
+        external_id = "gmail-msg-reclassify-unit-1"
+        upsert_classification(
+            1,
+            external_id=external_id,
+            provider="gmail",
+            triage={
+                "category": "business_lead",
+                "lead_score": 60,
+                "business_relevance_score": 60,
+                "urgency_score": 50,
+                "cleanup_action": "keep",
+                "confidence": 0.65,
+                "reason": "old classification",
+            },
+        )
+        triage_and_store_synced_message(
+            1,
+            external_id=external_id,
+            subject="API usage has reached your notification threshold",
+            body="Your OpenAI API usage notification.",
+            sender_email="noreply@tm.openai.com",
+            provider="gmail",
+        )
+        listed = list_classified_emails(1, category="action_needed", limit=50)
+        ids = [e.get("id") for e in listed.get("emails") or []]
+        self.assertIn(external_id, ids)
+        lead_list = list_classified_emails(1, category="business_lead", limit=200)
+        lead_ids = [e.get("id") for e in lead_list.get("emails") or []]
+        self.assertNotIn(external_id, lead_ids)
 
 
 class TestBulkActionSafety(unittest.TestCase):

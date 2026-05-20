@@ -26,6 +26,7 @@ import { apiClient, EmailSyncStatus } from '../services/apiClient'
 import { useToast } from '../components/Toast'
 import { EmptyState } from '../components/EmptyState'
 import { DEFAULT_GMAIL_LOOKBACK_PRESETS, GmailSyncOptions } from '../components/GmailSyncOptions'
+import { LiveMailLocalBadges, type LiveMailLocalOverlay } from '../components/LiveMailLocalBadges'
 import DOMPurify from 'dompurify'
 import {
   canShowInboxTechnicalDetails,
@@ -67,7 +68,7 @@ function canPreviewAttachment(mimeType?: string): boolean {
   return isImageMime(mimeType) || isAudioMime(mimeType) || isVideoMime(mimeType) || isPdfMime(mimeType)
 }
 
-interface Email {
+interface Email extends LiveMailLocalOverlay {
   id: string
   subject: string
   from: string
@@ -426,11 +427,6 @@ export const EmailInbox: React.FC = () => {
   const hideListOnMobile = isNarrowViewport && !!selectedEmail
   const hideDetailOnMobile = isNarrowViewport && !selectedEmail
 
-  // Reset email limit when filter changes
-  useEffect(() => {
-    setEmailLimit(50)
-  }, [filter])
-
   const loadAttachments = useCallback(async (emailId: string) => {
     setLoadingAttachments(true)
     try {
@@ -674,8 +670,15 @@ export const EmailInbox: React.FC = () => {
         })
         queryClient.invalidateQueries({ queryKey: ['emails', user?.id] })
         queryClient.invalidateQueries({ queryKey: ['gmail-sync-status', user?.id] })
-        setTimeout(() => refetchEmails(), 3000)
-        setTimeout(() => refetchEmails(), 15000)
+        queryClient.invalidateQueries({ queryKey: ['email-triage'] })
+        setTimeout(() => {
+          refetchEmails()
+          queryClient.invalidateQueries({ queryKey: ['email-triage'] })
+        }, 3000)
+        setTimeout(() => {
+          refetchEmails()
+          queryClient.invalidateQueries({ queryKey: ['email-triage'] })
+        }, 15000)
       } catch (error: unknown) {
         const err = error as { response?: { data?: { message?: string } }; message?: string }
         const message =
@@ -1187,6 +1190,7 @@ export const EmailInbox: React.FC = () => {
                               </span>
                             ) : null}
                           </p>
+                          <LiveMailLocalBadges email={email} />
                           {showInboxTechnical && showRawSnippets && email.snippet?.trim() ? (
                             <pre
                               className="mt-1 max-h-20 overflow-auto rounded border border-amber-200/80 bg-amber-50/90 p-1.5 text-left font-mono text-[10px] leading-tight text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100"
