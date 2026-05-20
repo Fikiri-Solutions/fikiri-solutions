@@ -160,11 +160,11 @@ class TestAutomationEngine(unittest.TestCase):
 
         result = self.engine._execute_send_email(
             {"subject": "Hi", "body": "Hello"},
-            {"sender_email": "Lead <lead@example.com>", "_automation_rule_id": 9},
+            {"sender_email": "Lead <lead@gmail.com>", "_automation_rule_id": 9},
             42,
         )
         self.assertTrue(result.get("success"))
-        self.assertEqual(result["data"]["recipient"], "lead@example.com")
+        self.assertEqual(result["data"]["recipient"], "lead@gmail.com")
         mock_gc_singleton.send_plain_text_as_user.assert_called_once()
         mock_txn.assert_not_called()
 
@@ -175,13 +175,13 @@ class TestAutomationEngine(unittest.TestCase):
         self, mock_db, mock_schedule, mock_safety
     ):
         mock_safety.check_rate_limits.return_value = {"allowed": True}
-        mock_db.execute_query.return_value = [{"email": "other@example.com"}]
+        mock_db.execute_query.return_value = [{"email": "other@gmail.com"}]
         mock_schedule.side_effect = AssertionError(
             "schedule_follow_up must not run when lead email mismatches recipient"
         )
         result = self.engine._execute_send_email(
             {"delay_minutes": 60, "body": "later"},
-            {"lead_id": 3, "sender_email": "self@example.com"},
+            {"lead_id": 3, "sender_email": "self@gmail.com"},
             77,
         )
         self.assertFalse(result.get("success"))

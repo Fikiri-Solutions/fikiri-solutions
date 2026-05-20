@@ -27,11 +27,14 @@ class TestEmailJobHelpers:
         assert isinstance(t, datetime)
 
     def test_should_skip_smtp_delivery_reserved_domains(self):
+        from core.reserved_email_recipients import should_skip_real_email_delivery
         from email_automation.jobs import _should_skip_smtp_delivery
 
+        assert _should_skip_smtp_delivery is should_skip_real_email_delivery
         assert _should_skip_smtp_delivery("u@example.com") is True
         assert _should_skip_smtp_delivery("u@example.net") is True
         assert _should_skip_smtp_delivery("u@example.org") is True
+        assert _should_skip_smtp_delivery("u@example.test") is True
         assert _should_skip_smtp_delivery("u@foo.test") is True
         assert _should_skip_smtp_delivery("u@x.invalid") is True
         assert _should_skip_smtp_delivery("real@gmail.com") is False
