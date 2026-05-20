@@ -88,5 +88,19 @@ def record_email_pipeline_ai_usage(user_id: Optional[int], quantity: int = 1) ->
         from core.ai_budget_guardrails import ai_budget_guardrails
 
         ai_budget_guardrails.record_ai_usage(user_id, quantity)
+        try:
+            from analytics.service_usage_analytics import record_email_pipeline_service_usage
+
+            record_email_pipeline_service_usage(
+                user_id,
+                operation="pipeline_ai",
+                quantity=quantity,
+            )
+        except Exception as analytics_exc:
+            logger.debug(
+                "email_pipeline_ai_gate: service analytics skipped user_id=%s: %s",
+                user_id,
+                analytics_exc,
+            )
     except Exception as exc:
         logger.warning("email_pipeline_ai_gate: record_ai_usage failed user_id=%s: %s", user_id, exc)

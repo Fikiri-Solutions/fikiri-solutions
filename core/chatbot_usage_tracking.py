@@ -301,6 +301,18 @@ def record_chatbot_ai_usage_if_needed(
     ):
         return False
     ai_budget_guardrails.record_ai_usage(billing_uid, 1)
+    try:
+        from analytics.service_usage_analytics import record_chatbot_service_usage
+        from analytics.service_usage_constants import METRIC_AI_RESPONSES
+
+        record_chatbot_service_usage(
+            billing_uid,
+            metric_name=METRIC_AI_RESPONSES,
+            correlation_id=tenant_id,
+            llm_success=True,
+        )
+    except Exception as exc:
+        logger.debug("chatbot service usage analytics skipped: %s", exc)
     _log_usage_event(
         "chatbot ai usage recorded",
         event="chatbot.usage.ai_recorded",
