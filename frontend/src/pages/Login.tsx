@@ -8,6 +8,7 @@ import { RadiantLayout } from '../components/radiant'
 import { motion } from 'framer-motion'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { apiClient } from '../services/apiClient'
+import { loadGmailLookbackId } from '../utils/gmailLookbackStorage'
 import { AUTOCOMPLETE } from '../constants/autocomplete'
 
 export const Login: React.FC = () => {
@@ -293,7 +294,7 @@ export const Login: React.FC = () => {
     try {
       trackLogin('gmail', 'oauth')
       const redirectUri = `${window.location.origin}/integrations/gmail`
-      const result = await apiClient.startGmailOAuth(redirectUri)
+      const result = await apiClient.startGmailOAuth(redirectUri, loadGmailLookbackId())
       if (result?.url) {
         window.location.href = result.url
         return

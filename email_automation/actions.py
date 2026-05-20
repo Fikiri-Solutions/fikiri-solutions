@@ -238,8 +238,9 @@ class MinimalEmailActions:
             # Extract sender name
             sender_name = self._extract_name_from_email(sender)
             
-            # Generate reply content using AI if available
-            reply_content = self._generate_reply_content(sender_name, subject, parsed_email)
+            reply_content, reply_mode = self._generate_reply_content(
+                sender_name, subject, parsed_email, user_id=user_id
+            )
             if user_id:
                 record_email_event(
                     user_id,
@@ -311,7 +312,24 @@ class MinimalEmailActions:
                     "reply_generated": True,
                     "reply_sent": reply_sent,
                     "reply_message_id": reply_message_id,
-                    "error_classification": classification if not reply_sent else None
+                    "error_classification": classification if not reply_sent else None,
+                    "reply_generation_mode": reply_mode,
+                    "analysis_reused": reply_mode == "reused_suggested_reply",
+                    "intent": (parsed_email.get("_analysis") or {}).get("intent")
+                    if isinstance(parsed_email.get("_analysis"), dict)
+                    else None,
+                    "urgency": (parsed_email.get("_analysis") or {}).get("urgency")
+                    if isinstance(parsed_email.get("_analysis"), dict)
+                    else None,
+                    "lead_score": (parsed_email.get("_analysis") or {}).get("lead_score")
+                    if isinstance(parsed_email.get("_analysis"), dict)
+                    else None,
+                    "tone": (
+                        ((parsed_email.get("_analysis") or {}).get("reply_guidance") or {}).get("tone")
+                        or (parsed_email.get("_analysis") or {}).get("tone")
+                    )
+                    if isinstance(parsed_email.get("_analysis"), dict)
+                    else None,
                 }
             }
             
@@ -386,27 +404,64 @@ class MinimalEmailActions:
             logger.error(f"Failed to send Gmail reply: {e}")
             raise
     
-    def _generate_reply_content(self, sender_name: str, subject: str, 
-                               parsed_email: Dict[str, Any] = None) -> str:
-        """Generate reply content using AI if available, otherwise use templates."""
-        
-        # Try AI-generated reply first
-        if 'ai_assistant' in self.services:
+    def _extract_analysis_from_parsed(
+        self, parsed_email: Optional[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        if not isinstance(parsed_email, dict):
+            return None
+        analysis = parsed_email.get("_analysis")
+        return analysis if isinstance(analysis, dict) else None
+
+    @staticmethod
+    def _email_text_from_parsed(parsed_email: Optional[Dict[str, Any]]) -> tuple:
+        if not isinstance(parsed_email, dict):
+            return "", ""
+        body = parsed_email.get("body")
+        if isinstance(body, dict):
+            text = str(body.get("text") or "")
+        else:
+            text = str(parsed_email.get("body_text") or "")
+        snippet = str(parsed_email.get("snippet") or "")
+        return text, snippet
+
+    def _generate_reply_content(
+        self,
+        sender_name: str,
+        subject: str,
+        parsed_email: Dict[str, Any] = None,
+        *,
+        user_id: int = None,
+    ) -> tuple:
+        """Generate reply body and a ``reply_generation_mode`` tag for billing/logging."""
+        analysis = self._extract_analysis_from_parsed(parsed_email)
+        body_text, snippet = self._email_text_from_parsed(parsed_email)
+        mailbox_user_id = user_id
+        if isinstance(parsed_email, dict) and parsed_email.get("_mailbox_user_id") is not None:
+            mailbox_user_id = parsed_email.get("_mailbox_user_id")
+
+        if "ai_assistant" in self.services:
             try:
-                ai_reply = self.services['ai_assistant'].generate_reply(
+                assistant = self.services["ai_assistant"]
+                ai_reply, mode = assistant.generate_reply_with_metadata(
                     sender_name=sender_name,
                     subject=subject,
-                    email_content=parsed_email.get("snippet", "") if parsed_email else "",
-                    email_body=parsed_email.get("body_text", "") if parsed_email else ""
+                    email_content=snippet,
+                    email_body=body_text,
+                    analysis=analysis,
+                    user_id=mailbox_user_id,
                 )
                 if ai_reply:
-                    logger.info("✅ AI-generated reply used")
-                    return ai_reply
+                    logger.info(
+                        "mailbox auto-reply generated mode=%s intent=%s",
+                        mode,
+                        (analysis or {}).get("intent"),
+                    )
+                    return ai_reply, mode
             except Exception as e:
-                logger.warning(f"AI reply generation failed: {e}")
-        
-        # Fallback to template-based reply
-        return self._generate_template_reply(sender_name, subject)
+                logger.warning("AI reply generation failed: %s", e)
+
+        template = self._generate_template_reply(sender_name, subject)
+        return template, "template_fallback"
     
     def _generate_template_reply(self, sender_name: str, subject: str) -> str:
         """Generate reply content using templates."""

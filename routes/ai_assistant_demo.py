@@ -105,10 +105,19 @@ def ai_assistant_demo():
         assistant = create_ai_assistant(api_key)
         start_time = datetime.now(timezone.utc)
 
-        intent_result = assistant.classify_email_intent(content, subject)
-        intent = intent_result.get("intent", "general")
+        analysis = assistant.analyze_incoming_email(
+            sender_email=sender,
+            sender_name=sender,
+            subject=subject,
+            body=content,
+            classification_source="legacy_wrapper",
+        )
+        intent_result = analysis
+        intent = analysis.get("intent", "general")
 
-        response = assistant.generate_response(content, sender, subject, intent)
+        response = assistant.generate_response(
+            content, sender, subject, intent, analysis=analysis
+        )
 
         contact_info = assistant.extract_contact_info(content)
 

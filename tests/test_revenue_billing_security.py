@@ -28,10 +28,10 @@ def client():
 
 class TestRevenueBillingSecurity:
     @patch('core.public_chatbot_api.context_system.start_conversation')
-    @patch('core.public_chatbot_api.knowledge_base.search')
-    @patch('core.public_chatbot_api.faq_system.search_faqs')
-    @patch('core.public_chatbot_api.get_vector_search')
-    @patch('core.public_chatbot_api.get_feature_flags')
+    @patch('core.chatbot_retrieval.knowledge_base.search')
+    @patch('core.chatbot_retrieval.faq_system.search_faqs')
+    @patch('core.chatbot_retrieval.get_vector_search')
+    @patch('core.chatbot_retrieval.get_feature_flags')
     @patch('core.public_chatbot_api._check_plan_access')
     @patch('core.public_chatbot_api.api_key_manager.record_usage')
     @patch('core.public_chatbot_api.api_key_manager.validate_api_key')

@@ -1,13 +1,20 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Upload, FileText, MessageSquare, BookOpen, Sparkles, Loader2, Search, Code2 } from 'lucide-react'
 import { apiClient, KnowledgeSearchResult } from '../services/apiClient'
 import { useToast } from '../components/Toast'
 import { EmptyState } from '../components/EmptyState'
+import {
+  BotPreview,
+  createPreviewConversationId,
+  previewSourceLabel,
+  runChatbotBuilderPreview,
+} from './chatbotBuilderPreview'
 
 export const ChatbotBuilder: React.FC = () => {
   const { addToast } = useToast()
+  const queryClient = useQueryClient()
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [extractedText, setExtractedText] = useState('')
   const [faqForm, setFaqForm] = useState({ question: '', answer: '', category: 'general', keywords: '' })
@@ -15,6 +22,9 @@ export const ChatbotBuilder: React.FC = () => {
   const [vectorPayload, setVectorPayload] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<KnowledgeSearchResult[]>([])
+  const [botPreview, setBotPreview] = useState<BotPreview | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewConversationId, setPreviewConversationId] = useState<string | null>(null)
 
   const { data: faqStats } = useQuery({
     queryKey: ['faq-stats'],
@@ -47,6 +57,7 @@ export const ChatbotBuilder: React.FC = () => {
     onSuccess: () => {
       addToast({ type: 'success', title: 'FAQ Saved', message: 'FAQ has been saved successfully' })
       setFaqForm({ question: '', answer: '', category: 'general', keywords: '' })
+      void queryClient.invalidateQueries({ queryKey: ['faq-stats'] })
     },
     onError: () => addToast({ type: 'error', title: 'Save Failed', message: 'Unable to save FAQ' })
   })
@@ -56,6 +67,7 @@ export const ChatbotBuilder: React.FC = () => {
     onSuccess: () => {
       addToast({ type: 'success', title: 'Document Saved', message: 'Business info saved to knowledge base' })
       setDocForm({ title: '', summary: '', category: 'general', content: '' })
+      void queryClient.invalidateQueries({ queryKey: ['faq-stats'] })
     },
     onError: () => addToast({ type: 'error', title: 'Save Failed', message: 'Unable to save document' })
   })
@@ -110,16 +122,36 @@ export const ChatbotBuilder: React.FC = () => {
     vectorMutation.mutate({ content: vectorPayload, metadata: { source: 'builder' } })
   }
 
+  const handleClearPreview = () => {
+    setSearchQuery('')
+    setSearchResults([])
+    setBotPreview(null)
+    setPreviewConversationId(null)
+  }
+
   const handleSearch = async () => {
-    if (!searchQuery) {
+    if (!searchQuery.trim()) {
       setSearchResults([])
+      setBotPreview(null)
       return
     }
+    setPreviewLoading(true)
+    let conversationId = previewConversationId
+    if (!conversationId) {
+      conversationId = createPreviewConversationId()
+      setPreviewConversationId(conversationId)
+    }
     try {
-      const results = await apiClient.searchKnowledge(searchQuery)
-      setSearchResults(results)
+      const { botPreview: preview, searchResults: kbResults } = await runChatbotBuilderPreview(
+        searchQuery.trim(),
+        conversationId
+      )
+      setBotPreview(preview)
+      setSearchResults(kbResults)
     } catch {
-      addToast({ type: 'error', title: 'Search Failed', message: 'Failed to search knowledge base' })
+      addToast({ type: 'error', title: 'Preview Failed', message: 'Could not run chatbot preview' })
+    } finally {
+      setPreviewLoading(false)
     }
   }
 
@@ -376,26 +408,66 @@ export const ChatbotBuilder: React.FC = () => {
               />
               <button
                 onClick={handleSearch}
-                className="rounded-xl bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-secondary"
+                disabled={previewLoading}
+                className="rounded-xl bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-secondary disabled:opacity-50"
               >
-                Preview
+                {previewLoading ? 'Testing…' : 'Test reply'}
               </button>
+              {(botPreview || previewConversationId) && (
+                <button
+                  type="button"
+                  onClick={handleClearPreview}
+                  disabled={previewLoading}
+                  className="rounded-xl border border-brand-text/20 px-4 py-2 text-sm font-medium text-brand-text dark:text-gray-200 hover:bg-brand-text/5 disabled:opacity-50"
+                >
+                  Clear preview
+                </button>
+              )}
             </div>
             <div className="space-y-3">
-              {searchResults.length === 0 ? (
+              {botPreview ? (
+                <div className="rounded-xl border border-brand-primary/30 bg-brand-primary/5 dark:bg-brand-primary/10 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-brand-text/60 dark:text-gray-400">
+                    Bot reply ({previewSourceLabel(botPreview.source, botPreview.fallbackUsed)})
+                    {typeof botPreview.confidence === 'number' && ` · ${Math.round(botPreview.confidence * 100)}%`}
+                  </p>
+                  {botPreview.question && (
+                    <p className="text-sm font-semibold text-brand-text dark:text-white mt-2">{botPreview.question}</p>
+                  )}
+                  <p className="text-sm text-brand-text dark:text-gray-100 mt-2 whitespace-pre-wrap">{botPreview.answer}</p>
+                  {botPreview.sources && botPreview.sources.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs text-brand-text/60 dark:text-gray-400">Sources used</p>
+                      {botPreview.sources.slice(0, 3).map((src, idx) => (
+                        <div
+                          key={`${src.type ?? 'src'}-${src.id ?? idx}`}
+                          className="rounded-lg border border-brand-text/10 dark:border-gray-700 p-2 text-xs text-brand-text/80 dark:text-gray-300"
+                        >
+                          <span className="font-medium capitalize">{src.type?.replace('_', ' ') ?? 'source'}</span>
+                          {src.title && `: ${src.title}`}
+                          {src.question && !src.title && `: ${src.question}`}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : searchResults.length === 0 ? (
                 <EmptyState
                   icon={Search}
                   title="No preview yet"
-                  description="Ask a question to see how your bot would respond."
+                  description="Ask a question to preview the same reply path as your live website chatbot."
                 />
-              ) : (
-                searchResults.map(result => (
-                  <div key={result.document_id} className="rounded-xl border border-brand-text/10 dark:border-gray-700 p-4">
-                    <p className="text-sm font-semibold text-brand-text dark:text-white">{result.title}</p>
-                    <p className="text-xs text-brand-text/60 dark:text-gray-400 mt-1">{result.summary}</p>
-                    <p className="text-sm text-brand-text dark:text-gray-100 mt-2 whitespace-pre-wrap">{result.content_preview}</p>
-                  </div>
-                ))
+              ) : null}
+              {searchResults.length > 1 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-brand-text/60 dark:text-gray-400">Other knowledge matches</p>
+                  {searchResults.slice(1).map(result => (
+                    <div key={result.document_id} className="rounded-xl border border-brand-text/10 dark:border-gray-700 p-3">
+                      <p className="text-sm font-semibold text-brand-text dark:text-white">{result.title}</p>
+                      <p className="text-xs text-brand-text/60 dark:text-gray-400 mt-1 line-clamp-2">{result.content_preview}</p>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>

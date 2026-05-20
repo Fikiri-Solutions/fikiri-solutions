@@ -137,6 +137,34 @@ def _coerce_llm_json_for_schema(text: str, output_schema: Optional[Dict[str, Any
             elif isinstance(v, (int, float)):
                 data[key] = str(v)
 
+    # Business email analysis (v2): align prompt/schema field names before validation
+    if "schema_version" in required:
+        data.setdefault("schema_version", "2026-05-email-analysis-v2")
+        reason = data.get("reason_for_recommendation") or data.get("reasoning_summary")
+        if reason:
+            data["reason_for_recommendation"] = str(reason)
+            data.setdefault("reasoning_summary", str(reason))
+        else:
+            data.setdefault("reason_for_recommendation", "Automated analysis.")
+        data.setdefault("intent", "unknown_business_relevant")
+        data.setdefault("urgency", "medium")
+        data.setdefault("business_value", "medium")
+        data.setdefault("confidence", 0.5)
+        data.setdefault("summary", "Email analyzed.")
+        data.setdefault("recommended_action", "draft_reply")
+        data.setdefault("tone", "professional")
+        data.setdefault("suggested_reply", "")
+        data.setdefault("should_auto_send", False)
+        data.setdefault("needs_human_review", True)
+        crm = data.get("crm_updates")
+        if not isinstance(crm, dict):
+            crm = {}
+            data["crm_updates"] = crm
+        crm.setdefault("stage", "new")
+        crm.setdefault("tags", [])
+        crm.setdefault("follow_up_needed", True)
+        crm.setdefault("priority", "medium")
+
     try:
         return json.dumps(data)
     except (TypeError, ValueError):

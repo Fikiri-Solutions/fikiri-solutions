@@ -68,20 +68,34 @@ class OnboardingJobManager:
         else:
             logger.warning("⚠️ Onboarding jobs will run without Redis")
     
-    def queue_first_sync_job(self, user_id: int) -> Dict[str, Any]:
+    def queue_first_sync_job(
+        self,
+        user_id: int,
+        *,
+        lookback_days: Optional[int] = None,
+    ) -> Dict[str, Any]:
         """Queue first email sync job for user"""
+        from core.gmail_sync_options import DEFAULT_LOOKBACK_DAYS, parse_lookback_days
+
+        sync_lookback_days = parse_lookback_days(lookback_days)
         try:
             if REDIS_QUEUE_AVAILABLE and self.queue:
                 # Queue background job
                 job = self.queue.enqueue(
-                    run_first_sync, 
+                    run_first_sync,
                     user_id,
+                    lookback_days=sync_lookback_days,
                     depends_on=None,
                     job_timeout=900,  # 15 minutes
-                    job_id=f"first_sync_{user_id}_{int(time.time())}"
+                    job_id=f"first_sync_{user_id}_{int(time.time())}",
                 )
                 
-                logger.info(f"✅ Queued first sync job {job.id} for user {user_id}")
+                logger.info(
+                    "✅ Queued first sync job %s for user %s (lookback_days=%s)",
+                    job.id,
+                    user_id,
+                    sync_lookback_days,
+                )
                 
                 return {
                     "success": True,
@@ -98,6 +112,7 @@ class OnboardingJobManager:
                 worker = threading.Thread(
                     target=run_first_sync,
                     args=(user_id,),
+                    kwargs={"lookback_days": sync_lookback_days},
                     name=f"onboarding-first-sync-{user_id}",
                     daemon=True,
                 )
@@ -164,13 +179,30 @@ class OnboardingJobManager:
 # Global job manager instance
 onboarding_job_manager = OnboardingJobManager()
 
-def run_first_sync(user_id: int, limit: int = 500, newer_than_days: int = 90) -> Dict[str, Any]:
+def run_first_sync(
+    user_id: int,
+    limit: int = 500,
+    newer_than_days: Optional[int] = None,
+    *,
+    lookback_days: Optional[int] = None,
+) -> Dict[str, Any]:
     """
     Run first Gmail sync for user (bounded and idempotent)
     Based on proven patterns that avoid timeouts and rate limits
     """
+    from core.gmail_sync_options import DEFAULT_LOOKBACK_DAYS, parse_lookback_days
+
+    if newer_than_days is None:
+        newer_than_days = parse_lookback_days(lookback_days)
+    else:
+        newer_than_days = parse_lookback_days(newer_than_days)
+
     try:
-        logger.info(f"🔄 Starting first sync for user {user_id}")
+        logger.info(
+            "🔄 Starting first sync for user %s (newer_than_days=%s)",
+            user_id,
+            newer_than_days,
+        )
         
         # Initialize Redis for progress tracking (uses REDIS_URL or UPSTASH_* via helper)
         redis_client = None

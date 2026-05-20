@@ -461,6 +461,17 @@ def email_sync_status():
                 
                 logger.debug(f"Returning sync status: progress={final_progress}%, syncing={is_syncing}, status={sync_status}, job_progress={progress}")
                 
+                sync_cursor = {}
+                lookback_presets = []
+                try:
+                    from core.gmail_sync_options import lookback_presets_for_api
+                    from email_automation.gmail_sync_jobs import GmailSyncJobManager
+
+                    lookback_presets = lookback_presets_for_api()
+                    sync_cursor = GmailSyncJobManager().get_latest_sync_cursor(user_id)
+                except Exception as cursor_err:
+                    logger.debug("sync cursor lookup skipped: %s", cursor_err)
+
                 return create_success_response({
                     'last_sync': last_sync,
                     'sync_status': sync_status,
@@ -468,7 +479,9 @@ def email_sync_status():
                     'syncing': is_syncing,
                     'progress': final_progress,  # 0-100 percentage
                     'emails_synced_this_job': emails_synced_this_job if emails_synced_this_job is not None else 0,
-                    'gmail_connected': True
+                    'gmail_connected': True,
+                    'sync_cursor': sync_cursor,
+                    'lookback_presets': lookback_presets,
                 }, 'Email sync status retrieved')
             else:
                 # Gmail is connected but no sync record yet - check if emails exist

@@ -128,14 +128,14 @@ class TestPublicChatbotAPI(unittest.TestCase):
         self.assertEqual(data['error_code'], 'INVALID_API_KEY')
     
     @patch('core.public_chatbot_api._check_plan_access')
-    @patch('core.public_chatbot_api.get_feature_flags')
-    @patch('core.public_chatbot_api.LLMRouter')
-    @patch('core.public_chatbot_api.get_vector_search')
+    @patch('core.chatbot_retrieval.get_feature_flags')
+    @patch('core.chatbot_response_service.LLMRouter')
+    @patch('core.chatbot_retrieval.get_vector_search')
     @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
     @patch('core.public_chatbot_api.api_key_manager.check_rate_limit')
     @patch('core.public_chatbot_api.api_key_manager.record_usage')
-    @patch('core.public_chatbot_api.faq_system.search_faqs')
-    @patch('core.public_chatbot_api.knowledge_base.search')
+    @patch('core.chatbot_retrieval.faq_system.search_faqs')
+    @patch('core.chatbot_retrieval.knowledge_base.search')
     @patch('core.public_chatbot_api.context_system.start_conversation')
     def test_3_query_endpoint_works_with_valid_key(self, mock_start_conv, mock_kb_search,
                                                    mock_faq_search, mock_record, mock_rate_limit,
@@ -204,6 +204,63 @@ class TestPublicChatbotAPI(unittest.TestCase):
         
         # Verify usage was recorded
         mock_record.assert_called_once()
+
+    @patch('core.public_chatbot_api.load_chatbot_config')
+    @patch('core.public_chatbot_api._check_plan_access')
+    @patch('core.chatbot_retrieval.get_feature_flags')
+    @patch('core.chatbot_response_service.LLMRouter')
+    @patch('core.chatbot_retrieval.get_vector_search')
+    @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
+    @patch('core.public_chatbot_api.api_key_manager.check_rate_limit')
+    @patch('core.public_chatbot_api.api_key_manager.record_usage')
+    @patch('core.chatbot_retrieval.faq_system.search_faqs')
+    @patch('core.chatbot_retrieval.knowledge_base.search')
+    @patch('core.public_chatbot_api.context_system.start_conversation')
+    def test_3b_query_succeeds_when_config_load_raises(
+        self, mock_start_conv, mock_kb_search, mock_faq_search, mock_record,
+        mock_rate_limit, mock_validate, mock_vector_search, mock_llm_router,
+        mock_flags, mock_plan, mock_load_config,
+    ):
+        mock_validate.return_value = self.mock_api_key_info
+        mock_rate_limit.return_value = {'allowed': True, 'remaining': 60, 'limit': 60}
+        mock_flags.return_value.is_enabled.return_value = False
+        mock_plan.return_value = {"plan": "starter", "allow_llm": True}
+        mock_vector_search.return_value.search_similar.return_value = []
+        mock_faq_search.return_value = Mock(success=True, matches=[])
+        mock_doc = Mock()
+        mock_doc.id = "doc_1"
+        mock_doc.title = "Hours"
+        mock_doc.content = "We are open 9am-5pm."
+        mock_kb_search.return_value = Mock(
+            success=True,
+            results=[Mock(document=mock_doc, relevance_score=0.9)],
+        )
+        mock_start_conv.return_value = Mock(conversation_id="conv_cfg")
+        mock_load_config.side_effect = RuntimeError("config store unavailable")
+        mock_llm = Mock()
+        mock_llm.process.return_value = {
+            "success": True,
+            "validated": True,
+            "content": json.dumps({
+                "answer": "Still works",
+                "confidence": 0.9,
+                "fallback_used": False,
+                "sources": [],
+            }),
+            "trace_id": "trace_cfg",
+        }
+        mock_llm_router.return_value = mock_llm
+
+        response = self.client.post(
+            '/api/public/chatbot/query',
+            json={'query': 'What are your hours?'},
+            headers={'X-API-Key': 'fik_test_key'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data['success'])
+        self.assertEqual(data['schema_version'], 'v1')
     
     @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
     @patch('core.public_chatbot_api.api_key_manager.check_rate_limit')
@@ -263,11 +320,11 @@ class TestPublicChatbotAPI(unittest.TestCase):
         self.assertEqual(data['error_code'], 'MISSING_QUERY')
 
     @patch('core.public_chatbot_api.ai_budget_guardrails.evaluate')
-    @patch('core.public_chatbot_api.get_feature_flags')
+    @patch('core.chatbot_retrieval.get_feature_flags')
     @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
     @patch('core.public_chatbot_api.api_key_manager.check_rate_limit')
-    @patch('core.public_chatbot_api.faq_system.search_faqs')
-    @patch('core.public_chatbot_api.knowledge_base.search')
+    @patch('core.chatbot_retrieval.faq_system.search_faqs')
+    @patch('core.chatbot_retrieval.knowledge_base.search')
     @patch('core.public_chatbot_api.context_system.start_conversation')
     def test_5b_query_endpoint_ai_budget_soft_stop(
         self, mock_start_conv, mock_kb_search, mock_faq_search, mock_rate_limit,
@@ -319,11 +376,11 @@ class TestPublicChatbotAPI(unittest.TestCase):
 
     @patch("core.public_chatbot_api.check_tier_usage_cap")
     @patch("core.public_chatbot_api._check_plan_access")
-    @patch("core.public_chatbot_api.get_feature_flags")
+    @patch("core.chatbot_retrieval.get_feature_flags")
     @patch("core.public_chatbot_api.api_key_manager.validate_api_key")
     @patch("core.public_chatbot_api.api_key_manager.check_rate_limit")
-    @patch("core.public_chatbot_api.faq_system.search_faqs")
-    @patch("core.public_chatbot_api.knowledge_base.search")
+    @patch("core.chatbot_retrieval.faq_system.search_faqs")
+    @patch("core.chatbot_retrieval.knowledge_base.search")
     @patch("core.public_chatbot_api.context_system.start_conversation")
     def test_5c_query_endpoint_tier_cap_blocks_llm(
         self,
@@ -376,13 +433,13 @@ class TestPublicChatbotAPI(unittest.TestCase):
 
     @patch("core.public_chatbot_api.ai_budget_guardrails.record_ai_usage")
     @patch("core.public_chatbot_api._check_plan_access")
-    @patch("core.public_chatbot_api.get_feature_flags")
-    @patch("core.public_chatbot_api.LLMRouter")
-    @patch("core.public_chatbot_api.get_vector_search")
+    @patch("core.chatbot_retrieval.get_feature_flags")
+    @patch("core.chatbot_response_service.LLMRouter")
+    @patch("core.chatbot_retrieval.get_vector_search")
     @patch("core.public_chatbot_api.api_key_manager.validate_api_key")
     @patch("core.public_chatbot_api.api_key_manager.check_rate_limit")
-    @patch("core.public_chatbot_api.faq_system.search_faqs")
-    @patch("core.public_chatbot_api.knowledge_base.search")
+    @patch("core.chatbot_retrieval.faq_system.search_faqs")
+    @patch("core.chatbot_retrieval.knowledge_base.search")
     @patch("core.public_chatbot_api.context_system.start_conversation")
     def test_5d_schema_validation_failure_does_not_record_ai_usage(
         self,
@@ -464,11 +521,11 @@ class TestPublicChatbotAPI(unittest.TestCase):
         self.assertIn('Access-Control-Allow-Methods', response.headers)
         self.assertIn('Access-Control-Allow-Headers', response.headers)
     
-    @patch('core.public_chatbot_api.get_feature_flags')
+    @patch('core.chatbot_retrieval.get_feature_flags')
     @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
     @patch('core.public_chatbot_api.api_key_manager.check_rate_limit')
-    @patch('core.public_chatbot_api.faq_system.search_faqs')
-    @patch('core.public_chatbot_api.knowledge_base.search')
+    @patch('core.chatbot_retrieval.faq_system.search_faqs')
+    @patch('core.chatbot_retrieval.knowledge_base.search')
     @patch('core.public_chatbot_api.context_system.start_conversation')
     def test_8_bearer_token_auth(self, mock_start_conv, mock_kb_search, mock_faq_search,
                                  mock_rate_limit, mock_validate, mock_flags):
@@ -499,13 +556,13 @@ class TestPublicChatbotAPI(unittest.TestCase):
         # We're just testing the auth mechanism
         mock_validate.assert_called_once()
 
-    @patch('core.public_chatbot_api.get_feature_flags')
-    @patch('core.public_chatbot_api.get_vector_search')
-    @patch('core.public_chatbot_api.LLMRouter')
+    @patch('core.chatbot_retrieval.get_feature_flags')
+    @patch('core.chatbot_retrieval.get_vector_search')
+    @patch('core.chatbot_response_service.LLMRouter')
     @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
     @patch('core.public_chatbot_api.api_key_manager.check_rate_limit')
-    @patch('core.public_chatbot_api.faq_system.search_faqs')
-    @patch('core.public_chatbot_api.knowledge_base.search')
+    @patch('core.chatbot_retrieval.faq_system.search_faqs')
+    @patch('core.chatbot_retrieval.knowledge_base.search')
     @patch('core.public_chatbot_api.context_system.start_conversation')
     def test_9_vector_search_invoked_when_enabled(self, mock_start_conv, mock_kb_search, mock_faq_search,
                                                   mock_rate_limit, mock_validate, mock_llm_router,
@@ -548,15 +605,15 @@ class TestPublicChatbotAPI(unittest.TestCase):
 
         mock_vector_search.return_value.search_similar.assert_called_once()
 
-    @patch('core.public_chatbot_api.get_feature_flags')
+    @patch('core.chatbot_retrieval.get_feature_flags')
     @patch('core.public_chatbot_api.enhanced_crm_service.create_lead')
     @patch('core.public_chatbot_api.enhanced_crm_service.add_lead_activity')
     @patch('core.public_chatbot_api.db_optimizer.execute_query')
-    @patch('core.public_chatbot_api.LLMRouter')
+    @patch('core.chatbot_response_service.LLMRouter')
     @patch('core.public_chatbot_api.api_key_manager.validate_api_key')
     @patch('core.public_chatbot_api.api_key_manager.check_rate_limit')
-    @patch('core.public_chatbot_api.faq_system.search_faqs')
-    @patch('core.public_chatbot_api.knowledge_base.search')
+    @patch('core.chatbot_retrieval.faq_system.search_faqs')
+    @patch('core.chatbot_retrieval.knowledge_base.search')
     @patch('core.public_chatbot_api.context_system.start_conversation')
     def test_10_lead_capture_stores_lead(self, mock_start_conv, mock_kb_search, mock_faq_search,
                                          mock_rate_limit, mock_validate, mock_llm_router,

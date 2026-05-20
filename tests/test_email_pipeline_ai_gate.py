@@ -2,7 +2,7 @@
 
 import os
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from core.ai_budget_guardrails import AIBudgetDecision
 from core.email_pipeline_ai_gate import (
@@ -247,3 +247,73 @@ class TestPipelineOrchestrateAIGate(unittest.TestCase):
         self.assertTrue(out.get("success"))
         self.assertEqual(out.get("mailbox_ai_reply_skip_reason"), "PLAN_LIMIT_EXCEEDED")
         mock_record_usage.assert_called_once_with(5)
+
+    @patch("email_automation.pipeline.record_email_pipeline_ai_usage")
+    @patch("email_automation.pipeline.email_pipeline_ai_gate_enabled", return_value=True)
+    def test_pipeline_records_second_usage_for_llm_reply_when_gate_on(
+        self, _gate_on, mock_record_usage
+    ):
+        from email_automation.pipeline import orchestrate_incoming
+        from email_automation.actions import MinimalEmailActions
+        from email_automation.ai_assistant import MinimalAIEmailAssistant
+
+        parsed = {
+            "message_id": "mid-llm",
+            "thread_id": "tid-llm",
+            "headers": {"from": "Buyer <buyer@example.com>", "subject": "Services"},
+            "body": {"text": "Tell me about your services.", "html": ""},
+            "snippet": "Tell me about your services.",
+            "labels": [],
+        }
+        analysis = {
+            "intent": "service_inquiry",
+            "legacy_intent": "lead_inquiry",
+            "confidence": 0.92,
+            "should_auto_send": True,
+            "needs_human_review": False,
+            "suggested_reply": "",
+            "recommended_action": "draft_reply",
+        }
+        assistant = MagicMock(spec=MinimalAIEmailAssistant)
+        assistant.is_enabled.return_value = True
+        assistant._load_business_context.return_value = {"company_name": "Acme"}
+        assistant.analyze_incoming_email.return_value = analysis
+        assistant.generate_reply_with_metadata.return_value = (
+            "We would be happy to walk you through our services.",
+            "llm_with_analysis_context",
+        )
+
+        actions = MinimalEmailActions(services={"ai_assistant": assistant})
+        actions.gmail_service = None
+        actions.db_optimizer = MagicMock()
+
+        wf = {
+            "success": True,
+            "correlation_id": "corr-llm",
+            "lead_capture": {"success": True, "data": {"lead_id": 9}},
+            "automation": {"success": True},
+        }
+
+        with patch("email_automation.pipeline.run_inbound_email_workflow", return_value=wf), \
+             patch("email_automation.pipeline.automation_safety_manager") as mock_safety, \
+             patch("email_automation.pipeline.MinimalEmailParser") as mock_parser_cls, \
+             patch("email_automation.pipeline.db_optimizer") as mock_db, \
+             patch("email_automation.pipeline.enhanced_crm_service"):
+            mock_safety.check_rate_limits.return_value = {"allowed": True}
+            mock_parser = MagicMock()
+            mock_parser.get_subject.return_value = "Services"
+            mock_parser.get_body_text.return_value = parsed["body"]["text"]
+            mock_parser.get_sender.return_value = parsed["headers"]["from"]
+            mock_parser_cls.return_value = mock_parser
+            mock_db.execute_query.return_value = [{"id": 9}]
+
+            result = orchestrate_incoming(parsed, user_id=3, actions=actions)
+
+        self.assertTrue(result.get("success"))
+        self.assertEqual(
+            result["action"]["details"]["reply_generation_mode"],
+            "llm_with_analysis_context",
+        )
+        self.assertEqual(len(mock_record_usage.call_args_list), 2)
+        mock_record_usage.assert_any_call(3)
+        mock_record_usage.assert_any_call(3, 1)

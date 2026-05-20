@@ -33,6 +33,14 @@ except ImportError:
     GMAIL_API_AVAILABLE = False
 
 from core.database_optimization import db_optimizer
+from core.gmail_sync_options import (
+    DEFAULT_LOOKBACK_DAYS,
+    DEFAULT_MAX_MESSAGES_PER_JOB,
+    GmailSyncRequestParams,
+    extract_sync_cursor,
+    parse_job_metadata,
+    sync_params_to_job_metadata,
+)
 from integrations.gmail.gmail_client import gmail_client
 
 logger = logging.getLogger(__name__)
@@ -127,9 +135,12 @@ class GmailSyncJobManager:
         self.failed_queue_name = "fikiri:gmail:failed"
         # Per-request page size (Gmail allows up to 500; we page with nextPageToken).
         self.sync_page_size = min(500, max(1, int(os.getenv('GMAIL_SYNC_PAGE_SIZE', '100'))))
-        # Max messages to pull per sync job (after pagination). Was a single-page cap of 50 — caused “missing” mail.
-        self.sync_max_messages = max(1, int(os.getenv('GMAIL_SYNC_MAX_MESSAGES', '500')))
-        self.sync_days = int(os.getenv('GMAIL_SYNC_DAYS', '90'))  # Align with onboarding-style window
+        # Default per-job batch when the client does not pass max_messages.
+        self.sync_max_messages = max(
+            1,
+            int(os.getenv('GMAIL_SYNC_MAX_MESSAGES', str(DEFAULT_MAX_MESSAGES_PER_JOB))),
+        )
+        self.sync_days = int(os.getenv('GMAIL_SYNC_DAYS', str(DEFAULT_LOOKBACK_DAYS)))
         self._connect_redis()
         self._initialize_tables()
     
@@ -240,6 +251,11 @@ class GmailSyncJobManager:
                         logger.warning("synced_emails provider backfill failed: %s", retry_err)
                 else:
                     logger.warning(f"Migration note: {e}")
+
+            try:
+                db_optimizer.ensure_synced_emails_upsert_constraint()
+            except Exception as upsert_key_err:
+                logger.debug("synced_emails upsert key ensure skipped: %s", upsert_key_err)
             
             # Create contacts table
             db_optimizer.execute_query("""
@@ -301,12 +317,41 @@ class GmailSyncJobManager:
         except Exception as e:
             logger.error(f"❌ Gmail sync table initialization failed: {e}")
     
-    def queue_sync_job(self, user_id: int, sync_type: str = 'full', 
-                      metadata: Dict[str, Any] = None) -> str:
-        """Queue a Gmail sync job for a user"""
+    def get_latest_sync_cursor(self, user_id: int) -> Dict[str, Any]:
+        """Return pagination cursor from the most recent completed sync job."""
+        try:
+            rows = db_optimizer.execute_query(
+                """
+                SELECT metadata FROM gmail_sync_jobs
+                WHERE user_id = ? AND status = 'completed'
+                ORDER BY completed_at DESC, created_at DESC
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            if not rows:
+                return {}
+            meta = parse_job_metadata(rows[0].get("metadata") if isinstance(rows[0], dict) else rows[0])
+            return extract_sync_cursor(meta)
+        except Exception as exc:
+            logger.debug("get_latest_sync_cursor failed for user %s: %s", user_id, exc)
+            return {}
+
+    def queue_sync_job(
+        self,
+        user_id: int,
+        sync_type: str = 'full',
+        metadata: Dict[str, Any] = None,
+        *,
+        sync_params: Optional[GmailSyncRequestParams] = None,
+    ) -> str:
+        """Queue a Gmail sync job for a user."""
         try:
             job_id = f"gmail_sync_{user_id}_{int(time.time())}"
-            
+            job_meta = dict(metadata or {})
+            if sync_params is not None:
+                job_meta.update(sync_params_to_job_metadata(sync_params))
+
             # Create job record
             db_optimizer.execute_query("""
                 INSERT INTO gmail_sync_jobs 
@@ -315,7 +360,7 @@ class GmailSyncJobManager:
             """, (
                 user_id,
                 job_id,
-                json.dumps(metadata or {})
+                json.dumps(job_meta)
             ), fetch=False)
             
             # Update user_sync_status to show pending sync
@@ -333,7 +378,7 @@ class GmailSyncJobManager:
                     'job_id': job_id,
                     'user_id': user_id,
                     'sync_type': sync_type,
-                    'metadata': metadata or {},
+                    'metadata': job_meta,
                     'created_at': time.time()
                 }
                 
@@ -381,6 +426,7 @@ class GmailSyncJobManager:
             
             job = job_data[0]
             user_id = job['user_id']
+            job_meta = parse_job_metadata(job.get("metadata"))
             logger.info(f"📋 Processing sync job {job_id} for user {user_id}")
             
             # Update job status
@@ -410,29 +456,63 @@ class GmailSyncJobManager:
             service = gmail_client.get_gmail_service_for_user(user_id)
             
             # Sync emails
-            sync_result = self._sync_emails(service, user_id, job_id)
-            
+            sync_result = self._sync_emails(service, user_id, job_id, job_meta)
+
+            completed_meta = dict(job_meta)
+            completed_meta["last_batch_count"] = sync_result.get("emails_synced", 0)
+            completed_meta["has_more"] = bool(sync_result.get("has_more"))
+            if sync_result.get("next_page_token"):
+                completed_meta["next_page_token"] = sync_result["next_page_token"]
+            else:
+                completed_meta.pop("next_page_token", None)
+                completed_meta["has_more"] = False
+            lookback_days = job_meta.get("lookback_days", self.sync_days)
+            completed_meta["lookback_days"] = lookback_days
+            from core.gmail_sync_options import GMAIL_LOOKBACK_PRESETS
+
+            for preset_id, days in GMAIL_LOOKBACK_PRESETS.items():
+                if days == lookback_days:
+                    completed_meta["lookback_preset"] = preset_id
+                    break
+
             # Update job with results - ensure progress is 100% when completed
             final_progress = 100
             db_optimizer.execute_query("""
                 UPDATE gmail_sync_jobs 
                 SET status = 'completed', completed_at = CURRENT_TIMESTAMP,
-                    progress = ?, emails_synced = ?, contacts_found = ?, leads_identified = ?
+                    progress = ?, emails_synced = ?, contacts_found = ?, leads_identified = ?,
+                    metadata = ?
                 WHERE job_id = ?
             """, (
                 final_progress,
                 sync_result['emails_synced'],
                 sync_result['contacts_found'],
                 sync_result['leads_identified'],
+                json.dumps(completed_meta),
                 job_id
             ), fetch=False)
             logger.info(f"✅ Updated job {job_id} to completed with progress={final_progress}%")
             
             # Update user_sync_status to reflect completed sync
             try:
-                total_emails = sync_result.get('emails_synced', 0)
-                db_optimizer.upsert_user_sync_status_completed(user_id, total_emails)
-                logger.info(f"✅ Updated user_sync_status for user {user_id}")
+                count_rows = db_optimizer.execute_query(
+                    "SELECT COUNT(*) as total FROM synced_emails WHERE user_id = ?",
+                    (user_id,),
+                )
+                total_emails = (
+                    int(count_rows[0]["total"])
+                    if count_rows and count_rows[0].get("total") is not None
+                    else 0
+                )
+                sync_status = "partial" if completed_meta.get("has_more") else "completed"
+                db_optimizer.upsert_user_sync_status_merge(
+                    user_id,
+                    last_sync=_utcnow_naive().isoformat(),
+                    sync_status=sync_status,
+                    syncing=0,
+                    total_emails=total_emails,
+                )
+                logger.info(f"✅ Updated user_sync_status for user {user_id} ({sync_status})")
             except Exception as status_error:
                 logger.warning(f"⚠️ Could not update user_sync_status: {status_error}")
             
@@ -443,7 +523,9 @@ class GmailSyncJobManager:
                 'job_id': job_id,
                 'emails_synced': sync_result['emails_synced'],
                 'contacts_found': sync_result['contacts_found'],
-                'leads_identified': sync_result['leads_identified']
+                'leads_identified': sync_result['leads_identified'],
+                'has_more': bool(completed_meta.get("has_more")),
+                'lookback_days': completed_meta.get("lookback_days"),
             }
             
         except Exception as e:
@@ -480,9 +562,20 @@ class GmailSyncJobManager:
                 'error_code': 'SYNC_PROCESSING_FAILED'
             }
     
-    def _sync_emails(self, service, user_id: int, job_id: str) -> Dict[str, Any]:
-        """Sync emails from Gmail"""
+    def _sync_emails(
+        self,
+        service,
+        user_id: int,
+        job_id: str,
+        job_meta: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Sync emails from Gmail for one batch (lookback window + optional page token)."""
         try:
+            meta = job_meta if isinstance(job_meta, dict) else {}
+            lookback_days = int(meta.get("lookback_days") or self.sync_days)
+            max_messages = int(meta.get("max_messages") or self.sync_max_messages)
+            page_token = meta.get("page_token")
+
             # Update initial progress to show sync has started
             db_optimizer.execute_query("""
                 UPDATE gmail_sync_jobs 
@@ -492,7 +585,13 @@ class GmailSyncJobManager:
             logger.info(f"📊 Sync job {job_id} started - progress set to 5%")
             
             # Get messages from Gmail
-            messages = self._get_gmail_messages(service)
+            fetch_result = self._get_gmail_messages(
+                service,
+                lookback_days=lookback_days,
+                max_messages=max_messages,
+                page_token=page_token if isinstance(page_token, str) else None,
+            )
+            messages = fetch_result.get("messages") or []
             
             # Update progress after fetching message list
             if messages:
@@ -659,40 +758,65 @@ class GmailSyncJobManager:
             return {
                 'emails_synced': emails_synced,
                 'contacts_found': contacts_found,
-                'leads_identified': leads_identified
+                'leads_identified': leads_identified,
+                'has_more': bool(fetch_result.get("has_more")),
+                'next_page_token': fetch_result.get("next_page_token"),
             }
             
         except Exception as e:
             logger.error(f"❌ Email sync failed: {e}")
             raise
     
-    def _get_gmail_messages(self, service) -> List[Dict[str, Any]]:
-        """Get messages from Gmail API (paginates nextPageToken until cap or no more results)."""
+    def _get_gmail_messages(
+        self,
+        service,
+        *,
+        lookback_days: int,
+        max_messages: int,
+        page_token: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        List then fetch full Gmail messages for one batch.
+
+        Uses Gmail ``nextPageToken`` so callers can run multiple jobs over large inboxes.
+        """
+        empty: Dict[str, Any] = {
+            "messages": [],
+            "next_page_token": None,
+            "has_more": False,
+        }
         try:
-            end_date = _utcnow_naive()
-            start_date = end_date - timedelta(days=self.sync_days)
-            query = f"after:{start_date.strftime('%Y/%m/%d')} before:{end_date.strftime('%Y/%m/%d')}"
+            start_date = _utcnow_naive() - timedelta(days=max(1, lookback_days))
+            query = f"after:{start_date.strftime('%Y/%m/%d')}"
 
             message_ids: List[str] = []
-            page_token = None
-            while len(message_ids) < self.sync_max_messages:
-                page_size = min(self.sync_page_size, self.sync_max_messages - len(message_ids))
-                list_params = {
+            list_page_token = page_token
+            next_list_page_token: Optional[str] = None
+
+            while len(message_ids) < max_messages:
+                page_size = min(self.sync_page_size, max_messages - len(message_ids))
+                list_params: Dict[str, Any] = {
                     'userId': 'me',
                     'q': query,
                     'maxResults': page_size,
                 }
-                if page_token:
-                    list_params['pageToken'] = page_token
+                if list_page_token:
+                    list_params['pageToken'] = list_page_token
                 results = service.users().messages().list(**list_params).execute()
                 batch = results.get('messages', []) or []
                 for m in batch:
-                    if len(message_ids) >= self.sync_max_messages:
+                    if len(message_ids) >= max_messages:
                         break
                     message_ids.append(m['id'])
-                page_token = results.get('nextPageToken')
-                if not page_token or not batch:
+                next_list_page_token = results.get('nextPageToken')
+                if len(message_ids) >= max_messages:
                     break
+                if not next_list_page_token or not batch:
+                    next_list_page_token = None
+                    break
+                list_page_token = next_list_page_token
+
+            has_more = bool(next_list_page_token) and len(message_ids) >= max_messages
 
             full_messages: List[Dict[str, Any]] = []
             for mid in message_ids:
@@ -707,11 +831,15 @@ class GmailSyncJobManager:
                     logger.warning(f"Failed to get message {mid}: {e}")
                     continue
 
-            return full_messages
+            return {
+                "messages": full_messages,
+                "next_page_token": next_list_page_token if has_more else None,
+                "has_more": has_more,
+            }
 
         except Exception as e:
             logger.error(f"❌ Gmail message retrieval failed: {e}")
-            return []
+            return empty
     
     def _store_email(self, user_id: int, message: Dict[str, Any]) -> Optional[int]:
         """Store email in database"""

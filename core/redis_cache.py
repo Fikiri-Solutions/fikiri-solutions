@@ -170,6 +170,50 @@ class FikiriCache:
             logger.error(f"❌ Email parse cache retrieval failed: {e}")
             return None
     
+    def cache_email_analysis(
+        self,
+        user_id: int,
+        email_id: str,
+        content_hash: str,
+        analysis: Dict[str, Any],
+        ttl: int = 1800,
+    ) -> bool:
+        """Cache manual inbox AI analysis (per user + message + body hash)."""
+        if not self.is_connected() or not email_id:
+            return False
+        try:
+            key = self._generate_cache_key(
+                "email",
+                f"analysis:{user_id}:{email_id}:{content_hash}",
+            )
+            self.redis_client.setex(key, ttl, json.dumps(analysis))
+            return True
+        except Exception as e:
+            logger.error("Email analysis cache failed: %s", e)
+            return False
+
+    def get_cached_email_analysis(
+        self,
+        user_id: int,
+        email_id: str,
+        content_hash: str,
+    ) -> Optional[Dict[str, Any]]:
+        if not self.is_connected() or not email_id:
+            return None
+        try:
+            key = self._generate_cache_key(
+                "email",
+                f"analysis:{user_id}:{email_id}:{content_hash}",
+            )
+            cached_data = self.redis_client.get(key)
+            if cached_data:
+                parsed = json.loads(cached_data)
+                return parsed if isinstance(parsed, dict) else None
+            return None
+        except Exception as e:
+            logger.error("Email analysis cache retrieval failed: %s", e)
+            return None
+
     # Lead Scoring Cache
     def cache_lead_score(self, lead_data: Dict[str, Any], score: float, ttl: int = 3600) -> bool:
         """Cache lead scoring results"""

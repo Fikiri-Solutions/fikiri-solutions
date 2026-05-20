@@ -15,6 +15,7 @@ import uuid
 from email.utils import parseaddr
 from typing import Any, Dict, Optional
 
+from core.user_services import is_crm_inbound_capture_enabled
 from crm.service import enhanced_crm_service
 from services.automation_engine import automation_engine, TriggerType
 
@@ -37,15 +38,24 @@ def run_inbound_email_workflow(
     correlation_id: propagated into CRM events, automation run context, and webhook payloads.
     """
     corr = correlation_id or str(uuid.uuid4())
-    lead_res = enhanced_crm_service.upsert_lead_from_inbound_email(
-        user_id,
-        sender_header=sender_header,
-        subject=subject,
-        provider=provider,
-        correlation_id=corr,
-        mailbox_owner_email=mailbox_owner_email,
-        default_source="gmail" if provider == "gmail" else "outlook",
-    )
+
+    if not is_crm_inbound_capture_enabled(user_id):
+        lead_res = {
+            "success": True,
+            "skipped": True,
+            "reason": "crm_service_disabled",
+            "data": {},
+        }
+    else:
+        lead_res = enhanced_crm_service.upsert_lead_from_inbound_email(
+            user_id,
+            sender_header=sender_header,
+            subject=subject,
+            provider=provider,
+            correlation_id=corr,
+            mailbox_owner_email=mailbox_owner_email,
+            default_source="gmail" if provider == "gmail" else "outlook",
+        )
 
     disp_name, addr = parseaddr(sender_header or "")
     parsed_email = (addr or "").strip()

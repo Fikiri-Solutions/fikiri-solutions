@@ -11,7 +11,7 @@ os.environ.setdefault("FIKIRI_TEST_MODE", "1")
 os.environ.setdefault("FIKIRI_AI_EVENT_LOG", "0")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.ai.schemas import EmailClassificationSchema
+from core.ai.schemas import BusinessEmailAnalysisSchema, EmailClassificationSchema
 
 from core.ai.llm_router import (
     LLMRouter,
@@ -38,6 +38,28 @@ class TestStructuredJsonHelpers:
         data = json.loads(fixed)
         assert data["confidence"] == 1.0
         assert isinstance(data["intent"], str)
+
+    def test_coerce_business_analysis_reasoning_summary_alias(self):
+        raw = """{
+            "schema_version": "2026-05-email-analysis-v2",
+            "intent": "marketing",
+            "urgency": "low",
+            "business_value": "low",
+            "confidence": 0.82,
+            "summary": "Lamb chain promo",
+            "recommended_action": "archive",
+            "tone": "neutral",
+            "crm_updates": {"stage": "new", "tags": [], "follow_up_needed": false, "priority": "low"},
+            "suggested_reply": "",
+            "should_auto_send": false,
+            "needs_human_review": false,
+            "reasoning_summary": "Promotional email, not a lead."
+        }"""
+        fixed = _coerce_llm_json_for_schema(raw, BusinessEmailAnalysisSchema)
+        import json
+
+        data = json.loads(fixed)
+        assert data["reason_for_recommendation"] == "Promotional email, not a lead."
 
 
 class TestSafeCoercions:

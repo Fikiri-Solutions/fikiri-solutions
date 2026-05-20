@@ -50,11 +50,20 @@ class TestMinimalEmailActions(unittest.TestCase):
         self.assertEqual(self.actions._extract_name_from_email(""), "Valued Customer")
 
     def test_auto_reply_uses_ai_assistant_if_available(self):
-        ai = MagicMock(generate_reply=MagicMock(return_value="AI reply"))
+        ai = MagicMock()
+        ai.generate_reply_with_metadata.return_value = ("AI reply", "ai_generated")
         self.actions.services["ai_assistant"] = ai
-        result = self.actions.process_email(self.sample_email, action_type="auto_reply", user_id=1)
+        with patch("email_automation.actions.idempotency_manager") as mock_idem, patch(
+            "email_automation.actions.automation_safety_manager"
+        ) as mock_safety:
+            mock_idem.check_key.return_value = None
+            mock_safety.check_rate_limits.return_value = {"allowed": True}
+            result = self.actions.process_email(
+                self.sample_email, action_type="auto_reply", user_id=1
+            )
         self.assertTrue(result.get("success"))
         self.assertEqual(result.get("details", {}).get("reply_content"), "AI reply")
+        ai.generate_reply_with_metadata.assert_called_once()
 
     def test_process_email_idempotent(self):
         self.actions._auto_reply = MagicMock(return_value={"success": True, "action": "auto_reply"})

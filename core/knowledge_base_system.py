@@ -1367,48 +1367,45 @@ Need help setting up? Contact our landscaping specialists at info@fikirisolution
                 "tags": getattr(document, "tags", []) or [],
                 "author": getattr(document, "author", ""),
             }
-            # Preserve tenant_id and user_id from document metadata for multi-tenant isolation
             meta = getattr(document, "metadata", None)
-            if isinstance(meta, dict):
-                vector_id = meta.get("vector_id")
-                # Preserve tenant isolation fields
-                if "tenant_id" in meta:
-                    vector_meta["tenant_id"] = meta["tenant_id"]
-                if "user_id" in meta:
-                    vector_meta["user_id"] = meta["user_id"]
-            else:
-                vector_id = None
-            if vector_id is not None:
-                try:
-                    vs = _get_vector_search()
-                    if getattr(vs, "use_pinecone", False) is True:
-                        vs.upsert_document(str(vector_id), new_text, vector_meta)
+            if not isinstance(meta, dict):
+                meta = {}
+            vector_id = meta.get("vector_id")
+            if "tenant_id" in meta:
+                vector_meta["tenant_id"] = meta["tenant_id"]
+            if "user_id" in meta:
+                vector_meta["user_id"] = meta["user_id"]
+
+            try:
+                from core.chatbot_vector_chunk_cleanup import kb_vector_metadata_fields
+                from core.chatbot_vector_chunk_ingestion import sync_kb_document_vectors
+
+                vs = _get_vector_search()
+                prior_metadata = meta if vector_id is not None else None
+                vector_ids, primary = sync_kb_document_vectors(
+                    vs,
+                    doc_id=doc_id,
+                    text=new_text,
+                    base_metadata=vector_meta,
+                    prior_metadata=prior_metadata,
+                )
+                if primary is not None:
+                    new_meta = dict(meta)
+                    new_meta.update(kb_vector_metadata_fields(vector_ids, primary))
+                    setattr(document, "metadata", new_meta)
+                    if vector_id is None:
+                        logger.info(
+                            "✅ Self-healed vector_id for knowledge document %s (was missing)",
+                            doc_id,
+                        )
                     else:
-                        vs.update_document(int(vector_id), new_text, vector_meta)
-                    logger.info(f"✅ Synced knowledge document {doc_id} to vector index")
-                except Exception as ve:
-                    logger.warning("Vector index update failed for doc %s: %s", doc_id, ve)
-            else:
-                # Self-heal: re-add to vector and store vector_id so future updates/deletes stay in sync
-                try:
-                    vs = _get_vector_search()
-                    # Ensure tenant_id is preserved when self-healing
-                    if isinstance(meta, dict) and "tenant_id" in meta:
-                        vector_meta["tenant_id"] = meta["tenant_id"]
-                    if isinstance(meta, dict) and "user_id" in meta:
-                        vector_meta["user_id"] = meta["user_id"]
-                    if getattr(vs, "use_pinecone", False) is True:
-                        vs.upsert_document(doc_id, new_text, vector_meta)
-                        new_vid = doc_id
-                    else:
-                        new_vid = vs.add_document(new_text, metadata=vector_meta)
-                    if new_vid is not None and (new_vid >= 0 if isinstance(new_vid, int) else True):
-                        new_meta = dict(meta) if isinstance(meta, dict) else {}
-                        new_meta["vector_id"] = new_vid
-                        setattr(document, "metadata", new_meta)
-                        logger.info("✅ Self-healed vector_id for knowledge document %s (was missing)", doc_id)
-                except Exception as ve:
-                    logger.warning("Vector self-heal (re-add) failed for doc %s: %s", doc_id, ve)
+                        logger.info(
+                            "✅ Synced knowledge document %s to vector index (%s chunk(s))",
+                            doc_id,
+                            len(vector_ids),
+                        )
+            except Exception as ve:
+                logger.warning("Vector index sync failed for doc %s: %s", doc_id, ve)
 
             logger.info(f"✅ Updated knowledge document: {doc_id}")
 
@@ -1454,14 +1451,23 @@ Need help setting up? Contact our landscaping specialists at info@fikirisolution
             if isinstance(meta, dict):
                 vector_id = meta.get("vector_id")
 
-            if vector_id is not None:
+            if isinstance(meta, dict) and (
+                vector_id is not None or meta.get("chunk_vector_ids") or meta.get("chunk_count")
+            ):
                 try:
+                    from core.chatbot_vector_chunk_cleanup import delete_kb_chunk_vectors
+
                     vs = _get_vector_search()
-                    if getattr(vs, "use_pinecone", False) is True:
-                        vs.delete_document_by_id(str(vector_id))
-                    else:
-                        vs.delete_document(int(vector_id))
-                    logger.info(f"✅ Removed knowledge document {doc_id} from vector index")
+                    use_pinecone = getattr(vs, "use_pinecone", False) is True
+                    delete_kb_chunk_vectors(
+                        vs,
+                        doc_id,
+                        stored_chunk_ids=meta.get("chunk_vector_ids"),
+                        previous_chunk_count=meta.get("chunk_count"),
+                        prior_vector_id=vector_id,
+                        use_pinecone=use_pinecone,
+                    )
+                    logger.info("✅ Removed knowledge document %s chunk vectors from vector index", doc_id)
                 except Exception as ve:
                     logger.warning("Vector index delete failed for doc %s: %s", doc_id, ve)
 

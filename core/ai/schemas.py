@@ -71,9 +71,14 @@ BusinessEmailAnalysisSchema = {
     "properties": {
         "schema_version": {"type": "string"},
         "intent": {"type": "string"},
+        "secondary_intents": {"type": "array", "items": {"type": "string"}},
         "urgency": {"type": "string"},
         "business_value": {"type": "string"},
         "confidence": {"type": "number"},
+        "confidence_score": {"type": "number"},
+        "lead_score": {"type": "integer"},
+        "urgency_score": {"type": "integer"},
+        "business_value_score": {"type": "integer"},
         "summary": {"type": "string"},
         "recommended_action": {"type": "string"},
         "tone": {"type": "string"},
@@ -87,6 +92,41 @@ BusinessEmailAnalysisSchema = {
                 "priority": {"type": "string"},
             },
         },
+        "sender": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "email": {"type": "string"},
+                "company": {"type": "string"},
+                "phone": {"type": "string"},
+            },
+        },
+        "extracted_details": {
+            "type": "object",
+            "properties": {
+                "requested_service": {"type": "string"},
+                "budget_signal": {"type": "string"},
+                "timeline_signal": {"type": "string"},
+                "pain_points": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+        "recommended_action_detail": {
+            "type": "object",
+            "properties": {
+                "next_best_action": {"type": "string"},
+                "crm_action": {"type": "string"},
+                "workflow": {"type": "string"},
+            },
+        },
+        "reply_guidance": {
+            "type": "object",
+            "properties": {
+                "tone": {"type": "string"},
+                "should_auto_draft": {"type": "boolean"},
+                "should_auto_send": {"type": "boolean"},
+            },
+        },
+        "reasoning_summary": {"type": "string"},
         "suggested_reply": {"type": "string"},
         "should_auto_send": {"type": "boolean"},
         "needs_human_review": {"type": "boolean"},

@@ -27,6 +27,17 @@ from core.chatbot_content_events import (
 )
 from core.request_correlation import get_or_create_correlation_id
 from core.user_feedback_router import get_user_feedback_router
+from core.chatbot_config import (
+    ChatbotConfig,
+    config_to_dict,
+    load_chatbot_config,
+    sanitize_chatbot_config_patch,
+    save_chatbot_config,
+)
+from core.chatbot_retrieval import retrieve_chatbot_context
+from core.chatbot_response_service import generate_chatbot_answer
+from core.chatbot_vector_chunk_ingestion import ingest_kb_text_to_vector_store
+from core.chatbot_vector_chunk_cleanup import delete_kb_chunk_vectors, kb_vector_metadata_fields
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +113,53 @@ def _kb_metadata_user_fields(tenant_id: Optional[str], user_id: Any) -> Dict[str
     elif user_id is not None:
         meta["user_id"] = user_id
     return meta
+
+
+def _ingest_kb_vectors(
+    vs: MinimalVectorSearch,
+    content: str,
+    doc_id: str,
+    vector_metadata: Dict[str, Any],
+    *,
+    replace_existing: bool = False,
+    cleanup_metadata: Optional[Dict[str, Any]] = None,
+):
+    """Chunk-aware KB vector ingestion; returns (vector_ids, primary_vector_id)."""
+    use_pinecone = getattr(vs, "use_pinecone", False) is True
+    cleanup = cleanup_metadata if cleanup_metadata is not None else ({} if replace_existing else None)
+    return ingest_kb_text_to_vector_store(
+        vs,
+        text=content,
+        parent_doc_id=str(doc_id),
+        base_metadata=vector_metadata,
+        use_pinecone=use_pinecone,
+        cleanup_metadata=cleanup,
+    )
+
+
+def _link_kb_vector_metadata(
+    doc_id: str,
+    vector_ids: List[Any],
+    primary_vector_id: Any,
+    *,
+    correlation_id: Optional[str],
+    source: str,
+    user_id: Optional[int],
+) -> None:
+    if primary_vector_id is None:
+        return
+    doc = knowledge_base.get_document(doc_id)
+    if doc is None:
+        return
+    new_meta = dict(doc.metadata or {})
+    new_meta.update(kb_vector_metadata_fields(vector_ids, primary_vector_id))
+    knowledge_base.update_document(
+        doc_id,
+        {"metadata": new_meta},
+        correlation_id=correlation_id,
+        source=source,
+        user_id=user_id,
+    )
 
 
 # Smart FAQ Endpoints
@@ -605,21 +663,20 @@ def create_knowledge_document():
                 vector_metadata['user_id'] = kb_metadata['user_id']
             
             vs = get_vector_search()
-            if getattr(vs, "use_pinecone", False) is True:
-                ok = vs.upsert_document(doc_id, doc_content, vector_metadata)
-                vector_id = doc_id if ok else None
-            else:
-                vector_id = vs.add_document(content=doc_content, metadata=vector_metadata)
-                vector_id = vector_id if (vector_id is not None and vector_id >= 0) else None
-            logger.info(f"✅ Knowledge document {doc_id} persisted to vector index: {vector_id}")
-            # Store vector_id in KB document metadata so update/delete can sync to vector index (see docs/CRUD_RAG_ARCHITECTURE.md)
-            doc = knowledge_base.get_document(doc_id)
-            if doc is not None and vector_id is not None:
-                new_meta = dict(doc.metadata) if getattr(doc, "metadata", None) else {}
-                new_meta["vector_id"] = vector_id
-                knowledge_base.update_document(
+            vector_ids, vector_id = _ingest_kb_vectors(vs, doc_content, doc_id, vector_metadata)
+            if vector_ids:
+                logger.info(
+                    "✅ Knowledge document %s persisted to vector index (%s chunk(s)): %s",
                     doc_id,
-                    {"metadata": new_meta},
+                    len(vector_ids),
+                    vector_id,
+                )
+            # Store vector_id in KB document metadata so update/delete can sync to vector index (see docs/CRUD_RAG_ARCHITECTURE.md)
+            if vector_id is not None:
+                _link_kb_vector_metadata(
+                    doc_id,
+                    vector_ids,
+                    vector_id,
                     correlation_id=correlation_id,
                     source="api.chatbot.knowledge.vector_link",
                     user_id=actor_uid,
@@ -702,47 +759,26 @@ def import_knowledge_document():
         vector_id = None
         try:
             vs = get_vector_search()
-            if getattr(vs, "use_pinecone", False) is True:
-                vm_imp = {
-                    "type": "knowledge_base",
-                    "document_id": doc_id,
-                    "title": title or "Imported Knowledge",
-                    "category": category,
-                }
-                if tenant_id:
-                    vm_imp["tenant_id"] = tenant_id
-                if "user_id" in kb_metadata:
-                    vm_imp["user_id"] = kb_metadata["user_id"]
-                ok = vs.upsert_document(doc_id, content, vm_imp)
-                vector_id = doc_id if ok else None
-            else:
-                vm_imp2 = {
-                    "type": "knowledge_base",
-                    "document_id": doc_id,
-                    "title": title or "Imported Knowledge",
-                    "category": category,
-                }
-                if tenant_id:
-                    vm_imp2["tenant_id"] = tenant_id
-                if "user_id" in kb_metadata:
-                    vm_imp2["user_id"] = kb_metadata["user_id"]
-                vector_id = vs.add_document(
-                    content=content,
-                    metadata=vm_imp2,
-                )
-                vector_id = vector_id if (vector_id is not None and vector_id >= 0) else None
+            vm_imp = {
+                "type": "knowledge_base",
+                "document_id": doc_id,
+                "title": title or "Imported Knowledge",
+                "category": category,
+            }
+            if tenant_id:
+                vm_imp["tenant_id"] = tenant_id
+            if "user_id" in kb_metadata:
+                vm_imp["user_id"] = kb_metadata["user_id"]
+            vector_ids, vector_id = _ingest_kb_vectors(vs, content, doc_id, vm_imp)
             if vector_id is not None:
-                doc = knowledge_base.get_document(doc_id)
-                if doc:
-                    new_meta = dict(doc.metadata or {})
-                    new_meta["vector_id"] = vector_id
-                    knowledge_base.update_document(
-                        doc_id,
-                        {"metadata": new_meta},
-                        correlation_id=correlation_id,
-                        source="api.chatbot.knowledge.import_vector_link",
-                        user_id=actor_uid,
-                    )
+                _link_kb_vector_metadata(
+                    doc_id,
+                    vector_ids,
+                    vector_id,
+                    correlation_id=correlation_id,
+                    source="api.chatbot.knowledge.import_vector_link",
+                    user_id=actor_uid,
+                )
         except Exception as e:
             logger.warning("⚠️ Failed to persist imported knowledge to vector index: %s", e)
 
@@ -828,47 +864,26 @@ def import_knowledge_bulk():
                 vector_id = None
                 try:
                     vs = get_vector_search()
-                    if getattr(vs, "use_pinecone", False) is True:
-                        vm_b = {
-                            "type": "knowledge_base",
-                            "document_id": doc_id,
-                            "title": title or "Imported Knowledge",
-                            "category": category,
-                        }
-                        if tenant_id:
-                            vm_b["tenant_id"] = tenant_id
-                        if "user_id" in kb_metadata:
-                            vm_b["user_id"] = kb_metadata["user_id"]
-                        ok = vs.upsert_document(doc_id, content, vm_b)
-                        vector_id = doc_id if ok else None
-                    else:
-                        vm_b2 = {
-                            "type": "knowledge_base",
-                            "document_id": doc_id,
-                            "title": title or "Imported Knowledge",
-                            "category": category,
-                        }
-                        if tenant_id:
-                            vm_b2["tenant_id"] = tenant_id
-                        if "user_id" in kb_metadata:
-                            vm_b2["user_id"] = kb_metadata["user_id"]
-                        vector_id = get_vector_search().add_document(
-                            text=content,
-                            metadata=vm_b2,
-                        )
-                        vector_id = vector_id if (vector_id is not None and vector_id >= 0) else None
+                    vm_b = {
+                        "type": "knowledge_base",
+                        "document_id": doc_id,
+                        "title": title or "Imported Knowledge",
+                        "category": category,
+                    }
+                    if tenant_id:
+                        vm_b["tenant_id"] = tenant_id
+                    if "user_id" in kb_metadata:
+                        vm_b["user_id"] = kb_metadata["user_id"]
+                    vector_ids, vector_id = _ingest_kb_vectors(vs, content, doc_id, vm_b)
                     if vector_id is not None:
-                        doc = knowledge_base.get_document(doc_id)
-                        if doc:
-                            new_meta = dict(doc.metadata or {})
-                            new_meta["vector_id"] = vector_id
-                            knowledge_base.update_document(
-                                doc_id,
-                                {"metadata": new_meta},
-                                correlation_id=batch_correlation_id,
-                                source="api.chatbot.knowledge.import_bulk_vector_link",
-                                user_id=actor_uid,
-                            )
+                        _link_kb_vector_metadata(
+                            doc_id,
+                            vector_ids,
+                            vector_id,
+                            correlation_id=batch_correlation_id,
+                            source="api.chatbot.knowledge.import_bulk_vector_link",
+                            user_id=actor_uid,
+                        )
                 except Exception as e:
                     logger.warning("⚠️ Bulk import: vector index failed for doc %s: %s", doc_id, e)
                 results.append({"index": i, "success": True, "document_id": doc_id, "vector_id": vector_id})
@@ -920,13 +935,20 @@ def revectorize_knowledge():
                 "user_id": user_id,
                 **{k: v for k, v in meta.items() if k in ("tenant_id", "user_id")}
             }
-            ok = vs.upsert_document(doc.id, text, vector_meta)
+            vector_ids, vector_id = _ingest_kb_vectors(
+                vs,
+                text,
+                doc.id,
+                vector_meta,
+                replace_existing=True,
+                cleanup_metadata=meta,
+            )
+            ok = vector_id is not None
             if ok:
-                new_meta = dict(doc.metadata or {})
-                new_meta["vector_id"] = doc.id
-                knowledge_base.update_document(
+                _link_kb_vector_metadata(
                     doc.id,
-                    {"metadata": new_meta},
+                    vector_ids,
+                    vector_id,
                     correlation_id=rev_correlation_id,
                     source="api.chatbot.knowledge.revectorize",
                     user_id=actor_uid,
@@ -1094,6 +1116,8 @@ def get_popular_documents():
 def vectorize_document_content():
     """Vectorize content for chatbot retrieval"""
     try:
+        import uuid
+
         data = request.json or {}
         content = data.get('content', '').strip()
         metadata = data.get('metadata', {})
@@ -1104,11 +1128,17 @@ def vectorize_document_content():
         if not isinstance(metadata, dict):
             metadata = {}
 
-        doc_id = get_vector_search().add_document(content=content, metadata=metadata)
+        vs = get_vector_search()
+        parent_doc_id = str(
+            metadata.get("parent_doc_id") or metadata.get("document_id") or uuid.uuid4()
+        )
+        vector_ids, vector_id = _ingest_kb_vectors(vs, content, parent_doc_id, metadata)
 
         return jsonify({
             "success": True,
-            "vector_id": doc_id,
+            "vector_id": vector_id,
+            "chunk_count": len(vector_ids),
+            "parent_doc_id": parent_doc_id,
             "message": "Content vectorized successfully"
         })
 
@@ -1471,6 +1501,127 @@ def get_comprehensive_analytics():
     except Exception as e:
         logger.error(f"❌ Failed to get comprehensive analytics: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+def _require_authenticated_user_id() -> Optional[int]:
+    """Dashboard config routes: session user id only."""
+    return _coerce_numeric_user_id(get_current_user_id())
+
+
+@chatbot_bp.route('/config', methods=['GET'])
+@handle_api_errors
+def get_chatbot_config_route():
+    """Return effective per-user chatbot configuration (sanitized)."""
+    user_id = _require_authenticated_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, "AUTHENTICATION_REQUIRED")
+
+    effective = load_chatbot_config(user_id, tenant_id=str(user_id))
+    return jsonify({
+        "success": True,
+        "config": config_to_dict(effective),
+        "source": "effective",
+    })
+
+
+@chatbot_bp.route('/config', methods=['PUT'])
+@handle_api_errors
+def put_chatbot_config_route():
+    """Persist whitelisted chatbot settings under users.metadata.chatbot."""
+    user_id = _require_authenticated_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, "AUTHENTICATION_REQUIRED")
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return create_error_response("Request body must be a JSON object", 400, "INVALID_BODY")
+
+    raw = data.get("config") if isinstance(data.get("config"), dict) else data
+    patch, rejected = sanitize_chatbot_config_patch(raw)
+    if rejected:
+        return create_error_response(
+            f"Unsupported or unsafe fields: {', '.join(sorted(set(rejected)))}",
+            400,
+            "INVALID_CONFIG_FIELDS",
+        )
+    if not patch:
+        return create_error_response("No valid config fields to update", 400, "EMPTY_CONFIG")
+
+    correlation_id = get_or_create_correlation_id(request, data)
+    effective = save_chatbot_config(
+        user_id,
+        patch,
+        source="api.chatbot.config.put",
+        correlation_id=correlation_id,
+    )
+    return jsonify({
+        "success": True,
+        "config": config_to_dict(effective),
+        "source": "effective",
+    })
+
+
+@chatbot_bp.route('/preview-query', methods=['POST'])
+@handle_api_errors
+def preview_chatbot_query():
+    """
+    Dashboard preview: same retrieval + config + response path as the public widget,
+    without API keys, billing gates, lead capture, or usage tracking.
+    """
+    user_id = _require_authenticated_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, "AUTHENTICATION_REQUIRED")
+
+    data = request.get_json(silent=True) or {}
+    query = (data.get("query") or "").strip()
+    if not query:
+        return create_error_response("Query is required", 400, "MISSING_QUERY")
+
+    tenant_id = str(user_id)
+    correlation_id = get_or_create_correlation_id(request, data)
+
+    retrieval = retrieve_chatbot_context(
+        query,
+        tenant_id,
+        user_id,
+    )
+
+    config_applied = True
+    try:
+        chatbot_config = load_chatbot_config(user_id, tenant_id=tenant_id)
+    except Exception as config_exc:
+        logger.warning(
+            "chatbot_config load failed in preview; using defaults: %s",
+            config_exc,
+            extra={"event": "chatbot_config_load_warning", "user_id": user_id},
+        )
+        chatbot_config = ChatbotConfig()
+        config_applied = False
+
+    answer_result = generate_chatbot_answer(
+        query,
+        retrieval.context_text,
+        retrieval.sources,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        conversation_id=data.get("conversation_id"),
+        correlation_id=correlation_id,
+        billing_uid=user_id,
+        fallback_needed=retrieval.fallback_needed,
+        allow_llm=True,
+        chatbot_config=chatbot_config,
+    )
+
+    return jsonify({
+        "success": True,
+        "answer": answer_result.answer,
+        "confidence": answer_result.confidence,
+        "fallback_used": answer_result.fallback_used,
+        "sources": retrieval.sources,
+        "config_applied": config_applied,
+        "retrieval_confidence": answer_result.retrieval_confidence,
+        "llm_confidence": answer_result.llm_confidence,
+    })
+
 
 # Error handlers
 @chatbot_bp.errorhandler(404)

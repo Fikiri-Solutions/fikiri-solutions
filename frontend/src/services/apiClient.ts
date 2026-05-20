@@ -13,6 +13,9 @@ const API_BASE_URL = config.apiUrl
 /** Auth flows (login/signup) can exceed default API timeout on cold Render / SQLite; keep under Gunicorn worker limit (~120s). */
 const AUTH_REQUEST_TIMEOUT_MS = 90000
 
+/** Manual inbox AI (analyze / generate-reply) may run 3+ LLM calls; keep under Gunicorn worker limit (~120s). */
+const AI_EMAIL_REQUEST_TIMEOUT_MS = 90000
+
 /** Single-flight refresh so concurrent 401s share one POST /auth/refresh. */
 let refreshInFlight: Promise<string | null> | null = null
 
@@ -199,6 +202,20 @@ export interface OutlookConnectionStatus {
   error?: string
 }
 
+export interface GmailLookbackPreset {
+  id: string
+  label: string
+  days: number
+}
+
+export interface GmailSyncCursor {
+  has_more: boolean
+  lookback_days?: number
+  lookback_preset?: string
+  max_messages?: number
+  last_batch_count?: number
+}
+
 export interface EmailSyncStatus {
   sync_status: string
   last_sync?: string
@@ -207,6 +224,16 @@ export interface EmailSyncStatus {
   progress?: number  // 0-100 percentage
   emails_synced_this_job?: number
   error?: string
+  sync_cursor?: GmailSyncCursor
+  lookback_presets?: GmailLookbackPreset[]
+}
+
+export interface GmailSyncOptions {
+  /** Preset id (`90d`, `1y`) or days (60, 90, 365, 730, 1825) */
+  lookback?: string | number
+  lookback_days?: number
+  max_messages?: number
+  continue_sync?: boolean
 }
 
 export interface AutomationRule {
@@ -256,6 +283,28 @@ export interface KnowledgeSearchResult {
   relevance_score: number
   category: string
   content_preview: string
+}
+
+export interface ChatbotPreviewSource {
+  type?: string
+  id?: string | number
+  question?: string
+  title?: string
+  content?: string
+  answer?: string
+  confidence?: number
+  relevance?: number
+}
+
+export interface ChatbotPreviewQueryResult {
+  success: boolean
+  answer: string
+  confidence: number
+  fallback_used: boolean
+  sources: ChatbotPreviewSource[]
+  config_applied: boolean
+  retrieval_confidence?: number
+  llm_confidence?: number
 }
 
 /** GET /api/migration/capabilities — structured import & migration map */
@@ -563,8 +612,15 @@ class ApiClient {
     return response.data
   }
 
-  async startGmailOAuth(redirectUri: string): Promise<{ url?: string; error?: string }> {
-    const response = await this.client.get('/oauth/gmail/start', { params: { redirect: redirectUri } })
+  async startGmailOAuth(
+    redirectUri: string,
+    lookback?: string
+  ): Promise<{ url?: string; error?: string }> {
+    const params: Record<string, string> = { redirect: redirectUri }
+    if (lookback) {
+      params.lookback = lookback
+    }
+    const response = await this.client.get('/oauth/gmail/start', { params })
     return response.data
   }
 
@@ -638,6 +694,7 @@ class ApiClient {
         return servicesData.map((s: any) => ({
           id: s.service_id,
           name: s.service_name,
+          enabled: Boolean(s.enabled),
           status: s.status || (s.enabled ? 'active' : 'inactive'),
           description: this.getServiceDescription(s.service_id),
           // Preserve saved settings so the UI can't clobber them silently.
@@ -726,7 +783,54 @@ class ApiClient {
     }
   }
 
-  // Service test endpoints
+  /** Production-safe service diagnostics (Services dashboard). */
+  async testServiceById(serviceId: string, payload: Record<string, unknown> = {}): Promise<any> {
+    const response = await this.client.post(`/services/${encodeURIComponent(serviceId)}/test`, payload)
+    return response.data
+  }
+
+  async searchChatbotFaqs(query: string, maxResults = 3): Promise<{
+    success?: boolean
+    best_match?: { question: string; answer: string; confidence: number } | null
+    matches?: Array<{ question: string; answer: string; confidence: number }>
+    fallback_response?: string
+  }> {
+    const response = await this.client.post('/chatbot/faq/search', {
+      query,
+      max_results: maxResults,
+    })
+    return response.data
+  }
+
+  /** Dashboard preview — same brain as public widget; session auth only. */
+  async previewChatbotQuery(
+    query: string,
+    conversationId?: string
+  ): Promise<ChatbotPreviewQueryResult> {
+    const response = await this.client.post('/chatbot/preview-query', {
+      query,
+      ...(conversationId ? { conversation_id: conversationId } : {}),
+    })
+    return response.data as ChatbotPreviewQueryResult
+  }
+
+  async previewLeadsCsv(
+    file: File
+  ): Promise<{
+    rows: Array<{ row: number; email: string; name: string; status: string; reason?: string }>
+    summary: { ok: number; duplicate: number; invalid: number; total: number }
+  }> {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await this.client.post('/crm/leads/import/csv/preview', formData)
+    const data = response.data?.data ?? response.data
+    return {
+      rows: data?.rows ?? [],
+      summary: data?.summary ?? { ok: 0, duplicate: 0, invalid: 0, total: data?.total_rows ?? 0 },
+    }
+  }
+
+  // Service test endpoints (development-only legacy paths; prefer testServiceById)
   async testEmailParser(): Promise<any> {
     const response = await this.client.post('/test/email-parser', {})
     return response.data
@@ -1217,10 +1321,23 @@ class ApiClient {
     return statusData
   }
 
-  async triggerGmailSync(): Promise<{ message: string }> {
-    const response = await this.client.post('/crm/sync-gmail', {
-      user_id: this.getUserId() ?? 1
-    })
+  async triggerGmailSync(options?: GmailSyncOptions): Promise<{
+    message: string
+    data?: {
+      job_id?: string
+      lookback_days?: number
+      max_messages?: number
+      lookback_presets?: GmailLookbackPreset[]
+    }
+  }> {
+    const payload: Record<string, unknown> = {
+      user_id: this.getUserId() ?? 1,
+    }
+    if (options?.lookback != null) payload.lookback = options.lookback
+    if (options?.lookback_days != null) payload.lookback_days = options.lookback_days
+    if (options?.max_messages != null) payload.max_messages = options.max_messages
+    if (options?.continue_sync) payload.continue_sync = true
+    const response = await this.client.post('/crm/sync-gmail', payload)
     return response.data
   }
 
@@ -1279,22 +1396,37 @@ class ApiClient {
   }
 
   async analyzeEmail(emailId: string, subject: string, content: string, from: string): Promise<any> {
-    const response = await this.client.post('/ai/analyze-email', {
-      email_id: emailId,
-      subject,
-      content,
-      from
-    })
+    const response = await this.client.post(
+      '/ai/analyze-email',
+      {
+        email_id: emailId,
+        subject,
+        content,
+        from,
+      },
+      { timeout: AI_EMAIL_REQUEST_TIMEOUT_MS }
+    )
     return response.data.data || response.data
   }
 
-  async generateReply(emailId: string, subject: string, content: string, from: string): Promise<any> {
-    const response = await this.client.post('/ai/generate-reply', {
-      email_id: emailId,
-      subject,
-      content,
-      from
-    })
+  async generateReply(
+    emailId: string,
+    subject: string,
+    content: string,
+    from: string,
+    analysis?: Record<string, unknown>
+  ): Promise<any> {
+    const response = await this.client.post(
+      '/ai/generate-reply',
+      {
+        email_id: emailId,
+        subject,
+        content,
+        from,
+        ...(analysis ? { analysis } : {}),
+      },
+      { timeout: AI_EMAIL_REQUEST_TIMEOUT_MS }
+    )
     return response.data.data || response.data
   }
 

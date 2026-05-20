@@ -9,16 +9,34 @@ import json
 import logging
 import asyncio
 import uuid
+import re
+import html
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
 from pathlib import Path
 
 from core.ai.llm_router import LLMRouter
-from core.ai.schemas import EmailClassificationSchema, BusinessEmailAnalysisSchema
+from core.ai.schemas import BusinessEmailAnalysisSchema
+from core.ai.email_intent_taxonomy import intent_labels_for_prompt, normalize_intent
+from core.client_email_config import load_client_email_config
 from core.domain.schemas import normalize_extracted_contact
+from email_automation.email_classification import (
+    SOURCE_LEGACY_WRAPPER,
+    SOURCE_MAILBOX_SYNC,
+    SOURCE_MANUAL_API,
+    SOURCE_V2_AI,
+    SOURCE_V2_FALLBACK,
+    finalize_email_analysis,
+)
+from email_automation.email_intent_classifier import (
+    build_rule_hints,
+    classify_with_fallback,
+    normalize_business_analysis,
+    preprocess_email_metadata,
+)
 
 logger = logging.getLogger(__name__)
-EMAIL_ANALYSIS_SCHEMA_VERSION = "2026-05-email-analysis-v1"
+EMAIL_ANALYSIS_SCHEMA_VERSION = "2026-05-email-analysis-v2"
 
 # Contact extraction: keep local until Phase 2 (ExtractedContact in core/domain/schemas.py)
 CONTACT_SCHEMA = {
@@ -42,7 +60,27 @@ def _clean_text(value: Any) -> str:
     return str(value).strip()
 
 
-def _truncate_email_body_for_analysis(body: str, max_chars: int = 8000) -> str:
+_HTML_TAG_RE = re.compile(
+    r"<\s*(?:html|body|div|p|table|tr|td|th|span|a|img|style|meta|head|!DOCTYPE|center|font|br\s*/?)",
+    re.IGNORECASE,
+)
+
+
+def _strip_html_for_ai(text: str) -> str:
+    """Strip marketing/newsletter HTML before LLM analysis; preserve angle-bracket emails."""
+    if not text:
+        return ""
+    t = str(text).strip()
+    if "<" not in t or not _HTML_TAG_RE.search(t):
+        return t
+    t = re.sub(r"<style[^>]*>[\s\S]*?</style>", " ", t, flags=re.IGNORECASE)
+    t = re.sub(r"<script[^>]*>[\s\S]*?</script>", " ", t, flags=re.IGNORECASE)
+    t = re.sub(r"<[^>]+>", " ", t)
+    t = html.unescape(t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def _truncate_email_body_for_analysis(body: str, max_chars: int = 6000) -> str:
     if not body:
         return ""
     if len(body) <= max_chars:
@@ -85,6 +123,7 @@ class MinimalAIEmailAssistant:
         # CRM service for auto-lead capture
         self.crm_service = None
         self._initialize_crm()
+        self._last_reply_generation_mode: Optional[str] = None
         
         if self.enabled:
             logger.info("✅ AI assistant initialized with LLM router")
@@ -150,61 +189,35 @@ class MinimalAIEmailAssistant:
         except Exception as e:
             logger.warning(f"Failed to track AI usage: {e}")
     
-    def classify_email_intent(self, email_content: str, subject: str = "") -> Dict[str, Any]:
-        """Classify email intent using AI with enhanced tracking."""
-        if not self.is_enabled():
-            return self._fallback_classification(email_content, subject)
+    def classify_email_intent(
+        self,
+        email_content: str,
+        subject: str = "",
+        *,
+        user_id: Optional[int] = None,
+        sender_email: str = "",
+        sender_name: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Legacy-compatible wrapper — delegates to v2 ``analyze_incoming_email``.
 
-        try:
-            prompt = f"""
-            Classify this email into one of these categories:
-            - lead_inquiry: Someone interested in services/products
-            - support_request: Technical help or issue
-            - general_info: General information request
-            - complaint: Complaint or negative feedback
-            - spam: Spam or irrelevant content
-
-            Email Subject: {subject}
-            Email Content: {email_content[:500]}
-
-            Respond with JSON format:
-            {{
-                "intent": "category",
-                "confidence": 0.0-1.0,
-                "urgency": "low|medium|high",
-                "suggested_action": "action_to_take"
-            }}
-            """
-
-            result = self.router.process(
-                input_data=prompt,
-                intent="classification",
-                output_schema=EmailClassificationSchema,
-                context=self._llm_context(operation="email_classification", subject=subject),
-            )
-
-            if result.get("success") and result.get("validated"):
-                try:
-                    parsed_result = json.loads(result.get("content") or "{}")
-                    self._track_ai_usage("classify_intent", True, result.get("tokens_used", 0))
-
-                    if parsed_result.get("intent") == "lead_inquiry" and self.crm_service:
-                        self._auto_capture_lead(email_content, subject)
-
-                    logger.info("✅ Email classified as: %s via LLM router", parsed_result.get("intent"))
-                    return parsed_result
-                except json.JSONDecodeError:
-                    logger.warning("Failed to parse classification as JSON, using fallback")
-                    return self._fallback_classification(email_content, subject)
-            err_msg = result.get("error") or "Schema validation failed or empty error"
-            logger.error("❌ AI classification failed: %s", err_msg)
-            self._track_ai_usage("classify_intent", False)
-            return self._fallback_classification(email_content, subject)
-
-        except Exception as e:
-            logger.error("❌ AI classification failed: %s", e)
-            self._track_ai_usage("classify_intent", False)
-            return self._fallback_classification(email_content, subject)
+        Returns the full v2 analysis object (with legacy alias keys). No separate
+        5-intent LLM prompt is used.
+        """
+        safe_email = _clean_text(sender_email) or self._extract_email_from_content(email_content) or ""
+        safe_name = _clean_text(sender_name) or self._extract_name_from_content(email_content) or ""
+        analysis = self.analyze_incoming_email(
+            sender_email=safe_email,
+            sender_name=safe_name,
+            subject=subject,
+            body=email_content,
+            user_id=user_id,
+            classification_source=SOURCE_LEGACY_WRAPPER,
+        )
+        if analysis.get("legacy_intent") == "lead_inquiry" and self.crm_service:
+            self._auto_capture_lead(email_content, subject)
+        self._track_ai_usage("classify_intent", True)
+        return analysis
 
     def analyze_incoming_email(
         self,
@@ -218,20 +231,38 @@ class MinimalAIEmailAssistant:
         business_context: Optional[Dict[str, Any]] = None,
         correlation_id: Optional[str] = None,
         user_id: Optional[int] = None,
+        classification_source: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Analyze inbound email with business context and return a structured, validated payload.
         """
         safe_subject = _clean_text(subject)
-        safe_body = _clean_text(body)
+        safe_body = _strip_html_for_ai(_clean_text(body))
         safe_sender_email = _clean_text(sender_email)
         safe_sender_name = _clean_text(sender_name)
         safe_thread = thread_history if isinstance(thread_history, list) else []
         safe_crm = crm_lead_data if isinstance(crm_lead_data, dict) else {}
-        safe_business = business_context if isinstance(business_context, dict) else self._load_business_context()
+        client_cfg = load_client_email_config(user_id)
+        safe_business = (
+            business_context
+            if isinstance(business_context, dict)
+            else self._load_business_context(user_id=user_id)
+        )
 
         compact_thread = _compact_thread_history_for_prompt(safe_thread)
         analysis_body = _truncate_email_body_for_analysis(safe_body)
+        pre_meta = preprocess_email_metadata(
+            subject=safe_subject,
+            body=safe_body,
+            sender_email=safe_sender_email,
+            sender_name=safe_sender_name,
+        )
+        rule_hints = build_rule_hints(
+            subject=safe_subject, body=safe_body, client_config=client_cfg
+        )
+        intent_labels = intent_labels_for_prompt(client_cfg.get("custom_intent_labels"))
+
+        source = classification_source or SOURCE_V2_AI
 
         if not self.is_enabled():
             return self._fallback_business_analysis(
@@ -240,13 +271,24 @@ class MinimalAIEmailAssistant:
                 subject=safe_subject,
                 body=safe_body,
                 crm_lead_data=safe_crm,
+                user_id=user_id,
+                classification_source=source if source != SOURCE_V2_AI else SOURCE_V2_FALLBACK,
             )
 
         prompt = f"""
         Analyze this inbound business email and return JSON only.
 
-        BUSINESS PROFILE:
-        {json.dumps(safe_business, default=str)}
+        BUSINESS PROFILE (client-specific):
+        {json.dumps({**safe_business, **client_cfg}, default=str)}
+
+        ALLOWED PRIMARY INTENTS (choose exactly one):
+        {json.dumps(intent_labels)}
+
+        RULE HINTS (advisory, may override if email clearly differs):
+        {json.dumps(rule_hints, default=str)}
+
+        PREPROCESS METADATA:
+        {json.dumps(pre_meta, default=str)}
 
         SENDER:
         {json.dumps({"email": safe_sender_email, "name": safe_sender_name}, default=str)}
@@ -260,37 +302,27 @@ class MinimalAIEmailAssistant:
         CRM LEAD CONTEXT (may be empty):
         {json.dumps(safe_crm, default=str)}
 
-        Evaluate:
-        - intent
-        - urgency
-        - business value
-        - sender context
-        - thread/cadence
-        - tone/diction
-        - jargon/keywords
-        - recommended next action
-        - CRM updates
-        - suggested reply
+        Return JSON with:
+        - schema_version: "{EMAIL_ANALYSIS_SCHEMA_VERSION}"
+        - intent: one allowed primary intent
+        - secondary_intents: array of other applicable intents
+        - confidence / confidence_score: 0-1
+        - lead_score, urgency_score, business_value_score: 0-100 integers
+        - urgency, business_value: high|medium|low labels
+        - summary: one paragraph
+        - recommended_action: short action label
+        - recommended_action_detail: {{next_best_action, crm_action, workflow}}
+        - tone, reply_guidance: {{tone, should_auto_draft, should_auto_send}}
+        - sender: {{name, email, company, phone}}
+        - extracted_details: {{requested_service, budget_signal, timeline_signal, pain_points[]}}
+        - crm_updates: {{stage, tags[], follow_up_needed, priority}}
+        - suggested_reply: draft text
+        - should_auto_send: false by default
+        - needs_human_review: true if complaint, legal, payment dispute, or confidence < 0.7
+        - reason_for_recommendation: brief explanation (no chain-of-thought)
+        - reasoning_summary: same text as reason_for_recommendation (optional duplicate)
 
-        Return object fields:
-        - schema_version (string, use {EMAIL_ANALYSIS_SCHEMA_VERSION})
-        - intent (string)
-        - urgency (string)
-        - business_value (string)
-        - confidence (number 0-1)
-        - summary (string)
-        - recommended_action (string)
-        - tone (string)
-        - crm_updates (object: stage, tags, follow_up_needed, priority)
-        - suggested_reply (string)
-        - should_auto_send (boolean)
-        - needs_human_review (boolean)
-        - reason_for_recommendation (string)
-
-        Safety rules:
-        - Default should_auto_send to false.
-        - Any complaint, escalation, legal/financial risk, or confidence below 0.7 must set needs_human_review=true.
-        - If you cannot infer safely, set needs_human_review=true and explain why.
+        Safety: never auto-send complaints, legal, or low-confidence mail.
         """
         try:
             result = self.router.process(
@@ -308,9 +340,29 @@ class MinimalAIEmailAssistant:
             if result.get("success") and result.get("validated"):
                 try:
                     parsed = json.loads(result.get("content") or "{}")
-                    return self._normalize_business_analysis(parsed)
+                    normalized = normalize_business_analysis(
+                        parsed,
+                        rule_hints=rule_hints,
+                        sender_email=safe_sender_email,
+                        sender_name=safe_sender_name,
+                        client_config=client_cfg,
+                    )
+                    finalized = finalize_email_analysis(
+                        normalized, classification_source=source
+                    )
+                    self._log_classification_result(
+                        user_id=user_id,
+                        correlation_id=correlation_id,
+                        analysis=finalized,
+                    )
+                    return finalized
                 except json.JSONDecodeError:
                     logger.warning("Business email analysis JSON parse failed; using fallback")
+            elif result.get("success"):
+                logger.warning(
+                    "Business email analysis schema validation failed (trace_id=%s); using fallback",
+                    result.get("trace_id"),
+                )
         except Exception as e:
             logger.error("Business email analysis failed: %s", e)
 
@@ -320,6 +372,8 @@ class MinimalAIEmailAssistant:
             subject=safe_subject,
             body=safe_body,
             crm_lead_data=safe_crm,
+            user_id=user_id,
+            classification_source=SOURCE_V2_FALLBACK,
         )
 
     def _auto_capture_lead(self, email_content: str, subject: str):
@@ -366,37 +420,109 @@ class MinimalAIEmailAssistant:
                 return line.split(':')[1].strip() if ':' in line else ""
         return ""
     
-    def generate_response(self, email_content: str, sender_name: str, subject: str, intent: str = "general") -> str:
-        """Generate AI-powered email response with enhanced features."""
-        if not self.is_enabled():
-            return self._fallback_response(sender_name, subject)
-        
+    def _log_reply_generation(
+        self,
+        mode: str,
+        *,
+        user_id: Optional[int] = None,
+        intent: Optional[str] = None,
+        llm_called: bool = False,
+    ) -> None:
         try:
-            # Load business context
-            business_context = self._load_business_context()
-            
+            logger.info(
+                "reply_generation.completed",
+                extra={
+                    "event": "reply_generation.completed",
+                    "service": "email",
+                    "severity": "INFO",
+                    "user_id": user_id,
+                    "metadata": {
+                        "reply_generation_mode": mode,
+                        "llm_called": llm_called,
+                        "intent": intent,
+                    },
+                },
+            )
+        except Exception:
+            pass
+
+    def generate_response(
+        self,
+        email_content: str,
+        sender_name: str,
+        subject: str,
+        intent: str = "general",
+        *,
+        analysis: Optional[Dict[str, Any]] = None,
+        user_id: Optional[int] = None,
+    ) -> str:
+        """Generate AI-powered email response using v2 analysis when provided."""
+        if not self.is_enabled():
+            self._last_reply_generation_mode = "assistant_disabled"
+            self._log_reply_generation(
+                "assistant_disabled",
+                user_id=user_id,
+                intent=intent,
+                llm_called=False,
+            )
+            return self._fallback_response(sender_name, subject)
+
+        suggested = (analysis or {}).get("suggested_reply") if analysis else None
+        if suggested and str(suggested).strip():
+            self._last_reply_generation_mode = "reused_suggested_reply"
+            self._log_reply_generation(
+                "reused_suggested_reply",
+                user_id=user_id,
+                intent=(analysis or {}).get("intent"),
+                llm_called=False,
+            )
+            return str(suggested).strip()
+
+        try:
+            business_context = self._load_business_context(user_id=user_id)
+            client_cfg = load_client_email_config(user_id)
+
+            v2_intent = intent
+            tone = business_context.get("tone", "professional_warm")
+            requested_service = ""
+            pain_points: List[str] = []
+            next_action = "draft_reply"
+            urgency = "medium"
+
+            if analysis:
+                v2_intent = analysis.get("intent") or intent
+                tone = (
+                    (analysis.get("reply_guidance") or {}).get("tone")
+                    or analysis.get("tone")
+                    or tone
+                )
+                extracted = analysis.get("extracted_details") or {}
+                requested_service = extracted.get("requested_service") or ""
+                pain_points = extracted.get("pain_points") or []
+                rad = analysis.get("recommended_action_detail") or {}
+                next_action = rad.get("next_best_action") or analysis.get("recommended_action") or next_action
+                urgency = analysis.get("urgency") or urgency
+
             prompt = f"""
             You are a professional email assistant for {business_context['company_name']}.
-            
-            Business Context:
-            - Company: {business_context['company_name']}
-            - Services: {business_context['services']}
-            - Tone: {business_context['tone']}
-            
-            Email Details:
+
+            Business / client config:
+            {json.dumps({**business_context, **client_cfg}, default=str)}
+
+            Classification (v2):
+            - Intent: {v2_intent}
+            - Urgency: {urgency}
+            - Requested service: {requested_service or 'not specified'}
+            - Pain points: {json.dumps(pain_points, default=str)}
+            - Next best action: {next_action}
+            - Reply tone: {tone}
+
+            Email:
             - From: {sender_name}
             - Subject: {subject}
-            - Content: {email_content[:300]}
-            - Intent: {intent}
-            
-            Generate a professional, helpful response that:
-            1. Acknowledges their message
-            2. Addresses their specific needs
-            3. Maintains professional tone
-            4. Includes next steps if appropriate
-            5. Keeps it concise (2-3 paragraphs max)
-            
-            Don't include signature - that will be added separately.
+            - Content: {email_content[:1200]}
+
+            Write a concise professional reply (2-3 short paragraphs). No signature block.
             """
             
             # Use LLM router (required by rulepack)
@@ -407,29 +533,98 @@ class MinimalAIEmailAssistant:
                     operation='email_reply',
                     sender=sender_name,
                     subject=subject,
-                    intent_label=intent,
+                    intent_label=v2_intent,
+                    user_id=user_id,
                 ),
             )
             
+            mode = "llm_with_analysis_context" if analysis else "llm_no_analysis"
             if result['success']:
-                # Track usage
+                self._last_reply_generation_mode = mode
                 self._track_ai_usage("generate_response", True, result.get('tokens_used', 0))
-                logger.info(f"✅ AI response generated for {sender_name} via LLM router")
+                self._log_reply_generation(
+                    mode,
+                    user_id=user_id,
+                    intent=v2_intent,
+                    llm_called=True,
+                )
+                logger.info("AI response generated for %s via LLM router", sender_name)
                 return result['content']
-            else:
-                logger.error(f"❌ AI response generation failed: {result.get('error')}")
-                self._track_ai_usage("generate_response", False)
-                return self._fallback_response(sender_name, subject)
-            
-        except Exception as e:
-            logger.error(f"❌ AI response generation failed: {e}")
+            logger.error("AI response generation failed: %s", result.get('error'))
             self._track_ai_usage("generate_response", False)
+            self._last_reply_generation_mode = "template_fallback"
+            self._log_reply_generation(
+                "template_fallback",
+                user_id=user_id,
+                intent=v2_intent,
+                llm_called=False,
+            )
             return self._fallback_response(sender_name, subject)
 
-    def generate_reply(self, sender_name: str, subject: str, email_content: str = "", email_body: str = "") -> str:
-        """Generate a reply for email automation actions."""
+        except Exception as e:
+            logger.error("AI response generation failed: %s", e)
+            self._track_ai_usage("generate_response", False)
+            self._last_reply_generation_mode = "template_fallback"
+            self._log_reply_generation(
+                "template_fallback",
+                user_id=user_id,
+                intent=intent,
+                llm_called=False,
+            )
+            return self._fallback_response(sender_name, subject)
+
+    def generate_reply_with_metadata(
+        self,
+        sender_name: str,
+        subject: str,
+        email_content: str = "",
+        email_body: str = "",
+        *,
+        analysis: Optional[Dict[str, Any]] = None,
+        user_id: Optional[int] = None,
+    ) -> tuple:
+        """
+        Generate reply text and return (reply, reply_generation_mode).
+
+        Does not call classify_email_intent; uses ``analysis`` from mailbox sync when set.
+        """
         combined = "\n".join([part for part in [email_content, email_body] if part])
-        return self.generate_response(combined, sender_name, subject, intent="email_reply")
+        intent_label = (analysis or {}).get("intent") or "email_reply"
+        text = self.generate_response(
+            combined,
+            sender_name,
+            subject,
+            intent=intent_label,
+            analysis=analysis,
+            user_id=user_id,
+        )
+        mode = self._last_reply_generation_mode or (
+            "reused_suggested_reply"
+            if analysis and (analysis.get("suggested_reply") or "").strip()
+            else "llm_no_analysis"
+        )
+        return text, mode
+
+    def generate_reply(
+        self,
+        sender_name: str,
+        subject: str,
+        email_content: str = "",
+        email_body: str = "",
+        *,
+        analysis: Optional[Dict[str, Any]] = None,
+        user_id: Optional[int] = None,
+    ) -> str:
+        """Generate a reply for email automation actions."""
+        text, _mode = self.generate_reply_with_metadata(
+            sender_name,
+            subject,
+            email_content=email_content,
+            email_body=email_body,
+            analysis=analysis,
+            user_id=user_id,
+        )
+        return text
     
     def extract_contact_info(self, email_content: str) -> Dict[str, Any]:
         """Extract contact information from email with enhanced tracking."""
@@ -613,60 +808,67 @@ class MinimalAIEmailAssistant:
         
         return stats
     
-    def _load_business_context(self) -> Dict[str, str]:
-        """Load business context from file or use defaults."""
-        defaults = {
-            "company_name": "Fikiri Solutions",
-            "services": "Gmail automation and lead management",
-            "tone": "professional and helpful"
-        }
-        try:
-            business_file = Path("data/business_profile.json")
-            if business_file.exists():
-                with open(business_file, 'r') as f:
-                    context = json.load(f) or {}
-                    merged = {**defaults, **context}
-                    logger.info("✅ Business context loaded from file")
-                    return merged
-        except Exception as e:
-            logger.warning(f"Failed to load business context: {e}")
-        
-        return defaults
-    
-    def _fallback_classification(self, email_content: str, subject: str) -> Dict[str, Any]:
-        """Fallback classification when AI is not available."""
-        content_lower = email_content.lower()
-        subject_lower = subject.lower()
-        
-        # Simple keyword-based classification
-        if any(word in content_lower for word in ['price', 'cost', 'quote', 'buy', 'purchase', 'interested']):
-            return {
-                "intent": "lead_inquiry",
-                "confidence": 0.7,
-                "urgency": "medium",
-                "suggested_action": "send_pricing_info"
-            }
-        elif any(word in content_lower for word in ['help', 'support', 'issue', 'problem', 'bug']):
-            return {
-                "intent": "support_request",
-                "confidence": 0.8,
-                "urgency": "high",
-                "suggested_action": "escalate_to_support"
-            }
-        elif any(word in content_lower for word in ['complaint', 'angry', 'upset', 'disappointed']):
-            return {
-                "intent": "complaint",
-                "confidence": 0.9,
-                "urgency": "high",
-                "suggested_action": "escalate_to_manager"
-            }
+    def _load_business_context(self, user_id: Optional[int] = None) -> Dict[str, Any]:
+        """Load business context from client config (per-user) or file defaults."""
+        cfg = load_client_email_config(user_id)
+        services = cfg.get("services_offered") or cfg.get("services") or []
+        if isinstance(services, list):
+            services_str = ", ".join(str(s) for s in services if s)
         else:
-            return {
-                "intent": "general_info",
-                "confidence": 0.6,
-                "urgency": "low",
-                "suggested_action": "send_general_info"
-            }
+            services_str = str(services)
+        return {
+            "company_name": cfg.get("company_name") or "Fikiri Solutions",
+            "services": services_str or "Business services",
+            "tone": cfg.get("preferred_tone") or "professional and helpful",
+            "business_type": cfg.get("business_type") or "",
+            "target_customer_types": cfg.get("target_customer_types") or [],
+        }
+
+    def _log_classification_result(
+        self,
+        *,
+        user_id: Optional[int],
+        correlation_id: Optional[str],
+        analysis: Dict[str, Any],
+    ) -> None:
+        try:
+            logger.info(
+                "email.classification.routed",
+                extra={
+                    "event": "email.classification.routed",
+                    "service": "email",
+                    "severity": "INFO",
+                    "user_id": user_id,
+                    "metadata": {
+                        "correlation_id": correlation_id,
+                        "intent": analysis.get("intent"),
+                        "legacy_intent": analysis.get("legacy_intent"),
+                        "confidence_score": analysis.get("confidence_score"),
+                        "lead_score": analysis.get("lead_score"),
+                        "urgency_score": analysis.get("urgency_score"),
+                        "recommended_action_type": analysis.get("recommended_action_type"),
+                        "needs_human_review": analysis.get("needs_human_review"),
+                        "workflow": (analysis.get("recommended_action_detail") or {}).get("workflow"),
+                        "classification_source": analysis.get("classification_source"),
+                    },
+                },
+            )
+        except Exception:
+            pass
+    
+    def _fallback_classification(
+        self,
+        email_content: str,
+        subject: str,
+        *,
+        user_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Deprecated — delegates to v2 heuristic classifier."""
+        return classify_with_fallback(
+            subject=subject,
+            body=email_content,
+            user_id=user_id,
+        )
     
     def _fallback_response(self, sender_name: str, subject: str) -> str:
         """Fallback response when AI is not available."""
@@ -707,44 +909,9 @@ Fikiri Solutions Team"""
             return ""
         return email_content[:200] + "..." if len(email_content) > 200 else email_content
 
-    def _normalize_business_analysis(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        if not isinstance(data, dict):
-            return self._fallback_business_analysis()
-        crm_updates = data.get("crm_updates") if isinstance(data.get("crm_updates"), dict) else {}
-        tags = crm_updates.get("tags")
-        if not isinstance(tags, list):
-            tags = []
-        norm = {
-            "schema_version": _clean_text(data.get("schema_version")) or EMAIL_ANALYSIS_SCHEMA_VERSION,
-            "intent": _clean_text(data.get("intent")) or "general_info",
-            "urgency": _clean_text(data.get("urgency")) or "medium",
-            "business_value": _clean_text(data.get("business_value")) or "low",
-            "confidence": float(data.get("confidence") or 0.0),
-            "summary": _clean_text(data.get("summary")),
-            "recommended_action": _clean_text(data.get("recommended_action")) or "review_and_draft_reply",
-            "tone": _clean_text(data.get("tone")) or "neutral",
-            "crm_updates": {
-                "stage": _clean_text(crm_updates.get("stage")) or "contacted",
-                "tags": [str(t) for t in tags if str(t).strip()],
-                "follow_up_needed": bool(crm_updates.get("follow_up_needed")),
-                "priority": _clean_text(crm_updates.get("priority")) or "medium",
-            },
-            "suggested_reply": _clean_text(data.get("suggested_reply")),
-            "should_auto_send": bool(data.get("should_auto_send")),
-            "needs_human_review": bool(data.get("needs_human_review")),
-            "reason_for_recommendation": _clean_text(data.get("reason_for_recommendation")),
-        }
-        if norm["confidence"] < 0.7:
-            norm["needs_human_review"] = True
-            norm["should_auto_send"] = False
-            if not norm["reason_for_recommendation"]:
-                norm["reason_for_recommendation"] = "Low confidence analysis requires approval."
-        if norm["intent"] in {"complaint", "escalation"}:
-            norm["needs_human_review"] = True
-            norm["should_auto_send"] = False
-        if norm["should_auto_send"] and norm["needs_human_review"]:
-            norm["should_auto_send"] = False
-        return norm
+    def _normalize_business_analysis(self, data: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+        """Delegate to shared classifier normalizer (backward-compatible wrapper)."""
+        return normalize_business_analysis(data if isinstance(data, dict) else {}, **kwargs)
 
     def _fallback_business_analysis(
         self,
@@ -754,37 +921,26 @@ Fikiri Solutions Team"""
         subject: str = "",
         body: str = "",
         crm_lead_data: Optional[Dict[str, Any]] = None,
+        user_id: Optional[int] = None,
+        classification_source: str = SOURCE_V2_FALLBACK,
     ) -> Dict[str, Any]:
-        base_class = self._fallback_classification(body or subject, subject)
-        intent = _clean_text(base_class.get("intent")) or "general_info"
-        urgency = _clean_text(base_class.get("urgency")) or "medium"
-        confidence = float(base_class.get("confidence") or 0.55)
-        follow_up_needed = intent in {"lead_inquiry", "support_request", "complaint"}
-        stage = "qualified" if intent == "lead_inquiry" else "replied"
-        tags = ["email_inbound", intent]
+        result = classify_with_fallback(
+            subject=subject,
+            body=body,
+            sender_email=sender_email,
+            sender_name=sender_name,
+            user_id=user_id,
+        )
         if crm_lead_data and crm_lead_data.get("id"):
-            tags.append("existing_lead")
-        suggested_reply = self._fallback_response(sender_name or "there", subject or "your message")
-        return {
-            "schema_version": EMAIL_ANALYSIS_SCHEMA_VERSION,
-            "intent": intent,
-            "urgency": urgency,
-            "business_value": "medium" if intent == "lead_inquiry" else "low",
-            "confidence": confidence,
-            "summary": self._fallback_summary(body or subject),
-            "recommended_action": _clean_text(base_class.get("suggested_action")) or "review_and_draft_reply",
-            "tone": "neutral",
-            "crm_updates": {
-                "stage": stage,
-                "tags": tags,
-                "follow_up_needed": follow_up_needed,
-                "priority": urgency,
-            },
-            "suggested_reply": suggested_reply,
-            "should_auto_send": False,
-            "needs_human_review": True,
-            "reason_for_recommendation": "Safe default: draft reply and require human approval before sending.",
-        }
+            tags = result.get("crm_updates", {}).get("tags") or []
+            if "existing_lead" not in tags:
+                tags.append("existing_lead")
+                result["crm_updates"]["tags"] = tags
+        if not result.get("suggested_reply"):
+            result["suggested_reply"] = self._fallback_response(
+                sender_name or "there", subject or "your message"
+            )
+        return finalize_email_analysis(result, classification_source=classification_source)
     
 def create_ai_assistant(api_key: Optional[str] = None, services: Dict[str, Any] = None) -> MinimalAIEmailAssistant:
     """Create and return an AI assistant instance."""

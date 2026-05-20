@@ -20,6 +20,25 @@ logger = logging.getLogger(__name__)
 # Keep payloads bounded for SQLite row size and log volume
 _MAX_PAYLOAD_BYTES = 16 * 1024
 
+_schema_mode: Optional[str] = None
+
+
+def _crm_events_schema_mode() -> str:
+    """
+    Detect legacy local DBs that still require tenant_user_id NOT NULL.
+
+    Canonical schema (Postgres bootstrap / fresh SQLite) uses user_id only.
+    """
+    global _schema_mode
+    if _schema_mode is not None:
+        return _schema_mode
+    cols = set(db_optimizer.list_table_columns("crm_events") or [])
+    if "tenant_user_id" in cols:
+        _schema_mode = "legacy"
+    else:
+        _schema_mode = "canonical"
+    return _schema_mode
+
 
 def record_crm_event(
     user_id: int,
@@ -52,32 +71,61 @@ def record_crm_event(
             else:
                 payload_json = raw
 
-        # Optional columns status / error_message / source exist for richer tooling; leave NULL here.
-        db_optimizer.execute_query(
-            """
-            INSERT INTO crm_events (
-                user_id, event_type, entity_type, entity_id,
-                correlation_id, supersedes_event_id,
-                payload_json, payload_truncated,
-                status, error_message, source, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                user_id,
-                event_type,
-                entity_type,
-                entity_id,
-                correlation_id,
-                supersedes_event_id,
-                payload_json,
-                truncated,
-                status,
-                error_message,
-                source,
-                created_at,
-            ),
-            fetch=False,
-        )
+        if _crm_events_schema_mode() == "legacy":
+            db_optimizer.execute_query(
+                """
+                INSERT INTO crm_events (
+                    tenant_user_id, user_id, event_type, entity_type, entity_id,
+                    correlation_id, supersedes_event_id,
+                    payload_json, payload_truncated,
+                    status, error_message, source,
+                    occurred_at, created_at, actor_type
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user')
+                """,
+                (
+                    user_id,
+                    user_id,
+                    event_type,
+                    entity_type,
+                    entity_id,
+                    correlation_id,
+                    supersedes_event_id,
+                    payload_json,
+                    truncated,
+                    status,
+                    error_message,
+                    source,
+                    created_at,
+                    created_at,
+                ),
+                fetch=False,
+            )
+        else:
+            db_optimizer.execute_query(
+                """
+                INSERT INTO crm_events (
+                    user_id, event_type, entity_type, entity_id,
+                    correlation_id, supersedes_event_id,
+                    payload_json, payload_truncated,
+                    status, error_message, source, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    event_type,
+                    entity_type,
+                    entity_id,
+                    correlation_id,
+                    supersedes_event_id,
+                    payload_json,
+                    truncated,
+                    status,
+                    error_message,
+                    source,
+                    created_at,
+                ),
+                fetch=False,
+            )
     except Exception as exc:  # noqa: BLE001 — intentional best-effort sink
         logger.warning(
             "crm_events insert failed (non-fatal): %s",

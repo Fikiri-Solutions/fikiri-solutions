@@ -12,6 +12,64 @@ os.environ.setdefault("FLASK_ENV", "test")
 
 
 class TestCRMEventLog(unittest.TestCase):
+    def test_record_crm_event_legacy_schema_sets_tenant_user_id(self):
+        import sqlite3
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            path = tmp.name
+        conn = sqlite3.connect(path)
+        conn.execute(
+            """
+            CREATE TABLE crm_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                occurred_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                tenant_user_id INTEGER NOT NULL,
+                actor_type TEXT NOT NULL DEFAULT 'user',
+                event_type TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id INTEGER NOT NULL,
+                correlation_id TEXT,
+                supersedes_event_id INTEGER,
+                payload_json TEXT,
+                payload_truncated INTEGER NOT NULL DEFAULT 0,
+                status TEXT,
+                error_message TEXT,
+                source TEXT,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                user_id INTEGER
+            )
+            """
+        )
+        conn.commit()
+        conn.close()
+
+        import crm.event_log as event_log_mod
+
+        event_log_mod._schema_mode = None
+        with patch("crm.event_log.db_optimizer") as mock_db:
+            mock_db.list_table_columns.return_value = [
+                "tenant_user_id",
+                "user_id",
+                "event_type",
+                "entity_type",
+                "entity_id",
+                "occurred_at",
+                "created_at",
+                "actor_type",
+            ]
+            mock_db.execute_query = MagicMock()
+            from crm.event_log import record_crm_event
+
+            record_crm_event(108, "lead.created", "lead", 99, payload={"k": "v"})
+            sql = mock_db.execute_query.call_args.args[0]
+            params = mock_db.execute_query.call_args.args[1]
+            self.assertIn("tenant_user_id", sql)
+            self.assertEqual(params[0], 108)
+            self.assertEqual(params[1], 108)
+
+        os.unlink(path)
+
     def test_record_crm_event_swallows_db_errors(self):
         with patch("crm.event_log.db_optimizer") as mock_db:
             mock_db.execute_query.side_effect = RuntimeError("db down")
@@ -26,7 +84,17 @@ class TestCRMEventLog(unittest.TestCase):
             )
 
     def test_record_crm_event_truncates_large_payload(self):
+        import crm.event_log as event_log_mod
+
+        event_log_mod._schema_mode = None
         with patch("crm.event_log.db_optimizer") as mock_db:
+            mock_db.list_table_columns.return_value = [
+                "user_id",
+                "event_type",
+                "entity_type",
+                "entity_id",
+                "created_at",
+            ]
             mock_db.execute_query = MagicMock()
             from crm.event_log import record_crm_event
 

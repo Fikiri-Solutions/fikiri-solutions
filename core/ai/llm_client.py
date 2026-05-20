@@ -27,6 +27,21 @@ except ImportError:
 # Default timeout for OpenAI API calls (seconds)
 DEFAULT_OPENAI_TIMEOUT = int(os.getenv("OPENAI_TIMEOUT", "30"))
 
+
+def _is_llm_test_mode() -> bool:
+    """Disable real OpenAI calls during pytest and explicit test env."""
+    explicit = os.getenv("FIKIRI_TEST_MODE", "").strip().lower()
+    if explicit in ("0", "false", "no", "off"):
+        return False
+    if explicit in ("1", "true", "yes", "on"):
+        return True
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        return True
+    if os.getenv("FLASK_ENV", "").strip().lower() == "test":
+        return True
+    return False
+
+
 class LLMClient:
     """
     Centralized LLM client with exponential backoff, cost tracking, and error handling.
@@ -35,9 +50,14 @@ class LLMClient:
     
     def __init__(self, api_key: Optional[str] = None):
         """Initialize LLM client with OpenAI API key."""
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        test_mode = _is_llm_test_mode()
+        if api_key is not None:
+            self.api_key = api_key
+        elif test_mode:
+            self.api_key = None
+        else:
+            self.api_key = os.getenv("OPENAI_API_KEY")
         self.client = None
-        test_mode = os.getenv("FIKIRI_TEST_MODE") == "1"
         self.enabled = bool(self.api_key) and not test_mode
         
         if self.enabled:

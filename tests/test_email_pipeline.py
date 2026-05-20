@@ -93,7 +93,15 @@ class TestEmailPipeline(unittest.TestCase):
 
         self.assertTrue(result.get("success"))
         actions.services["ai_assistant"].analyze_incoming_email.assert_called_once()
-        actions.process_email.assert_called_once_with(parsed, action_type="auto_reply", user_id=1)
+        call_args = actions.process_email.call_args
+        self.assertEqual(call_args.kwargs.get("action_type"), "auto_reply")
+        self.assertEqual(call_args.kwargs.get("user_id"), 1)
+        parsed_for_action = call_args.args[0]
+        self.assertIn("_analysis", parsed_for_action)
+        self.assertEqual(
+            parsed_for_action["_analysis"].get("suggested_reply"),
+            "Thanks for reaching out.",
+        )
 
     def test_process_incoming_draft_only_policy(self):
         from email_automation import pipeline

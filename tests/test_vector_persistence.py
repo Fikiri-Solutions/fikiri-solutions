@@ -115,6 +115,7 @@ class TestVectorPersistence(unittest.TestCase):
         metadata = call_args.kwargs.get('metadata') if call_args.kwargs else call_args[0][1]
         self.assertEqual(metadata['type'], 'knowledge_base')
         self.assertEqual(metadata['document_id'], 456)
+        self.assertEqual(metadata['parent_doc_id'], '456')
     
     @patch('core.chatbot_smart_faq_api.get_vector_search')
     @patch('core.chatbot_smart_faq_api.faq_system.add_faq')

@@ -742,6 +742,32 @@ def sync_gmail():
         if not gmail_connected:
             return create_error_response("Gmail connection required. Please connect your Gmail account first.", 403, 'OAUTH_REQUIRED')
 
+        from core.gmail_sync_options import (
+            lookback_presets_for_api,
+            parse_job_metadata,
+            parse_sync_params_from_body,
+        )
+
+        body = request.get_json(silent=True) or {}
+        cursor_meta = {}
+        if body.get("continue_sync") or body.get("continue"):
+            latest_rows = db_optimizer.execute_query(
+                """
+                SELECT metadata FROM gmail_sync_jobs
+                WHERE user_id = ? AND status = 'completed'
+                ORDER BY completed_at DESC, created_at DESC
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            if latest_rows:
+                cursor_meta = parse_job_metadata(
+                    latest_rows[0].get("metadata")
+                    if isinstance(latest_rows[0], dict)
+                    else latest_rows[0]
+                )
+        sync_params = parse_sync_params_from_body(body, cursor_metadata=cursor_meta)
+
         # Queue Gmail sync job using RQ (Redis Queue)
         sync_job_queued = False
         job_id = None
@@ -754,7 +780,12 @@ def sync_gmail():
             from core.redis_queues import get_email_queue
 
             sync_job_manager = GmailSyncJobManager()
-            job_id = sync_job_manager.queue_sync_job(user_id, sync_type='manual')
+            job_id = sync_job_manager.queue_sync_job(
+                user_id,
+                sync_type='manual',
+                metadata={"source": "api.crm.sync_gmail"},
+                sync_params=sync_params,
+            )
 
             if job_id:
                 use_inline = should_process_gmail_sync_inline()
@@ -845,7 +876,14 @@ def sync_gmail():
             # If we queued a job, that's still success even if CRM sync fails
             if sync_job_queued:
                 return create_success_response(
-                    {'sync_job_queued': True, 'message': 'Gmail sync job queued successfully'},
+                    {
+                        'sync_job_queued': True,
+                        'job_id': job_id,
+                        'lookback_days': sync_params.lookback_days,
+                        'max_messages': sync_params.max_messages,
+                        'lookback_presets': lookback_presets_for_api(),
+                        'message': 'Gmail sync job queued successfully',
+                    },
                     'Gmail sync job queued'
                 )
             return create_error_response(f"Failed to sync Gmail leads: {str(sync_error)}", 500, 'GMAIL_SYNC_ERROR')
@@ -881,6 +919,10 @@ def sync_gmail():
                 {
                     'contacts_synced': data.get('count', 0),
                     'sync_job_queued': sync_job_queued,
+                    'job_id': job_id,
+                    'lookback_days': sync_params.lookback_days,
+                    'max_messages': sync_params.max_messages,
+                    'lookback_presets': lookback_presets_for_api(),
                     'message': message
                 }, 
                 message
@@ -889,7 +931,14 @@ def sync_gmail():
             # Even if CRM sync fails, if we queued a job, that's still success
             if sync_job_queued:
                 return create_success_response(
-                    {'sync_job_queued': True, 'message': 'Gmail sync job queued successfully'},
+                    {
+                        'sync_job_queued': True,
+                        'job_id': job_id,
+                        'lookback_days': sync_params.lookback_days,
+                        'max_messages': sync_params.max_messages,
+                        'lookback_presets': lookback_presets_for_api(),
+                        'message': 'Gmail sync job queued successfully',
+                    },
                     'Gmail sync job queued'
                 )
             error_msg = sync_result.get('error', 'Unknown error') if sync_result else 'Sync failed'
@@ -1377,6 +1426,19 @@ def analyze_email():
         if not content:
             return create_error_response("Email content is required", 400, 'MISSING_CONTENT')
 
+        import hashlib
+
+        content_hash = hashlib.sha256(content.encode("utf-8", errors="ignore")).hexdigest()[:16]
+        if email_id:
+            try:
+                from core.redis_cache import get_cache
+
+                cached = get_cache().get_cached_email_analysis(user_id, str(email_id), content_hash)
+                if cached:
+                    return create_success_response(cached, "Email analyzed successfully")
+            except Exception as cache_err:
+                logger.debug("analyze-email cache read skipped: %s", cache_err)
+
         tier_limit_error = _check_tier_usage_cap(user_id, "ai_responses", projected_increment=1)
         if tier_limit_error:
             return tier_limit_error
@@ -1398,17 +1460,31 @@ def analyze_email():
             if not ai_assistant.is_enabled():
                 return create_error_response("AI assistant is not available", 503, 'AI_UNAVAILABLE')
             
+            from email_automation.email_classification import SOURCE_MANUAL_API
+
+            sender_name = from_email.split("<")[0].strip().replace('"', "") if "<" in from_email else from_email
             analysis = ai_assistant.analyze_incoming_email(
                 sender_email=from_email,
-                sender_name=from_email,
+                sender_name=sender_name or from_email,
                 subject=subject,
                 body=content,
                 thread_history=data.get("thread_history") if isinstance(data.get("thread_history"), list) else [],
                 crm_lead_data=data.get("crm_lead_data") if isinstance(data.get("crm_lead_data"), dict) else {},
                 business_context=data.get("business_context") if isinstance(data.get("business_context"), dict) else None,
                 user_id=user_id,
+                classification_source=SOURCE_MANUAL_API,
             )
             ai_budget_guardrails.record_ai_usage(user_id, 1)
+
+            if email_id:
+                try:
+                    from core.redis_cache import get_cache
+
+                    get_cache().cache_email_analysis(
+                        user_id, str(email_id), content_hash, analysis
+                    )
+                except Exception as cache_err:
+                    logger.debug("analyze-email cache write skipped: %s", cache_err)
             
             return create_success_response(analysis, 'Email analyzed successfully')
             
@@ -1476,18 +1552,54 @@ def generate_reply():
             if not ai_assistant.is_enabled():
                 return create_error_response("AI assistant is not available", 503, 'AI_UNAVAILABLE')
             
-            # Extract sender name from email
             sender_name = from_email.split('<')[0].strip().replace('"', '') if '<' in from_email else from_email
-            
-            # Classify email to get intent for better reply generation
-            classification = ai_assistant.classify_email_intent(content, subject)
-            intent = classification.get('intent', 'general') if classification else 'general'
-            
-            # Generate reply
-            reply = ai_assistant.generate_response(content, sender_name, subject, intent)
-            ai_budget_guardrails.record_ai_usage(user_id, 1)
-            
-            return create_success_response({'reply': reply}, 'Reply generated successfully')
+
+            from email_automation.email_classification import SOURCE_MANUAL_API
+
+            analysis = data.get("analysis") if isinstance(data.get("analysis"), dict) else None
+            if not analysis:
+                analysis = ai_assistant.analyze_incoming_email(
+                    sender_email=from_email,
+                    sender_name=sender_name or from_email,
+                    subject=subject,
+                    body=content,
+                    user_id=user_id,
+                    classification_source=SOURCE_MANUAL_API,
+                )
+                ai_budget_guardrails.record_ai_usage(user_id, 1)
+
+            intent = analysis.get("intent") or analysis.get("legacy_intent") or "general"
+            reply = ai_assistant.generate_response(
+                content,
+                sender_name,
+                subject,
+                intent,
+                analysis=analysis,
+                user_id=user_id,
+            )
+            reply_mode = getattr(ai_assistant, "_last_reply_generation_mode", None) or ""
+            if reply_mode not in (
+                "reused_suggested_reply",
+                "template_fallback",
+                "assistant_disabled",
+            ):
+                ai_budget_guardrails.record_ai_usage(user_id, 1)
+            else:
+                logger.info(
+                    "manual generate-reply skipped reply AI usage billing",
+                    extra={
+                        "event": "reply_generation.billing_skipped",
+                        "service": "email",
+                        "severity": "INFO",
+                        "user_id": user_id,
+                        "metadata": {"reply_generation_mode": reply_mode},
+                    },
+                )
+
+            return create_success_response(
+                {"reply": reply, "analysis": analysis},
+                "Reply generated successfully",
+            )
             
         except Exception as e:
             error_msg = str(e)
@@ -2882,6 +2994,20 @@ def delete_service(service_id):
     except Exception as e:
         logger.error(f"❌ Delete service failed: {e}")
         return create_error_response(str(e), 500, 'DELETE_SERVICE_FAILED')
+
+
+@business_bp.route('/services/<service_id>/test', methods=['POST'])
+@handle_api_errors
+def test_user_service(service_id):
+    """Run a diagnostic for a Services dashboard card (works in production)."""
+    user_id = get_current_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+    from routes.service_tests import run_service_test
+
+    return run_service_test(service_id, user_id, request.get_json() or {})
+
 
 # IMAP/SMTP configuration (legacy providers)
 @business_bp.route('/email/imap-config', methods=['GET'])

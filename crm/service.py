@@ -1065,7 +1065,22 @@ class EnhancedCRMService:
                 },
                 correlation_id=correlation_id,
             )
+            self._run_lead_scoring_automations(user_id, lead_id, new_score)
         return {'success': True, 'data': {'lead': self._format_lead(lead)}}
+
+    def _run_lead_scoring_automations(self, user_id: int, lead_id: int, score: int) -> None:
+        """Run active lead_scoring preset rules when CRM score changes."""
+        try:
+            from services.automation_engine import automation_engine, TriggerType
+
+            automation_engine.execute_automation_rules(
+                TriggerType.LEAD_CREATED,
+                {"lead_id": lead_id, "score": score, "event_type": "lead_scored"},
+                user_id,
+                automation_source="lead_score_recalc",
+            )
+        except Exception as exc:
+            logger.warning("lead_scoring automation after recalc failed: %s", exc)
 
     def import_leads(
         self,

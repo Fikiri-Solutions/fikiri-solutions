@@ -54,9 +54,9 @@ class TestPublicChatbotTenantIsolation(unittest.TestCase):
         with self.app.test_request_context():
             g.api_key_info = key_info
     
-    @patch('core.public_chatbot_api.get_vector_search')
-    @patch('core.public_chatbot_api.knowledge_base')
-    @patch('core.public_chatbot_api.faq_system')
+    @patch('core.chatbot_retrieval.get_vector_search')
+    @patch('core.chatbot_retrieval.knowledge_base')
+    @patch('core.chatbot_retrieval.faq_system')
     def test_public_chatbot_passes_tenant_id_to_vector_search(self, mock_faq, mock_kb, mock_get_vs):
         """Test that public chatbot passes tenant_id to vector search"""
         # Setup mocks
@@ -88,9 +88,9 @@ class TestPublicChatbotTenantIsolation(unittest.TestCase):
         call_kwargs = mock_vector_search.search_similar.call_args[1]
         self.assertEqual(call_kwargs.get('tenant_id'), 'tenant_test')
     
-    @patch('core.public_chatbot_api.get_vector_search')
-    @patch('core.public_chatbot_api.knowledge_base')
-    @patch('core.public_chatbot_api.faq_system')
+    @patch('core.chatbot_retrieval.get_vector_search')
+    @patch('core.chatbot_retrieval.knowledge_base')
+    @patch('core.chatbot_retrieval.faq_system')
     def test_public_chatbot_passes_tenant_id_to_kb_search(self, mock_faq, mock_kb, mock_get_vs):
         """Test that public chatbot passes tenant_id filter to KB search"""
         # Setup mocks
@@ -124,9 +124,9 @@ class TestPublicChatbotTenantIsolation(unittest.TestCase):
         filters = call_args[1].get('filters', {})
         self.assertEqual(filters.get('tenant_id'), 'tenant_kb_test')
     
-    @patch('core.public_chatbot_api.get_vector_search')
-    @patch('core.public_chatbot_api.knowledge_base')
-    @patch('core.public_chatbot_api.faq_system')
+    @patch('core.chatbot_retrieval.get_vector_search')
+    @patch('core.chatbot_retrieval.knowledge_base')
+    @patch('core.chatbot_retrieval.faq_system')
     def test_public_chatbot_no_tenant_id_when_not_provided(self, mock_faq, mock_kb, mock_get_vs):
         """Test that public chatbot works when tenant_id is not in API key"""
         # Setup mocks
@@ -160,9 +160,9 @@ class TestPublicChatbotTenantIsolation(unittest.TestCase):
         call_kwargs = mock_vector_search.search_similar.call_args[1]
         self.assertIsNone(call_kwargs.get('tenant_id'))
     
-    @patch('core.public_chatbot_api.get_vector_search')
-    @patch('core.public_chatbot_api.knowledge_base')
-    @patch('core.public_chatbot_api.faq_system')
+    @patch('core.chatbot_retrieval.get_vector_search')
+    @patch('core.chatbot_retrieval.knowledge_base')
+    @patch('core.chatbot_retrieval.faq_system')
     def test_public_chatbot_isolates_results_by_tenant(self, mock_faq, mock_kb, mock_get_vs):
         """Test that results are isolated by tenant"""
         # Setup vector search to return tenant-specific results
@@ -390,27 +390,28 @@ class TestKBVectorSyncTenantIsolation(unittest.TestCase):
             metadata={"tenant_id": "tenant_sync", "user_id": "user_sync"}
         )
     
+    @patch('core.chatbot_vector_chunk_ingestion.sync_kb_document_vectors')
     @patch('core.knowledge_base_system._get_vector_search')
-    def test_update_document_preserves_tenant_id_in_vector_sync(self, mock_get_vs):
+    def test_update_document_preserves_tenant_id_in_vector_sync(
+        self, mock_get_vs, mock_sync_vectors
+    ):
         """Test that updating KB document preserves tenant_id in vector sync"""
-        # Setup document with vector_id
         doc = self.kb.get_document(self.doc_id)
         doc.metadata["vector_id"] = 999
-        
-        # Mock vector search
-        mock_vs = MagicMock()
-        mock_vs.update_document.return_value = True
-        mock_get_vs.return_value = mock_vs
-        
-        # Update document
+
+        mock_get_vs.return_value = MagicMock()
+        mock_sync_vectors.return_value = ([999], 999)
+
         self.kb.update_document(self.doc_id, {"title": "Updated Title"})
-        
-        # Verify vector update was called with tenant_id in metadata
-        mock_vs.update_document.assert_called_once()
-        call_args = mock_vs.update_document.call_args
-        vector_metadata = call_args[0][2]  # Third argument is metadata
-        self.assertEqual(vector_metadata.get('tenant_id'), 'tenant_sync')
-        self.assertEqual(vector_metadata.get('user_id'), 'user_sync')
+
+        mock_sync_vectors.assert_called_once()
+        base_metadata = mock_sync_vectors.call_args.kwargs.get("base_metadata") or (
+            mock_sync_vectors.call_args.args[3]
+            if len(mock_sync_vectors.call_args.args) > 3
+            else {}
+        )
+        self.assertEqual(base_metadata.get("tenant_id"), "tenant_sync")
+        self.assertEqual(base_metadata.get("user_id"), "user_sync")
     
     @patch('core.knowledge_base_system._get_vector_search')
     def test_update_document_self_heal_preserves_tenant_id(self, mock_get_vs):
