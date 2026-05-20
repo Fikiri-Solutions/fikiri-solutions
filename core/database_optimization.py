@@ -1327,6 +1327,44 @@ class DatabaseOptimizer:
             )
         """)
 
+        # Durable chatbot conversations (append-only messages, tenant-scoped)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS chatbot_conversations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tenant_id TEXT NOT NULL,
+                conversation_id TEXT NOT NULL,
+                user_id TEXT,
+                session_id TEXT,
+                channel TEXT NOT NULL DEFAULT 'api',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                last_activity_at TEXT NOT NULL,
+                UNIQUE(tenant_id, conversation_id)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS chatbot_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tenant_id TEXT NOT NULL,
+                conversation_id TEXT NOT NULL,
+                message_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                retrieval_metadata_json TEXT,
+                source_ids_json TEXT,
+                fallback_used INTEGER NOT NULL DEFAULT 0,
+                confidence REAL,
+                correlation_id TEXT,
+                retrieval_debug_json TEXT,
+                created_at TEXT NOT NULL,
+                UNIQUE(tenant_id, conversation_id, message_id)
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_chatbot_messages_tenant_conv_time
+            ON chatbot_messages (tenant_id, conversation_id, created_at)
+        """)
+
         # Chatbot feedback: ratings on answers (question, answer, retrieved_doc_ids, rating)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS chatbot_feedback (
@@ -1649,6 +1687,60 @@ class DatabaseOptimizer:
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_user_services_user_id 
             ON user_services (user_id)
+        """)
+
+        # Unified service usage analytics (operational; billing_usage remains canonical for metering)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS service_usage_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                service_id TEXT NOT NULL,
+                event_category TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                metric_name TEXT,
+                quantity REAL NOT NULL DEFAULT 1,
+                status TEXT,
+                idempotency_key TEXT UNIQUE,
+                correlation_id TEXT,
+                resource_type TEXT,
+                resource_id TEXT,
+                metadata_json TEXT,
+                source TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS service_daily_rollups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                service_id TEXT NOT NULL,
+                day TEXT NOT NULL,
+                metric_name TEXT NOT NULL,
+                event_category TEXT NOT NULL,
+                total_quantity REAL NOT NULL DEFAULT 0,
+                success_count INTEGER NOT NULL DEFAULT 0,
+                failure_count INTEGER NOT NULL DEFAULT 0,
+                event_count INTEGER NOT NULL DEFAULT 0,
+                last_event_at TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                UNIQUE(user_id, service_id, day, metric_name, event_category)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS tenant_service_metrics (
+                user_id INTEGER NOT NULL,
+                service_id TEXT NOT NULL,
+                metric_name TEXT NOT NULL,
+                window_type TEXT NOT NULL,
+                metric_value REAL NOT NULL DEFAULT 0,
+                last_activity_at TIMESTAMP,
+                metadata_json TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, service_id, metric_name, window_type),
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
         """)
         
         cursor.execute("""
@@ -2036,6 +2128,12 @@ class DatabaseOptimizer:
             
             # Billing usage indexes
             ("idx_billing_usage_user_month", "billing_usage", ["user_id", "month"]),
+            # Service usage analytics indexes
+            ("idx_service_usage_events_user_created", "service_usage_events", ["user_id", "created_at"]),
+            ("idx_service_usage_events_service_day", "service_usage_events", ["user_id", "service_id", "created_at"]),
+            ("idx_service_daily_rollups_user_day", "service_daily_rollups", ["user_id", "day"]),
+            ("idx_service_daily_rollups_service", "service_daily_rollups", ["user_id", "service_id", "day"]),
+            ("idx_tenant_service_metrics_user", "tenant_service_metrics", ["user_id", "window_type"]),
             
             # Appointments table indexes
             ("idx_appointments_user_id", "appointments", ["user_id"]),
