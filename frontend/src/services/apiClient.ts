@@ -65,7 +65,7 @@ function shouldSuppressUnauthorizedRedirect(): boolean {
   if (typeof window === 'undefined') return false
   const p = window.location.pathname
 
-  if (p === '/login' || p === '/inbox' || p === '/install') return true
+  if (p === '/login' || p === '/inbox' || p.startsWith('/inbox/') || p === '/install') return true
 
   const prefixes = [
     '/signup',
@@ -1420,6 +1420,53 @@ class ApiClient {
     })
     const data = response.data?.data ?? response.data
     return data?.email ?? null
+  }
+
+  /** Classified synced emails for Inbox Command Center (separate from live Gmail list). */
+  async getEmailTriage(params?: {
+    category?: string
+    limit?: number
+    offset?: number
+  }): Promise<{
+    emails: Array<Record<string, unknown>>
+    tabs?: Array<{ id: string; label: string }>
+    pagination?: { total_count?: number; has_more?: boolean }
+  }> {
+    const response = await this.client.get('/email/triage', {
+      params: {
+        category: params?.category,
+        limit: params?.limit ?? 20,
+        offset: params?.offset ?? 0,
+        user_id: this.getUserId() ?? 1,
+      },
+    })
+    return response.data?.data ?? response.data
+  }
+
+  async classifyEmailTriage(emailIds: string[]): Promise<{ classified: unknown[]; count: number }> {
+    const response = await this.client.post('/email/triage/classify', {
+      email_ids: emailIds,
+      user_id: this.getUserId() ?? 1,
+    })
+    return response.data?.data ?? response.data
+  }
+
+  async emailTriageBulkAction(payload: {
+    action: string
+    email_ids: string[]
+    confirm_destructive?: boolean
+    label_names?: string[]
+  }): Promise<{
+    success?: boolean
+    processed?: number
+    errors?: Array<{ email_id: string; error: string }>
+    code?: string
+  }> {
+    const response = await this.client.post('/email/triage/bulk-action', {
+      ...payload,
+      user_id: this.getUserId() ?? 1,
+    })
+    return response.data?.data ?? response.data
   }
 
   async analyzeEmail(emailId: string, subject: string, content: string, from: string): Promise<any> {

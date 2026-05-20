@@ -72,7 +72,13 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
 
     // Handle authentication requirements
     // Don't redirect /inbox to login - it handles its own auth state
-    if (requireAuth && !isAuthenticated && !hasRedirected.current && currentPath !== '/inbox') {
+    if (
+      requireAuth &&
+      !isAuthenticated &&
+      !hasRedirected.current &&
+      currentPath !== '/inbox' &&
+      !currentPath.startsWith('/inbox/')
+    ) {
       // User needs to be authenticated but isn't
       // Only redirect if not already on an auth page or /inbox
       if (currentPath !== '/login' && currentPath !== '/signup') {
@@ -198,7 +204,7 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({
   // authenticated queries that come back as 401 before navigation lands.
   const currentPath = location.pathname
   const onAuthPage = currentPath === '/login' || currentPath === '/signup'
-  const onInbox = currentPath === '/inbox'
+  const onInbox = currentPath === '/inbox' || currentPath.startsWith('/inbox/')
 
   const hasLocalStorageAuth =
     typeof window !== 'undefined' &&

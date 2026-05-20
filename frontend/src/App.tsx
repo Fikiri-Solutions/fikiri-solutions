@@ -22,7 +22,7 @@ import { ContentMigration } from './pages/ContentMigration'
 import { GmailConnect } from './pages/GmailConnect'
 import { OutlookConnect } from './pages/OutlookConnect'
 import { Integrations } from './pages/Integrations'
-import { EmailInbox } from './pages/EmailInbox'
+import { InboxPage } from './pages/InboxPage'
 import { GmailStatusCheck } from './pages/GmailStatusCheck'
 import { NotFoundPage, ErrorPage } from './pages/ErrorPages'
 import { ServicesLanding } from './pages/ServicesLanding'
@@ -277,8 +277,8 @@ function App() {
                               <Layout><InternalContact /></Layout>
                             </ProtectedRoute>
                           } />
-                          <Route path="/inbox" element={
-                            <Layout><EmailInbox /></Layout>
+                          <Route path="/inbox/*" element={
+                            <Layout><InboxPage /></Layout>
                           } />
                           <Route path="/gmail-status" element={
                             <ProtectedRoute>
