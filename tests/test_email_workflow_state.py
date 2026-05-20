@@ -4,8 +4,12 @@
 import json
 import os
 import sys
+import threading
+import time
 import unittest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -33,33 +37,59 @@ from services.email_triage_service import (
 
 # Distinct user ids per class avoid cross-test cleanup races on shared SQLite CI DB.
 _USER_WORKFLOW_BASE = 91_001
+_WORKFLOW_DB_LOCK = threading.RLock()
+
+
+@pytest.fixture(autouse=True)
+def _serialize_workflow_state_db():
+    """Serializes this module's DB writes on the shared CI SQLite file."""
+    with _WORKFLOW_DB_LOCK:
+        yield
 
 
 def _ensure_workflow_test_user(user_id: int) -> None:
     """synced_emails.user_id FK requires a users row."""
-    existing = db_optimizer.execute_query(
-        "SELECT id FROM users WHERE id = ?", (user_id,)
-    )
-    if existing:
-        return
     db_optimizer.execute_query(
-        "INSERT INTO users (id, email, name, password_hash) VALUES (?, ?, ?, ?)",
+        """
+        INSERT OR IGNORE INTO users (id, email, name, password_hash)
+        VALUES (?, ?, ?, ?)
+        """,
         (user_id, f"wf-test-{user_id}@example.test", "Workflow Test", "hash"),
         fetch=False,
     )
+    row = db_optimizer.execute_query("SELECT id FROM users WHERE id = ?", (user_id,))
+    if not row:
+        raise AssertionError(f"workflow test user {user_id} missing after ensure")
+
+
+def _execute_with_sqlite_retry(query: str, params: tuple, *, fetch: bool = False) -> None:
+    for attempt in range(4):
+        try:
+            db_optimizer.execute_query(query, params, fetch=fetch)
+            return
+        except Exception as exc:
+            if "locked" not in str(exc).lower() or attempt >= 3:
+                raise
+            time.sleep(0.05 * (attempt + 1))
 
 
 def _cleanup_workflow_test_user(user_id: int) -> None:
     """Best-effort teardown; order respects child tables first."""
     for tbl in ("email_workflow_state", "email_classifications", "synced_emails"):
         try:
-            db_optimizer.execute_query(
+            _execute_with_sqlite_retry(
                 f"DELETE FROM {tbl} WHERE user_id = ?",
                 (user_id,),
-                fetch=False,
             )
         except Exception:
             pass
+    try:
+        _execute_with_sqlite_retry(
+            "DELETE FROM users WHERE id = ?",
+            (user_id,),
+        )
+    except Exception:
+        pass
 
 
 def _insert_synced_email_row(
