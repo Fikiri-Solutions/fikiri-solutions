@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import app
 from core.email_triage_store import ensure_email_classifications_table, upsert_classification
+from email_automation.email_workflow_state import ensure_email_workflow_state_table
 
 
 class TestEmailTriageRoutes(unittest.TestCase):
@@ -19,6 +20,7 @@ class TestEmailTriageRoutes(unittest.TestCase):
         self.app.config["TESTING"] = True
         self.client = self.app.test_client()
         ensure_email_classifications_table()
+        ensure_email_workflow_state_table()
 
     def test_list_requires_auth(self):
         response = self.client.get("/api/email/triage")
