@@ -390,27 +390,28 @@ class TestKBVectorSyncTenantIsolation(unittest.TestCase):
             metadata={"tenant_id": "tenant_sync", "user_id": "user_sync"}
         )
     
+    @patch('core.chatbot_vector_chunk_ingestion.sync_kb_document_vectors')
     @patch('core.knowledge_base_system._get_vector_search')
-    def test_update_document_preserves_tenant_id_in_vector_sync(self, mock_get_vs):
+    def test_update_document_preserves_tenant_id_in_vector_sync(
+        self, mock_get_vs, mock_sync_vectors
+    ):
         """Test that updating KB document preserves tenant_id in vector sync"""
-        # Setup document with vector_id
         doc = self.kb.get_document(self.doc_id)
         doc.metadata["vector_id"] = 999
-        
-        # Mock vector search
-        mock_vs = MagicMock()
-        mock_vs.update_document.return_value = True
-        mock_get_vs.return_value = mock_vs
-        
-        # Update document
+
+        mock_get_vs.return_value = MagicMock()
+        mock_sync_vectors.return_value = ([999], 999)
+
         self.kb.update_document(self.doc_id, {"title": "Updated Title"})
-        
-        # Verify vector update was called with tenant_id in metadata
-        mock_vs.update_document.assert_called_once()
-        call_args = mock_vs.update_document.call_args
-        vector_metadata = call_args[0][2]  # Third argument is metadata
-        self.assertEqual(vector_metadata.get('tenant_id'), 'tenant_sync')
-        self.assertEqual(vector_metadata.get('user_id'), 'user_sync')
+
+        mock_sync_vectors.assert_called_once()
+        base_metadata = mock_sync_vectors.call_args.kwargs.get("base_metadata") or (
+            mock_sync_vectors.call_args.args[3]
+            if len(mock_sync_vectors.call_args.args) > 3
+            else {}
+        )
+        self.assertEqual(base_metadata.get("tenant_id"), "tenant_sync")
+        self.assertEqual(base_metadata.get("user_id"), "user_sync")
     
     @patch('core.knowledge_base_system._get_vector_search')
     def test_update_document_self_heal_preserves_tenant_id(self, mock_get_vs):

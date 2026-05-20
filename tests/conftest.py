@@ -31,6 +31,9 @@ try:
 except ImportError:
     pass
 
+# .env may set FIKIRI_TEST_MODE=0 for local dev servers; pytest must not call live LLMs.
+os.environ["FIKIRI_TEST_MODE"] = "1"
+
 
 class FakeRedis:
     """In-memory Redis stub for unit tests. No real Redis required."""

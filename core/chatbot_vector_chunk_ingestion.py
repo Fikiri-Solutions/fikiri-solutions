@@ -87,3 +87,36 @@ def ingest_kb_text_to_vector_store(
 
     primary = vector_ids[0] if vector_ids else None
     return vector_ids, primary
+
+
+def sync_kb_document_vectors(
+    vector_search: Any,
+    *,
+    doc_id: str,
+    text: str,
+    base_metadata: Optional[Dict[str, Any]] = None,
+    prior_metadata: Optional[Dict[str, Any]] = None,
+    max_chars: int = 1200,
+    overlap_chars: int = 150,
+) -> Tuple[List[VectorId], Optional[VectorId]]:
+    """Re-chunk and re-ingest KB document text, cleaning up prior chunk vectors when known."""
+    use_pinecone = getattr(vector_search, "use_pinecone", False) is True
+    cleanup_metadata = None
+    if prior_metadata and (
+        prior_metadata.get("vector_id") or prior_metadata.get("chunk_vector_ids")
+    ):
+        cleanup_metadata = {
+            "vector_id": prior_metadata.get("vector_id"),
+            "chunk_vector_ids": prior_metadata.get("chunk_vector_ids"),
+            "chunk_count": prior_metadata.get("chunk_count"),
+        }
+    return ingest_kb_text_to_vector_store(
+        vector_search,
+        text=text,
+        parent_doc_id=str(doc_id),
+        base_metadata=base_metadata,
+        use_pinecone=use_pinecone,
+        max_chars=max_chars,
+        overlap_chars=overlap_chars,
+        cleanup_metadata=cleanup_metadata,
+    )
