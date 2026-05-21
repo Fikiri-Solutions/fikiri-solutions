@@ -2386,6 +2386,19 @@ class DatabaseOptimizer:
         """Literal for UPDATE ... SET truthy flag = ... (BOOLEAN vs INTEGER)."""
         return "TRUE" if self.db_type == "postgresql" else "1"
 
+    def bind_boolean_column(self, value: Any) -> Union[bool, int]:
+        """
+        Bind value for BOOLEAN columns: Postgres requires bool, SQLite uses 0/1.
+        Gmail sync passes 0/1 from label parsing; callers may also pass bool.
+        """
+        if self.db_type == "postgresql":
+            if isinstance(value, bool):
+                return value
+            return bool(int(value or 0))
+        if isinstance(value, bool):
+            return 1 if value else 0
+        return 1 if int(value or 0) else 0
+
     def encrypt_sensitive_data(self, data: str) -> str:
         """Encrypt sensitive data using Fernet encryption"""
         if not self.cipher:
@@ -3296,7 +3309,7 @@ class DatabaseOptimizer:
             date_iso,
             body,
             labels_json,
-            is_read,
+            self.bind_boolean_column(is_read),
         )
         self.execute_query(
             """

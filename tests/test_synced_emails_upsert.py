@@ -162,6 +162,74 @@ def _assert_upsert_updated_row(opt: DatabaseOptimizer, user_id: int = 42) -> Non
     assert provider == "gmail"
 
 
+class TestBindBooleanColumn(unittest.TestCase):
+    """Regression: Postgres rejects INTEGER for BOOLEAN columns (Gmail sync storage)."""
+
+    def setUp(self):
+        self._tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        self.db_path = self._tmp.name
+        self._tmp.close()
+
+    def tearDown(self):
+        if os.path.exists(self.db_path):
+            os.unlink(self.db_path)
+
+    def test_postgres_binds_bool(self):
+        opt = DatabaseOptimizer(db_path=self.db_path)
+        opt.db_type = "postgresql"
+        self.assertTrue(opt.bind_boolean_column(1))
+        self.assertFalse(opt.bind_boolean_column(0))
+        self.assertTrue(opt.bind_boolean_column(True))
+
+    def test_sqlite_binds_int(self):
+        opt = DatabaseOptimizer(db_path=self.db_path)
+        self.assertEqual(opt.bind_boolean_column(1), 1)
+        self.assertEqual(opt.bind_boolean_column(0), 0)
+        self.assertEqual(opt.bind_boolean_column(False), 0)
+
+    def test_upsert_passes_bool_is_read_on_postgres(self):
+        from unittest.mock import patch
+
+        opt = DatabaseOptimizer(db_path=self.db_path)
+        opt.db_type = "postgresql"
+        captured = {}
+
+        def _capture(query, params=None, fetch=True, **kwargs):
+            captured["params"] = params
+            return []
+
+        with patch.object(opt, "execute_query", side_effect=_capture):
+            with patch.object(opt, "ensure_synced_emails_upsert_constraint"):
+                opt.upsert_synced_email_from_gmail(
+                    1,
+                    "msg_pg_bool",
+                    "t1",
+                    "Subj",
+                    "a@b.com",
+                    "c@d.com",
+                    "2026-05-20T08:00:00",
+                    "body",
+                    "[]",
+                    1,
+                )
+        self.assertIs(captured["params"][-1], True)
+        with patch.object(opt, "execute_query", side_effect=_capture):
+            with patch.object(opt, "ensure_synced_emails_upsert_constraint"):
+                opt.upsert_synced_email_from_gmail(
+                    1,
+                    "msg_pg_bool",
+                    "t1",
+                    "Subj",
+                    "a@b.com",
+                    "c@d.com",
+                    "2026-05-20T09:00:00",
+                    "body",
+                    "[]",
+                    0,
+                )
+        self.assertIs(captured["params"][-1], False)
+
+
 class TestSyncedEmailsLegacyUpsertSqlite(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
