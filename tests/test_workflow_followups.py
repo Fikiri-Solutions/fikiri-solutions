@@ -41,6 +41,22 @@ class TestScheduleFollowUp:
         assert result.get("success") is True
         assert result.get("follow_up_id") == 99
         assert result.get("deduped") is True
+        dedup_sql = mock_db.execute_query.call_args_list[0][0][0]
+        assert "lead_id = ?" in dedup_sql
+        assert "lead_id IS ?" not in dedup_sql
+
+    @patch("core.workflow_followups.db_optimizer")
+    def test_schedule_follow_up_null_lead_dedup_uses_is_null(self, mock_db):
+        mock_db.execute_query.return_value = []
+        schedule_follow_up(
+            user_id=1,
+            lead_id=None,
+            follow_up_date="2024-12-01",
+            follow_up_type="email",
+            message="Hi",
+        )
+        dedup_sql = mock_db.execute_query.call_args_list[0][0][0]
+        assert "lead_id IS NULL" in dedup_sql
 
     @patch("core.workflow_followups.db_optimizer")
     def test_schedule_follow_up_email_new_returns_success(self, mock_db):

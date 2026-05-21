@@ -33,13 +33,23 @@ def schedule_follow_up(
 
     corr = correlation_id or str(uuid.uuid4())
 
-    existing = db_optimizer.execute_query(
-        """
-        SELECT id FROM scheduled_follow_ups
-        WHERE user_id = ? AND lead_id IS ? AND follow_up_date = ? AND follow_up_type = ? AND message = ? AND status = 'scheduled'
-        """,
-        (user_id, lead_id, follow_up_date, follow_up_type, message)
-    )
+    # Postgres: `lead_id IS 1` is invalid — use IS NULL or = ? (SQLite allowed `IS ?` with bound NULL only).
+    if lead_id is None:
+        existing = db_optimizer.execute_query(
+            """
+            SELECT id FROM scheduled_follow_ups
+            WHERE user_id = ? AND lead_id IS NULL AND follow_up_date = ? AND follow_up_type = ? AND message = ? AND status = 'scheduled'
+            """,
+            (user_id, follow_up_date, follow_up_type, message),
+        )
+    else:
+        existing = db_optimizer.execute_query(
+            """
+            SELECT id FROM scheduled_follow_ups
+            WHERE user_id = ? AND lead_id = ? AND follow_up_date = ? AND follow_up_type = ? AND message = ? AND status = 'scheduled'
+            """,
+            (user_id, lead_id, follow_up_date, follow_up_type, message),
+        )
     if existing:
         logger.info("Deduped follow-up user_id=%s lead_id=%s type=%s date=%s", user_id, lead_id, follow_up_type, follow_up_date)
         try:

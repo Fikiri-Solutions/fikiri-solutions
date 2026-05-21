@@ -72,7 +72,7 @@ def upsert_classification(
             classification_source, intent_canonical, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(user_id, external_id, provider) DO UPDATE SET
-            synced_email_id = COALESCE(excluded.synced_email_id, synced_email_id),
+            synced_email_id = COALESCE(excluded.synced_email_id, email_classifications.synced_email_id),
             category = excluded.category,
             lead_score = excluded.lead_score,
             business_relevance_score = excluded.business_relevance_score,

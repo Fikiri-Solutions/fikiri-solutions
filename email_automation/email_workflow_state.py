@@ -334,9 +334,9 @@ def mark_classified(
             created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, 'classified', 'active', ?, 'classify', ?, ?, 0, 0, 0, ?, ?)
         ON CONFLICT(user_id, external_id, provider) DO UPDATE SET
-            synced_email_id = COALESCE(excluded.synced_email_id, synced_email_id),
-            classification_id = COALESCE(excluded.classification_id, classification_id),
-            provider_thread_id = COALESCE(excluded.provider_thread_id, provider_thread_id),
+            synced_email_id = COALESCE(excluded.synced_email_id, email_workflow_state.synced_email_id),
+            classification_id = COALESCE(excluded.classification_id, email_workflow_state.classification_id),
+            provider_thread_id = COALESCE(excluded.provider_thread_id, email_workflow_state.provider_thread_id),
             classification_status = CASE
                 WHEN classification_status = 'reclassified' THEN 'reclassified'
                 ELSE 'classified'
@@ -399,9 +399,9 @@ def mark_reclassified(
             created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, 'reclassified', 'active', ?, 'reclassify', 'command_center', ?, 1, 0, 0, ?, ?)
         ON CONFLICT(user_id, external_id, provider) DO UPDATE SET
-            synced_email_id = COALESCE(excluded.synced_email_id, synced_email_id),
-            classification_id = COALESCE(excluded.classification_id, classification_id),
-            provider_thread_id = COALESCE(excluded.provider_thread_id, provider_thread_id),
+            synced_email_id = COALESCE(excluded.synced_email_id, email_workflow_state.synced_email_id),
+            classification_id = COALESCE(excluded.classification_id, email_workflow_state.classification_id),
+            provider_thread_id = COALESCE(excluded.provider_thread_id, email_workflow_state.provider_thread_id),
             classification_status = 'reclassified',
             workflow_status = CASE
                 WHEN workflow_status IN ('archived', 'dismissed', 'done', 'spam', 'converted_to_lead', 'replied')
