@@ -526,7 +526,7 @@ export const EmailInbox: React.FC = () => {
       addToast({
         type: 'info',
         title: 'Import range updated',
-        message: `Selected ${label}. Click Sync inbox to import mail from that period.`,
+        message: `Selected ${label}. Use Update & sort in Organize when you're ready.`,
       })
     },
     [gmailLookbackPresets, addToast]
@@ -729,11 +729,11 @@ export const EmailInbox: React.FC = () => {
         'code' in error &&
         (error as { code?: string }).code === 'ECONNABORTED'
       addToast({
-        type: 'error',
-        title: 'AI analysis unavailable',
+        type: 'info',
+        title: 'Quick help only',
         message: timedOut
-          ? 'Analysis is taking longer than usual. Try again in a moment, or use a shorter email.'
-          : 'The AI assistant is currently unavailable.',
+          ? 'This is taking longer than usual. Try again shortly, or reply on your own below.'
+          : 'Full suggestions will be back soon. You can still read and reply normally.',
       })
     } finally {
       setAiLoading(false)
@@ -769,7 +769,11 @@ export const EmailInbox: React.FC = () => {
       }
     } catch (error) {
       console.error('Error generating reply:', error)
-      addToast({ type: 'error', title: 'Reply generation unavailable', message: 'The AI assistant is currently unavailable.' })
+      addToast({
+        type: 'info',
+        title: 'Draft not ready',
+        message: 'Write your reply below—you stay in control.',
+      })
     } finally {
       setAiLoading(false)
     }
@@ -967,11 +971,11 @@ export const EmailInbox: React.FC = () => {
                 onClick={handleSyncInbox}
                 disabled={syncInboxPending || loading || isFetching || gmailConnected !== true}
                 className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-brand-text/15 px-2.5 py-2 text-xs font-medium text-brand-text hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-                title="Pull latest messages from Gmail"
+                title="Refresh your message list"
               >
                 <Activity className={`h-4 w-4 shrink-0 ${syncInboxPending ? 'animate-pulse' : ''}`} />
-                <span className="hidden sm:inline">Sync inbox</span>
-                <span className="sm:hidden">Sync</span>
+                <span className="hidden sm:inline">Refresh</span>
+                <span className="sm:hidden">Refresh</span>
               </button>
               <button
                 type="button"

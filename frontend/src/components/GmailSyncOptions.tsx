@@ -78,12 +78,12 @@ export const GmailSyncOptions: React.FC<Props> = ({
       )}
       {showActiveMismatch && (
         <span className="w-full text-[11px] text-amber-700 dark:text-amber-300 sm:w-auto">
-          Last sync used {activeLookbackLabel}. Click Sync inbox to import {selectedLabel}.
+          Last sync used {activeLookbackLabel}. Use Update & sort in Organize to import {selectedLabel}.
         </span>
       )}
       {!compact && !showActiveMismatch && !pending && (
         <span className="text-[11px] text-brand-text/50 dark:text-gray-500">
-          Changing the range only applies after you sync.
+          Changing the range applies on the next Update & sort in Organize.
         </span>
       )}
     </div>

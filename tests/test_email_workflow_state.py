@@ -439,6 +439,24 @@ class TestPhaseCWorkflowPersistence(unittest.TestCase):
         )
         self.assertNotIn(self.ext_id, [e["id"] for e in active.get("emails") or []])
 
+    def test_bulk_restore_to_queue_after_dismiss(self):
+        self._seed_lead(self.ext_id)
+        execute_bulk_action(self.user_id, action="dismiss", email_ids=[self.ext_id])
+        dismissed = get_or_create_workflow_state(self.user_id, self.ext_id, provider="gmail")
+        self.assertEqual(dismissed["workflow_status"], "dismissed")
+
+        result = execute_bulk_action(
+            self.user_id, action="restore_to_queue", email_ids=[self.ext_id]
+        )
+        self.assertEqual(result.get("processed"), 1)
+        restored = get_or_create_workflow_state(self.user_id, self.ext_id, provider="gmail")
+        self.assertEqual(restored["workflow_status"], "active")
+        self.assertEqual(int(restored.get("hidden_from_command_center") or 0), 0)
+        active = list_classified_emails(
+            self.user_id, category="business_lead", include_handled=False
+        )
+        self.assertIn(self.ext_id, [e["id"] for e in active.get("emails") or []])
+
     @patch("integrations.gmail.gmail_client.gmail_client.get_gmail_service_for_user")
     def test_bulk_spam_and_done_hide(self, mock_gmail):
         ext_spam = "wf-phasec-spam"

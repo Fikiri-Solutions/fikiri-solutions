@@ -3,16 +3,17 @@ import { render, screen } from '@testing-library/react'
 import { LiveMailLocalBadges } from '../components/LiveMailLocalBadges'
 
 describe('LiveMailLocalBadges', () => {
-  it('renders Lead badge when classification_category is business_lead', () => {
+  it('renders Opportunity badge for business_lead', () => {
     render(
       <LiveMailLocalBadges
         email={{ classification_category: 'business_lead', lead_score: 70 }}
       />
     )
-    expect(screen.getByText('Lead')).toBeInTheDocument()
+    expect(screen.getByText('Opportunity')).toBeInTheDocument()
+    expect(screen.queryByText('Lead')).not.toBeInTheDocument()
   })
 
-  it('renders archived locally when workflow_status is archived', () => {
+  it('renders Filed in Gmail when archived', () => {
     render(
       <LiveMailLocalBadges
         email={{
@@ -22,45 +23,35 @@ describe('LiveMailLocalBadges', () => {
         }}
       />
     )
-    expect(screen.getByText('Archived locally')).toBeInTheDocument()
+    expect(screen.getByText('Filed in Gmail')).toBeInTheDocument()
   })
 
-  it('renders Done and Dismissed workflow badges', () => {
-    const { rerender } = render(
-      <LiveMailLocalBadges email={{ workflow_status: 'done', is_locally_handled: true }} />
-    )
-    expect(screen.getByText('Done')).toBeInTheDocument()
-
-    rerender(
+  it('renders Done for dismissed workflow', () => {
+    render(
       <LiveMailLocalBadges
         email={{ workflow_status: 'dismissed', is_locally_handled: true }}
       />
     )
-    expect(screen.getByText('Dismissed')).toBeInTheDocument()
+    expect(screen.getByText('Done')).toBeInTheDocument()
+    expect(screen.queryByText('Dismissed')).not.toBeInTheDocument()
   })
 
-  it('renders Newsletter and Action Needed category badges', () => {
-    const { rerender } = render(
-      <LiveMailLocalBadges email={{ classification_category: 'newsletter' }} />
-    )
-    expect(screen.getByText('Newsletter')).toBeInTheDocument()
-
-    rerender(
-      <LiveMailLocalBadges email={{ classification_category: 'action_needed' }} />
-    )
-    expect(screen.getByText('Action Needed')).toBeInTheDocument()
+  it('renders Needs reply for action_needed', () => {
+    render(<LiveMailLocalBadges email={{ classification_category: 'action_needed' }} />)
+    expect(screen.getByText('Needs reply')).toBeInTheDocument()
   })
 
-  it('renders Handled badge when is_locally_handled without specific workflow label', () => {
+  it('renders at most one badge', () => {
     render(
       <LiveMailLocalBadges
         email={{
-          workflow_status: 'converted_to_lead',
+          classification_category: 'business_lead',
+          workflow_status: 'dismissed',
           is_locally_handled: true,
         }}
       />
     )
-    expect(screen.getByText('Converted')).toBeInTheDocument()
+    expect(screen.getAllByText(/Opportunity|Done|Filed/).length).toBe(1)
   })
 
   it('renders nothing when no local state', () => {

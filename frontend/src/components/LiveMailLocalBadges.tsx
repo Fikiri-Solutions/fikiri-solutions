@@ -14,29 +14,28 @@ export interface LiveMailLocalOverlay {
   is_locally_handled?: boolean
 }
 
+/** Calm Read-tab labels — one badge max, no scores or jargon */
 const CATEGORY_LABELS: Record<string, string> = {
-  business_lead: 'Lead',
-  action_needed: 'Action Needed',
+  business_lead: 'Opportunity',
+  action_needed: 'Needs reply',
+  existing_client: 'Client',
+  newsletter_marketing: 'Newsletter',
   newsletter: 'Newsletter',
-  promotional: 'Promo',
-  automated_notification: 'Automated',
   personal_non_business: 'Personal',
   vendor_partner: 'Vendor',
-  existing_client: 'Client',
-  spam_risk: 'Spam/Risk',
-  review_needed: 'Review',
+  spam_risk: 'Junk',
+  review_needed: 'Not sure',
 }
 
 const WORKFLOW_LABELS: Record<string, string> = {
-  archived: 'Archived locally',
-  dismissed: 'Dismissed',
+  archived: 'Filed in Gmail',
+  dismissed: 'Done',
   done: 'Done',
-  spam: 'Spam/Risk',
-  converted_to_lead: 'Converted',
+  converted_to_lead: 'Saved',
   replied: 'Replied',
 }
 
-type BadgeTone = 'neutral' | 'lead' | 'action' | 'handled' | 'muted'
+type BadgeTone = 'lead' | 'action' | 'handled' | 'muted' | 'unsure'
 
 function badgeClass(tone: BadgeTone): string {
   const base =
@@ -46,66 +45,63 @@ function badgeClass(tone: BadgeTone): string {
       return `${base} bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300`
     case 'action':
       return `${base} bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200`
+    case 'unsure':
+      return `${base} bg-yellow-100 text-yellow-900 dark:bg-yellow-950/40 dark:text-yellow-200`
     case 'handled':
-      return `${base} bg-slate-200/90 text-slate-700 dark:bg-slate-700/80 dark:text-slate-300`
+      return `${base} bg-slate-200/90 text-slate-600 dark:bg-slate-700/80 dark:text-slate-400`
     default:
       return `${base} bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400`
   }
 }
 
-function categoryTone(category: string): BadgeTone {
-  if (category === 'business_lead') return 'lead'
-  if (category === 'action_needed' || category === 'spam_risk') return 'action'
-  return 'muted'
-}
-
-/** Small read-only badges for Command Center / workflow state on Live Mail rows. */
-export function LiveMailLocalBadges({ email }: { email: LiveMailLocalOverlay }) {
-  const badges: { key: string; label: string; tone: BadgeTone }[] = []
-
-  const category = email.classification_category?.trim()
-  if (category) {
-    badges.push({
-      key: `cat-${category}`,
-      label: CATEGORY_LABELS[category] ?? 'Classified',
-      tone: categoryTone(category),
-    })
-  } else if (email.classification_status === 'classified' || email.classification_status === 'reclassified') {
-    badges.push({ key: 'classified', label: 'Classified', tone: 'neutral' })
-  }
-
+function pickSingleBadge(email: LiveMailLocalOverlay): {
+  key: string
+  label: string
+  tone: BadgeTone
+} | null {
   const ws = (email.workflow_status || '').trim().toLowerCase()
   if (ws && ws !== 'active') {
     const wfLabel = WORKFLOW_LABELS[ws]
     if (wfLabel) {
-      badges.push({
+      return {
         key: `wf-${ws}`,
         label: wfLabel,
-        tone: ws === 'archived' || ws === 'dismissed' || ws === 'done' ? 'handled' : 'muted',
-      })
+        tone: 'handled',
+      }
     }
-  } else if (email.is_locally_archived) {
-    badges.push({ key: 'archived', label: 'Archived locally', tone: 'handled' })
+  }
+  if (email.is_locally_archived) {
+    return { key: 'archived', label: 'Filed in Gmail', tone: 'handled' }
+  }
+  if (email.is_locally_handled) {
+    return { key: 'handled', label: 'Done', tone: 'handled' }
   }
 
-  if (
-    email.is_locally_handled &&
-    !badges.some((b) => b.label === 'Archived locally' || b.label === 'Dismissed' || b.label === 'Done')
-  ) {
-    badges.push({ key: 'handled', label: 'Handled', tone: 'handled' })
-  }
+  const category = email.classification_category?.trim()
+  if (!category) return null
 
-  if (badges.length === 0) {
-    return null
+  if (category === 'business_lead') {
+    return { key: `cat-${category}`, label: 'Opportunity', tone: 'lead' }
   }
+  if (category === 'action_needed') {
+    return { key: `cat-${category}`, label: 'Needs reply', tone: 'action' }
+  }
+  if (category === 'review_needed') {
+    return { key: `cat-${category}`, label: 'Not sure', tone: 'unsure' }
+  }
+  const label = CATEGORY_LABELS[category]
+  if (!label) return null
+  return { key: `cat-${category}`, label, tone: 'muted' }
+}
+
+/** At most one calm badge on Live Mail rows (Organize state hint). */
+export function LiveMailLocalBadges({ email }: { email: LiveMailLocalOverlay }) {
+  const badge = pickSingleBadge(email)
+  if (!badge) return null
 
   return (
-    <div className="mt-1 flex flex-wrap gap-1" aria-label="Local inbox state">
-      {badges.map((b) => (
-        <span key={b.key} className={badgeClass(b.tone)}>
-          {b.label}
-        </span>
-      ))}
+    <div className="mt-1" aria-label="Inbox hint">
+      <span className={badgeClass(badge.tone)}>{badge.label}</span>
     </div>
   )
 }

@@ -71,10 +71,13 @@ BULK_ACTIONS = frozenset(
         "not_a_lead",
         "dismiss",
         "done",
+        "restore_to_queue",
     }
 )
 
-WORKFLOW_ONLY_BULK_ACTIONS = frozenset({"not_a_lead", "dismiss", "done"})
+WORKFLOW_ONLY_BULK_ACTIONS = frozenset(
+    {"not_a_lead", "dismiss", "done", "restore_to_queue"}
+)
 
 
 def triage_and_store_synced_message(

@@ -1,4 +1,4 @@
-/** Inbox Command Center tabs (matches backend triage categories). */
+/** Backend triage category IDs (Organize view groups these for simple-first UX). */
 
 export type TriageCategoryId =
   | 'business_lead'
@@ -7,6 +7,7 @@ export type TriageCategoryId =
   | 'newsletter_marketing'
   | 'spam_risk'
   | 'personal_non_business'
+  | 'vendor_partner'
   | 'review_needed'
 
 export const EMAIL_COMMAND_CENTER_TABS: { id: TriageCategoryId; label: string }[] = [

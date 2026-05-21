@@ -5,11 +5,18 @@ import { CheckCircle, XCircle, AlertCircle, Info } from 'lucide-react'
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info'
 
+export interface ToastUndoAction {
+  label: string
+  onClick: () => void
+}
+
 export interface Toast {
   type: ToastType
   title: string
   message?: string
   duration?: number
+  /** Optional undo control (e.g. Mark done in Organize) */
+  undo?: ToastUndoAction
 }
 
 interface ToastContextType {
@@ -104,7 +111,7 @@ const getToastPosition = (_pathname: string): { position: 'top-right' | 'top-lef
       boxSizing: 'border-box',
       paddingLeft: '1rem',
       paddingRight: '1rem',
-      pointerEvents: 'none',
+      pointerEvents: 'auto',
       zIndex: 10000,
     },
   }
@@ -118,34 +125,57 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
   const { position, containerStyle } = getToastPosition(location.pathname)
 
   const addToast = useCallback((toastData: Toast) => {
-    const { type, title, message, duration = 4000 } = toastData
-    
-    const toastKey = `${type}-${title}-${message || ''}`
+    const { type, title, message, duration = toastData.undo ? 8000 : 4000, undo } = toastData
+
+    const toastKey = `${type}-${title}-${message || ''}-${undo?.label || ''}`
     const now = Date.now()
-    
-    if (lastToastRef.current?.key === toastKey && 
-        now - lastToastRef.current.timestamp < DEBOUNCE_MS) {
+
+    if (
+      lastToastRef.current?.key === toastKey &&
+      now - lastToastRef.current.timestamp < DEBOUNCE_MS
+    ) {
       return
     }
-    
+
     lastToastRef.current = { key: toastKey, timestamp: now }
-    
+
     const customToast = (
-      <div style={getToastStyles(type)} className="flex items-start gap-3">
+      <div
+        style={{ ...getToastStyles(type), pointerEvents: 'auto' }}
+        className="flex items-start gap-3"
+      >
         {getToastIcon(type)}
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-base mb-1">{title}</div>
-          {message && <div className="text-sm opacity-90 leading-relaxed">{message}</div>}
+          <div className="mb-1 text-base font-semibold">{title}</div>
+          {message && <div className="text-sm leading-relaxed opacity-90">{message}</div>}
+          {undo ? (
+            <button
+              type="button"
+              className="mt-2 rounded-md bg-white/20 px-3 py-1.5 text-sm font-semibold hover:bg-white/30"
+              onClick={() => {
+                undo.onClick()
+                toast.dismiss()
+              }}
+            >
+              {undo.label}
+            </button>
+          ) : null}
         </div>
       </div>
     )
 
-    // Keep one visible toast at a time for signal over noise.
     toast.dismiss()
-    toast(customToast, {
-      duration,
-      position,
-    })
+    if (undo) {
+      toast.custom(customToast, {
+        duration,
+        position,
+      })
+    } else {
+      toast(customToast, {
+        duration,
+        position,
+      })
+    }
   }, [position])
 
   return (

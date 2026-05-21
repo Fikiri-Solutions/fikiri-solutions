@@ -1422,7 +1422,7 @@ class ApiClient {
     return data?.email ?? null
   }
 
-  /** Classified synced emails for Inbox Command Center (separate from live Gmail list). */
+  /** Classified synced emails for Inbox Organize (separate from live Gmail Read list). */
   async getEmailTriage(params?: {
     category?: string
     limit?: number
@@ -1453,7 +1453,7 @@ class ApiClient {
     return response.data?.data ?? response.data
   }
 
-  /** Triage synced rows missing email_classifications (Command Center after Gmail sync). */
+  /** Triage synced rows missing email_classifications (runs during Update & sort). */
   async classifyEmailTriageUnclassified(limit = 50): Promise<{ classified: unknown[]; count: number }> {
     const response = await this.client.post('/email/triage/classify-unclassified', {
       limit,

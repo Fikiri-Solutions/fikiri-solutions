@@ -546,6 +546,12 @@ def workflow_action_spec(action: str) -> Dict[str, Any]:
             "hide_from_command_center": False,
             "requires_gmail": False,
         },
+        "restore_to_queue": {
+            "workflow_status": "active",
+            "hide_from_command_center": False,
+            "requires_gmail": False,
+            "clear_handled_at": True,
+        },
     }
     return specs.get(key, {"workflow_status": None, "hide_from_command_center": False, "requires_gmail": False})
 
@@ -726,22 +732,20 @@ def mark_action_applied(
         if not override_cat:
             return "skipped"
 
-    hide_cc = (
-        1
-        if hide_from_command_center is True
-        else 0
-        if hide_from_command_center is False
-        else (
-            1
-            if spec.get("hide_from_command_center")
-            else int(row.get("hidden_from_command_center") or 0)
-        )
-    )
-    handled_at = (
-        now
-        if workflow_status_is_handled(new_status)
-        else row.get("handled_at")
-    )
+    if hide_from_command_center is True:
+        hide_cc = 1
+    elif hide_from_command_center is False:
+        hide_cc = 0
+    elif "hide_from_command_center" in spec:
+        hide_cc = 1 if spec.get("hide_from_command_center") else 0
+    else:
+        hide_cc = int(row.get("hidden_from_command_center") or 0)
+    if spec.get("clear_handled_at"):
+        handled_at = None
+    elif workflow_status_is_handled(new_status):
+        handled_at = now
+    else:
+        handled_at = row.get("handled_at")
 
     db_optimizer.execute_query(
         """
@@ -752,7 +756,7 @@ def mark_action_applied(
             last_action = ?,
             last_action_source = ?,
             last_action_at = ?,
-            handled_at = COALESCE(?, handled_at),
+            handled_at = ?,
             hidden_from_command_center = ?,
             updated_at = ?
         WHERE user_id = ? AND external_id = ? AND provider = ?

@@ -33,7 +33,7 @@ export const GmailConnect: React.FC = () => {
   const queryClient = useQueryClient()
   type SyncResponse = { message?: string; data?: { message?: string } }
 
-  /** Only after "Sync inbox" — avoids showing queue/spinner from a stale DB row on page load. */
+  /** Only after explicit update — avoids showing queue/spinner from a stale DB row on page load. */
   const [syncUiSession, setSyncUiSession] = useState(false)
   const [gmailLookbackId, setGmailLookbackId] = useState(() => loadGmailLookbackId('90d'))
   const syncUiSessionRef = useRef(false)
@@ -138,7 +138,7 @@ export const GmailConnect: React.FC = () => {
       addToast({
         type: 'info',
         title: 'Import range updated',
-        message: `Selected ${labelForLookbackId(id, gmailLookbackPresets)}. Click Sync inbox to apply.`,
+        message: `Selected ${labelForLookbackId(id, gmailLookbackPresets)}. Use Update & sort in Organize to apply.`,
       })
     },
     [gmailLookbackPresets, addToast]
@@ -169,7 +169,7 @@ export const GmailConnect: React.FC = () => {
       addToast({
         type: 'error',
         title: 'Sync did not complete',
-        message: 'Gmail sync failed or timed out. Try Sync inbox again.'
+        message: 'Update failed or timed out. Try Update & sort in Organize again.'
       })
       return
     }
@@ -196,7 +196,7 @@ export const GmailConnect: React.FC = () => {
       addToast({
         type: 'info',
         title: 'Sync monitor closed',
-        message: 'No progress was detected. Click Sync inbox again or refresh status.'
+        message: 'No progress was detected. Try Update & sort in Organize again.'
       })
     }, SYNC_UI_SESSION_MAX_MS)
     return () => window.clearTimeout(t)
@@ -359,7 +359,7 @@ export const GmailConnect: React.FC = () => {
               className="inline-flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-brand-secondary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Activity className="h-4 w-4" />
-              Sync inbox
+              Import mail
             </button>
           </div>
         </div>

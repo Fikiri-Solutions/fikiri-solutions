@@ -1,7 +1,11 @@
 import React from 'react'
 import { NavLink, Route, Routes } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { EmailInbox } from './EmailInbox'
 import { EmailCommandCenter } from './EmailCommandCenter'
+import { useAuth } from '../contexts/AuthContext'
+import { apiClient } from '../services/apiClient'
+import { organizeAttentionCount, primaryCategoryForQueue } from '../constants/inboxSimpleFirst'
 
 const tabClass = ({ isActive }: { isActive: boolean }) =>
   `min-h-[44px] shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition-colors touch-manipulation sm:px-4 ${
@@ -11,10 +15,22 @@ const tabClass = ({ isActive }: { isActive: boolean }) =>
   }`
 
 /**
- * Inbox hub: live Gmail (unchanged) + Command Center (synced triage).
- * Single sidebar nav item (/inbox).
+ * Inbox hub: Read (Gmail) + Organize (sorted piles). Single sidebar nav item (/inbox).
  */
 export const InboxPage: React.FC = () => {
+  const { user } = useAuth()
+  const { data: triageSummary } = useQuery({
+    queryKey: ['email-triage-summary', user?.id],
+    queryFn: () =>
+      apiClient.getEmailTriage({
+        category: primaryCategoryForQueue('opportunities'),
+        limit: 1,
+      }),
+    enabled: !!user,
+    staleTime: 60_000,
+  })
+  const organizeBadge = organizeAttentionCount(triageSummary?.category_counts)
+
   return (
     <div className="flex min-h-0 w-full flex-col">
       <nav
@@ -22,10 +38,15 @@ export const InboxPage: React.FC = () => {
         aria-label="Inbox views"
       >
         <NavLink to="/inbox" end className={tabClass}>
-          Live mail
+          Read
         </NavLink>
         <NavLink to="/inbox/command-center" className={tabClass}>
-          Command Center
+          Organize
+          {organizeBadge > 0 ? (
+            <span className="ml-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-brand-primary/15 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-brand-primary dark:bg-sky-500/20 dark:text-sky-300">
+              {organizeBadge > 99 ? '99+' : organizeBadge}
+            </span>
+          ) : null}
         </NavLink>
       </nav>
       <div className="min-h-0 flex-1">
