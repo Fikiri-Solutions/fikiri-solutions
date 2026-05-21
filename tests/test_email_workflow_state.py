@@ -143,6 +143,18 @@ class TestEmailWorkflowState(unittest.TestCase):
         self.assertEqual(row["classification_status"], "classified")
         self.assertEqual(int(row["classification_version"] or 0), 0)
 
+    def test_mark_classified_upsert_sql_qualifies_columns_for_postgres(self):
+        """Postgres ON CONFLICT requires table-qualified refs (excluded vs existing row)."""
+        import inspect
+        from email_automation import email_workflow_state as wf_mod
+
+        classified_src = inspect.getsource(wf_mod.mark_classified)
+        reclassified_src = inspect.getsource(wf_mod.mark_reclassified)
+        self.assertIn("email_workflow_state.classification_status", classified_src)
+        self.assertIn("email_workflow_state.workflow_status", classified_src)
+        self.assertNotIn("WHEN classification_status =", classified_src)
+        self.assertIn("email_workflow_state.classification_version + 1", reclassified_src)
+
     def test_should_classify_false_after_classified(self):
         mark_classified(self.user_id, self.ext_id, provider="gmail")
         self.assertFalse(should_classify_email(self.user_id, self.ext_id, "gmail", force=False))

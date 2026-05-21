@@ -338,12 +338,14 @@ def mark_classified(
             classification_id = COALESCE(excluded.classification_id, email_workflow_state.classification_id),
             provider_thread_id = COALESCE(excluded.provider_thread_id, email_workflow_state.provider_thread_id),
             classification_status = CASE
-                WHEN classification_status = 'reclassified' THEN 'reclassified'
+                WHEN email_workflow_state.classification_status = 'reclassified' THEN 'reclassified'
                 ELSE 'classified'
             END,
             workflow_status = CASE
-                WHEN workflow_status IN ('archived', 'dismissed', 'done', 'spam', 'converted_to_lead', 'replied')
-                THEN workflow_status
+                WHEN email_workflow_state.workflow_status IN (
+                    'archived', 'dismissed', 'done', 'spam', 'converted_to_lead', 'replied'
+                )
+                THEN email_workflow_state.workflow_status
                 ELSE 'active'
             END,
             last_classified_at = excluded.last_classified_at,
@@ -404,15 +406,17 @@ def mark_reclassified(
             provider_thread_id = COALESCE(excluded.provider_thread_id, email_workflow_state.provider_thread_id),
             classification_status = 'reclassified',
             workflow_status = CASE
-                WHEN workflow_status IN ('archived', 'dismissed', 'done', 'spam', 'converted_to_lead', 'replied')
-                THEN workflow_status
+                WHEN email_workflow_state.workflow_status IN (
+                    'archived', 'dismissed', 'done', 'spam', 'converted_to_lead', 'replied'
+                )
+                THEN email_workflow_state.workflow_status
                 ELSE 'active'
             END,
             last_classified_at = excluded.last_classified_at,
             last_action = excluded.last_action,
             last_action_source = excluded.last_action_source,
             last_action_at = excluded.last_action_at,
-            classification_version = classification_version + 1,
+            classification_version = email_workflow_state.classification_version + 1,
             hidden_from_command_center = 0,
             updated_at = excluded.updated_at
         """,
