@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Archive, Inbox, Loader2, RefreshCw, Sparkles } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Archive, Inbox, Loader2, Mail, RefreshCw, Sparkles, Trash2 } from 'lucide-react'
 import { apiClient } from '../services/apiClient'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/Toast'
@@ -16,13 +17,19 @@ import {
   ORGANIZE_TRUST_LINES,
   organizeAttentionCount,
   RESTORE_TO_QUEUE_BACKEND_ACTION,
-  type OrganizeBulkActionId,
-  type OrganizeQueueAction,
   type OrganizeQueueId,
   priorityTagClass,
   queueCount,
-  QUEUE_ACTIONS,
 } from '../constants/inboxSimpleFirst'
+import { ORGANIZE_QUEUE_ACTIONS, type OrganizeUiActionId } from '../constants/organizeQueueActions'
+import {
+  buildRecommendationGroups,
+  cleanupActionUserLabel,
+  countActionableRecommendations,
+  displayOrganizeReason,
+  formatRecommendationSummary,
+  suggestedNextStepLine,
+} from '../constants/organizeRecommendations'
 
 export interface TriageListEmail {
   id: string
@@ -34,11 +41,16 @@ export interface TriageListEmail {
   cleanup_action: string
   confidence: number
   reason: string
+  suggested_labels: string[]
 }
 
 function normalizeRow(raw: Record<string, unknown>): TriageListEmail | null {
   const id = raw.id != null ? String(raw.id) : ''
   if (!id) return null
+  const labelsRaw = raw.suggested_labels
+  const suggested_labels = Array.isArray(labelsRaw)
+    ? labelsRaw.map((x) => String(x)).filter(Boolean)
+    : []
   return {
     id,
     from: String(raw.from ?? ''),
@@ -49,6 +61,7 @@ function normalizeRow(raw: Record<string, unknown>): TriageListEmail | null {
     cleanup_action: String(raw.cleanup_action ?? 'keep'),
     confidence: Number(raw.confidence ?? 0),
     reason: String(raw.reason ?? ''),
+    suggested_labels,
   }
 }
 
@@ -68,11 +81,13 @@ function categoriesForQueue(queue: OrganizeQueueId): TriageCategoryId[] {
 export const EmailCommandCenter: React.FC = () => {
   const { user } = useAuth()
   const { addToast } = useToast()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [activeQueue, setActiveQueue] = useState<OrganizeQueueId>('opportunities')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [syncPending, setSyncPending] = useState(false)
   const [expandedReasonId, setExpandedReasonId] = useState<string | null>(null)
+  const [applyingRecommendations, setApplyingRecommendations] = useState(false)
   const prevSyncingRef = useRef(false)
   const lastMarkDoneIdsRef = useRef<string[]>([])
 
@@ -119,6 +134,17 @@ export const EmailCommandCenter: React.FC = () => {
     }
     return Array.from(byId.values())
   }, [listQueries])
+
+  const selectedEmails = useMemo(
+    () => emails.filter((e) => selected.has(e.id)),
+    [emails, selected]
+  )
+
+  const safeRecommendationsOnly = activeQueue === 'not_sure'
+  const recommendationCount = useMemo(
+    () => countActionableRecommendations(selectedEmails, { safeOnly: safeRecommendationsOnly }),
+    [selectedEmails, safeRecommendationsOnly]
+  )
 
   const queueLabel = activeQueue === 'not_sure' ? 'Not sure' : queueDef(activeQueue).label
 
@@ -171,18 +197,20 @@ export const EmailCommandCenter: React.FC = () => {
       action: string
       ids: string[]
       confirmDestructive: boolean
+      labelNames?: string[]
     }) =>
       apiClient.emailTriageBulkAction({
         action: opts.action,
         email_ids: opts.ids,
         confirm_destructive: opts.confirmDestructive,
+        label_names: opts.labelNames,
       }),
     onSuccess: (res, vars) => {
-      clearSelection()
-      invalidateOrganize()
       if (vars.action === MARK_DONE_BACKEND_ACTION) {
         return
       }
+      clearSelection()
+      invalidateOrganize()
       const actionLabel =
         vars.action === RESTORE_TO_QUEUE_BACKEND_ACTION
           ? 'Restored to pile'
@@ -190,7 +218,15 @@ export const EmailCommandCenter: React.FC = () => {
             ? 'Filed away in Gmail'
             : vars.action === 'create_leads'
               ? 'Saved to customers'
-              : 'Done'
+              : vars.action === 'spam_candidate'
+                ? 'Reported as spam'
+                : vars.action === 'delete_candidate'
+                  ? 'Moved to trash'
+                  : vars.action === 'label'
+                    ? 'Labels applied'
+                    : vars.action === 'not_a_lead'
+                      ? 'Moved to Clear out'
+                      : 'Done'
       addToast({
         type: 'success',
         title: actionLabel,
@@ -232,31 +268,146 @@ export const EmailCommandCenter: React.FC = () => {
     [bulkMutation]
   )
 
+  const openInRead = useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) {
+        addToast({ type: 'info', title: 'Select at least one message' })
+        return
+      }
+      navigate('/inbox', { state: { openEmailId: ids[0] } })
+      if (ids.length > 1) {
+        addToast({
+          type: 'info',
+          title: 'Opened first message',
+          message: 'Use Read for replies; select one row at a time to open a specific message.',
+        })
+      }
+    },
+    [addToast, navigate]
+  )
+
+  const runBulkGmailAction = useCallback(
+    (
+      backendAction: string,
+      ids: string[],
+      opts?: { confirmDestructive?: boolean; labelNames?: string[]; confirmMessage?: string }
+    ) => {
+      if (ids.length === 0) return
+      if (opts?.confirmMessage) {
+        const ok = window.confirm(opts.confirmMessage)
+        if (!ok) return
+      }
+      bulkMutation.mutate({
+        action: backendAction,
+        ids,
+        confirmDestructive: Boolean(opts?.confirmDestructive),
+        labelNames: opts?.labelNames,
+      })
+    },
+    [bulkMutation]
+  )
+
+  const runApplyRecommendations = useCallback(async () => {
+    const groups = buildRecommendationGroups(selectedEmails, {
+      safeOnly: safeRecommendationsOnly,
+    })
+    if (groups.length === 0) {
+      addToast({
+        type: 'info',
+        title: 'No recommendations ready',
+        message:
+          'Select messages with a suggested cleanup step, or use Mark done to hide them in Organize only.',
+      })
+      return
+    }
+
+    const summary = formatRecommendationSummary(groups)
+    const intro = safeRecommendationsOnly
+      ? 'Apply safe cleanup in Gmail?'
+      : 'Apply recommendations in Gmail?'
+    if (
+      !window.confirm(
+        `${intro}\n\n${summary}\n\nYou stay in control — nothing runs until you confirm each step.`
+      )
+    ) {
+      return
+    }
+
+    setApplyingRecommendations(true)
+    let applied = 0
+    try {
+      for (const group of groups) {
+        if (group.bulkAction === 'archive') {
+          const ok = window.confirm(
+            `File away ${group.emailIds.length} message(s) in Gmail?\n\nThey leave your main inbox but stay in All Mail.`
+          )
+          if (!ok) continue
+        } else if (group.destructive) {
+          const verb =
+            group.bulkAction === 'spam_candidate' ? 'Report as spam' : 'Move to trash'
+          const ok = window.confirm(
+            `${verb} for ${group.emailIds.length} message(s)?\n\nThis changes mail in Gmail.`
+          )
+          if (!ok) continue
+        }
+
+        const res = await apiClient.emailTriageBulkAction({
+          action: group.bulkAction,
+          email_ids: group.emailIds,
+          confirm_destructive: group.destructive,
+          label_names: group.labelNames,
+        })
+        applied += res.processed ?? group.emailIds.length
+      }
+      clearSelection()
+      invalidateOrganize()
+      addToast({
+        type: 'success',
+        title: 'Recommendations applied',
+        message:
+          applied > 0
+            ? `${applied} message(s) updated in Gmail.`
+            : 'No messages were changed.',
+      })
+    } catch {
+      addToast({ type: 'error', title: 'Something went wrong', message: 'Please try again.' })
+    } finally {
+      setApplyingRecommendations(false)
+    }
+  }, [
+    addToast,
+    clearSelection,
+    invalidateOrganize,
+    safeRecommendationsOnly,
+    selectedEmails,
+  ])
+
   const runQueueAction = useCallback(
-    (action: OrganizeBulkActionId) => {
+    (action: OrganizeUiActionId) => {
       const ids = Array.from(selected)
+      if (action === 'open_read') {
+        openInRead(ids)
+        return
+      }
+
+      if (action === 'apply_recommendations') {
+        void runApplyRecommendations()
+        return
+      }
+
       if (ids.length === 0) {
         addToast({ type: 'info', title: 'Select at least one message' })
         return
       }
 
-      const backendAction = action === 'dismiss' ? MARK_DONE_BACKEND_ACTION : action
-
-      if (backendAction === 'archive') {
-        const ok = window.confirm(
-          `File away ${ids.length} message(s) in Gmail?\n\nThey leave your main inbox but stay in Gmail All Mail.`
-        )
-        if (!ok) return
-        bulkMutation.mutate({ action: backendAction, ids, confirmDestructive: false })
-        return
-      }
-
-      if (backendAction === MARK_DONE_BACKEND_ACTION) {
+      if (action === 'dismiss') {
         lastMarkDoneIdsRef.current = [...ids]
         bulkMutation.mutate(
           { action: MARK_DONE_BACKEND_ACTION, ids, confirmDestructive: false },
           {
             onSuccess: (res) => {
+              clearSelection()
+              invalidateOrganize()
               const processed = res.processed ?? ids.length
               addToast({
                 type: 'success',
@@ -274,9 +425,53 @@ export const EmailCommandCenter: React.FC = () => {
         return
       }
 
-      bulkMutation.mutate({ action: backendAction, ids, confirmDestructive: false })
+      if (action === 'archive') {
+        runBulkGmailAction('archive', ids, {
+          confirmMessage: `File away ${ids.length} message(s) in Gmail?\n\nThey leave your main inbox but stay in Gmail All Mail.`,
+        })
+        return
+      }
+
+      if (action === 'spam_candidate') {
+        runBulkGmailAction('spam_candidate', ids, {
+          confirmDestructive: true,
+          confirmMessage: `Report ${ids.length} message(s) as spam in Gmail?`,
+        })
+        return
+      }
+
+      if (action === 'delete_candidate') {
+        runBulkGmailAction('delete_candidate', ids, {
+          confirmDestructive: true,
+          confirmMessage: `Move ${ids.length} message(s) to trash in Gmail?\n\nYou can recover them from Trash in Gmail.`,
+        })
+        return
+      }
+
+      if (action === 'move_clear_out') {
+        const ok = window.confirm(
+          `Move ${ids.length} message(s) to Clear out?\n\nFikiri will treat them as non-business mail. Gmail is unchanged until you file them away.`
+        )
+        if (!ok) return
+        bulkMutation.mutate({ action: 'not_a_lead', ids, confirmDestructive: false })
+        return
+      }
+
+      if (action === 'create_leads') {
+        bulkMutation.mutate({ action: 'create_leads', ids, confirmDestructive: false })
+      }
     },
-    [addToast, bulkMutation, restoreMarkDone, selected]
+    [
+      addToast,
+      bulkMutation,
+      clearSelection,
+      invalidateOrganize,
+      openInRead,
+      restoreMarkDone,
+      runApplyRecommendations,
+      runBulkGmailAction,
+      selected,
+    ]
   )
 
   const switchQueue = useCallback(
@@ -289,10 +484,38 @@ export const EmailCommandCenter: React.FC = () => {
   )
 
   const busy =
-    isListLoading || isListFetching || bulkMutation.isPending || syncPending || syncing
+    isListLoading ||
+    isListFetching ||
+    bulkMutation.isPending ||
+    applyingRecommendations ||
+    syncPending ||
+    syncing
 
-  const queueActions: OrganizeQueueAction[] = QUEUE_ACTIONS[activeQueue]
+  const queueActions = ORGANIZE_QUEUE_ACTIONS[activeQueue]
   const notSureCount = categoryCounts[NOT_SURE_CATEGORY] ?? 0
+
+  const actionButtonLabel = useCallback(
+    (actionId: OrganizeUiActionId, baseLabel: string) => {
+      if (actionId === 'apply_recommendations' && recommendationCount > 0) {
+        return `${baseLabel} (${recommendationCount})`
+      }
+      if (selected.size > 0 && actionId !== 'open_read') {
+        return `${baseLabel} (${selected.size})`
+      }
+      return baseLabel
+    },
+    [recommendationCount, selected.size]
+  )
+
+  const actionDisabled = useCallback(
+    (actionId: OrganizeUiActionId) => {
+      if (busy) return true
+      if (actionId === 'open_read') return selected.size === 0
+      if (actionId === 'apply_recommendations') return recommendationCount === 0
+      return selected.size === 0
+    },
+    [busy, recommendationCount, selected.size]
+  )
 
   return (
     <div
@@ -386,20 +609,25 @@ export const EmailCommandCenter: React.FC = () => {
               key={action.id}
               type="button"
               onClick={() => runQueueAction(action.id)}
-              disabled={busy || selected.size === 0}
+              disabled={actionDisabled(action.id)}
               className={
-                action.primary
-                  ? 'inline-flex min-h-[44px] items-center gap-1 rounded-lg bg-brand-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-sky-600'
-                  : 'inline-flex min-h-[44px] items-center gap-1 rounded-lg border border-brand-text/15 bg-white px-3 py-2 text-sm font-medium text-brand-text disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200'
+                action.guarded
+                  ? 'inline-flex min-h-[40px] items-center gap-1 rounded-lg border border-red-200/80 bg-white px-3 py-2 text-sm font-medium text-red-800 disabled:opacity-50 dark:border-red-900/50 dark:bg-gray-900 dark:text-red-300'
+                  : action.primary
+                    ? 'inline-flex min-h-[44px] items-center gap-1 rounded-lg bg-brand-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-sky-600'
+                    : 'inline-flex min-h-[44px] items-center gap-1 rounded-lg border border-brand-text/15 bg-white px-3 py-2 text-sm font-medium text-brand-text disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200'
               }
             >
               {action.id === 'archive' ? (
                 <Archive className="h-4 w-4" />
               ) : action.id === 'create_leads' ? (
                 <Sparkles className="h-4 w-4" />
+              ) : action.id === 'open_read' ? (
+                <Mail className="h-4 w-4" />
+              ) : action.id === 'delete_candidate' ? (
+                <Trash2 className="h-4 w-4" />
               ) : null}
-              {action.label}
-              {selected.size > 0 ? ` (${selected.size})` : ''}
+              {actionButtonLabel(action.id, action.label)}
             </button>
           ))}
           <button
@@ -441,6 +669,8 @@ export const EmailCommandCenter: React.FC = () => {
               const checked = selected.has(email.id)
               const tag = humanPriorityTag(email, activeQueue)
               const showReason = expandedReasonId === email.id
+              const reasonText = displayOrganizeReason(email, activeQueue)
+              const nextStep = suggestedNextStepLine(email.cleanup_action)
               return (
                 <li
                   key={email.id}
@@ -471,25 +701,28 @@ export const EmailCommandCenter: React.FC = () => {
                     <p className="mt-0.5 text-sm font-semibold text-brand-text dark:text-gray-200">
                       {email.subject}
                     </p>
-                    {email.reason ? (
-                      <div className="mt-1">
-                        <button
-                          type="button"
-                          className="text-xs text-brand-text/50 hover:text-brand-primary dark:text-gray-500 dark:hover:text-sky-400"
-                          onClick={() =>
-                            setExpandedReasonId(showReason ? null : email.id)
-                          }
-                          aria-expanded={showReason}
-                        >
-                          {showReason ? 'Hide note' : 'Why?'}
-                        </button>
-                        {showReason ? (
-                          <p className="mt-0.5 line-clamp-3 text-xs text-brand-text/70 dark:text-gray-500">
-                            {email.reason}
+                    <div className="mt-1">
+                      <button
+                        type="button"
+                        className="text-xs text-brand-text/50 hover:text-brand-primary dark:text-gray-500 dark:hover:text-sky-400"
+                        onClick={() => setExpandedReasonId(showReason ? null : email.id)}
+                        aria-expanded={showReason}
+                      >
+                        {showReason ? 'Hide note' : 'Why?'}
+                      </button>
+                      {showReason ? (
+                        <div className="mt-0.5 space-y-0.5">
+                          <p className="line-clamp-4 text-xs text-brand-text/70 dark:text-gray-500">
+                            {reasonText}
                           </p>
-                        ) : null}
-                      </div>
-                    ) : null}
+                          {nextStep ? (
+                            <p className="text-xs font-medium text-brand-text/60 dark:text-gray-400">
+                              {nextStep}
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </li>
               )

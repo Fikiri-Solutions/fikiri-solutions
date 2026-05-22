@@ -4,6 +4,8 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { EmailCommandCenter } from '../pages/EmailCommandCenter'
 
+const navigate = vi.fn()
+
 const {
   getEmailTriage,
   emailTriageBulkAction,
@@ -19,6 +21,11 @@ const {
 }))
 
 const addToast = vi.fn()
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
+  return { ...actual, useNavigate: () => navigate }
+})
 
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 108 } }),
@@ -63,6 +70,7 @@ const sampleEmails = {
       cleanup_action: 'keep',
       confidence: 0.88,
       reason: 'Pricing inquiry',
+      suggested_labels: ['Fikiri/business_lead'],
     },
   ],
   category_counts: { business_lead: 1, action_needed: 0, review_needed: 0 },
@@ -83,52 +91,35 @@ describe('EmailCommandCenter (Organize)', () => {
     classifyEmailTriageUnclassified.mockResolvedValue({ count: 0, classified: [] })
   })
 
-  it('renders Organize with queue cards and calm row copy', async () => {
+  it('renders Organize with queue cards, trust copy, and calm row copy', async () => {
     renderOrganize()
     await waitFor(() => {
       expect(screen.getByText(/Florida Atlantic University inquiry/)).toBeInTheDocument()
     })
     expect(screen.getByRole('main', { name: 'Inbox Organize' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /Opportunities/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Update & sort/i })).toBeInTheDocument()
+    expect(screen.getByText(/Fikiri organizes your inbox/i)).toBeInTheDocument()
+    expect(screen.getByText(/Nothing leaves Gmail without your approval/i)).toBeInTheDocument()
     expect(screen.queryByText(/Lead 72/)).not.toBeInTheDocument()
     expect(screen.queryByText(/confidence/i)).not.toBeInTheDocument()
     expect(screen.getByText('Strong lead')).toBeInTheDocument()
   })
 
-  it('switches to Needs reply queue and refetches', async () => {
+  it('shows Open and Save lead on Opportunities', async () => {
     renderOrganize()
     await waitFor(() => {
-      expect(screen.getByText(/Florida Atlantic University inquiry/)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^Open$/i })).toBeInTheDocument()
     })
-
-    getEmailTriage.mockResolvedValueOnce({ emails: [], category_counts: sampleEmails.category_counts })
-    fireEvent.click(screen.getByRole('tab', { name: /Needs reply/i }))
-
-    await waitFor(() => {
-      expect(getEmailTriage).toHaveBeenCalledWith(
-        expect.objectContaining({ category: 'action_needed' })
-      )
-    })
+    expect(screen.getByRole('button', { name: /^Save lead$/i })).toBeInTheDocument()
   })
 
-  it('selects rows and enables Save lead action', async () => {
+  it('navigates to Read when Open is used', async () => {
     renderOrganize()
     await waitFor(() => {
       expect(screen.getByText(/Florida Atlantic University inquiry/)).toBeInTheDocument()
     })
     fireEvent.click(screen.getByRole('checkbox', { name: /Select Florida Atlantic/i }))
-    expect(screen.getByRole('button', { name: /Save lead \(1\)/i })).toBeEnabled()
-  })
-
-  it('does not expose delete or spam bulk actions in simple mode', async () => {
-    renderOrganize()
-    await waitFor(() => {
-      expect(screen.getByText(/Florida Atlantic University inquiry/)).toBeInTheDocument()
-    })
-    expect(screen.queryByLabelText('Bulk action')).not.toBeInTheDocument()
-    expect(screen.queryByText(/Delete/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/spam/i)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Open$/i }))
+    expect(navigate).toHaveBeenCalledWith('/inbox', { state: { openEmailId: 'msg-1' } })
   })
 
   it('calls dismiss immediately and offers undo that restores to queue', async () => {
@@ -155,9 +146,7 @@ describe('EmailCommandCenter (Organize)', () => {
       })
     )
 
-    const undoCall = addToast.mock.calls.find(
-      (c) => c[0]?.undo?.label === 'Undo'
-    )
+    const undoCall = addToast.mock.calls.find((c) => c[0]?.undo?.label === 'Undo')
     undoCall?.[0]?.undo?.onClick()
     await waitFor(() => {
       expect(emailTriageBulkAction).toHaveBeenCalledWith(
@@ -185,6 +174,7 @@ describe('EmailCommandCenter (Organize)', () => {
               ...sampleEmails.emails[0],
               id: 'msg-2',
               category: 'newsletter_marketing',
+              cleanup_action: 'archive',
             },
           ],
           category_counts: { newsletter_marketing: 1, business_lead: 1 },
@@ -213,5 +203,95 @@ describe('EmailCommandCenter (Organize)', () => {
     expect(confirmSpy).toHaveBeenCalled()
     expect(emailTriageBulkAction).not.toHaveBeenCalled()
     confirmSpy.mockRestore()
+  })
+
+  it('shows guarded spam and trash actions on Clear out', async () => {
+    getEmailTriage.mockResolvedValue({
+      emails: [
+        {
+          ...sampleEmails.emails[0],
+          id: 'msg-spam',
+          category: 'spam_risk',
+          cleanup_action: 'spam_candidate',
+        },
+      ],
+      category_counts: { spam_risk: 1 },
+    })
+
+    renderOrganize()
+    fireEvent.click(screen.getByRole('tab', { name: /Clear out/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^Report spam$/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^Move to trash$/i })).toBeInTheDocument()
+    })
+  })
+
+  it('applies recommendations with confirm_destructive for spam', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    getEmailTriage.mockResolvedValue({
+      emails: [
+        {
+          ...sampleEmails.emails[0],
+          id: 'msg-spam',
+          category: 'spam_risk',
+          cleanup_action: 'spam_candidate',
+        },
+      ],
+      category_counts: { spam_risk: 1 },
+    })
+
+    renderOrganize()
+    fireEvent.click(screen.getByRole('tab', { name: /Clear out/i }))
+    await waitFor(() => {
+      expect(screen.getByText(/Florida Atlantic University inquiry/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(document.getElementById('email-organize-select-msg-spam')!)
+    fireEvent.click(screen.getByRole('button', { name: /Apply recommendations \(1\)/i }))
+
+    await waitFor(() => {
+      expect(emailTriageBulkAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'spam_candidate',
+          email_ids: ['msg-spam'],
+          confirm_destructive: true,
+        })
+      )
+    })
+    confirmSpy.mockRestore()
+  })
+
+  it('sanitizes jargon in Why panel', async () => {
+    const unsureRow = {
+      ...sampleEmails.emails[0],
+      category: 'review_needed',
+      reason: 'Heuristic classification (AI unavailable).',
+    }
+    getEmailTriage.mockImplementation((params: { category?: string; limit?: number }) => {
+      if (params?.category === 'review_needed') {
+        return Promise.resolve({
+          emails: [unsureRow],
+          category_counts: { review_needed: 1 },
+        })
+      }
+      return Promise.resolve({
+        emails: [],
+        category_counts: { review_needed: 1, business_lead: 0 },
+      })
+    })
+
+    renderOrganize()
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: /Not sure/i })).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByRole('tab', { name: /Not sure/i }))
+    await waitFor(() => {
+      expect(screen.getByText(/Florida Atlantic University inquiry/)).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^Why\?$/i }))
+    expect(screen.queryByText(/Heuristic classification/i)).not.toBeInTheDocument()
+    expect(
+      screen.getByText('We were not sure, so we kept it for review.')
+    ).toBeInTheDocument()
   })
 })

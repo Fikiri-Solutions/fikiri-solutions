@@ -51,39 +51,6 @@ export const ORGANIZE_QUEUES: OrganizeQueueDef[] = [
 
 export const NOT_SURE_CATEGORY: TriageCategoryId = 'review_needed'
 
-export type OrganizeBulkActionId =
-  | 'create_leads'
-  | 'dismiss'
-  | 'archive'
-  | 'mark_read'
-  | 'mark_unread'
-
-export interface OrganizeQueueAction {
-  id: OrganizeBulkActionId
-  label: string
-  /** Uses brand fill — at most one per queue */
-  primary?: boolean
-  /** Secondary outline style */
-  outline?: boolean
-}
-
-export const QUEUE_ACTIONS: Record<OrganizeQueueId, OrganizeQueueAction[]> = {
-  opportunities: [
-    { id: 'create_leads', label: 'Save lead', primary: true },
-    { id: 'dismiss', label: 'Mark done', outline: true },
-  ],
-  needs_reply: [
-    { id: 'dismiss', label: 'Mark done', primary: true },
-  ],
-  clear_out: [
-    { id: 'dismiss', label: 'Mark done', primary: true },
-    { id: 'archive', label: 'File away in Gmail', outline: true },
-  ],
-  not_sure: [
-    { id: 'dismiss', label: 'Mark done', primary: true },
-  ],
-}
-
 /** Maps backend dismiss action — UI says Mark done */
 export const MARK_DONE_BACKEND_ACTION = 'dismiss'
 

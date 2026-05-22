@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   Mail,
   Search,
@@ -376,10 +376,16 @@ function hasAiPanelContent(a: AIAnalysis | null, loading: boolean): boolean {
   )
 }
 
+type InboxLocationState = { openEmailId?: string }
+
 export const EmailInbox: React.FC = () => {
   const { user } = useAuth()
   const { addToast } = useToast()
   const queryClient = useQueryClient()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const openEmailIdFromOrganize = (location.state as InboxLocationState | null)?.openEmailId
+  const openFromOrganizeHandledRef = useRef<string | null>(null)
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(null)
@@ -612,6 +618,54 @@ export const EmailInbox: React.FC = () => {
     () => emailsInfiniteData?.pages.flatMap((page) => page.emails ?? []) ?? [],
     [emailsInfiniteData]
   )
+
+  useEffect(() => {
+    if (!openEmailIdFromOrganize || gmailConnected !== true) return
+    if (openFromOrganizeHandledRef.current === openEmailIdFromOrganize) return
+
+    const clearOrganizeNavigationState = () => {
+      openFromOrganizeHandledRef.current = openEmailIdFromOrganize
+      navigate('/inbox', { replace: true, state: null })
+    }
+
+    const inList = emails.find((e) => e.id === openEmailIdFromOrganize)
+    if (inList) {
+      setSelectedEmail(inList)
+      clearOrganizeNavigationState()
+      return
+    }
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const msg = await apiClient.getEmailMessage(openEmailIdFromOrganize)
+        if (cancelled || !msg) return
+        setSelectedEmail({
+          id: String(msg.id ?? openEmailIdFromOrganize),
+          subject: String(msg.subject ?? ''),
+          from: String(msg.from ?? msg.sender ?? ''),
+          from_name: String(msg.from_name ?? ''),
+          date: String(msg.date ?? new Date().toISOString()),
+          body: String(msg.body ?? msg.snippet ?? ''),
+          unread: Boolean(msg.unread),
+        } as Email)
+        clearOrganizeNavigationState()
+      } catch {
+        if (!cancelled) {
+          addToast({
+            type: 'info',
+            title: 'Open from Organize',
+            message: 'Message not in the current Read list. Try search or load more mail.',
+          })
+          clearOrganizeNavigationState()
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [addToast, emails, gmailConnected, navigate, openEmailIdFromOrganize])
+
   const searchActive = debouncedSearch.length > 0
   const typingAheadOfSearch =
     searchQuery.trim().length > 0 && searchQuery.trim() !== debouncedSearch
