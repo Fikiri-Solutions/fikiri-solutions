@@ -4,9 +4,10 @@ import json
 import logging
 import hashlib
 import os
+import re
 import uuid
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 
 from core.database_optimization import db_optimizer
 from core.automation_run_events import record_automation_cancelled
@@ -16,6 +17,123 @@ from core.sms_consent import lead_row_allows_sms
 from crm.service import enhanced_crm_service
 
 logger = logging.getLogger(__name__)
+
+# Extra local-part patterns for newsletter/marketing senders (follow-up guard only).
+_FOLLOW_UP_NEWSLETTER_LOCAL_RE = re.compile(
+    r"(newsletter|unsubscribe|digest|recap|community|memberinfo|^news$)",
+    re.I,
+)
+
+
+def should_skip_scheduled_follow_up_email(to_email: str) -> Tuple[bool, str]:
+    """
+    True when a scheduled email follow-up must not call Gmail.
+
+    Reuses reserved-domain and triage automated-sender detection; adds newsletter-style locals.
+    Returns (skip, reason_code). Never logs full addresses.
+    """
+    from core.reserved_email_recipients import (
+        recipient_domain,
+        should_skip_real_email_delivery,
+    )
+    from email_automation.email_triage_operational_rules import is_automated_sender
+
+    email = (to_email or "").strip()
+    if not email or "@" not in email:
+        return True, "invalid_recipient"
+    if should_skip_real_email_delivery(email):
+        return True, "reserved_recipient_domain"
+    if is_automated_sender(email):
+        return True, "automated_sender"
+    local = email.split("@", 1)[0].lower()
+    if _FOLLOW_UP_NEWSLETTER_LOCAL_RE.search(local):
+        return True, "newsletter_sender"
+    return False, ""
+
+
+def _log_follow_up_delivery_skipped(
+    *,
+    user_id: int,
+    follow_up_id: int,
+    lead_id: Optional[int],
+    reason: str,
+    recipient_domain: str,
+) -> None:
+    logger.info(
+        "email.followup.delivery_skipped",
+        extra={
+            "event": "email.followup.delivery_skipped",
+            "service": "email",
+            "severity": "INFO",
+            "user_id": user_id,
+            "follow_up_id": follow_up_id,
+            "lead_id": lead_id,
+            "reason": reason,
+            "domain": recipient_domain or None,
+            "source": "workflow_followups",
+        },
+    )
+
+
+def _finalize_skipped_email_follow_up(
+    *,
+    user_id: int,
+    follow_up_id: int,
+    lead_id: Optional[int],
+    follow_up_type: str,
+    idempotency_key: str,
+    skip_reason: str,
+    recipient_domain: str,
+    target_contact: str,
+) -> None:
+    """Terminal cancel + idempotency complete so due scheduler does not retry."""
+    now = datetime.utcnow().isoformat()
+    result = {"success": False, "skipped": True, "reason": skip_reason}
+    idempotency_manager.update_key_result(idempotency_key, "completed", result)
+    db_optimizer.execute_query(
+        """
+        UPDATE scheduled_follow_ups
+        SET status = ?, sent_at = ?
+        WHERE id = ?
+        """,
+        ("cancelled", now, follow_up_id),
+        fetch=False,
+    )
+    _log_follow_up_delivery_skipped(
+        user_id=user_id,
+        follow_up_id=follow_up_id,
+        lead_id=lead_id,
+        reason=skip_reason,
+        recipient_domain=recipient_domain,
+    )
+    try:
+        from email_automation.email_event_log import record_email_event
+
+        record_email_event(
+            user_id,
+            "email.followup_skipped",
+            lead_id=lead_id,
+            correlation_id=f"followup:{user_id}:{follow_up_id}",
+            payload={
+                "follow_up_id": follow_up_id,
+                "follow_up_type": follow_up_type,
+                "reason": skip_reason,
+                "domain": recipient_domain or None,
+            },
+            status="skipped",
+            source="workflow_followups",
+        )
+    except Exception as ev_err:
+        logger.debug("follow-up skip email_events: %s", ev_err)
+    automation_safety_manager.log_automation_action(
+        user_id=user_id,
+        rule_id=0,
+        action_type=f"follow_up_{follow_up_type}",
+        target_contact=target_contact or "unknown",
+        idempotency_key=idempotency_key,
+        status="skipped",
+        error_message=skip_reason,
+    )
 
 
 def schedule_follow_up(
@@ -205,6 +323,21 @@ def execute_due_follow_ups(user_id: int, now_iso: Optional[str] = None) -> Dict[
                     raise ValueError("Lead not found")
                 to_email = lead[0]["email"]
                 target_contact = to_email
+                from core.reserved_email_recipients import recipient_domain
+
+                skip, skip_reason = should_skip_scheduled_follow_up_email(to_email)
+                if skip:
+                    _finalize_skipped_email_follow_up(
+                        user_id=user_id,
+                        follow_up_id=follow_up_id,
+                        lead_id=lead_id,
+                        follow_up_type=follow_up_type,
+                        idempotency_key=key,
+                        skip_reason=skip_reason,
+                        recipient_domain=recipient_domain(to_email),
+                        target_contact=target_contact,
+                    )
+                    continue
                 safety = automation_safety_manager.check_rate_limits(
                     user_id=user_id,
                     action_type=f"follow_up_{follow_up_type}",
@@ -329,7 +462,7 @@ def execute_due_follow_ups(user_id: int, now_iso: Optional[str] = None) -> Dict[
             except Exception as ev_err:
                 logger.debug("follow-up email_events: %s", ev_err)
 
-            if lead_id:
+            if lead_id and result.get("success") and not result.get("skipped"):
                 enhanced_crm_service.add_lead_activity(
                     lead_id,
                     user_id,

@@ -63,12 +63,52 @@ class Job:
     retry_count: int = 0
     max_retries: int = 3
 
+def _is_brpop_idle_timeout(exc: BaseException) -> bool:
+    """True when BRPOP finished with no job (socket/read timeout), not a real failure."""
+    if not REDIS_AVAILABLE or redis is None:
+        return False
+    if isinstance(exc, redis.TimeoutError):
+        return True
+    msg = str(exc).lower()
+    return "timeout reading from socket" in msg
+
+
+def _log_queue_idle_wait(queue_name: str, brpop_timeout_s: int = 0) -> None:
+    """Structured log for idle worker poll — not a job failure."""
+    logger.info(
+        "Queue wait timed out (no job); worker continuing",
+        extra={
+            "event": "queue_idle_wait",
+            "service": "background_job",
+            "severity": "INFO",
+            "metadata": {
+                "queue_name": queue_name,
+                "brpop_timeout_s": brpop_timeout_s,
+            },
+        },
+    )
+
+
+def _log_dequeue_reconnect(queue_name: str, error: str) -> None:
+    """Structured log when dequeue loses Redis and will reconnect."""
+    logger.warning(
+        "Redis connection lost during dequeue; reconnecting",
+        extra={
+            "event": "redis_dequeue_reconnect",
+            "service": "background_job",
+            "severity": "WARN",
+            "metadata": {"queue_name": queue_name, "error": error},
+        },
+    )
+
+
 class RedisQueue:
     """Redis-based job queue system"""
     
     def __init__(self, queue_name: str = "fikiri:jobs"):
         self.config = get_config()
         self.redis_client = None
+        self._blocking_redis_client = None
         self.queue_name = queue_name
         self.job_prefix = f"fikiri:job:"
         self.result_prefix = f"fikiri:result:"
@@ -103,6 +143,44 @@ class RedisQueue:
         except Exception as e:
             logger.error(f"❌ Redis queue connection failed: {e}")
             self.redis_client = None
+
+    def _redis_db(self) -> int:
+        if hasattr(self.config, "redis_db"):
+            return getattr(self.config, "redis_db", 0) or 0
+        return 0
+
+    def _get_blocking_redis_client(self):
+        """Redis client without socket read timeout — required for BRPOP idle polls."""
+        if not REDIS_AVAILABLE:
+            return None
+        if self._blocking_redis_client is not None:
+            try:
+                self._blocking_redis_client.ping()
+                return self._blocking_redis_client
+            except Exception:
+                self._blocking_redis_client = None
+        try:
+            from core.redis_connection_helper import get_redis_client
+            client = get_redis_client(
+                decode_responses=True,
+                db=self._redis_db(),
+                socket_timeout=None,
+            )
+            if client:
+                self._blocking_redis_client = client
+            return client
+        except Exception as e:
+            logger.debug("Blocking Redis client unavailable: %s", e)
+            return None
+
+    def _invalidate_redis_clients(self) -> None:
+        self.redis_client = None
+        self._blocking_redis_client = None
+
+    def _reconnect_redis_clients(self) -> None:
+        """Drop stale clients and re-establish queue connections."""
+        self._invalidate_redis_clients()
+        self._connect()
     
     def is_connected(self) -> bool:
         """Check if Redis is connected"""
@@ -184,9 +262,18 @@ class RedisQueue:
                     self.redis_client.lpush(f"{self.queue_name}:pending", job_id)
                     self.redis_client.zrem(f"{self.queue_name}:delayed", job_id)
             
-            # Get next pending job
+            # Get next pending job (blocking client avoids socket_timeout vs BRPOP race)
             if timeout > 0:
-                result = self.redis_client.brpop(f"{self.queue_name}:pending", timeout)
+                blocking = self._get_blocking_redis_client()
+                if not blocking:
+                    return None
+                try:
+                    result = blocking.brpop(f"{self.queue_name}:pending", timeout)
+                except Exception as brpop_error:
+                    if _is_brpop_idle_timeout(brpop_error):
+                        _log_queue_idle_wait(self.queue_name, brpop_timeout_s=timeout)
+                        return None
+                    raise
                 if result:
                     job_id = result[1]
                 else:
@@ -220,7 +307,24 @@ class RedisQueue:
             return None
             
         except Exception as e:
-            logger.error(f"❌ Job dequeue failed: {e}")
+            if _is_brpop_idle_timeout(e):
+                _log_queue_idle_wait(self.queue_name, brpop_timeout_s=timeout)
+                return None
+            if REDIS_AVAILABLE and redis is not None and isinstance(
+                e, (redis.ConnectionError, OSError)
+            ):
+                _log_dequeue_reconnect(self.queue_name, str(e))
+                self._reconnect_redis_clients()
+                return None
+            logger.error(
+                "Job dequeue failed",
+                extra={
+                    "event": "job_dequeue_failed",
+                    "service": "background_job",
+                    "severity": "ERROR",
+                    "metadata": {"queue_name": self.queue_name, "error": str(e)},
+                },
+            )
             return None
     
     def complete_job(self, job_id: str, result: Any = None):

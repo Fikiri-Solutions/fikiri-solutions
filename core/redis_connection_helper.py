@@ -14,8 +14,9 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 logger = logging.getLogger(__name__)
 
 _cache_lock = threading.Lock()
-# Reuse clients per (decode_responses, db) — avoids new TCP + INFO spam on every /api/health poll.
-_redis_client_cache: Dict[Tuple[bool, int], "redis.Redis"] = {}
+# Reuse clients per (decode_responses, db, socket_timeout) — avoids new TCP + INFO spam on every /api/health poll.
+# socket_timeout=None is a separate cache entry for blocking BRPOP workers (no read timeout).
+_redis_client_cache: Dict[Tuple[bool, int, Optional[float]], "redis.Redis"] = {}
 _connection_info_logged: set = set()
 # After the first failed connect/auth for a given target, skip retries and duplicate ERROR logs (import-time fan-out).
 _redis_failed_for_identity: Optional[str] = None
@@ -95,14 +96,20 @@ def reset_redis_connection_helper_cache() -> None:
     _redis_failed_for_identity = None
 
 
-def get_redis_client(decode_responses: bool = True, db: int = 0) -> Optional[redis.Redis]:
+def get_redis_client(
+    decode_responses: bool = True,
+    db: int = 0,
+    socket_timeout: Optional[float] = 5,
+) -> Optional[redis.Redis]:
     """
     Get a Redis client with proper SSL handling for Upstash Redis.
-    Returns a cached client per (decode_responses, db) for the process lifetime.
+    Returns a cached client per (decode_responses, db, socket_timeout) for the process lifetime.
     
     Args:
         decode_responses: Whether to decode responses as strings
         db: Redis database number
+        socket_timeout: Read timeout in seconds for socket operations. Use None for
+            blocking queue workers (BRPOP) so idle polls do not raise socket timeouts.
     
     Returns:
         Redis client or None if connection fails
@@ -118,7 +125,7 @@ def get_redis_client(decode_responses: bool = True, db: int = 0) -> Optional[red
     if _redis_failed_for_identity == ident:
         return None
 
-    cache_key = (decode_responses, db)
+    cache_key = (decode_responses, db, socket_timeout)
     with _cache_lock:
         cached = _redis_client_cache.get(cache_key)
         if cached is not None:
@@ -139,13 +146,14 @@ def get_redis_client(decode_responses: bool = True, db: int = 0) -> Optional[red
             # redis-py: TLS SSL options must be in the URL query string for from_url
             if redis_url.startswith("rediss://"):
                 redis_url = _normalize_rediss_url_tls(redis_url)
-            client = redis.from_url(
-                redis_url,
-                decode_responses=decode_responses,
-                db=db,
-                socket_connect_timeout=5,
-                socket_timeout=5,
-            )
+            url_kwargs = {
+                "decode_responses": decode_responses,
+                "db": db,
+                "socket_connect_timeout": 5,
+            }
+            if socket_timeout is not None:
+                url_kwargs["socket_timeout"] = socket_timeout
+            client = redis.from_url(redis_url, **url_kwargs)
             
             # Test connection
             client.ping()
@@ -167,15 +175,17 @@ def get_redis_client(decode_responses: bool = True, db: int = 0) -> Optional[red
             redis_port = int(os.getenv('REDIS_PORT', 6379))
             redis_password = os.getenv('REDIS_PASSWORD')
             
-            client = redis.Redis(
-                host=redis_host,
-                port=redis_port,
-                password=redis_password,
-                db=db,
-                decode_responses=decode_responses,
-                socket_connect_timeout=5,
-                socket_timeout=5,
-            )
+            local_kwargs = {
+                "host": redis_host,
+                "port": redis_port,
+                "password": redis_password,
+                "db": db,
+                "decode_responses": decode_responses,
+                "socket_connect_timeout": 5,
+            }
+            if socket_timeout is not None:
+                local_kwargs["socket_timeout"] = socket_timeout
+            client = redis.Redis(**local_kwargs)
             client.ping()
             with _cache_lock:
                 _redis_client_cache[cache_key] = client

@@ -49,21 +49,8 @@ def register_tasks():
     except Exception as e:
         logger.warning("Could not register process_durable_background_job: %s", e)
     
-    # Register email sending task (if exists)
-    try:
-        from email_automation.actions import MinimalEmailActions
-        email_actions = MinimalEmailActions()
-        email_queue.register_task('send_email', email_actions.send_email)
-    except Exception as e:
-        logger.warning(f"Could not register send_email task: {e}")
-    
-    # Register AI processing task
-    try:
-        from email_automation.ai_assistant import MinimalAIEmailAssistant
-        ai_assistant = MinimalAIEmailAssistant()
-        ai_queue.register_task('process_ai_request', ai_assistant.process_request)
-    except Exception as e:
-        logger.warning(f"Could not register AI task: {e}")
+    # send_email / process_ai_request are registered via @task in core.redis_queues at import.
+    # MinimalEmailActions / MinimalAIEmailAssistant do not expose those methods; skip duplicate registration.
     
     # Register CRM update task
     try:

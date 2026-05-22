@@ -5,6 +5,7 @@ Covers: redis_connection_helper, redis_cache, redis_sessions, redis_pool, redis_
 
 import os
 import sys
+import pytest
 from unittest.mock import patch, MagicMock
 
 os.environ.setdefault("FLASK_ENV", "test")
@@ -222,6 +223,119 @@ class TestRedisQueues:
         with pytest.raises(Exception) as exc_info:
             q.enqueue_job("task1", {})
         assert "not connected" in str(exc_info.value).lower() or "redis" in str(exc_info.value).lower()
+
+    def test_is_brpop_idle_timeout_detects_redis_timeout(self):
+        import redis
+        from core.redis_queues import _is_brpop_idle_timeout
+        assert _is_brpop_idle_timeout(redis.TimeoutError("Timeout reading from socket")) is True
+        assert _is_brpop_idle_timeout(Exception("timeout reading from socket")) is True
+        assert _is_brpop_idle_timeout(Exception("connection refused")) is False
+
+    @patch("core.redis_connection_helper.get_redis_client")
+    @patch("core.redis_queues.get_config")
+    def test_dequeue_brpop_idle_timeout_returns_none_without_error_log(
+        self, mock_config, mock_get_client
+    ):
+        import redis
+        from core.redis_queues import RedisQueue
+
+        mock_config.return_value = MagicMock(redis_db=0)
+        regular = MagicMock()
+        regular.ping.return_value = True
+        regular.zrangebyscore.return_value = []
+        blocking = MagicMock()
+        blocking.ping.return_value = True
+        blocking.brpop.side_effect = redis.TimeoutError("Timeout reading from socket")
+
+        def client_factory(*_args, **kwargs):
+            if kwargs.get("socket_timeout") is None:
+                return blocking
+            return regular
+
+        mock_get_client.side_effect = client_factory
+
+        q = RedisQueue(queue_name="test:queue")
+        q.redis_client = regular
+        q._blocking_redis_client = blocking
+
+        assert q.dequeue_job(timeout=5) is None
+        blocking.brpop.assert_called_once()
+
+    @patch("core.redis_connection_helper.get_redis_client")
+    @patch("core.redis_queues.get_config")
+    def test_dequeue_connection_error_reconnects(self, mock_config, mock_get_client):
+        import redis
+        from core.redis_queues import RedisQueue
+
+        mock_config.return_value = MagicMock(redis_db=0)
+        regular = MagicMock()
+        regular.ping.return_value = True
+        regular.zrangebyscore.return_value = []
+        blocking = MagicMock()
+        blocking.ping.return_value = True
+        blocking.brpop.side_effect = redis.ConnectionError("Connection reset by peer")
+
+        def client_factory(*_args, **kwargs):
+            if kwargs.get("socket_timeout") is None:
+                return blocking
+            return regular
+
+        mock_get_client.side_effect = client_factory
+
+        q = RedisQueue(queue_name="test:queue")
+        q.redis_client = regular
+        q._blocking_redis_client = blocking
+
+        with patch.object(q, "_reconnect_redis_clients") as mock_reconnect:
+            assert q.dequeue_job(timeout=5) is None
+            mock_reconnect.assert_called_once()
+
+    @patch("core.redis_queues.time.sleep")
+    def test_start_worker_idle_timeout_does_not_fail_job(self, mock_sleep):
+        from core.redis_queues import RedisQueue, start_worker
+
+        class _TestWorkerExit(BaseException):
+            pass
+
+        queue = MagicMock(spec=RedisQueue)
+        queue.queue_name = "fikiri:email"
+        queue.dequeue_job.side_effect = [None, _TestWorkerExit()]
+        queue._registered_tasks = {}
+
+        with pytest.raises(_TestWorkerExit):
+            start_worker(queue, worker_name="test-worker")
+
+        assert queue.dequeue_job.call_count >= 1
+        queue.fail_job.assert_not_called()
+        queue.complete_job.assert_not_called()
+
+    @patch("core.redis_queues.time.sleep")
+    def test_start_worker_task_exception_marks_job_failed(self, mock_sleep):
+        from core.redis_queues import RedisQueue, Job, JobStatus, start_worker
+        import time
+
+        class _TestWorkerExit(BaseException):
+            pass
+
+        job = Job(
+            id="job-1",
+            task="failing_task",
+            args={},
+            status=JobStatus.PENDING,
+            created_at=time.time(),
+        )
+        queue = MagicMock(spec=RedisQueue)
+        queue.queue_name = "fikiri:email"
+        queue.dequeue_job.side_effect = [job, _TestWorkerExit()]
+        queue._registered_tasks = {
+            "failing_task": lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("boom"))
+        }
+
+        with pytest.raises(_TestWorkerExit):
+            start_worker(queue, worker_name="test-worker")
+
+        queue.fail_job.assert_called_once()
+        assert "boom" in queue.fail_job.call_args[0][1]
 
 
 class TestRedisMonitor:
