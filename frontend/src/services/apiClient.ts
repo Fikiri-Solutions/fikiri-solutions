@@ -1608,6 +1608,17 @@ class ApiClient {
     return response.data?.statistics || {}
   }
 
+  async getChatbotRetrievalHealth(): Promise<{
+    tenant_id: string
+    summary: Record<string, number | boolean>
+    pipelines: Record<string, unknown>
+    preview_live_parity: boolean
+    vector_search_enabled: boolean
+  }> {
+    const response = await this.client.get('/chatbot/knowledge/retrieval-health')
+    return response.data?.health || response.data
+  }
+
   async getFaqCategories(): Promise<string[]> {
     const response = await this.client.get('/chatbot/faq/categories')
     return response.data?.categories || []

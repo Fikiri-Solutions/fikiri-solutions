@@ -1486,6 +1486,40 @@ class DatabaseOptimizer:
             CREATE INDEX IF NOT EXISTS idx_chatbot_kb_current_tenant_id
             ON chatbot_kb_current (tenant_id)
         """)
+
+        # Per-artifact ingest/index lifecycle (authoritative ops state; additive)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS chatbot_knowledge_lifecycle (
+                artifact_id TEXT NOT NULL,
+                artifact_type TEXT NOT NULL,
+                tenant_id TEXT NOT NULL,
+                user_id INTEGER,
+                lifecycle_state TEXT NOT NULL DEFAULT 'stored',
+                extraction_status TEXT NOT NULL DEFAULT 'n/a',
+                storage_status TEXT NOT NULL DEFAULT 'pending',
+                chunk_status TEXT NOT NULL DEFAULT 'pending',
+                vectorization_status TEXT NOT NULL DEFAULT 'pending',
+                retrieval_ready INTEGER NOT NULL DEFAULT 0,
+                vector_chunk_count INTEGER NOT NULL DEFAULT 0,
+                last_indexed_at TIMESTAMP,
+                last_error TEXT,
+                retryable INTEGER NOT NULL DEFAULT 0,
+                content_fingerprint TEXT,
+                durable_job_id TEXT,
+                metadata_json TEXT,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (artifact_id, artifact_type)
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_chatbot_klc_tenant
+            ON chatbot_knowledge_lifecycle (tenant_id, updated_at DESC)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_chatbot_klc_ready
+            ON chatbot_knowledge_lifecycle (tenant_id, retrieval_ready)
+        """)
         
         # KPI tracking table for historical KPI data
         cursor.execute("""

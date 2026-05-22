@@ -36,6 +36,13 @@ export const ChatbotBuilder: React.FC = () => {
     refetchInterval: 5 * 60 * 1000, // Auto-refresh every 5 minutes
   })
 
+  const { data: retrievalHealth } = useQuery({
+    queryKey: ['chatbot-retrieval-health'],
+    queryFn: () => apiClient.getChatbotRetrievalHealth(),
+    staleTime: 60 * 1000,
+    refetchInterval: 2 * 60 * 1000,
+  })
+
   const { data: faqCategories } = useQuery({
     queryKey: ['faq-categories'],
     queryFn: () => apiClient.getFaqCategories(),
@@ -60,6 +67,7 @@ export const ChatbotBuilder: React.FC = () => {
       addToast({ type: 'success', title: 'FAQ Saved', message: 'FAQ has been saved successfully' })
       setFaqForm({ question: '', answer: '', category: 'general', keywords: '' })
       void queryClient.invalidateQueries({ queryKey: ['faq-stats'] })
+      void queryClient.invalidateQueries({ queryKey: ['chatbot-retrieval-health'] })
     },
     onError: () => addToast({ type: 'error', title: 'Save Failed', message: 'Unable to save FAQ' })
   })
@@ -70,13 +78,17 @@ export const ChatbotBuilder: React.FC = () => {
       addToast({ type: 'success', title: 'Document Saved', message: 'Business info saved to knowledge base' })
       setDocForm({ title: '', summary: '', category: 'general', content: '' })
       void queryClient.invalidateQueries({ queryKey: ['faq-stats'] })
+      void queryClient.invalidateQueries({ queryKey: ['chatbot-retrieval-health'] })
     },
     onError: () => addToast({ type: 'error', title: 'Save Failed', message: 'Unable to save document' })
   })
 
   const vectorMutation = useMutation({
     mutationFn: apiClient.vectorizeKnowledge,
-    onSuccess: () => addToast({ type: 'success', title: 'Content Vectorized', message: 'Content has been vectorized successfully' }),
+    onSuccess: () => {
+      addToast({ type: 'success', title: 'Content Vectorized', message: 'Content has been vectorized successfully' })
+      void queryClient.invalidateQueries({ queryKey: ['chatbot-retrieval-health'] })
+    },
     onError: () => addToast({ type: 'error', title: 'Vectorization Failed', message: 'Vectorization failed' })
   })
 
@@ -488,18 +500,50 @@ export const ChatbotBuilder: React.FC = () => {
           </div>
 
           <div className="rounded-2xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm space-y-3">
-            <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400">Stats</p>
-            <h2 className="text-lg font-semibold text-brand-text dark:text-white">Knowledge health</h2>
+            <p className="text-xs uppercase tracking-wide text-brand-text/60 dark:text-gray-400">Retrieval readiness</p>
+            <h2 className="text-lg font-semibold text-brand-text dark:text-white">Knowledge pipeline</h2>
+            <p className="text-xs text-brand-text/60 dark:text-gray-400">
+              Upload extracts text only. Save to knowledge base or vectorize to make content searchable. Preview uses the same path as your live widget.
+            </p>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-2xl font-bold text-brand-text dark:text-white">{faqStats?.total_faqs ?? 0}</p>
-                <p className="text-xs text-brand-text/60 dark:text-gray-400">FAQs</p>
+                <p className="text-2xl font-bold text-brand-text dark:text-white">
+                  {retrievalHealth?.summary?.kb_semantic_ready_count ?? 0}
+                </p>
+                <p className="text-xs text-brand-text/60 dark:text-gray-400">KB embedded (semantic)</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-brand-text dark:text-white">{faqStats?.helpful_votes ?? 0}</p>
-                <p className="text-xs text-brand-text/60 dark:text-gray-400">Helpful votes</p>
+                <p className="text-2xl font-bold text-brand-text dark:text-white">
+                  {retrievalHealth?.summary?.kb_stored_count ?? 0}
+                </p>
+                <p className="text-xs text-brand-text/60 dark:text-gray-400">KB stored (keyword)</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-brand-text dark:text-white">
+                  {retrievalHealth?.summary?.tenant_faq_count ?? 0}
+                </p>
+                <p className="text-xs text-brand-text/60 dark:text-gray-400">Your FAQs</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-brand-text dark:text-white">
+                  {retrievalHealth?.summary?.pending_vectorization_count ?? 0}
+                </p>
+                <p className="text-xs text-brand-text/60 dark:text-gray-400">Pending embed</p>
               </div>
             </div>
+            {(retrievalHealth?.summary?.failed_artifact_count as number) > 0 ||
+            (retrievalHealth?.summary?.failed_vector_jobs_count as number) > 0 ? (
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                {(retrievalHealth?.summary?.failed_artifact_count as number) || 0} indexing failure(s),{' '}
+                {(retrievalHealth?.summary?.failed_vector_jobs_count as number) || 0} failed background job(s).
+                Re-save or vectorize again to retry.
+              </p>
+            ) : null}
+            <p className="text-xs text-brand-text/50 dark:text-gray-500 border-t border-brand-text/10 dark:border-gray-700 pt-2">
+              Platform seed FAQs: {retrievalHealth?.summary?.platform_seed_faq_count ?? faqStats?.total_faqs ?? 0}
+              {' · '}
+              Helpful votes: {faqStats?.helpful_votes ?? 0}
+            </p>
           </div>
         </div>
       </div>

@@ -235,6 +235,38 @@ class TestVectorizeEndpointChunking(unittest.TestCase):
         self.assertIn("parent_doc_id", data)
         self.assertGreaterEqual(vs.add_document.call_count, 2)
 
+    @patch("core.chatbot_smart_faq_api.get_current_user_id")
+    @patch("core.chatbot_smart_faq_api.get_vector_search")
+    def test_vectorize_injects_session_tenant_when_metadata_omits_it(
+        self, mock_get_vs, mock_get_user
+    ):
+        from flask import Flask
+        from core.chatbot_smart_faq_api import chatbot_bp
+
+        mock_get_user.return_value = 42
+        vs = MagicMock()
+        vs.use_pinecone = False
+        vs.add_document.return_value = 101
+        mock_get_vs.return_value = vs
+
+        app = Flask(__name__)
+        app.config["TESTING"] = True
+        app.register_blueprint(chatbot_bp)
+        client = app.test_client()
+
+        response = client.post(
+            "/api/chatbot/knowledge/vectorize",
+            json={"content": "Our hours are 9am to 5pm weekdays.", "metadata": {"source": "builder"}},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        vs.add_document.assert_called()
+        metadata = vs.add_document.call_args.kwargs.get("metadata") or vs.add_document.call_args[1].get(
+            "metadata"
+        )
+        self.assertEqual(metadata.get("tenant_id"), "42")
+        self.assertEqual(metadata.get("user_id"), 42)
+
 
 if __name__ == "__main__":
     unittest.main()

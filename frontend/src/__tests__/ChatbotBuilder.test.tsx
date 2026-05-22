@@ -13,6 +13,7 @@ const { apiClientMock, runPreviewMock, addToastMock } = vi.hoisted(() => ({
     addKnowledgeDocument: vi.fn(),
     vectorizeKnowledge: vi.fn(),
     getFaqStats: vi.fn(),
+    getChatbotRetrievalHealth: vi.fn(),
     getFaqCategories: vi.fn(),
     previewChatbotQuery: vi.fn(),
   },
@@ -53,6 +54,20 @@ describe('ChatbotBuilder preview', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     apiClientMock.getFaqStats.mockResolvedValue({ total_faqs: 2, helpful_votes: 1 })
+    apiClientMock.getChatbotRetrievalHealth.mockResolvedValue({
+      tenant_id: '1',
+      summary: {
+        kb_semantic_ready_count: 1,
+        kb_stored_count: 2,
+        tenant_faq_count: 0,
+        pending_vectorization_count: 0,
+        platform_seed_faq_count: 16,
+        failed_artifact_count: 0,
+        failed_vector_jobs_count: 0,
+      },
+      preview_live_parity: true,
+      vector_search_enabled: true,
+    })
     apiClientMock.getFaqCategories.mockResolvedValue(['general'])
     runPreviewMock.mockResolvedValue({
       botPreview: {

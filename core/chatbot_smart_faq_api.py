@@ -42,6 +42,15 @@ from core.chatbot_vector_chunk_ingestion import (
     ingest_kb_text_to_vector_store_tracked,
 )
 from core.chatbot_vector_chunk_cleanup import delete_kb_chunk_vectors, kb_vector_metadata_fields
+from core.chatbot_knowledge_lifecycle import (
+    compute_tenant_retrieval_health,
+    mark_faq_stored,
+    mark_faq_vectorization_completed,
+    mark_faq_vectorization_failed,
+    mark_kb_stored,
+    mark_kb_vectorization_completed,
+    mark_kb_vectorization_failed,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +115,27 @@ def _resolve_faq_user_id() -> Optional[int]:
         return None
 
 
+def _resolve_kb_tenant_scope() -> tuple[Optional[str], Optional[Any]]:
+    """Tenant + user from API key (public) or session (dashboard builder)."""
+    tenant_id: Optional[str] = None
+    user_id: Any = None
+    try:
+        info = getattr(g, "api_key_info", None) or {}
+        if info:
+            tenant_id = info.get("tenant_id")
+            user_id = info.get("user_id")
+    except Exception:
+        pass
+    if not tenant_id and user_id is None:
+        try:
+            user_id = get_current_user_id()
+            if user_id is not None:
+                tenant_id = str(user_id)
+        except Exception:
+            pass
+    return tenant_id, user_id
+
+
 def _kb_metadata_user_fields(tenant_id: Optional[str], user_id: Any) -> Dict[str, Any]:
     """Normalize user_id to int in metadata when possible so user_id in DB/events matches."""
     meta: Dict[str, Any] = {}
@@ -117,6 +147,18 @@ def _kb_metadata_user_fields(tenant_id: Optional[str], user_id: Any) -> Dict[str
     elif user_id is not None:
         meta["user_id"] = user_id
     return meta
+
+
+def _merge_vector_tenant_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
+    """Ensure vector metadata includes tenant scope when the caller is authenticated."""
+    merged = dict(metadata or {})
+    tenant_id, user_id = _resolve_kb_tenant_scope()
+    if tenant_id and "tenant_id" not in merged:
+        merged["tenant_id"] = tenant_id
+    uid_int = _coerce_numeric_user_id(user_id)
+    if uid_int is not None and "user_id" not in merged:
+        merged["user_id"] = uid_int
+    return merged
 
 
 def _ingest_kb_vectors(
@@ -309,6 +351,9 @@ def create_faq_entry():
             correlation_id=correlation_id,
         )
 
+        faq_tenant = str(actor_id) if actor_id is not None else "global"
+        mark_faq_stored(faq_id=str(faq_id), tenant_id=faq_tenant, user_id=actor_id)
+
         # Persist FAQ to vector index for semantic search
         vector_id = None
         try:
@@ -319,20 +364,31 @@ def create_faq_entry():
             
             vector_id = get_vector_search().add_document(
                 content=faq_content,
-                metadata={
+                metadata=_merge_vector_tenant_metadata({
                     "type": "faq",
                     "faq_id": faq_id,
                     "question": question,
                     "category": category,
-                    "priority": priority
-                }
+                    "priority": priority,
+                }),
             )
             logger.info(f"✅ FAQ {faq_id} persisted to vector index: {vector_id}")
             if vector_id is not None:
                 set_faq_vector_key(faq_id, str(vector_id))
+            mark_faq_vectorization_completed(
+                faq_id=str(faq_id),
+                tenant_id=faq_tenant,
+                user_id=actor_id,
+                vector_key=str(vector_id) if vector_id is not None else None,
+            )
         except Exception as e:
             logger.warning(f"⚠️ Failed to persist FAQ to vector index: {e}")
-            # Don't fail the request if vectorization fails
+            mark_faq_vectorization_failed(
+                faq_id=str(faq_id),
+                tenant_id=faq_tenant,
+                user_id=actor_id,
+                error=str(e),
+            )
 
         return jsonify({
             "success": True,
@@ -401,13 +457,13 @@ def update_faq_entry(faq_id: str):
     faq_content = f"Question: {faq.question}\nAnswer: {faq.answer}"
     if faq.keywords:
         faq_content += f"\nKeywords: {', '.join(faq.keywords)}"
-    meta = {
+    meta = _merge_vector_tenant_metadata({
         "type": "faq",
         "faq_id": faq_id,
         "question": faq.question,
         "category": faq.category.value,
         "priority": faq.priority,
-    }
+    })
     vk = get_faq_vector_key(faq_id)
     try:
         vs = get_vector_search()
@@ -602,32 +658,7 @@ def create_knowledge_document():
         if not isinstance(keywords, list):
             keywords = [keywords]
 
-        # Extract tenant_id and user_id for multi-tenant isolation
-        tenant_id = None
-        user_id = None
-        
-        # Try API key auth first (for public API)
-        try:
-            from flask import g
-            if hasattr(g, 'api_key_info') and g.api_key_info:
-                tenant_id = g.api_key_info.get('tenant_id')
-                user_id = g.api_key_info.get('user_id')
-        except Exception:
-            pass
-        
-        # Fallback to session auth (for authenticated users)
-        if not tenant_id and not user_id:
-            try:
-                from flask import g
-                from core.secure_sessions import get_current_user_id
-                user_id = get_current_user_id()
-                # For session-based auth, tenant_id might be same as user_id or derived from user
-                # For now, use user_id as tenant_id if no explicit tenant_id exists
-                if user_id:
-                    tenant_id = str(user_id)  # Use user_id as tenant_id for single-tenant users
-            except Exception:
-                pass
-
+        tenant_id, user_id = _resolve_kb_tenant_scope()
         kb_metadata = _kb_metadata_user_fields(tenant_id, user_id)
         correlation_id = get_or_create_correlation_id(request, request.get_json(silent=True))
         actor_uid = _coerce_numeric_user_id(user_id)
@@ -646,6 +677,14 @@ def create_knowledge_document():
             source="api.chatbot.knowledge.create",
             user_id=actor_uid,
         )
+
+        effective_tenant = tenant_id or (str(actor_uid) if actor_uid is not None else None)
+        if effective_tenant:
+            mark_kb_stored(
+                doc_id=doc_id,
+                tenant_id=effective_tenant,
+                user_id=actor_uid,
+            )
 
         # Persist document to vector index for semantic search; store vector_id for future sync on update/delete
         vector_id = None
@@ -687,8 +726,32 @@ def create_knowledge_document():
                     source="api.chatbot.knowledge.vector_link",
                     user_id=actor_uid,
                 )
+            if effective_tenant:
+                if vector_ids:
+                    mark_kb_vectorization_completed(
+                        doc_id=doc_id,
+                        tenant_id=effective_tenant,
+                        user_id=actor_uid,
+                        vector_chunk_count=len(vector_ids),
+                    )
+                else:
+                    mark_kb_vectorization_failed(
+                        doc_id=doc_id,
+                        tenant_id=effective_tenant,
+                        user_id=actor_uid,
+                        error="vector ingest returned no chunk ids",
+                        retryable=True,
+                    )
         except Exception as e:
             logger.warning(f"⚠️ Failed to persist document to vector index: {e}")
+            if effective_tenant:
+                mark_kb_vectorization_failed(
+                    doc_id=doc_id,
+                    tenant_id=effective_tenant,
+                    user_id=actor_uid,
+                    error=str(e),
+                    retryable=True,
+                )
 
         return jsonify({
             "success": True,
@@ -1134,11 +1197,40 @@ def vectorize_document_content():
         if not isinstance(metadata, dict):
             metadata = {}
 
+        metadata = _merge_vector_tenant_metadata(metadata)
+
         vs = get_vector_search()
         parent_doc_id = str(
             metadata.get("parent_doc_id") or metadata.get("document_id") or uuid.uuid4()
         )
+        tenant_id, user_id = _resolve_kb_tenant_scope()
+        actor_uid = _coerce_numeric_user_id(user_id)
+        effective_tenant = tenant_id or (str(actor_uid) if actor_uid is not None else None)
+        if effective_tenant:
+            mark_kb_stored(
+                doc_id=parent_doc_id,
+                tenant_id=effective_tenant,
+                user_id=actor_uid,
+            )
+
         vector_ids, vector_id = _ingest_kb_vectors(vs, content, parent_doc_id, metadata)
+
+        if effective_tenant:
+            if vector_ids:
+                mark_kb_vectorization_completed(
+                    doc_id=parent_doc_id,
+                    tenant_id=effective_tenant,
+                    user_id=actor_uid,
+                    vector_chunk_count=len(vector_ids),
+                )
+            else:
+                mark_kb_vectorization_failed(
+                    doc_id=parent_doc_id,
+                    tenant_id=effective_tenant,
+                    user_id=actor_uid,
+                    error="vector ingest returned no chunk ids",
+                    retryable=True,
+                )
 
         return jsonify({
             "success": True,
@@ -1151,6 +1243,20 @@ def vectorize_document_content():
     except Exception as e:
         logger.error(f"❌ Failed to vectorize content: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+@chatbot_bp.route('/knowledge/retrieval-health', methods=['GET'])
+@handle_api_errors
+def get_knowledge_retrieval_health():
+    """
+    Tenant-scoped truthful retrieval readiness (dashboard / ops).
+    Does not expose retrieval_debug or embedding internals.
+    """
+    user_id = _require_authenticated_user_id()
+    if not user_id:
+        return create_error_response("Authentication required", 401, "AUTHENTICATION_REQUIRED")
+    tenant_id = str(user_id)
+    health = compute_tenant_retrieval_health(tenant_id, user_id)
+    return jsonify({"success": True, "health": health})
 
 # Context-Aware Conversation Endpoints
 
