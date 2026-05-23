@@ -3,7 +3,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Mail, RefreshCw, Activity, AlertCircle, Clock, Shield, Loader2 } from 'lucide-react'
 import { GmailConnection } from '../components/GmailConnection'
 import { useAuth } from '../contexts/AuthContext'
-import { apiClient, EmailSyncStatus, GmailConnectionStatus } from '../services/apiClient'
+import {
+  apiClient,
+  EmailSyncStatus,
+  GmailConnectionStatus,
+  GmailSyncResponse,
+} from '../services/apiClient'
 import { useToast } from '../components/Toast'
 import { DEFAULT_GMAIL_LOOKBACK_PRESETS, GmailSyncOptions } from '../components/GmailSyncOptions'
 import {
@@ -31,8 +36,6 @@ export const GmailConnect: React.FC = () => {
   const { user } = useAuth()
   const { addToast } = useToast()
   const queryClient = useQueryClient()
-  type SyncResponse = { message?: string; data?: { message?: string } }
-
   /** Only after explicit update — avoids showing queue/spinner from a stale DB row on page load. */
   const [syncUiSession, setSyncUiSession] = useState(false)
   const [gmailLookbackId, setGmailLookbackId] = useState(() => loadGmailLookbackId('90d'))
@@ -60,8 +63,8 @@ export const GmailConnect: React.FC = () => {
         continue_sync: opts?.continue_sync,
       }),
     onMutate: () => setSyncUiSession(true),
-    onSuccess: (data: SyncResponse) => {
-      const message = data?.message || data?.data?.message || 'Gmail sync triggered successfully'
+    onSuccess: (data: GmailSyncResponse) => {
+      const message = data?.message || 'Gmail sync triggered successfully'
       addToast({
         type: 'success',
         title: 'Gmail Sync Started',
@@ -352,7 +355,7 @@ export const GmailConnect: React.FC = () => {
               Refresh
             </button>
             <button
-              onClick={() => syncMutation.mutate()}
+              onClick={() => syncMutation.mutate(undefined)}
               disabled={
                 syncMutation.isPending || gmailStatus?.connected === false || isActivelySyncing
               }

@@ -225,7 +225,19 @@ export interface EmailSyncStatus {
   emails_synced_this_job?: number
   error?: string
   sync_cursor?: GmailSyncCursor
+  /** Active import window when not nested under sync_cursor */
+  lookback_days?: number
   lookback_presets?: GmailLookbackPreset[]
+}
+
+export interface GmailSyncResponse {
+  message: string
+  data?: {
+    job_id?: string
+    lookback_days?: number
+    max_messages?: number
+    lookback_presets?: GmailLookbackPreset[]
+  }
 }
 
 export interface GmailSyncOptions {
@@ -1342,15 +1354,7 @@ class ApiClient {
     return statusData
   }
 
-  async triggerGmailSync(options?: GmailSyncOptions): Promise<{
-    message: string
-    data?: {
-      job_id?: string
-      lookback_days?: number
-      max_messages?: number
-      lookback_presets?: GmailLookbackPreset[]
-    }
-  }> {
+  async triggerGmailSync(options?: GmailSyncOptions): Promise<GmailSyncResponse> {
     const payload: Record<string, unknown> = {
       user_id: this.getUserId() ?? 1,
     }
@@ -1499,7 +1503,7 @@ class ApiClient {
     subject: string,
     content: string,
     from: string,
-    analysis?: Record<string, unknown>
+    analysis?: object
   ): Promise<any> {
     const response = await this.client.post(
       '/ai/generate-reply',

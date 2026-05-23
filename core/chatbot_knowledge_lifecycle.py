@@ -116,7 +116,7 @@ def upsert_lifecycle_row(
                 retryable = excluded.retryable,
                 content_fingerprint = COALESCE(
                     excluded.content_fingerprint,
-                    chatbot_knowledge_lifecycle.content_fingerprint,
+                    chatbot_knowledge_lifecycle.content_fingerprint
                 ),
                 durable_job_id = COALESCE(excluded.durable_job_id, chatbot_knowledge_lifecycle.durable_job_id),
                 metadata_json = COALESCE(excluded.metadata_json, chatbot_knowledge_lifecycle.metadata_json),
