@@ -515,7 +515,7 @@ const PricingPage: React.FC = () => {
               </p>
             </div>
             <button
-              onClick={() => navigate('/support/contact')}
+              onClick={() => navigate('/contact')}
               className="px-4 py-2 bg-brand-primary hover:bg-fikiri-400 text-white font-medium rounded-lg transition-all duration-300"
             >
               Book Consultation

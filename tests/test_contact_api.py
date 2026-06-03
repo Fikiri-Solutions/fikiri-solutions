@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Tests for public contact form persistence."""
 
-import unittest
 import json
 import os
-from unittest.mock import patch
-from flask import Flask
 import sys
+import unittest
+from unittest.mock import patch
+
+from flask import Flask
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -53,7 +54,10 @@ class TestContactApi(unittest.TestCase):
     @patch("core.contact_api.db_optimizer")
     @patch("core.contact_api._send_contact_email")
     def test_submit_contact_failure_persists_with_failed_status(
-        self, mock_send, mock_db, *_,
+        self,
+        mock_send,
+        mock_db,
+        *_,
     ):
         mock_send.return_value = False
         mock_db.execute_query.return_value = None
@@ -124,7 +128,46 @@ class TestContactApi(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         mock_send.assert_not_called()
 
+    @patch("core.contact_api.db_optimizer")
+    @patch("core.contact_api._send_contact_email")
+    def test_submit_contact_honeypot_returns_success_without_sending(
+        self, mock_send, mock_db
+    ):
+        payload = {
+            "name": "Spam Bot",
+            "email": "bot@example.com",
+            "message": "Buy now",
+            "leave_blank": "filled",
+        }
+
+        response = self.client.post("/api/contact", json=payload)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data.get("success"))
+        mock_send.assert_not_called()
+        mock_db.execute_query.assert_not_called()
+
+    @patch("core.contact_api.CONTACT_FROM_EMAIL", "noreply@test.com")
+    @patch("core.contact_api.CONTACT_TO_EMAIL", "info@test.com")
+    @patch("core.contact_api.db_optimizer")
+    @patch("core.contact_api._send_contact_email")
+    def test_submit_contact_escapes_html_in_email_body(self, mock_send, mock_db, *_):
+        mock_send.return_value = True
+        mock_db.execute_query.return_value = None
+
+        payload = {
+            "name": "<b>Jane</b>",
+            "email": "jane@example.com",
+            "message": "<script>alert(1)</script>",
+        }
+
+        response = self.client.post("/api/contact", json=payload)
+        self.assertEqual(response.status_code, 200)
+        sent_body = mock_send.call_args[0][2]
+        self.assertIn("&lt;b&gt;Jane&lt;/b&gt;", sent_body)
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", sent_body)
+        self.assertNotIn("<script>alert(1)</script>", sent_body)
+
 
 if __name__ == "__main__":
     unittest.main()
-

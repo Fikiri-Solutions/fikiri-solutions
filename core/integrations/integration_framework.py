@@ -7,6 +7,7 @@ Provider-agnostic integration system for Calendar, CRM, Payments, etc.
 import os
 import json
 import logging
+import threading
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from abc import ABC, abstractmethod
@@ -88,6 +89,8 @@ class IntegrationManager:
     def __init__(self):
         self._initialize_tables()
         self._providers: Dict[str, IntegrationProvider] = {}
+        self._refresh_locks: Dict[int, threading.Lock] = {}
+        self._refresh_locks_guard = threading.Lock()
     
     def _initialize_tables(self):
         """Create integration framework tables"""
@@ -393,8 +396,25 @@ class IntegrationManager:
             'meta': json.loads(integration.get('meta_json') or '{}')
         }
     
+    def _get_refresh_lock(self, integration_id: int) -> threading.Lock:
+        """Return a same-process lock for one integration refresh."""
+        with self._refresh_locks_guard:
+            lock = self._refresh_locks.get(integration_id)
+            if lock is None:
+                lock = threading.Lock()
+                self._refresh_locks[integration_id] = lock
+            return lock
+
     def _refresh_token_safely(self, integration_id: int, provider: str, refresh_token: str) -> Optional[Dict]:
         """Refresh token with concurrency protection - HTTP call outside transaction"""
+        # The database row lock protects cross-process workers; this same-process
+        # lock prevents sibling web/worker threads from reading the old token then
+        # refreshing again immediately after the first thread releases the DB row.
+        with self._get_refresh_lock(integration_id):
+            return self._refresh_token_safely_locked(integration_id, provider, refresh_token)
+
+    def _refresh_token_safely_locked(self, integration_id: int, provider: str, refresh_token: str) -> Optional[Dict]:
+        """Refresh token after the per-integration same-process lock is held."""
         # Get current token state
         tokens = self.get_integration_tokens(integration_id)
         if not tokens:
@@ -432,37 +452,43 @@ class IntegrationManager:
         # Acquire lock (atomic CAS update) - COMMIT IMMEDIATELY
         lock_acquired = False
         try:
-            # Update only if status is 'idle' (atomic operation)
-            db_optimizer.execute_query("""
+            # Update only if status is 'idle' (atomic operation). The rowcount is the
+            # lock signal; reading status after our own update would otherwise make the
+            # lock holder look like "another process" and skip the refresh entirely.
+            rows_updated = db_optimizer.execute_query("""
                 UPDATE integration_sync_state 
                 SET status = 'refreshing', updated_at = CURRENT_TIMESTAMP
                 WHERE integration_id = ? AND resource = 'token_refresh' AND status = 'idle'
             """, (integration_id,), fetch=False)
-            
-            # Verify lock was acquired (check if status changed)
-            sync_state = db_optimizer.execute_query("""
-                SELECT status, updated_at FROM integration_sync_state
-                WHERE integration_id = ? AND resource = 'token_refresh'
-            """, (integration_id,))
-            
-            if not sync_state or sync_state[0]['status'] != 'refreshing':
-                # Lock not acquired - another process is refreshing
-                logger.info(f"Token refresh already in progress for integration {integration_id}")
-                return tokens
-            
-            # Check if refresh is stale (older than 60 seconds)
-            updated_at = sync_state[0]['updated_at']
-            if isinstance(updated_at, str):
-                updated_at = datetime.fromisoformat(updated_at)
-            elif isinstance(updated_at, (int, float)):
-                updated_at = datetime.fromtimestamp(updated_at)
-            
-            if (datetime.now() - updated_at).total_seconds() < 60:
-                # Another refresh in progress (not stale), return existing token
-                logger.info(f"Token refresh already in progress for integration {integration_id}")
-                return tokens
-            
-            lock_acquired = True
+            if rows_updated:
+                lock_acquired = True
+            else:
+                sync_state = db_optimizer.execute_query("""
+                    SELECT status, updated_at FROM integration_sync_state
+                    WHERE integration_id = ? AND resource = 'token_refresh'
+                """, (integration_id,))
+                status = sync_state[0].get('status') if sync_state else None
+                updated_at = sync_state[0].get('updated_at') if sync_state else None
+                if status == 'refreshing' and updated_at:
+                    try:
+                        if isinstance(updated_at, str):
+                            updated_at = datetime.fromisoformat(updated_at)
+                        elif isinstance(updated_at, (int, float)):
+                            updated_at = datetime.fromtimestamp(updated_at)
+                    except Exception:
+                        updated_at = None
+                    if updated_at and (datetime.now() - updated_at).total_seconds() >= 60:
+                        rows_updated = db_optimizer.execute_query("""
+                            UPDATE integration_sync_state
+                            SET status = 'refreshing', updated_at = CURRENT_TIMESTAMP
+                            WHERE integration_id = ?
+                              AND resource = 'token_refresh'
+                              AND status = 'refreshing'
+                        """, (integration_id,), fetch=False)
+                        lock_acquired = bool(rows_updated)
+                if not lock_acquired:
+                    logger.info(f"Token refresh already in progress for integration {integration_id}")
+                    return tokens
             
             # COMMIT TRANSACTION HERE (db_optimizer handles this)
             # Now perform HTTP call OUTSIDE transaction (no DB lock held)

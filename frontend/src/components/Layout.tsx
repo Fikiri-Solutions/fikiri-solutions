@@ -130,12 +130,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               Sign out
             </button>
           </div>
-          <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 px-4 py-3">
-            <LegalFooterLinks
-              className="text-xs text-gray-500 dark:text-gray-400"
-              linkClassName="text-gray-600 hover:text-brand-primary hover:underline dark:text-gray-300 dark:hover:text-brand-accent"
-            />
-          </div>
         </div>
       </div>
 
@@ -155,6 +149,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           >
             {sidebarCollapsed ? (
               <>
+                <Link
+                  to="/dashboard"
+                  className="flex items-center justify-center rounded-lg hover:opacity-80 transition-opacity"
+                  title="Dashboard home"
+                >
+                  <FikiriLogo size="xs" variant="circle" animated={false} className="h-8 w-8 shrink-0" />
+                </Link>
                 <button
                   type="button"
                   onClick={() => setSidebarCollapsed(false)}
@@ -165,13 +166,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 >
                   <ChevronsRight className="h-5 w-5" />
                 </button>
-                <Link
-                  to="/dashboard"
-                  className="flex items-center justify-center rounded-lg hover:opacity-80 transition-opacity"
-                  title="Dashboard home"
-                >
-                  <FikiriLogo size="xs" variant="circle" animated={false} className="h-8 w-8 shrink-0" />
-                </Link>
               </>
             ) : (
               <>
@@ -187,23 +181,19 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     className="min-w-0 hover:scale-105 transition-transform duration-200"
                   />
                 </Link>
+                <button
+                  type="button"
+                  onClick={() => setSidebarCollapsed(true)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-brand-primary dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
+                  aria-expanded={true}
+                  aria-label="Collapse navigation"
+                  title="Collapse sidebar"
+                >
+                  <ChevronsLeft className="h-5 w-5" />
+                </button>
               </>
             )}
           </div>
-          {!sidebarCollapsed && (
-            <div className="shrink-0 px-3 pb-2">
-              <button
-                type="button"
-                onClick={() => setSidebarCollapsed(true)}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-brand-primary dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
-                aria-expanded={true}
-                aria-label="Collapse navigation"
-                title="Collapse sidebar"
-              >
-                <ChevronsLeft className="h-5 w-5" />
-              </button>
-            </div>
-          )}
           <nav className={`flex-1 py-3 overflow-y-auto ${sidebarCollapsed ? 'px-1.5' : 'px-3'}`}>
             {navigation.map((item) => (
               <Link
@@ -230,14 +220,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </Link>
             ))}
           </nav>
-          {!sidebarCollapsed && (
-            <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 px-3 py-3">
-              <LegalFooterLinks
-                className="text-xs text-gray-500 dark:text-gray-400"
-                linkClassName="text-gray-600 hover:text-brand-primary hover:underline dark:text-gray-300 dark:hover:text-brand-accent"
-              />
-            </div>
-          )}
         </div>
       </div>
 

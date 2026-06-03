@@ -7,8 +7,14 @@ First plugin for the unified integration framework
 import os
 import json
 import logging
-import requests
 from datetime import datetime, timedelta
+
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    requests = None
+    REQUESTS_AVAILABLE = False
 from typing import Dict, Any, Optional, List
 from urllib.parse import urlencode
 
@@ -74,6 +80,8 @@ class GoogleCalendarProvider(IntegrationProvider):
     
     def exchange_code_for_tokens(self, code: str, redirect_uri: str = None) -> Dict[str, Any]:
         """Exchange authorization code for tokens"""
+        if not REQUESTS_AVAILABLE:
+            raise ImportError("requests library not available")
         redirect_uri = redirect_uri or GOOGLE_REDIRECT_URI
         
         token_url = "https://oauth2.googleapis.com/token"
@@ -100,6 +108,8 @@ class GoogleCalendarProvider(IntegrationProvider):
     
     def refresh_access_token(self, refresh_token: str) -> Dict[str, Any]:
         """Refresh expired access token"""
+        if not REQUESTS_AVAILABLE:
+            raise ImportError("requests library not available")
         token_url = "https://oauth2.googleapis.com/token"
         data = {
             'client_id': GOOGLE_CLIENT_ID,
@@ -124,6 +134,9 @@ class GoogleCalendarProvider(IntegrationProvider):
     
     def revoke_token(self, access_token: str) -> bool:
         """Revoke access token"""
+        if not REQUESTS_AVAILABLE:
+            logger.warning("requests library not available; cannot revoke Google token")
+            return False
         revoke_url = "https://oauth2.googleapis.com/revoke"
         data = {'token': access_token}
         

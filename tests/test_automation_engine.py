@@ -84,6 +84,28 @@ class TestAutomationEngine(unittest.TestCase):
             user_id=1,
         )
 
+    @patch("services.automation_actions.crm_action.enhanced_crm_service.update_lead")
+    def test_update_crm_field_generic_uses_service_allowlist(self, mock_update):
+        mock_update.return_value = {"success": True, "data": {"lead": {"id": 9}}}
+        out = self.engine._execute_update_crm_field(
+            {"field_name": "stage", "field_value": "qualified"},
+            {"lead_id": 9},
+            1,
+        )
+        self.assertTrue(out.get("success"), msg=out)
+        mock_update.assert_called_once_with(9, 1, {"stage": "qualified"})
+
+    @patch("services.automation_actions.crm_action.enhanced_crm_service.update_lead")
+    def test_update_crm_field_rejects_disallowed_field_name(self, mock_update):
+        out = self.engine._execute_update_crm_field(
+            {"field_name": "score = 100 WHERE 1=1 --", "field_value": "ignored"},
+            {"lead_id": 9},
+            1,
+        )
+        self.assertFalse(out.get("success"))
+        self.assertEqual(out.get("error_code"), "INVALID_CRM_FIELD")
+        mock_update.assert_not_called()
+
     def test_execute_trigger_webhook_wrapper_delegates_to_handler(self):
         expected = {"success": True, "data": {"status_code": 200}}
         self.engine.webhook_action_handler.execute_trigger_webhook = MagicMock(

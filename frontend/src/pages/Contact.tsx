@@ -15,6 +15,7 @@ export const Contact: React.FC = () => {
   const [company, setCompany] = useState('')
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
+  const [leaveBlank, setLeaveBlank] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
@@ -39,6 +40,7 @@ export const Contact: React.FC = () => {
           ? `[Prospect] ${subject.trim()}`.slice(0, LIMITS.subject)
           : '[Prospect] General inquiry',
         message: `${message.trim().slice(0, LIMITS.message)}${sourceContext}`,
+        leave_blank: leaveBlank,
       })
       if (res.success) {
         setSuccess(true)
@@ -48,6 +50,7 @@ export const Contact: React.FC = () => {
         setCompany('')
         setSubject('')
         setMessage('')
+        setLeaveBlank('')
       } else {
         setError(res.error || 'Something went wrong.')
       }
@@ -64,7 +67,7 @@ export const Contact: React.FC = () => {
         <div className="absolute inset-0 fikiri-gradient-animated">
           <AnimatedBackground />
         </div>
-        <section className="relative py-16 sm:py-20 z-10">
+        <section className="relative py-12 sm:py-16 z-10">
           <Gradient className="absolute inset-x-2 top-0 bottom-0 rounded-3xl ring-1 ring-black/5 ring-inset opacity-20" />
           <Container className="relative">
             <div className="max-w-xl mx-auto">
@@ -94,6 +97,18 @@ export const Contact: React.FC = () => {
               )}
 
               <form onSubmit={handleSubmit} className="space-y-5" autoComplete="on">
+                <div className="hidden" aria-hidden="true">
+                  <label htmlFor="contact-leave-blank">Leave this field blank</label>
+                  <input
+                    id="contact-leave-blank"
+                    name="leave_blank"
+                    type="text"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={leaveBlank}
+                    onChange={(e) => setLeaveBlank(e.target.value)}
+                  />
+                </div>
                 <div>
                   <label htmlFor="contact-name" className="block text-sm font-medium text-foreground mb-1">
                     Name <span className="text-red-500">*</span>

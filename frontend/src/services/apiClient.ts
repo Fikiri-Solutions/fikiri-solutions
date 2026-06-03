@@ -1964,6 +1964,7 @@ class ApiClient {
     company?: string
     subject?: string
     message: string
+    leave_blank?: string
   }): Promise<{ success: boolean; message?: string; error?: string }> {
     const response = await this.client.post('/contact', payload, {
       headers: { 'Content-Type': 'application/json; charset=utf-8' },

@@ -126,6 +126,8 @@ class TestIntegrationFramework(unittest.TestCase):
     
     def test_2_concurrent_refresh_single_call(self):
         """Test: 10 parallel requests with expiring token → exactly 1 refresh call"""
+        if not ENCRYPTION_ENABLED:
+            self.skipTest("cryptography/FERNET_KEY not available in this environment")
         # Token already expired so refresh is triggered (buffer is 2 min)
         expires_at = int((datetime.now() - timedelta(minutes=1)).timestamp())
         
@@ -170,8 +172,126 @@ class TestIntegrationFramework(unittest.TestCase):
         call_count = self.mock_provider.refresh_access_token.call_count
         self.assertLessEqual(call_count, 1, "Should have at most 1 refresh call, not multiple")
     
+    @patch('core.integrations.integration_framework.db_optimizer')
+    def test_refresh_lock_holder_uses_rowcount_and_calls_provider(self, mock_db):
+        """Regression: lock holder should refresh instead of mistaking itself for another worker."""
+        provider_name = 'test_refresh_provider'
+        provider = Mock()
+        provider.refresh_access_token.return_value = {
+            'access_token': 'new_access_token',
+            'expires_in': 3600,
+            'token_type': 'Bearer',
+        }
+        integration_manager.register_provider(provider_name, provider)
+        expired = int((datetime.now() - timedelta(minutes=5)).timestamp())
+
+        try:
+            with patch.object(
+                integration_manager,
+                'get_integration_tokens',
+                return_value={
+                    'access_token': 'old_access_token',
+                    'refresh_token': 'refresh_token',
+                    'expires_at': expired,
+                },
+            ), patch.object(integration_manager, '_update_tokens') as mock_update:
+                mock_db.execute_query.side_effect = [
+                    None,  # ensure sync-state row exists
+                    1,     # CAS update acquired refresh lock
+                    None,  # release lock after successful refresh
+                ]
+
+                result = integration_manager._refresh_token_safely(
+                    123, provider_name, 'refresh_token'
+                )
+
+            self.assertEqual(result.get('access_token'), 'new_access_token')
+            provider.refresh_access_token.assert_called_once_with('refresh_token')
+            mock_update.assert_called_once()
+        finally:
+            integration_manager._providers.pop(provider_name, None)
+
+    @patch('core.integrations.integration_framework.db_optimizer')
+    def test_same_process_refresh_lock_reuses_first_result(self, mock_db):
+        """Regression: sibling threads should not refresh again after the first thread updates tokens."""
+        provider_name = 'test_thread_refresh_provider'
+        provider = Mock()
+        refresh_started = threading.Event()
+        release_refresh = threading.Event()
+
+        def refresh_side_effect(_refresh_token):
+            refresh_started.set()
+            release_refresh.wait(timeout=2)
+            return {
+                'access_token': 'new_access_token',
+                'expires_in': 3600,
+                'token_type': 'Bearer',
+            }
+
+        provider.refresh_access_token.side_effect = refresh_side_effect
+        integration_manager.register_provider(provider_name, provider)
+        expired = int((datetime.now() - timedelta(minutes=5)).timestamp())
+        fresh = int((datetime.now() + timedelta(hours=1)).timestamp())
+        token_reads = []
+
+        def token_side_effect(_integration_id):
+            token_reads.append(_integration_id)
+            if len(token_reads) == 1:
+                return {
+                    'access_token': 'old_access_token',
+                    'refresh_token': 'refresh_token',
+                    'expires_at': expired,
+                }
+            return {
+                'access_token': 'new_access_token',
+                'refresh_token': 'refresh_token',
+                'expires_at': fresh,
+            }
+
+        results = []
+        try:
+            with patch.object(
+                integration_manager, 'get_integration_tokens', side_effect=token_side_effect
+            ), patch.object(integration_manager, '_update_tokens'):
+                mock_db.execute_query.side_effect = [
+                    None,  # ensure sync-state row exists
+                    1,     # first thread acquired DB refresh lock
+                    None,  # first thread released DB refresh lock
+                ]
+
+                first = threading.Thread(
+                    target=lambda: results.append(
+                        integration_manager._refresh_token_safely(
+                            456, provider_name, 'refresh_token'
+                        )
+                    )
+                )
+                second = threading.Thread(
+                    target=lambda: results.append(
+                        integration_manager._refresh_token_safely(
+                            456, provider_name, 'refresh_token'
+                        )
+                    )
+                )
+                first.start()
+                self.assertTrue(refresh_started.wait(timeout=2))
+                second.start()
+                release_refresh.set()
+                first.join(timeout=2)
+                second.join(timeout=2)
+
+            self.assertEqual(provider.refresh_access_token.call_count, 1)
+            self.assertEqual(len(results), 2)
+            self.assertTrue(
+                all(result.get('access_token') == 'new_access_token' for result in results)
+            )
+        finally:
+            integration_manager._providers.pop(provider_name, None)
+
     def test_3_disconnect_during_refresh(self):
         """Test: Trigger refresh, then disconnect → integration revoked, no tokens, links inactive"""
+        if not ENCRYPTION_ENABLED:
+            self.skipTest("cryptography/FERNET_KEY not available in this environment")
         from core.database_optimization import db_optimizer
         integration_id = self._insert_integration_and_get_id()
         self.assertIsNotNone(integration_id)
@@ -237,6 +357,8 @@ class TestIntegrationFramework(unittest.TestCase):
     
     def test_4_expires_at_normalization(self):
         """Test: expires_at stored as epoch seconds (INTEGER) consistently"""
+        if not ENCRYPTION_ENABLED:
+            self.skipTest("cryptography/FERNET_KEY not available in this environment")
         from core.database_optimization import db_optimizer
 
         integration_id = self._insert_integration_and_get_id()

@@ -5,20 +5,23 @@ UTF-8, strict text limits to keep cost and abuse low.
 Consultation intake: POST /api/intake delegates to ``core.consultation_intake_service`` (CRM + email + backup row).
 """
 
-import logging
-import re
-import os
+import html
 import json
-from flask import Blueprint, request, jsonify
-from core.database_optimization import db_optimizer
-from core.email_branding import wrap_html_email_body
-from core.request_correlation import get_or_create_correlation_id
-from core.rate_limiter import check_public_intake_rate_limit
+import logging
+import os
+import re
+
+from flask import Blueprint, jsonify, request
+
 from core.consultation_intake_service import (
     parse_intake_body,
     process_public_intake,
-    validate_email as validate_intake_email,
 )
+from core.consultation_intake_service import validate_email as validate_intake_email
+from core.database_optimization import db_optimizer
+from core.email_branding import wrap_html_email_body
+from core.rate_limiter import check_public_intake_rate_limit
+from core.request_correlation import get_or_create_correlation_id
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +50,9 @@ def _send_contact_email(to_email: str, subject: str, body_utf8: str) -> bool:
             return _send_via_sendgrid(to_email, subject, body_utf8)
         if os.getenv("SMTP_SERVER"):
             return _send_via_smtp(to_email, subject, body_utf8)
-        logger.info("Contact form: no mail provider configured, would send to %s", to_email)
+        logger.info(
+            "Contact form: no mail provider configured, would send to %s", to_email
+        )
         return False
     except Exception as e:
         logger.exception("Contact email send failed: %s", e)
@@ -58,6 +63,7 @@ def _send_via_sendgrid(to_email: str, subject: str, body: str) -> bool:
     try:
         import sendgrid
         from sendgrid.helpers.mail import Mail
+
         sg = sendgrid.SendGridAPIClient(api_key=os.getenv("SENDGRID_API_KEY"))
         mail = Mail(
             from_email=CONTACT_FROM_EMAIL,
@@ -77,6 +83,7 @@ def _send_via_smtp(to_email: str, subject: str, body: str) -> bool:
     try:
         import smtplib
         from email.mime.text import MIMEText
+
         msg = MIMEText(body, "html", "utf-8")
         msg["Subject"] = subject
         msg["From"] = CONTACT_FROM_EMAIL
@@ -120,6 +127,20 @@ def submit_contact():
     else:
         data = request.form or {}
 
+    # Honeypot: real users never see or fill these fields. Return a normal success
+    # response without sending or persisting so bots cannot tune against rejections.
+    if any(
+        str(data.get(field) or "").strip()
+        for field in ("leave_blank", "website", "url", "honeypot")
+    ):
+        logger.info("Contact form submission ignored: honeypot field was filled")
+        return (
+            jsonify(
+                {"success": True, "message": "Thank you. We will get back to you soon."}
+            ),
+            200,
+        )
+
     name = _truncate(data.get("name") or "", CONTACT_LIMITS["name"])
     email = _truncate(data.get("email") or "", CONTACT_LIMITS["email"])
     phone = _truncate(data.get("phone") or "", CONTACT_LIMITS["phone"])
@@ -134,22 +155,31 @@ def submit_contact():
     if not message:
         return jsonify({"success": False, "error": "Message is required"}), 400
 
-    email_subject = f"Contact form: {subject}" if subject else "Fikiri contact form submission"
+    email_subject = (
+        f"Contact form: {subject}" if subject else "Fikiri contact form submission"
+    )
     if len(email_subject) > 200:
         email_subject = email_subject[:197] + "..."
 
+    safe_name = html.escape(name)
+    safe_email = html.escape(email)
+    safe_phone = html.escape(phone)
+    safe_company = html.escape(company)
+    safe_subject = html.escape(subject)
+    safe_message = html.escape(message).replace(chr(10), "<br>")
+
     lines = [
-        f"<p><strong>Name:</strong> {name}</p>",
-        f"<p><strong>Email:</strong> {email}</p>",
+        f"<p><strong>Name:</strong> {safe_name}</p>",
+        f"<p><strong>Email:</strong> {safe_email}</p>",
     ]
     if phone:
-        lines.append(f"<p><strong>Phone:</strong> {phone}</p>")
+        lines.append(f"<p><strong>Phone:</strong> {safe_phone}</p>")
     if company:
-        lines.append(f"<p><strong>Company:</strong> {company}</p>")
+        lines.append(f"<p><strong>Company:</strong> {safe_company}</p>")
     if subject:
-        lines.append(f"<p><strong>Subject:</strong> {subject}</p>")
+        lines.append(f"<p><strong>Subject:</strong> {safe_subject}</p>")
     lines.append("<p><strong>Message:</strong></p>")
-    lines.append(f"<p>{message.replace(chr(10), '<br>')}</p>")
+    lines.append(f"<p>{safe_message}</p>")
     body = wrap_html_email_body("\n".join(lines))
 
     sent = _send_contact_email(CONTACT_TO_EMAIL, email_subject, body)
@@ -177,7 +207,7 @@ def submit_contact():
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                'contact',
+                "contact",
                 name,
                 email,
                 phone or None,
@@ -189,10 +219,10 @@ def submit_contact():
                 CONTACT_FROM_EMAIL,
                 payload_json,
                 0,
-                'sent' if sent else 'failed',
-                None if sent else 'email_send_failed',
+                "sent" if sent else "failed",
+                None if sent else "email_send_failed",
                 request.remote_addr,
-                request.headers.get('User-Agent'),
+                request.headers.get("User-Agent"),
             ),
             fetch=False,
         )
@@ -200,8 +230,21 @@ def submit_contact():
         logger.error("Failed to persist contact submission: %s", e)
 
     if not sent:
-        return jsonify({"success": False, "error": "Unable to send message. Please try again later."}), 503
-    return jsonify({"success": True, "message": "Thank you. We will get back to you soon."}), 200
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error": "Unable to send message. Please try again later.",
+                }
+            ),
+            503,
+        )
+    return (
+        jsonify(
+            {"success": True, "message": "Thank you. We will get back to you soon."}
+        ),
+        200,
+    )
 
 
 @contact_bp.route("/intake", methods=["POST"])
@@ -219,23 +262,29 @@ def submit_consultation_intake():
 
     # Honeypot (bots): pretend success, do not persist.
     if p.get("leave_blank"):
-        return jsonify(
-            {
-                "success": True,
-                "message": "Thank you. We received your intake and will follow up shortly.",
-            }
-        ), 200
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "message": "Thank you. We received your intake and will follow up shortly.",
+                }
+            ),
+            200,
+        )
 
     rl = check_public_intake_rate_limit(request.remote_addr or "")
     if not rl.allowed:
-        return jsonify(
-            {
-                "success": False,
-                "error": "Too many submissions. Please try again later.",
-                "error_code": "RATE_LIMIT_EXCEEDED",
-                "retry_after": rl.retry_after,
-            }
-        ), 429
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error": "Too many submissions. Please try again later.",
+                    "error_code": "RATE_LIMIT_EXCEEDED",
+                    "retry_after": rl.retry_after,
+                }
+            ),
+            429,
+        )
 
     if not p.get("business_name"):
         return jsonify({"success": False, "error": "Business name is required"}), 400
@@ -256,12 +305,15 @@ def submit_consultation_intake():
     )
 
     if not outcome.crm_ok and not outcome.email_sent:
-        return jsonify(
-            {
-                "success": False,
-                "error": "Unable to submit intake right now. Please try again later or email us.",
-            }
-        ), 503
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error": "Unable to submit intake right now. Please try again later or email us.",
+                }
+            ),
+            503,
+        )
 
     if outcome.email_failed_after_crm:
         logger.warning(
@@ -269,9 +321,12 @@ def submit_consultation_intake():
             correlation_id,
         )
 
-    return jsonify(
-        {
-            "success": True,
-            "message": "Thank you. We received your intake and will use it to prepare for your conversation.",
-        }
-    ), 200
+    return (
+        jsonify(
+            {
+                "success": True,
+                "message": "Thank you. We received your intake and will use it to prepare for your conversation.",
+            }
+        ),
+        200,
+    )

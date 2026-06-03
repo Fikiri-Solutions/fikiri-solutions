@@ -140,6 +140,12 @@ class GmailSyncJobManager:
             1,
             int(os.getenv('GMAIL_SYNC_MAX_MESSAGES', str(DEFAULT_MAX_MESSAGES_PER_JOB))),
         )
+        # Throttle per-message progress writes. A single worker can process many inboxes;
+        # writing progress/status for every message adds avoidable DB load.
+        self.progress_update_every = max(
+            1,
+            int(os.getenv('GMAIL_SYNC_PROGRESS_UPDATE_EVERY', '10')),
+        )
         self.sync_days = int(os.getenv('GMAIL_SYNC_DAYS', str(DEFAULT_LOOKBACK_DAYS)))
         self._connect_redis()
         self._initialize_tables()
@@ -727,7 +733,11 @@ class GmailSyncJobManager:
             emails_synced = 0
             contacts_found = 0
             leads_identified = 0
-            mailbox_automation_enabled = os.getenv("MAILBOX_AUTOMATION_ENABLED", "").lower() in {"1", "true", "yes"}
+            mailbox_automation_enabled = os.getenv("MAILBOX_AUTOMATION_ENABLED", "").lower() in {
+                "1",
+                "true",
+                "yes",
+            }
             sync_runtime = None
             if mailbox_automation_enabled:
                 from email_automation.runtime_context import try_create_gmail_sync_runtime
@@ -745,6 +755,23 @@ class GmailSyncJobManager:
                         user_id,
                     )
                     mailbox_automation_enabled = False
+
+            try:
+                owner_rows = db_optimizer.execute_query(
+                    "SELECT email FROM users WHERE id = ? LIMIT 1", (user_id,)
+                )
+                owner_email = (
+                    (owner_rows[0].get("email") or "").strip().lower()
+                    if owner_rows
+                    else None
+                ) or None
+            except Exception:
+                owner_email = None
+
+            total_messages = len(messages)
+            progress_update_every = max(
+                1, int(getattr(self, "progress_update_every", 10) or 10)
+            )
             
             for message in messages:
                 try:
@@ -835,25 +862,17 @@ class GmailSyncJobManager:
                         except Exception as triage_err:
                             logger.debug("email triage skipped: %s", triage_err)
 
-                        try:
-                            owner_rows = db_optimizer.execute_query(
-                                "SELECT email FROM users WHERE id = ? LIMIT 1", (user_id,)
-                            )
-                            owner_email = (
-                                (owner_rows[0].get("email") or "").strip().lower()
-                                if owner_rows
-                                else None
-                            ) or None
-                        except Exception:
-                            owner_email = None
-
                         # Unified: orchestrate_incoming always runs inbound capture + automations;
                         # classify/process runs only when MAILBOX_AUTOMATION_ENABLED.
                         try:
                             from email_automation.parser import MinimalEmailParser
                             from email_automation.pipeline import orchestrate_incoming
                             from core.request_correlation import get_or_create_correlation_id
-                            from core.trace_context import get_trace_id
+
+                            try:
+                                from core.trace_context import get_trace_id
+                            except ImportError:
+                                get_trace_id = lambda: None
 
                             from email_automation.parser import MinimalEmailParser
 
@@ -926,31 +945,38 @@ class GmailSyncJobManager:
                     if lead_score > 50:  # Threshold for lead identification
                         leads_identified += 1
                     
-                    # Update progress in job table (after every email for real-time updates)
-                    progress = int((emails_synced / len(messages)) * 100) if messages and len(messages) > 0 else 0
-                    # Ensure progress is at least 10% after fetching messages, then increment
-                    if progress < 10 and emails_synced > 0:
-                        progress = 10 + int((emails_synced / len(messages)) * 90)  # 10-100% range
-                    db_optimizer.execute_query("""
-                        UPDATE gmail_sync_jobs 
-                        SET progress = ?, emails_synced = ?
-                        WHERE job_id = ?
-                    """, (progress, emails_synced, job_id), fetch=False)
-                    
-                    # Update user_sync_status more frequently for real-time progress
-                    # For small batches (< 20 emails), update after every email
-                    # For larger batches, update every 3-5 emails
-                    update_frequency = 1 if len(messages) < 20 else max(1, min(3, len(messages) // 10))
-                    if emails_synced % update_frequency == 0 or emails_synced == len(messages) or emails_synced == 1:
+                    # Throttle progress/status writes. The final job completion path still
+                    # writes 100%, so this only reduces intermediate DB churn.
+                    should_update_progress = emails_synced > 0 and (
+                        emails_synced == 1
+                        or emails_synced == total_messages
+                        or emails_synced % progress_update_every == 0
+                    )
+                    if should_update_progress:
+                        progress = (
+                            int((emails_synced / total_messages) * 100)
+                            if total_messages > 0
+                            else 0
+                        )
+                        if progress < 10 and emails_synced > 0:
+                            progress = 10
+                        db_optimizer.execute_query("""
+                            UPDATE gmail_sync_jobs
+                            SET progress = ?, emails_synced = ?
+                            WHERE job_id = ?
+                        """, (progress, emails_synced, job_id), fetch=False)
+
                         try:
-                            # Count total emails for this user
                             total_count_result = db_optimizer.execute_query(
                                 "SELECT COUNT(*) as total FROM synced_emails WHERE user_id = ?",
                                 (user_id,)
                             )
-                            total_emails = total_count_result[0]['total'] if total_count_result and total_count_result[0] else emails_synced
-                            
-                            # Update status to show progress
+                            total_emails = (
+                                total_count_result[0]['total']
+                                if total_count_result and total_count_result[0]
+                                else emails_synced
+                            )
+
                             db_optimizer.upsert_user_sync_status_merge(
                                 user_id,
                                 last_sync=_utcnow_naive().isoformat(),
@@ -959,7 +985,10 @@ class GmailSyncJobManager:
                                 total_emails=total_emails,
                             )
                         except Exception as status_update_error:
-                            logger.warning(f"Could not update sync status during progress: {status_update_error}")
+                            logger.warning(
+                                "Could not update sync status during progress: %s",
+                                status_update_error,
+                            )
                     
                 except Exception as e:
                     if sync_runtime is not None:

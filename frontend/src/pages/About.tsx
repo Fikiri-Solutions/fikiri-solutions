@@ -528,6 +528,10 @@ export const About: React.FC = () => {
                       <span className="font-medium text-muted-foreground">Website:</span>
                       <p className="text-foreground">https://fikirisolutions.com</p>
                     </div>
+                    <div>
+                      <span className="font-medium text-muted-foreground">Email:</span>
+                      <p className="text-foreground">info@fikirisolutions.com</p>
+                    </div>
                   </div>
                 </div>
                 <div>
