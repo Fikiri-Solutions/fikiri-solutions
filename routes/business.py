@@ -705,8 +705,20 @@ def get_pipeline():
     if not user_id:
         return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
 
-    pipeline = enhanced_crm_service.get_pipeline(user_id)
-    return create_success_response({'pipeline': pipeline}, 'Pipeline retrieved successfully')
+    pipeline_result = enhanced_crm_service.get_pipeline(user_id)
+    if isinstance(pipeline_result, dict) and pipeline_result.get('success') is False:
+        return create_error_response(
+            pipeline_result.get('error', 'Failed to retrieve pipeline'),
+            500,
+            pipeline_result.get('error_code', 'PIPELINE_ERROR'),
+        )
+
+    pipeline_data = (
+        pipeline_result.get('data')
+        if isinstance(pipeline_result, dict) and pipeline_result.get('success') is True
+        else {'pipeline': pipeline_result}
+    )
+    return create_success_response(pipeline_data, 'Pipeline retrieved successfully')
 
 @business_bp.route('/crm/sync-gmail', methods=['POST'])
 @handle_api_errors
@@ -881,7 +893,26 @@ def sync_gmail():
             import traceback
             logger.debug(f"Sync job queue error traceback: {traceback.format_exc()}")
 
-        # Also trigger CRM lead sync (this syncs contacts from emails)
+        if sync_job_queued:
+            try:
+                db_optimizer.upsert_user_sync_status_pending(user_id)
+            except Exception as status_error:
+                logger.warning(f"Could not update sync status: {status_error}")
+            _record_command_center_sync_analytics(True)
+            return create_success_response(
+                {
+                    'sync_job_queued': True,
+                    'job_id': job_id,
+                    'lookback_days': sync_params.lookback_days,
+                    'max_messages': sync_params.max_messages,
+                    'lookback_presets': lookback_presets_for_api(),
+                    'message': 'Gmail sync job queued successfully',
+                },
+                'Gmail sync job queued'
+            )
+
+        # Fallback path only: if the background sync job could not be queued, keep the
+        # previous CRM lead sync behavior rather than blocking normal queued sync requests.
         sync_result = None
         try:
             sync_result = enhanced_crm_service.sync_gmail_leads(user_id)

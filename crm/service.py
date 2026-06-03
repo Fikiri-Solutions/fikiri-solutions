@@ -24,6 +24,11 @@ logger = logging.getLogger(__name__)
 _ACTIVE_LEADS_SQL = " (withdrawn_at IS NULL) "
 
 
+def normalize_lead_email(value: Any) -> str:
+    """Normalize CRM lead emails consistently across manual, import, webhook, and email paths."""
+    return str(value or "").strip().lower()
+
+
 def _crm_tags_list(raw: Any) -> List[str]:
     if raw is None:
         return []
@@ -228,13 +233,19 @@ class EnhancedCRMService:
     
     def create_lead(self, user_id: int, lead_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new lead"""
+        lead_data = dict(lead_data or {})
+        if "email" in lead_data:
+            lead_data["email"] = normalize_lead_email(lead_data.get("email"))
+        if isinstance(lead_data.get("name"), str):
+            lead_data["name"] = lead_data["name"].strip()
+
         required_fields = ['email', 'name']
         for field in required_fields:
             if not lead_data.get(field):
                 return {'success': False, 'error': f'Missing required field: {field}', 'error_code': 'MISSING_FIELD'}
         
         existing = db_optimizer.execute_query(
-            "SELECT id, withdrawn_at FROM leads WHERE user_id = ? AND email = ?",
+            "SELECT id, withdrawn_at FROM leads WHERE user_id = ? AND lower(email) = lower(?)",
             (user_id, lead_data['email'])
         )
         if existing:
@@ -888,6 +899,10 @@ class EnhancedCRMService:
                 'data': None
             }
     
+    def get_pipeline(self, user_id: int) -> Dict[str, Any]:
+        """Backward-compatible alias for routes/clients that call get_pipeline."""
+        return self.get_lead_pipeline(user_id)
+
     def _format_lead(self, lead_data: Dict[str, Any]) -> Lead:
         """Format lead data into Lead object"""
         return Lead(
@@ -1147,13 +1162,19 @@ class EnhancedCRMService:
         if on_duplicate not in allowed_dup:
             on_duplicate = 'update'
         for item in leads:
-            email = item.get('email')
+            item = dict(item or {})
+            email = normalize_lead_email(item.get('email'))
+            if email:
+                item['email'] = email
             name = item.get('name')
+            if isinstance(name, str):
+                name = name.strip()
+                item['name'] = name
             if not email or not name:
                 errors.append({'lead': item, 'error': 'Missing required field: email/name'})
                 continue
             existing = db_optimizer.execute_query(
-                "SELECT id, withdrawn_at FROM leads WHERE user_id = ? AND email = ?",
+                "SELECT id, withdrawn_at FROM leads WHERE user_id = ? AND lower(email) = lower(?)",
                 (user_id, email)
             )
             if existing:

@@ -212,6 +212,20 @@ class TestBusinessRoutes(unittest.TestCase):
 
     @patch("routes.business.get_current_user_id")
     @patch("routes.business.enhanced_crm_service")
+    def test_get_pipeline_unwraps_service_result(self, mock_crm, mock_get_user):
+        mock_get_user.return_value = 1
+        mock_crm.get_pipeline.return_value = {
+            "success": True,
+            "data": {"pipeline": [{"stage": "new", "count": 2}], "total_leads": 2},
+        }
+        response = self.client.get("/api/crm/pipeline")
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json().get("data", {})
+        self.assertEqual(data.get("pipeline"), [{"stage": "new", "count": 2}])
+        self.assertEqual(data.get("total_leads"), 2)
+
+    @patch("routes.business.get_current_user_id")
+    @patch("routes.business.enhanced_crm_service")
     def test_add_lead_activity_requires_auth(self, mock_crm, mock_get_user):
         mock_get_user.return_value = None
         response = self.client.post(
@@ -305,6 +319,7 @@ class TestBusinessRoutes(unittest.TestCase):
         data = response.get_json()
         self.assertTrue(data.get("success"))
         self.assertTrue(data.get("data", {}).get("sync_job_queued"))
+        mock_crm.sync_gmail_leads.assert_not_called()
 
     @patch.dict(
         "os.environ",

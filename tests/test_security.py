@@ -4,7 +4,7 @@ Unit tests for core/security.py (init_security, require_auth, SecurityUtils).
 
 import os
 import sys
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 os.environ.setdefault("FLASK_ENV", "test")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -17,29 +17,34 @@ class TestSecurityUtils:
 
     def test_sanitize_input_string_removes_dangerous_chars(self):
         from core.security import SecurityUtils
+
         out = SecurityUtils.sanitize_input("hello <script> world")
         assert "<" not in out and ">" not in out
         assert "hello" in out and "script" in out and "world" in out
 
     def test_sanitize_input_dict_recursive(self):
         from core.security import SecurityUtils
+
         out = SecurityUtils.sanitize_input({"a": "<b>", "c": "safe"})
         assert out["a"] == "b"
         assert out["c"] == "safe"
 
     def test_sanitize_input_list_recursive(self):
         from core.security import SecurityUtils
+
         out = SecurityUtils.sanitize_input(["<x>", "y"])
         assert out[0] == "x"
         assert out[1] == "y"
 
     def test_validate_email_valid(self):
         from core.security import SecurityUtils
+
         assert SecurityUtils.validate_email("user@example.com") is True
         assert SecurityUtils.validate_email("a.b@co.uk") is True
 
     def test_validate_email_invalid(self):
         from core.security import SecurityUtils
+
         assert SecurityUtils.validate_email("notanemail") is False
         assert SecurityUtils.validate_email("@nodomain.com") is False
         assert SecurityUtils.validate_email("missing@") is False
@@ -50,24 +55,33 @@ class TestRequireAuth:
 
     def test_require_auth_missing_header_returns_401(self):
         from core.security import require_auth
+
         app = Flask(__name__)
+
         @app.route("/protected")
         @require_auth
         def protected():
             return {"ok": True}
+
         with app.test_client() as c:
             r = c.get("/protected")
         assert r.status_code == 401
         data = r.get_json()
-        assert data and (data.get("error_code") == "AUTHENTICATION_REQUIRED" or "auth" in str(data).lower())
+        assert data and (
+            data.get("error_code") == "AUTHENTICATION_REQUIRED"
+            or "auth" in str(data).lower()
+        )
 
     def test_require_auth_no_bearer_prefix_returns_401(self):
         from core.security import require_auth
+
         app = Flask(__name__)
+
         @app.route("/protected")
         @require_auth
         def protected():
             return {"ok": True}
+
         with app.test_client() as c:
             r = c.get("/protected", headers={"Authorization": "Invalid token"})
         assert r.status_code == 401
@@ -81,8 +95,32 @@ class TestInitSecurity:
     def test_init_security_returns_app(self, mock_limiter_class, mock_cors):
         mock_limiter_class.return_value.init_app = MagicMock()
         from core.security import init_security
+
         if not getattr(init_security, "__wrapped__", True):
             pass
         app = Flask(__name__)
         result = init_security(app)
         assert result is app
+
+    @patch("core.security.CORS")
+    @patch("core.security.Limiter")
+    def test_init_security_adds_csp_to_json_api_responses(
+        self, mock_limiter_class, mock_cors
+    ):
+        mock_limiter_class.return_value.init_app = MagicMock()
+        from core.security import init_security
+
+        app = Flask(__name__)
+
+        @app.route("/api/ping")
+        def ping():
+            return {"success": True}
+
+        init_security(app)
+        response = app.test_client().get("/api/ping")
+
+        assert response.headers.get("Content-Security-Policy")
+        assert response.headers.get("X-Frame-Options") == "DENY"
+        assert (
+            response.headers.get("Referrer-Policy") == "strict-origin-when-cross-origin"
+        )

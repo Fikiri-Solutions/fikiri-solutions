@@ -94,6 +94,61 @@ class TestGmailSyncJobs(unittest.TestCase):
         self.assertTrue(mock_db.execute_query.called)
 
 
+class TestGmailSyncCostControls(unittest.TestCase):
+    @patch.dict(os.environ, {"MAILBOX_AUTOMATION_ENABLED": "false"}, clear=False)
+    @patch("email_automation.gmail_sync_jobs.db_optimizer")
+    def test_sync_throttles_progress_writes_and_reuses_owner_email(self, mock_db):
+        manager = GmailSyncJobManager.__new__(GmailSyncJobManager)
+        manager.sync_days = 7
+        manager.sync_max_messages = 25
+        manager.progress_update_every = 10
+
+        messages = [
+            {"id": f"m{i}", "threadId": f"t{i}", "payload": {"headers": []}}
+            for i in range(25)
+        ]
+        mock_db.execute_query.return_value = []
+
+        with patch.object(
+            manager,
+            "_get_gmail_messages",
+            return_value={"messages": messages, "has_more": False},
+        ), patch.object(manager, "_store_email", return_value=1), patch.object(
+            manager, "_extract_contacts", return_value=[]
+        ), patch.object(manager, "_calculate_lead_score", return_value=0), patch(
+            "email_automation.email_workflow_state.should_classify_email",
+            return_value=False,
+        ), patch(
+            "email_automation.pipeline.orchestrate_incoming",
+            return_value={"success": True},
+        ):
+            result = manager._sync_emails(
+                MagicMock(), user_id=3, job_id="job-cost-1", job_meta={}
+            )
+
+        self.assertEqual(result.get("emails_synced"), 25)
+
+        progress_updates = [
+            call
+            for call in mock_db.execute_query.call_args_list
+            if "SET progress = ?, emails_synced = ?" in str(call.args[0])
+        ]
+        self.assertEqual(len(progress_updates), 4)
+        self.assertEqual(
+            [call.args[1][1] for call in progress_updates],
+            [1, 10, 20, 25],
+        )
+        self.assertEqual(mock_db.upsert_user_sync_status_merge.call_count, 4)
+
+        owner_queries = [
+            call
+            for call in mock_db.execute_query.call_args_list
+            if "SELECT email FROM users WHERE id = ? LIMIT 1" in str(call.args[0])
+        ]
+        self.assertEqual(len(owner_queries), 1)
+
+
+
 class TestEmailBodyExtraction(unittest.TestCase):
     def test_extract_email_body_prefers_html(self):
         manager = GmailSyncJobManager.__new__(GmailSyncJobManager)

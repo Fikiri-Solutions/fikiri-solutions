@@ -14,7 +14,6 @@ import {
   Settings
 } from 'lucide-react'
 import { getSubscriptionSignupSteps } from '../content/subscriptionSignupInstructions'
-import { LegalFooterLinks } from '../components/LegalFooterLinks'
 import { TableScroll } from '../components/TableScroll'
 
 export const BillingPage: React.FC = () => {
@@ -748,13 +747,6 @@ export const BillingPage: React.FC = () => {
         </div>
 
         {/* Account Information */}
-        {billingCustomerPayload?.billingUnavailable && billingCustomerPayload?.message && (
-          <div className="mb-8 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-            <p className="text-sm font-medium">Billing profile unavailable</p>
-            <p className="mt-1 text-sm opacity-90">{billingCustomerPayload.message}</p>
-          </div>
-        )}
-
         {stripeCustomer && (
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Account Information</h2>
@@ -923,10 +915,6 @@ export const BillingPage: React.FC = () => {
             )}
           </div>
         )}
-
-        <div className="mt-10 border-t border-gray-200 pt-6 dark:border-gray-700">
-          <LegalFooterLinks className="text-center text-xs text-gray-500 dark:text-gray-400" />
-        </div>
       </div>
     </div>
   )

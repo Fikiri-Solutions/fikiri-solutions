@@ -40,6 +40,34 @@ class TestCRMService(unittest.TestCase):
         self.assertFalse(result.get('success'))
         self.assertEqual(result.get('error_code'), 'NO_UPDATES')
 
+    @patch('crm.service.db_optimizer')
+    def test_get_pipeline_alias_delegates_to_lead_pipeline(self, mock_db):
+        mock_db.execute_query.side_effect = [
+            [{'stage': 'new', 'count': 1, 'avg_score': 42}],
+            [{'count': 1}],
+            [{'count': 0}],
+        ]
+        result = self.service.get_pipeline(1)
+        self.assertTrue(result.get('success'), msg=result)
+        self.assertIn('pipeline', result.get('data', {}))
+
+    @patch('crm.service.record_crm_event')
+    @patch('crm.service.db_optimizer')
+    def test_create_lead_normalizes_email_before_lookup_and_insert(self, mock_db, _mock_events):
+        mock_db.execute_insert_returning_id.return_value = 101
+        mock_db.execute_query.side_effect = [
+            [],
+            101,
+            [{'id': 101}],
+        ]
+        result = self.service.create_lead(1, {'email': '  Lead@Example.COM  ', 'name': ' Lead Name '})
+        self.assertTrue(result.get('success'), msg=result)
+        lookup_params = mock_db.execute_query.call_args_list[0].args[1]
+        self.assertEqual(lookup_params, (1, 'lead@example.com'))
+        insert_params = mock_db.execute_query.call_args_list[1].args[1]
+        self.assertEqual(insert_params[1], 'lead@example.com')
+        self.assertEqual(insert_params[2], 'Lead Name')
+
     @patch('crm.service.record_crm_event')
     @patch('crm.service.db_optimizer')
     def test_create_lead_sets_score_and_quality(self, mock_db, _mock_events):
