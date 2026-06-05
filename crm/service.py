@@ -38,6 +38,11 @@ def normalize_lead_email(value: Any) -> str:
     return str(value or "").strip().lower()
 
 
+def normalize_lead_email(value: Any) -> str:
+    """Normalize CRM lead emails consistently across manual, import, webhook, and email paths."""
+    return str(value or "").strip().lower()
+
+
 def _crm_tags_list(raw: Any) -> List[str]:
     if raw is None:
         return []
