@@ -45,6 +45,9 @@ Quick reference for project documentation. Repo root (tooling / onboarding): [`R
 | [PUBLIC_API_TESTING.md](PUBLIC_API_TESTING.md) | Public API unit tests and smoke test |
 | [E2E_TEST_PLAN.md](E2E_TEST_PLAN.md) | Playwright E2E test plan |
 | [CURSOR_QUALITY_GATE.md](CURSOR_QUALITY_GATE.md) | Quality gate for automation, queues, and workflows |
+| [PR1_BUGFIX_REPORT.md](PR1_BUGFIX_REPORT.md) | PR 1 bug ledger, root causes, fixes, regression checks, and known follow-ups |
+| [PR2_EMAIL_WORKER_COST_REPORT.md](PR2_EMAIL_WORKER_COST_REPORT.md) | PR 2 email worker cost controls, impact, tests, and follow-up candidates |
+| [PR3_REGRESSION_FIX_REPORT.md](PR3_REGRESSION_FIX_REPORT.md) | PR 3 regression fixes for Gmail worker, contract test gating, and integration refresh locking |
 
 ## Implementation Reference
 

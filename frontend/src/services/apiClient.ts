@@ -857,9 +857,15 @@ class ApiClient {
     formData.append('file', file)
     const response = await this.client.post('/crm/leads/import/csv/preview', formData)
     const data = response.data?.data ?? response.data
+    const summary = data?.summary ?? { ok: 0, duplicate: 0, invalid: 0 }
     return {
       rows: data?.rows ?? [],
-      summary: data?.summary ?? { ok: 0, duplicate: 0, invalid: 0, total: data?.total_rows ?? 0 },
+      summary: {
+        ok: summary.ok ?? 0,
+        duplicate: summary.duplicate ?? 0,
+        invalid: summary.invalid ?? 0,
+        total: summary.total ?? data?.total_rows ?? 0,
+      },
     }
   }
 
@@ -1964,6 +1970,7 @@ class ApiClient {
     company?: string
     subject?: string
     message: string
+    leave_blank?: string
   }): Promise<{ success: boolean; message?: string; error?: string }> {
     const response = await this.client.post('/contact', payload, {
       headers: { 'Content-Type': 'application/json; charset=utf-8' },

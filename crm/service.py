@@ -22,6 +22,20 @@ gmail_sync_manager = None
 logger = logging.getLogger(__name__)
 
 _ACTIVE_LEADS_SQL = " (withdrawn_at IS NULL) "
+_CRM_LEAD_SORT_COLUMNS = {
+    "created_at": "created_at",
+    "updated_at": "updated_at",
+    "last_contact": "last_contact",
+    "score": "score",
+    "name": "LOWER(name)",
+}
+_CRM_LEAD_DEFAULT_SORT = "created_at"
+_CRM_LEAD_DEFAULT_DIRECTION = "DESC"
+
+
+def normalize_lead_email(value: Any) -> str:
+    """Normalize CRM lead emails consistently across manual, import, webhook, and email paths."""
+    return str(value or "").strip().lower()
 
 
 def _crm_tags_list(raw: Any) -> List[str]:
@@ -190,18 +204,45 @@ class EnhancedCRMService:
                 parts.append("created_at >= ?")
                 params.append(cutoff_date.isoformat())
             if filters.get('company'):
-                parts.append("company LIKE ?")
-                params.append(f"%{filters['company']}%")
+                parts.append("LOWER(COALESCE(company, '')) LIKE ?")
+                params.append(f"%{str(filters['company']).strip().lower()}%")
+            if filters.get('q'):
+                search = f"%{str(filters['q']).strip().lower()}%"
+                parts.append(
+                    "(LOWER(COALESCE(name, '')) LIKE ? OR "
+                    "LOWER(COALESCE(email, '')) LIKE ? OR "
+                    "LOWER(COALESCE(company, '')) LIKE ? OR "
+                    "LOWER(COALESCE(phone, '')) LIKE ?)"
+                )
+                params.extend([search, search, search, search])
         return " AND ".join(parts), params
 
-    def get_leads_summary(self, user_id: int, filters: Dict[str, Any] = None, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
+    def _lead_sort_clause(self, sort: Optional[str], direction: Optional[str]) -> Tuple[str, str]:
+        """Return an allowlisted lead list sort expression and direction."""
+        sort_key = str(sort or _CRM_LEAD_DEFAULT_SORT).strip().lower()
+        sort_sql = _CRM_LEAD_SORT_COLUMNS.get(sort_key, _CRM_LEAD_SORT_COLUMNS[_CRM_LEAD_DEFAULT_SORT])
+        direction_sql = str(direction or _CRM_LEAD_DEFAULT_DIRECTION).strip().upper()
+        if direction_sql not in {"ASC", "DESC"}:
+            direction_sql = _CRM_LEAD_DEFAULT_DIRECTION
+        return sort_sql, direction_sql
+
+    def get_leads_summary(
+        self,
+        user_id: int,
+        filters: Dict[str, Any] = None,
+        limit: int = 100,
+        offset: int = 0,
+        sort: str = _CRM_LEAD_DEFAULT_SORT,
+        direction: str = _CRM_LEAD_DEFAULT_DIRECTION,
+    ) -> Dict[str, Any]:
         """Get comprehensive leads summary with analytics and pagination"""
         where_sql, params = self._leads_where_clause(user_id, filters)
+        sort_sql, direction_sql = self._lead_sort_clause(sort, direction)
 
         base_query = f"""SELECT id, user_id, email, name, phone, company, source, stage, score,
                        created_at, updated_at, last_contact, notes, tags, metadata
                        FROM leads WHERE {where_sql}
-                       ORDER BY created_at DESC LIMIT ? OFFSET ?"""
+                       ORDER BY {sort_sql} {direction_sql}, id DESC LIMIT ? OFFSET ?"""
         list_params = list(params) + [limit, offset]
         leads_data = db_optimizer.execute_query(base_query, tuple(list_params))
 
@@ -228,13 +269,19 @@ class EnhancedCRMService:
     
     def create_lead(self, user_id: int, lead_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new lead"""
+        lead_data = dict(lead_data or {})
+        if "email" in lead_data:
+            lead_data["email"] = normalize_lead_email(lead_data.get("email"))
+        if isinstance(lead_data.get("name"), str):
+            lead_data["name"] = lead_data["name"].strip()
+
         required_fields = ['email', 'name']
         for field in required_fields:
             if not lead_data.get(field):
                 return {'success': False, 'error': f'Missing required field: {field}', 'error_code': 'MISSING_FIELD'}
         
         existing = db_optimizer.execute_query(
-            "SELECT id, withdrawn_at FROM leads WHERE user_id = ? AND email = ?",
+            "SELECT id, withdrawn_at FROM leads WHERE user_id = ? AND lower(email) = lower(?)",
             (user_id, lead_data['email'])
         )
         if existing:
@@ -888,6 +935,10 @@ class EnhancedCRMService:
                 'data': None
             }
     
+    def get_pipeline(self, user_id: int) -> Dict[str, Any]:
+        """Backward-compatible alias for routes/clients that call get_pipeline."""
+        return self.get_lead_pipeline(user_id)
+
     def _format_lead(self, lead_data: Dict[str, Any]) -> Lead:
         """Format lead data into Lead object"""
         return Lead(
@@ -1147,13 +1198,19 @@ class EnhancedCRMService:
         if on_duplicate not in allowed_dup:
             on_duplicate = 'update'
         for item in leads:
-            email = item.get('email')
+            item = dict(item or {})
+            email = normalize_lead_email(item.get('email'))
+            if email:
+                item['email'] = email
             name = item.get('name')
+            if isinstance(name, str):
+                name = name.strip()
+                item['name'] = name
             if not email or not name:
                 errors.append({'lead': item, 'error': 'Missing required field: email/name'})
                 continue
             existing = db_optimizer.execute_query(
-                "SELECT id, withdrawn_at FROM leads WHERE user_id = ? AND email = ?",
+                "SELECT id, withdrawn_at FROM leads WHERE user_id = ? AND lower(email) = lower(?)",
                 (user_id, email)
             )
             if existing:

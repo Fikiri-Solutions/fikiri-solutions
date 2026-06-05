@@ -124,8 +124,9 @@ def test_gmail_list_messages_and_basic_modify():
 
 @pytest.mark.contract
 def test_gmail_invalid_token_returns_401():
-    if requests is None:
-        pytest.skip("requests not available")
+    if requests is None or _skip_if_missing_env():
+        reason = _missing_creds_reason() or "requests not installed"
+        pytest.skip(f"Gmail contract creds not configured ({reason})")
 
     headers = {"Authorization": "Bearer invalid"}
     resp = requests.get(

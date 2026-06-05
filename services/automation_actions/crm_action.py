@@ -14,6 +14,16 @@ logger = logging.getLogger(__name__)
 # update_crm_field preset: merge stage/tags after inbound workflow (legacy slug: gmail_crm).
 INBOUND_CRM_SYNC_SLUG = "inbound_crm_sync"
 _LEGACY_INBOUND_CRM_SYNC_SLUGS = frozenset(("gmail_crm",))
+CRM_AUTOMATION_UPDATE_FIELDS = frozenset((
+    "name",
+    "phone",
+    "company",
+    "source",
+    "stage",
+    "notes",
+    "tags",
+    "metadata",
+))
 
 
 def is_inbound_crm_sync_slug(slug: Any) -> bool:
@@ -204,15 +214,28 @@ class CrmActionHandler:
                 }
 
             lead_id = action_data.get("lead_id") or trigger_data.get("lead_id")
-            field_name = action_data.get("field_name")
+            field_name = str(action_data.get("field_name") or "").strip()
             field_value = action_data.get("field_value")
             if not lead_id or not field_name:
                 return {"success": False, "error": "Missing lead_id or field_name"}
-            db_optimizer.execute_query(
-                """UPDATE leads SET {} = ? WHERE id = ? AND user_id = ?""".format(field_name),
-                (field_value, lead_id, user_id),
-                fetch=False,
+            if field_name not in CRM_AUTOMATION_UPDATE_FIELDS:
+                return {
+                    "success": False,
+                    "error": f"Field '{field_name}' cannot be updated by automation",
+                    "error_code": "INVALID_CRM_FIELD",
+                }
+
+            result = enhanced_crm_service.update_lead(
+                int(lead_id),
+                user_id,
+                {field_name: field_value},
             )
+            if not result.get("success"):
+                return {
+                    "success": False,
+                    "error": result.get("error", "CRM update failed"),
+                    "error_code": result.get("error_code", "CRM_UPDATE_ERROR"),
+                }
             self.logger.info("Updated CRM field %s for lead %s", field_name, lead_id)
             return {"success": True, "data": {"lead_id": int(lead_id)}}
         except Exception as e:

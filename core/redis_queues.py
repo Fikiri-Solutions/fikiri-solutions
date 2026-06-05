@@ -8,6 +8,7 @@ import json
 import time
 import uuid
 import logging
+import random
 from typing import Dict, Any, Optional, Callable, List
 from enum import Enum
 from dataclasses import dataclass
@@ -47,6 +48,7 @@ class JobStatus(Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     RETRYING = "retrying"
+    DEAD = "dead"
 
 @dataclass
 class Job:
@@ -62,6 +64,8 @@ class Job:
     error: Optional[str] = None
     retry_count: int = 0
     max_retries: int = 3
+    retry_after: Optional[float] = None
+    dead_letter: bool = False
 
 def _is_brpop_idle_timeout(exc: BaseException) -> bool:
     """True when BRPOP finished with no job (socket/read timeout), not a real failure."""
@@ -360,6 +364,19 @@ class RedisQueue:
                 )
                 
                 logger.info(f"✅ Completed job {job_id}")
+                if job.retry_count > 0:
+                    logger.info(
+                        "Queue job completed after retry",
+                        extra={
+                            "event": "job.completed_after_retry",
+                            "service": "background_job",
+                            "severity": "INFO",
+                            "job_id": job_id,
+                            "task": job.task,
+                            "queue_name": self.queue_name,
+                            "retry_count": job.retry_count,
+                        },
+                    )
                 return True
             
             return False
@@ -368,8 +385,19 @@ class RedisQueue:
             logger.error(f"❌ Job completion failed: {e}")
             return False
     
+    def _retry_delay_seconds(self, retry_count: int) -> int:
+        """Return bounded exponential retry delay with small jitter.
+
+        retry_count is 1-based for the failure that just happened. The base
+        schedule is approximately 30s, 2m, 10m, then capped.
+        """
+        base_delays = (30, 120, 600)
+        base = base_delays[min(max(retry_count, 1), len(base_delays)) - 1]
+        jitter = random.randint(0, max(1, int(base * 0.1)))
+        return base + jitter
+
     def fail_job(self, job_id: str, error: str, retry: bool = True):
-        """Mark job as failed"""
+        """Mark job as failed, scheduling delayed retries before dead-letter."""
         if not self.is_connected():
             return False
         
@@ -383,17 +411,53 @@ class RedisQueue:
                 
                 job.error = error
                 job.retry_count += 1
+                now = time.time()
+                will_retry = retry and job.retry_count <= job.max_retries
                 
-                if retry and job.retry_count <= job.max_retries:
-                    # Retry job
+                if will_retry:
                     job.status = JobStatus.RETRYING
-                    self.redis_client.lpush(f"{self.queue_name}:pending", job_id)
-                    logger.info(f"🔄 Retrying job {job_id} (attempt {job.retry_count})")
+                    delay = self._retry_delay_seconds(job.retry_count)
+                    job.retry_after = now + delay
+                    job.dead_letter = False
+                    self.redis_client.zadd(
+                        f"{self.queue_name}:delayed",
+                        {job_id: job.retry_after},
+                    )
+                    logger.warning(
+                        "Queue job retry scheduled",
+                        extra={
+                            "event": "job.retry_scheduled",
+                            "service": "background_job",
+                            "severity": "WARN",
+                            "job_id": job_id,
+                            "task": job.task,
+                            "queue_name": self.queue_name,
+                            "retry_count": job.retry_count,
+                            "max_retries": job.max_retries,
+                            "retry_delay_seconds": delay,
+                            "retry_after": job.retry_after,
+                        },
+                    )
                 else:
-                    # Mark as failed
-                    job.status = JobStatus.FAILED
-                    job.completed_at = time.time()
-                    logger.info(f"❌ Failed job {job_id}: {error}")
+                    job.status = JobStatus.DEAD if retry else JobStatus.FAILED
+                    job.completed_at = now
+                    job.retry_after = None
+                    job.dead_letter = bool(retry)
+                    logger.error(
+                        "Queue job terminal failure",
+                        extra={
+                            "event": "job.dead_letter" if job.dead_letter else "job.retry_skipped",
+                            "service": "background_job",
+                            "severity": "ERROR",
+                            "job_id": job_id,
+                            "task": job.task,
+                            "queue_name": self.queue_name,
+                            "retry_count": job.retry_count,
+                            "max_retries": job.max_retries,
+                            "dead_letter": job.dead_letter,
+                            "error": error,
+                        },
+                    )
                 
                 # Update job data
                 self.redis_client.setex(

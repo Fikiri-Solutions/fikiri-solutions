@@ -5,6 +5,8 @@ Covers: redis_connection_helper, redis_cache, redis_sessions, redis_pool, redis_
 
 import os
 import sys
+import json
+import time
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -289,6 +291,141 @@ class TestRedisQueues:
         with patch.object(q, "_reconnect_redis_clients") as mock_reconnect:
             assert q.dequeue_job(timeout=5) is None
             mock_reconnect.assert_called_once()
+
+
+    def _queue_with_fake_redis(self, job):
+        from core.redis_queues import RedisQueue
+
+        q = RedisQueue.__new__(RedisQueue)
+        q.queue_name = "test:queue"
+        q.job_prefix = "fikiri:job:"
+        q.result_prefix = "fikiri:result:"
+        q._registered_tasks = {}
+        q.redis_client = MagicMock()
+        q.redis_client.ping.return_value = True
+        q._store = {f"{q.job_prefix}{job.id}": json.dumps(job.__dict__, default=str)}
+
+        def fake_get(key):
+            return q._store.get(key)
+
+        def fake_setex(key, _ttl, value):
+            q._store[key] = value
+            return True
+
+        q.redis_client.get.side_effect = fake_get
+        q.redis_client.setex.side_effect = fake_setex
+        return q
+
+    def _stored_job(self, queue, job_id):
+        return json.loads(queue._store[f"{queue.job_prefix}{job_id}"])
+
+    def test_fail_job_schedules_transient_retry_with_backoff(self):
+        from core.redis_queues import Job, JobStatus
+
+        job = Job(
+            id="job-retry-1",
+            task="process_gmail_sync",
+            args={"job_id": "gmail_sync_1"},
+            status=JobStatus.PROCESSING,
+            created_at=time.time(),
+            max_retries=3,
+        )
+        q = self._queue_with_fake_redis(job)
+
+        with patch("core.redis_queues.time.time", return_value=1000), patch(
+            "core.redis_queues.random.randint", return_value=0
+        ):
+            assert q.fail_job(job.id, "temporary Gmail API error") is True
+
+        stored = self._stored_job(q, job.id)
+        assert stored["retry_count"] == 1
+        assert stored["dead_letter"] is False
+        assert stored["retry_after"] == 1030
+        assert str(stored["status"]).endswith("RETRYING")
+        q.redis_client.zadd.assert_called_once_with(
+            "test:queue:delayed", {job.id: 1030}
+        )
+        q.redis_client.lpush.assert_not_called()
+
+    def test_fail_job_repeated_failures_increase_retry_delay(self):
+        from core.redis_queues import Job, JobStatus
+
+        job = Job(
+            id="job-retry-2",
+            task="process_gmail_sync",
+            args={},
+            status=JobStatus.PROCESSING,
+            created_at=time.time(),
+            max_retries=3,
+        )
+        q = self._queue_with_fake_redis(job)
+
+        with patch("core.redis_queues.random.randint", return_value=0):
+            with patch("core.redis_queues.time.time", return_value=1000):
+                assert q.fail_job(job.id, "first transient") is True
+            with patch("core.redis_queues.time.time", return_value=2000):
+                assert q.fail_job(job.id, "second transient") is True
+
+        stored = self._stored_job(q, job.id)
+        assert stored["retry_count"] == 2
+        assert stored["retry_after"] == 2120
+        assert q.redis_client.zadd.call_args_list[0].args == (
+            "test:queue:delayed",
+            {job.id: 1030},
+        )
+        assert q.redis_client.zadd.call_args_list[1].args == (
+            "test:queue:delayed",
+            {job.id: 2120},
+        )
+
+    def test_fail_job_marks_dead_letter_after_max_retries(self):
+        from core.redis_queues import Job, JobStatus
+
+        job = Job(
+            id="job-dead-1",
+            task="process_gmail_sync",
+            args={},
+            status=JobStatus.PROCESSING,
+            created_at=time.time(),
+            max_retries=1,
+        )
+        q = self._queue_with_fake_redis(job)
+
+        with patch("core.redis_queues.random.randint", return_value=0):
+            with patch("core.redis_queues.time.time", return_value=1000):
+                assert q.fail_job(job.id, "first transient") is True
+            with patch("core.redis_queues.time.time", return_value=2000):
+                assert q.fail_job(job.id, "still failing") is True
+
+        stored = self._stored_job(q, job.id)
+        assert stored["retry_count"] == 2
+        assert stored["dead_letter"] is True
+        assert stored["retry_after"] is None
+        assert stored["completed_at"] == 2000
+        assert str(stored["status"]).endswith("DEAD")
+        assert q.redis_client.zadd.call_count == 1
+
+    def test_complete_job_after_retry_does_not_schedule_retry(self):
+        from core.redis_queues import Job, JobStatus
+
+        job = Job(
+            id="job-success-after-retry",
+            task="process_gmail_sync",
+            args={},
+            status=JobStatus.RETRYING,
+            created_at=time.time(),
+            retry_count=1,
+            max_retries=3,
+        )
+        q = self._queue_with_fake_redis(job)
+
+        assert q.complete_job(job.id, {"success": True}) is True
+
+        stored = self._stored_job(q, job.id)
+        assert str(stored["status"]).endswith("COMPLETED")
+        assert stored["retry_count"] == 1
+        q.redis_client.zadd.assert_not_called()
+        q.redis_client.lpush.assert_not_called()
 
     @patch("core.redis_queues.time.sleep")
     def test_start_worker_idle_timeout_does_not_fail_job(self, mock_sleep):

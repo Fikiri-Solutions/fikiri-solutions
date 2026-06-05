@@ -3,7 +3,7 @@ import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react'
 import { FikiriLogo } from '../components/FikiriLogo'
 import { RadiantLayout } from '../components/radiant'
 import { motion } from 'framer-motion'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { apiClient } from '../services/apiClient'
 import { AUTOCOMPLETE } from '../constants/autocomplete'
 
@@ -16,9 +16,11 @@ export const ResetPassword: React.FC = () => {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [searchParams] = useSearchParams()
+  const location = useLocation()
   const navigate = useNavigate()
 
-  const token = searchParams.get('token')
+  const hashParams = new URLSearchParams(location.hash.replace(/^#/, ''))
+  const token = searchParams.get('token') || hashParams.get('token') || hashParams.get('reset_token')
 
   useEffect(() => {
     if (!token) {
@@ -51,7 +53,7 @@ export const ResetPassword: React.FC = () => {
       const data = await apiClient.request<{ success?: boolean; error?: string }>(
         'POST',
         '/auth/reset-password',
-        { data: { token, password } }
+        { data: { token, new_password: password } }
       )
 
       if (data.success) {

@@ -591,7 +591,7 @@ const LandingPage: React.FC = () => {
             </div>
           </div>
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-white">
-            <p>&copy; 2024 Fikiri Solutions. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Fikiri Solutions. All rights reserved.</p>
           </div>
         </div>
       </footer>

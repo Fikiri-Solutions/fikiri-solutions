@@ -336,10 +336,15 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
     setIsSavingSecurityPreferences(true)
     try {
       const { apiClient } = await import('../services/apiClient')
-      await apiClient.updateProfile({ notification_preferences: notificationSettings })
+      const securityPreferences = {
+        ...notificationSettings,
+        security: { ...notificationSettings.security, two_factor_enabled: false },
+      }
+      await apiClient.updateProfile({ notification_preferences: securityPreferences })
+      setNotificationSettings(securityPreferences)
       addToast({
         type: 'success',
-        title: 'Security preferences saved (preference-only until feature rollout).',
+        title: 'Security preferences saved.',
       })
     } catch (_err) {
       addToast({ type: 'error', title: 'Failed to save security preferences.' })
@@ -736,29 +741,30 @@ export const AccountManagement: React.FC<AccountManagementProps> = ({ isOpen = f
             Two-Factor Authentication
           </h4>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            In-app enrollment (authenticator / SMS) is not available yet. Your choice is saved and will apply when 2FA is enabled for your account.
+            In-app enrollment (authenticator / SMS) is not available yet. This setting is disabled until enrollment is available for your account.
           </p>
           <div className="flex items-center justify-between">
             <div>
               <h5 className="font-medium text-gray-900 dark:text-white">Enable 2FA</h5>
               <p className="text-sm text-gray-600 dark:text-gray-300">Add an extra layer of security to your account</p>
             </div>
-            <label htmlFor="account-two-factor-enabled" className="relative inline-flex items-center cursor-pointer">
-              <input
-                id="account-two-factor-enabled"
-                name="two_factor_enabled"
-                type="checkbox"
-                checked={notificationSettings.security.two_factor_enabled}
-                onChange={(e) =>
-                  setNotificationSettings((prev) => ({
-                    ...prev,
-                    security: { ...prev.security, two_factor_enabled: e.target.checked },
-                  }))
-                }
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 dark:peer-focus:ring-orange-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-orange-500"></div>
-            </label>
+            <div className="flex items-center gap-3">
+              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                Unavailable
+              </span>
+              <label htmlFor="account-two-factor-enabled" className="relative inline-flex items-center cursor-not-allowed opacity-60">
+                <input
+                  id="account-two-factor-enabled"
+                  name="two_factor_enabled"
+                  type="checkbox"
+                  checked={false}
+                  disabled
+                  aria-disabled="true"
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 rounded-full dark:bg-gray-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 dark:border-gray-600"></div>
+              </label>
+            </div>
           </div>
         </div>
 
