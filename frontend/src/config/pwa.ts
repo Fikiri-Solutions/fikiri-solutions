@@ -46,26 +46,12 @@ export const pwaConfig = VitePWA({
     dir: 'ltr'
   },
   workbox: {
+    // Do not emit sw.js.map or advertise //# sourceMappingURL in production output.
+    sourcemap: false,
     globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,avif}'],
-    runtimeCaching: [
-      {
-        urlPattern: /^https:\/\/fikirisolutions\.onrender\.com\/.*/i,
-        handler: 'NetworkFirst',
-        options: {
-          cacheName: 'api-cache',
-          expiration: {
-            maxEntries: 100,
-            maxAgeSeconds: 60 * 5 // 5 minutes for API calls
-          },
-          cacheableResponse: {
-            statuses: [0, 200]
-          }
-        }
-      },
-      // Fonts are loaded via <link> in the document; do not intercept in the SW.
-      // Intercepting with Workbox fetch() requires connect-src to allow fonts.googleapis.com/gstatic
-      // for the service worker scope, which is brittle across CSP updates.
-    ]
+    // Do not runtime-cache backend API responses (authenticated JSON, user-specific data).
+    // Static assets are precached via globPatterns above; API calls always go network-only.
+    runtimeCaching: []
   },
   // PWA is only enabled in production builds (see vite.config.mts)
   // No devOptions needed since plugin is conditionally included

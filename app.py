@@ -678,22 +678,25 @@ def setup_routes(app):
     # Consolidated health check endpoints
     @app.route('/health/summary')
     def health_summary():
-        """Simple health check summary"""
-        return jsonify({
+        """Simple health check summary (route inventory only in dev/test)."""
+        env = (os.getenv("FLASK_ENV") or "production").strip().lower()
+        payload = {
             'status': 'running',
             'timestamp': datetime.now().isoformat(),
             'version': '1.0.0',
             'message': 'Fikiri Solutions API',
-            'endpoints': {
+        }
+        if env in ("development", "test"):
+            payload['endpoints'] = {
                 'auth': '/api/auth/*',
                 'business': '/api/business/*',
                 'test': '/api/test/*',
                 'user': '/api/user/*',
                 'monitoring': '/api/monitoring/*',
                 'health': '/health/summary'
-            },
-            "frontend": "https://fikirisolutions.com"
-        })
+            }
+            payload['frontend'] = 'https://fikirisolutions.com'
+        return jsonify(payload)
 
     @app.route('/api/health/live')
     def api_health_live():

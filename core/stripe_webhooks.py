@@ -4,8 +4,9 @@ Handles Stripe webhook events for subscription management
 """
 
 import os
+import json
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime
 
 # Optional Stripe integration
@@ -148,6 +149,105 @@ class StripeWebhookHandler:
             logger.error(f"Webhook verification error: {e}")
             raise
     
+    def process_verified_event(self, event) -> Dict[str, Any]:
+        """Process a signature-verified Stripe event with event.id deduplication."""
+        if not event:
+            return {'status': 'error', 'message': 'No event data'}
+
+        event_id = event.get('id')
+        if not event_id:
+            return {'status': 'error', 'message': 'Missing event id'}
+
+        event_type = event.get('type') or ''
+        claim = self._claim_stripe_webhook_event(event_id, event_type)
+        if claim == 'duplicate':
+            logger.info("Stripe webhook duplicate ignored: %s", event_id)
+            return {
+                'status': 'duplicate',
+                'event_id': event_id,
+                'message': 'Event already processed',
+            }
+        if claim != 'claimed':
+            return {'status': 'error', 'message': 'Failed to record webhook event'}
+
+        result = self.handle_event(event)
+        if result.get('status') == 'error':
+            self._complete_stripe_webhook_event(event_id, 'failed', result)
+        else:
+            self._complete_stripe_webhook_event(event_id, 'completed', result)
+        return result
+
+    def _claim_stripe_webhook_event(self, event_id: str, event_type: str) -> str:
+        """Return 'claimed', 'duplicate', or 'failed'."""
+        from core.database_optimization import DatabaseOptimizer
+
+        db = DatabaseOptimizer()
+        try:
+            inserted = db.execute_query(
+                """
+                INSERT INTO stripe_webhook_events (stripe_event_id, event_type, status)
+                VALUES (?, ?, 'processing')
+                ON CONFLICT (stripe_event_id) DO NOTHING
+                """,
+                (event_id, event_type),
+                fetch=False,
+            )
+            if inserted and inserted > 0:
+                return 'claimed'
+
+            rows = db.execute_query(
+                "SELECT status FROM stripe_webhook_events WHERE stripe_event_id = ? LIMIT 1",
+                (event_id,),
+            )
+            if not rows:
+                return 'failed'
+
+            row = rows[0]
+            status = row.get('status') if hasattr(row, 'keys') else row[0]
+            if status == 'failed':
+                updated = db.execute_query(
+                    """
+                    UPDATE stripe_webhook_events
+                    SET status = 'processing',
+                        event_type = ?,
+                        processed_at = NULL,
+                        result_json = NULL
+                    WHERE stripe_event_id = ? AND status = 'failed'
+                    """,
+                    (event_type, event_id),
+                    fetch=False,
+                )
+                if updated and updated > 0:
+                    return 'claimed'
+            return 'duplicate'
+        except Exception as e:
+            logger.error("Stripe webhook claim failed for %s: %s", event_id, e)
+            return 'failed'
+
+    def _complete_stripe_webhook_event(
+        self,
+        event_id: str,
+        status: str,
+        result: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        from core.database_optimization import DatabaseOptimizer
+
+        db = DatabaseOptimizer()
+        try:
+            db.execute_query(
+                """
+                UPDATE stripe_webhook_events
+                SET status = ?,
+                    result_json = ?,
+                    processed_at = CURRENT_TIMESTAMP
+                WHERE stripe_event_id = ?
+                """,
+                (status, json.dumps(result) if result is not None else None, event_id),
+                fetch=False,
+            )
+        except Exception as e:
+            logger.error("Stripe webhook completion update failed for %s: %s", event_id, e)
+
     def handle_event(self, event) -> Dict[str, Any]:
         """Route webhook events to appropriate handlers"""
         if not event:

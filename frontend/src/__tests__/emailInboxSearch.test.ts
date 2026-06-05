@@ -37,7 +37,7 @@ describe('apiClient.getEmails inbox search + pagination', () => {
   beforeEach(() => {
     vi.resetModules()
     getMock.mockReset()
-    localStorage.setItem('user_id', '1')
+    localStorage.setItem('fikiri-user-id', '1')
     getMock.mockResolvedValue({
       data: {
         data: {
