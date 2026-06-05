@@ -150,6 +150,30 @@ export interface LeadData {
   source: string
 }
 
+export interface CrmLeadsPageParams {
+  q?: string
+  stage?: string
+  limit?: number
+  offset?: number
+  page?: number
+  sort?: string
+  direction?: 'asc' | 'desc'
+  company?: string
+  time_period?: string
+}
+
+export interface CrmLeadsPageResponse {
+  leads: LeadData[]
+  pagination: {
+    total_count: number
+    returned_count: number
+    limit: number
+    offset: number
+    has_more: boolean
+  }
+  analytics?: Record<string, unknown>
+}
+
 /** Row from GET /crm/leads/:id/events (append-only CRM timeline). */
 export interface LeadCrmEvent {
   id: number
@@ -888,8 +912,8 @@ class ApiClient {
   async sendChatMessage(message: string, context?: any): Promise<any> {
     const response = await this.client.post('/ai/chat', {
       message,
-      user_id: this.getUserId() ?? 1, // Use actual user ID or fallback to 1
-      context: context || {}
+      context: context || {},
+      ...this.userIdFields(),
     })
     // Handle both response formats: { success, data: { response, ... } } or direct { response, ... }
     if (response.data?.data?.response) {
@@ -900,9 +924,8 @@ class ApiClient {
 
   // Dashboard endpoints
   async getDashboardTimeseries(userId?: number, period: 'week' | 'month' | 'quarter' = 'week'): Promise<any> {
-    const uid = userId ?? this.getUserId() ?? 1
     const response = await this.client.get('/dashboard/timeseries', {
-      params: { user_id: uid, period }
+      params: { period, ...this.userIdFields(userId) }
     })
     return response.data
   }
@@ -920,9 +943,8 @@ class ApiClient {
   }
 
   async getIndustryUsage(userId?: number): Promise<IndustryUsageMetrics> {
-    const uid = userId ?? this.getUserId() ?? 1
     const response = await this.client.get('/dashboard/industry/usage', {
-      params: { user_id: uid }
+      params: this.userIdFields(userId)
     })
     const data = response.data?.data || response.data || {}
     return data.usage || {
@@ -934,9 +956,9 @@ class ApiClient {
     }
   }
 
-  async getDashboardMetrics(userId: number = 1): Promise<any> {
+  async getDashboardMetrics(userId?: number): Promise<any> {
     const response = await this.client.get('/dashboard/metrics', {
-      params: { user_id: userId }
+      params: this.userIdFields(userId)
     })
     return response.data
   }
@@ -1023,13 +1045,12 @@ class ApiClient {
   async getLeads(): Promise<LeadData[]> {
     const pageSize = 500
     const maxLeads = 25000
-    const uid = this.getUserId() ?? 1
     const out: LeadData[] = []
     let offset = 0
 
     while (out.length < maxLeads) {
       const response = await this.client.get('/crm/leads', {
-        params: { user_id: uid, limit: pageSize, offset }
+        params: { ...this.userIdFields(), limit: pageSize, offset }
       })
       const payload = response.data?.data ?? response.data
       const backendLeads = payload?.leads ?? []
@@ -1047,9 +1068,45 @@ class ApiClient {
     return out
   }
 
+  /** Single page of leads for CRM table (server-side search, stage filter, pagination). */
+  async getLeadsPage(params?: CrmLeadsPageParams): Promise<CrmLeadsPageResponse> {
+    const limit = params?.limit ?? 50
+    const offset =
+      params?.offset ?? (params?.page != null ? Math.max(0, params.page - 1) * limit : 0)
+
+    const queryParams: Record<string, string | number> = {
+      ...this.userIdFields(),
+      limit,
+      offset,
+    }
+    if (params?.q?.trim()) queryParams.q = params.q.trim()
+    if (params?.stage && params.stage !== 'all') queryParams.stage = params.stage
+    if (params?.sort) queryParams.sort = params.sort
+    if (params?.direction) queryParams.direction = params.direction
+    if (params?.company) queryParams.company = params.company
+    if (params?.time_period) queryParams.time_period = params.time_period
+
+    const response = await this.client.get('/crm/leads', { params: queryParams })
+    const payload = response.data?.data ?? response.data
+    const backendLeads = payload?.leads ?? []
+    const pagination = payload?.pagination ?? {}
+
+    return {
+      leads: backendLeads.map((lead: Record<string, unknown>) => this.mapLead(lead)),
+      pagination: {
+        total_count: pagination.total_count ?? 0,
+        returned_count: pagination.returned_count ?? backendLeads.length,
+        limit: pagination.limit ?? limit,
+        offset: pagination.offset ?? offset,
+        has_more: pagination.has_more === true,
+      },
+      analytics: payload?.analytics,
+    }
+  }
+
   async getPipeline(): Promise<Record<string, LeadData[]>> {
     const response = await this.client.get('/crm/pipeline', {
-      params: { user_id: this.getUserId() ?? 1 }
+      params: this.userIdFields()
     })
 
     const payload = response.data?.data ?? response.data
@@ -1171,9 +1228,8 @@ class ApiClient {
   }
 
   async getAutomationRules(): Promise<AutomationRule[]> {
-    const userId = this.getUserId() ?? 1
     const response = await this.client.get('/automation/rules', {
-      params: { user_id: userId }
+      params: this.userIdFields()
     })
     return response.data?.data?.rules || response.data?.rules || []
   }
@@ -1196,9 +1252,8 @@ class ApiClient {
   }
 
   async getAutomationSafetyStatus(): Promise<AutomationSafetyStatus> {
-    const userId = this.getUserId() ?? 1
     const response = await this.client.get('/automation/safety-status', {
-      params: { user_id: userId }
+      params: this.userIdFields()
     })
     // Handle both response formats: { success, data, ... } or direct data
     const safetyData = response.data?.data || response.data
@@ -1210,9 +1265,8 @@ class ApiClient {
   }
 
   async getAutomationSuggestions(): Promise<any[]> {
-    const userId = this.getUserId() ?? 1
     const response = await this.client.get('/automation/suggestions', {
-      params: { user_id: userId }
+      params: this.userIdFields()
     })
     return response.data?.data?.suggestions || response.data?.suggestions || []
   }
@@ -1311,10 +1365,9 @@ class ApiClient {
   }
 
   async getAutomationLogs(params?: { ruleId?: number; slug?: string; limit?: number }): Promise<AutomationLog[]> {
-    const userId = this.getUserId() ?? 1
     const response = await this.client.get('/automation/logs', {
       params: {
-        user_id: userId,
+        ...this.userIdFields(),
         rule_id: params?.ruleId,
         slug: params?.slug,
         limit: params?.limit
@@ -1362,7 +1415,7 @@ class ApiClient {
 
   async triggerGmailSync(options?: GmailSyncOptions): Promise<GmailSyncResponse> {
     const payload: Record<string, unknown> = {
-      user_id: this.getUserId() ?? 1,
+      ...this.userIdFields(),
     }
     if (options?.lookback != null) payload.lookback = options.lookback
     if (options?.lookback_days != null) payload.lookback_days = options.lookback_days
@@ -1383,14 +1436,14 @@ class ApiClient {
 
   async triggerOutlookSync(): Promise<{ message: string }> {
     const response = await this.client.post('/crm/sync-outlook', {
-      user_id: this.getUserId() ?? 1
+      ...this.userIdFields(),
     })
     return response.data
   }
 
   async getEmailSyncStatus(): Promise<EmailSyncStatus> {
     const response = await this.client.get('/email/sync/status', {
-      params: { user_id: this.getUserId() ?? 1 }
+      params: this.userIdFields()
     })
     // Handle both response formats: { success, data, ... } or direct data
     const status = response.data?.data || response.data
@@ -1414,7 +1467,7 @@ class ApiClient {
       params: {
         ...params,
         q: searchQ,
-        user_id: this.getUserId() ?? 1,
+        ...this.userIdFields(),
         use_synced: params?.use_synced ?? true,
         include_body: params?.include_body ?? false
       }
@@ -1426,7 +1479,7 @@ class ApiClient {
   async getEmailMessage(emailId: string): Promise<any | null> {
     const enc = encodeURIComponent(emailId)
     const response = await this.client.get(`/email/messages/${enc}`, {
-      params: { user_id: this.getUserId() ?? 1 }
+      params: this.userIdFields()
     })
     const data = response.data?.data ?? response.data
     return data?.email ?? null
@@ -1449,7 +1502,7 @@ class ApiClient {
         category: params?.category,
         limit: params?.limit ?? 20,
         offset: params?.offset ?? 0,
-        user_id: this.getUserId() ?? 1,
+        ...this.userIdFields(),
       },
     })
     return response.data?.data ?? response.data
@@ -1458,7 +1511,7 @@ class ApiClient {
   async classifyEmailTriage(emailIds: string[]): Promise<{ classified: unknown[]; count: number }> {
     const response = await this.client.post('/email/triage/classify', {
       email_ids: emailIds,
-      user_id: this.getUserId() ?? 1,
+      ...this.userIdFields(),
     })
     return response.data?.data ?? response.data
   }
@@ -1467,7 +1520,7 @@ class ApiClient {
   async classifyEmailTriageUnclassified(limit = 50): Promise<{ classified: unknown[]; count: number }> {
     const response = await this.client.post('/email/triage/classify-unclassified', {
       limit,
-      user_id: this.getUserId() ?? 1,
+      ...this.userIdFields(),
     })
     return response.data?.data ?? response.data
   }
@@ -1485,7 +1538,7 @@ class ApiClient {
   }> {
     const response = await this.client.post('/email/triage/bulk-action', {
       ...payload,
-      user_id: this.getUserId() ?? 1,
+      ...this.userIdFields(),
     })
     return response.data?.data ?? response.data
   }
@@ -1528,7 +1581,8 @@ class ApiClient {
   async processDocument(file: File): Promise<DocumentProcessingResult> {
     const formData = new FormData()
     formData.append('file', file)
-    formData.append('user_id', (this.getUserId() ?? 1).toString())
+    const uid = this.getUserId()
+    if (uid != null) formData.append('user_id', String(uid))
 
     const response = await this.client.post('/docs-forms/documents/process', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
@@ -1647,7 +1701,7 @@ class ApiClient {
   async archiveEmail(emailId: string): Promise<{ archived: boolean }> {
     const response = await this.client.post('/email/archive', {
       email_id: emailId,
-      user_id: this.getUserId() ?? 1
+      ...this.userIdFields(),
     })
     return response.data.data || response.data
   }
@@ -1655,7 +1709,7 @@ class ApiClient {
   async markEmailRead(emailId: string): Promise<{ read: boolean }> {
     const response = await this.client.post('/email/mark-read', {
       email_id: emailId,
-      user_id: this.getUserId() ?? 1
+      ...this.userIdFields(),
     })
     return response.data.data || response.data
   }
@@ -1787,6 +1841,12 @@ class ApiClient {
       lastContact: lead.last_contact || lead.updated_at || lead.created_at || new Date().toISOString(),
       source: lead.source || 'manual'
     }
+  }
+
+  /** Include user_id in params/body only when known; backend resolves tenant from JWT first. */
+  private userIdFields(explicit?: number): { user_id: number } | Record<string, never> {
+    const uid = explicit ?? this.getUserId()
+    return uid != null ? { user_id: uid } : {}
   }
 
   private getUserId(): number | null {

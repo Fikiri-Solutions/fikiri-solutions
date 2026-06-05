@@ -188,6 +188,82 @@ class TestStripeWebhookHandler(unittest.TestCase):
         mock_update.assert_called_once_with("sub_2", "cus_2", "past_due")
         mock_track.assert_called_once()
 
+    @patch("core.stripe_webhooks.stripe")
+    def test_process_verified_event_processes_once(self, mock_stripe):
+        from core.stripe_webhooks import StripeWebhookHandler
+
+        handler = StripeWebhookHandler()
+        event = {
+            "id": "evt_test_1",
+            "type": "invoice.payment_succeeded",
+            "data": {"object": {}},
+        }
+        with patch.object(handler, "_claim_stripe_webhook_event", return_value="claimed") as mock_claim, \
+            patch.object(handler, "handle_event", return_value={"status": "success"}) as mock_handle, \
+            patch.object(handler, "_complete_stripe_webhook_event") as mock_complete:
+            result = handler.process_verified_event(event)
+
+        self.assertEqual(result.get("status"), "success")
+        mock_claim.assert_called_once_with("evt_test_1", "invoice.payment_succeeded")
+        mock_handle.assert_called_once_with(event)
+        mock_complete.assert_called_once_with("evt_test_1", "completed", {"status": "success"})
+
+    @patch("core.stripe_webhooks.stripe")
+    def test_process_verified_event_duplicate_skips_side_effects(self, mock_stripe):
+        from core.stripe_webhooks import StripeWebhookHandler
+
+        handler = StripeWebhookHandler()
+        event = {
+            "id": "evt_test_dup",
+            "type": "customer.subscription.updated",
+            "data": {"object": {}},
+        }
+        with patch.object(handler, "_claim_stripe_webhook_event", return_value="duplicate"), \
+            patch.object(handler, "handle_event") as mock_handle, \
+            patch.object(handler, "_complete_stripe_webhook_event") as mock_complete:
+            result = handler.process_verified_event(event)
+
+        self.assertEqual(result.get("status"), "duplicate")
+        self.assertEqual(result.get("event_id"), "evt_test_dup")
+        mock_handle.assert_not_called()
+        mock_complete.assert_not_called()
+
+    @patch("core.database_optimization.DatabaseOptimizer")
+    @patch("core.stripe_webhooks.stripe")
+    def test_claim_stripe_webhook_event_inserts_once(self, mock_stripe, mock_db_cls):
+        from core.stripe_webhooks import StripeWebhookHandler
+
+        mock_db = MagicMock()
+        mock_db_cls.return_value = mock_db
+        mock_db.execute_query.return_value = 1
+
+        handler = StripeWebhookHandler()
+        self.assertEqual(handler._claim_stripe_webhook_event("evt_1", "invoice.paid"), "claimed")
+        mock_db.execute_query.assert_called_once()
+
+    @patch("core.database_optimization.DatabaseOptimizer")
+    @patch("core.stripe_webhooks.stripe")
+    def test_claim_stripe_webhook_event_detects_duplicate(self, mock_stripe, mock_db_cls):
+        from core.stripe_webhooks import StripeWebhookHandler
+
+        mock_db = MagicMock()
+        mock_db_cls.return_value = mock_db
+        mock_db.execute_query.side_effect = [0, [{"status": "completed"}]]
+
+        handler = StripeWebhookHandler()
+        self.assertEqual(handler._claim_stripe_webhook_event("evt_1", "invoice.paid"), "duplicate")
+
+    @patch("core.stripe_webhooks.stripe")
+    def test_verify_invalid_signature_not_claimed(self, mock_stripe):
+        from core.stripe_webhooks import StripeWebhookHandler
+
+        mock_stripe.Webhook.construct_event.side_effect = ValueError("Invalid signature")
+        handler = StripeWebhookHandler()
+        with patch.object(handler, "_claim_stripe_webhook_event") as mock_claim:
+            with self.assertRaises(ValueError):
+                handler.verify_webhook_signature(b"{}", "bad-sig")
+        mock_claim.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

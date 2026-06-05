@@ -25,6 +25,28 @@ class TestHealthChecks(unittest.TestCase):
         self.client = app.test_client()
         self.app.config['TESTING'] = True
     
+    @patch.dict(os.environ, {"FLASK_ENV": "production"}, clear=False)
+    def test_health_summary_production_hides_route_inventory(self):
+        """Production /health/summary must not expose endpoint maps for reconnaissance."""
+        response = self.client.get('/health/summary')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertEqual(data.get('status'), 'running')
+        self.assertIn('timestamp', data)
+        self.assertIn('version', data)
+        self.assertNotIn('endpoints', data)
+        self.assertNotIn('frontend', data)
+
+    @patch.dict(os.environ, {"FLASK_ENV": "development"}, clear=False)
+    def test_health_summary_development_includes_route_inventory(self):
+        """Dev keeps route inventory for local discovery."""
+        response = self.client.get('/health/summary')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertIn('endpoints', data)
+        self.assertIn('auth', data['endpoints'])
+        self.assertIn('frontend', data)
+
     def test_health_live_endpoint(self):
         """Liveness route for Render: no DB/Redis, must stay under platform probe timeouts."""
         response = self.client.get('/api/health/live')

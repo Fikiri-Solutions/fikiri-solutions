@@ -16,6 +16,7 @@ from core.secure_sessions import get_current_user_id
 from core.database_optimization import db_optimizer
 from core.oauth_token_manager import oauth_token_manager
 from core.request_user_id import resolve_request_user_id
+from core.billing_api import _is_admin_user
 
 logger = logging.getLogger(__name__)
 
@@ -676,10 +677,11 @@ def get_alerts():
 def get_circuit_breaker_status():
     """Get circuit breaker status for all services"""
     try:
-        # Check if user is admin (add admin check if needed)
         user_id = get_current_user_id()
         if not user_id:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+        if not _is_admin_user(user_id):
+            return create_error_response("Forbidden", 403, 'FORBIDDEN')
         
         try:
             from core.circuit_breaker import circuit_breaker_manager

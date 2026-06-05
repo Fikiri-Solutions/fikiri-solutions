@@ -1124,8 +1124,8 @@ def handle_stripe_webhook():
         # Verify webhook signature
         event = webhook_handler.verify_webhook_signature(payload, sig_header)
         
-        # Handle the event
-        result = webhook_handler.handle_event(event)
+        # Handle the event (dedupe by Stripe event.id before side effects)
+        result = webhook_handler.process_verified_event(event)
         
         return jsonify(result)
         

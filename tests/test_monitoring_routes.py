@@ -194,6 +194,37 @@ class TestMonitoringRoutes(unittest.TestCase):
         data = json.loads(response.data)
         self.assertEqual(data.get('data', {}).get('cpu'), 1)
 
+    @patch("routes.monitoring.get_current_user_id", return_value=None)
+    def test_circuit_breakers_requires_auth(self, mock_user_id):
+        response = self.client.get('/api/admin/circuit-breakers')
+        self.assertEqual(response.status_code, 401)
+        data = json.loads(response.data)
+        self.assertEqual(data.get('code'), 'AUTHENTICATION_REQUIRED')
+
+    @patch("routes.monitoring._is_admin_user", return_value=False)
+    @patch("routes.monitoring.get_current_user_id", return_value=2)
+    def test_circuit_breakers_forbidden_non_admin(self, mock_user_id, mock_is_admin):
+        response = self.client.get('/api/admin/circuit-breakers')
+        self.assertEqual(response.status_code, 403)
+        data = json.loads(response.data)
+        self.assertEqual(data.get('code'), 'FORBIDDEN')
+
+    @patch("routes.monitoring._is_admin_user", return_value=True)
+    @patch("routes.monitoring.get_current_user_id", return_value=1)
+    @patch("core.circuit_breaker.circuit_breaker_manager")
+    def test_circuit_breakers_admin_success(self, mock_manager, mock_user_id, mock_is_admin):
+        mock_manager.get_all_status.return_value = {
+            'openai': {'state': 'closed', 'failure_count': 0},
+            'stripe': {'state': 'open', 'failure_count': 3},
+        }
+        response = self.client.get('/api/admin/circuit-breakers')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        payload = data.get('data') or {}
+        self.assertEqual(payload.get('summary', {}).get('total'), 2)
+        self.assertEqual(payload.get('summary', {}).get('closed'), 1)
+        self.assertEqual(payload.get('summary', {}).get('open'), 1)
+
     @patch("routes.monitoring.get_current_user_id", return_value=1)
     @patch("routes.monitoring.db_optimizer")
     def test_get_alerts(self, mock_db, mock_user_id):

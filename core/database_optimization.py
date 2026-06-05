@@ -879,6 +879,19 @@ class DatabaseOptimizer:
                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
             )
         """)
+
+        # Stripe webhook idempotency — one row per Stripe event.id (retry-safe dedupe)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                stripe_event_id TEXT NOT NULL UNIQUE,
+                event_type TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'processing',
+                result_json TEXT,
+                processed_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         
         # Activities table for lead interactions
         cursor.execute("""
