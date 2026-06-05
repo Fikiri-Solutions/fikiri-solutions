@@ -146,6 +146,15 @@ class GmailSyncJobManager:
             1,
             int(os.getenv('GMAIL_SYNC_PROGRESS_UPDATE_EVERY', '10')),
         )
+        self.gmail_fetch_mode = (
+            os.getenv('GMAIL_SYNC_FETCH_MODE', 'serial') or 'serial'
+        ).strip().lower()
+        if self.gmail_fetch_mode not in {'serial', 'batch', 'auto'}:
+            logger.warning(
+                "Unsupported GMAIL_SYNC_FETCH_MODE=%s; using serial",
+                self.gmail_fetch_mode,
+            )
+            self.gmail_fetch_mode = 'serial'
         self.sync_days = int(os.getenv('GMAIL_SYNC_DAYS', str(DEFAULT_LOOKBACK_DAYS)))
         self._connect_redis()
         self._initialize_tables()
@@ -778,22 +787,18 @@ class GmailSyncJobManager:
                     # Store email
                     email_id = self._store_email(user_id, message)
                     if email_id:
+                        synced_email_id = int(email_id)
                         emails_synced += 1
                         try:
                             from email_automation.email_event_log import record_email_event
 
-                            sid_rows = db_optimizer.execute_query(
-                                "SELECT id FROM synced_emails WHERE user_id = ? AND gmail_id = ? LIMIT 1",
-                                (user_id, message.get("id")),
-                            )
-                            sid = int(sid_rows[0]["id"]) if sid_rows else None
                             record_email_event(
                                 user_id,
                                 "email.received",
                                 provider="gmail",
                                 message_id=message.get("id"),
                                 thread_id=message.get("threadId"),
-                                synced_email_id=sid,
+                                synced_email_id=synced_email_id,
                                 payload={"gmail_sync_job_id": job_id},
                                 status="applied",
                                 source="gmail_sync",
@@ -837,7 +842,7 @@ class GmailSyncJobManager:
                                         if "<" in _from
                                         else _from,
                                         provider="gmail",
-                                        synced_email_id=sid,
+                                        synced_email_id=synced_email_id,
                                     )
                                 except Exception as triage_inner:
                                     logger.debug(
@@ -851,7 +856,7 @@ class GmailSyncJobManager:
                                             user_id,
                                             _ext_id,
                                             provider="gmail",
-                                            synced_email_id=sid,
+                                            synced_email_id=synced_email_id,
                                             source="gmail_sync",
                                         )
                                     except Exception as wf_err:
@@ -906,7 +911,7 @@ class GmailSyncJobManager:
                                 ),
                                 trace_id=trace_id,
                                 correlation_id=correlation_id,
-                                synced_email_row_id=sid,
+                                synced_email_row_id=synced_email_id,
                                 external_message_id=str(message.get("id") or email_id or ""),
                                 mailbox_owner_email=owner_email,
                                 provider="gmail",
@@ -1011,6 +1016,104 @@ class GmailSyncJobManager:
             logger.error(f"❌ Email sync failed: {e}")
             raise
     
+    def _fetch_full_gmail_messages_serial(
+        self,
+        service,
+        message_ids: List[str],
+    ) -> List[Dict[str, Any]]:
+        """Fetch full Gmail messages serially in list order."""
+        full_messages: List[Dict[str, Any]] = []
+        for mid in message_ids:
+            try:
+                msg = service.users().messages().get(
+                    userId='me',
+                    id=mid,
+                    format='full',
+                ).execute()
+                full_messages.append(msg)
+            except Exception as e:
+                logger.warning(f"Failed to get message {mid}: {e}")
+                continue
+        return full_messages
+
+    def _fetch_full_gmail_messages_batch(
+        self,
+        service,
+        message_ids: List[str],
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Fetch full Gmail messages with google-api-python-client batch support.
+
+        Returns ``None`` when batch support is unavailable or a whole-batch failure
+        means the caller should use the serial fallback. Per-message callback
+        exceptions are logged and skipped.
+        """
+        if not hasattr(service, "new_batch_http_request"):
+            return None
+
+        responses_by_id: Dict[str, Dict[str, Any]] = {}
+
+        def handle_response(request_id, response, exception):
+            if exception is not None:
+                logger.warning(
+                    "Failed to batch fetch message %s: %s",
+                    request_id,
+                    exception,
+                )
+                return
+            if response:
+                responses_by_id[str(request_id)] = response
+
+        try:
+            batch = service.new_batch_http_request()
+            messages_resource = service.users().messages()
+            for mid in message_ids:
+                request = messages_resource.get(
+                    userId='me',
+                    id=mid,
+                    format='full',
+                )
+                batch.add(request, callback=handle_response, request_id=mid)
+            batch.execute()
+        except Exception as e:
+            logger.warning(
+                "Gmail batch full-message fetch failed; falling back to serial: %s",
+                e,
+            )
+            return None
+
+        return [responses_by_id[mid] for mid in message_ids if mid in responses_by_id]
+
+    def _fetch_full_gmail_messages(
+        self,
+        service,
+        message_ids: List[str],
+        *,
+        mode: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Fetch full Gmail messages in list order using the configured safe mode."""
+        normalized_mode = (
+            mode or getattr(self, 'gmail_fetch_mode', 'serial') or 'serial'
+        ).strip().lower()
+        if normalized_mode not in {'serial', 'batch', 'auto'}:
+            logger.warning(
+                "Unsupported Gmail fetch mode %s; using serial",
+                normalized_mode,
+            )
+            normalized_mode = 'serial'
+
+        if normalized_mode == 'serial':
+            return self._fetch_full_gmail_messages_serial(service, message_ids)
+
+        batch_messages = self._fetch_full_gmail_messages_batch(service, message_ids)
+        if batch_messages is not None:
+            return batch_messages
+
+        if normalized_mode == 'batch':
+            logger.warning(
+                "Gmail batch full-message fetch unavailable; falling back to serial"
+            )
+        return self._fetch_full_gmail_messages_serial(service, message_ids)
+
     def _get_gmail_messages(
         self,
         service,
@@ -1062,18 +1165,7 @@ class GmailSyncJobManager:
 
             has_more = bool(next_list_page_token) and len(message_ids) >= max_messages
 
-            full_messages: List[Dict[str, Any]] = []
-            for mid in message_ids:
-                try:
-                    msg = service.users().messages().get(
-                        userId='me',
-                        id=mid,
-                        format='full',
-                    ).execute()
-                    full_messages.append(msg)
-                except Exception as e:
-                    logger.warning(f"Failed to get message {mid}: {e}")
-                    continue
+            full_messages = self._fetch_full_gmail_messages(service, message_ids)
 
             return {
                 "messages": full_messages,
@@ -1127,8 +1219,9 @@ class GmailSyncJobManager:
             # Align with Gmail: UNREAD label present => not read yet
             is_read = 0 if 'UNREAD' in labels else 1
 
-            # Store in database
-            db_optimizer.upsert_synced_email_from_gmail(
+            # Store in database and return the synced_emails row id so callers can
+            # link events/workflow state without a second per-message lookup.
+            synced_email_id = db_optimizer.upsert_synced_email_from_gmail(
                 user_id,
                 message["id"],
                 message.get("threadId"),
@@ -1141,7 +1234,7 @@ class GmailSyncJobManager:
                 is_read,
             )
 
-            return 1
+            return int(synced_email_id) if synced_email_id is not None else None
             
         except Exception as e:
             logger.error(f"❌ Email storage failed: {e}")

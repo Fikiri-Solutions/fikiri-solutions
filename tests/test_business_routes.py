@@ -64,6 +64,108 @@ class TestBusinessRoutes(unittest.TestCase):
         self.assertIn("leads", data.get("data", {}))
         self.assertIn("pagination", data.get("data", {}))
 
+    def _mock_leads_summary(self, mock_crm, *, limit=100, offset=0):
+        mock_crm.get_leads_summary.return_value = {
+            "success": True,
+            "data": {
+                "leads": [],
+                "total_count": 0,
+                "returned_count": 0,
+                "limit": limit,
+                "offset": offset,
+                "has_more": False,
+                "analytics": {},
+                "filters_applied": {},
+            },
+        }
+
+    @patch("routes.business.get_current_user_id")
+    @patch("routes.business.enhanced_crm_service")
+    def test_get_leads_passes_q_to_service(self, mock_crm, mock_get_user):
+        mock_get_user.return_value = 1
+        self._mock_leads_summary(mock_crm)
+
+        response = self.client.get("/api/crm/leads?q=Acme")
+
+        self.assertEqual(response.status_code, 200)
+        mock_crm.get_leads_summary.assert_called_once_with(
+            1,
+            filters={"q": "Acme"},
+            limit=100,
+            offset=0,
+            sort="created_at",
+            direction="desc",
+        )
+
+    @patch("routes.business.get_current_user_id")
+    @patch("routes.business.enhanced_crm_service")
+    def test_get_leads_passes_stage_q_limit_and_offset(self, mock_crm, mock_get_user):
+        mock_get_user.return_value = 1
+        self._mock_leads_summary(mock_crm, limit=25, offset=50)
+
+        response = self.client.get("/api/crm/leads?stage=qualified&q=Acme&limit=25&offset=50")
+
+        self.assertEqual(response.status_code, 200)
+        mock_crm.get_leads_summary.assert_called_once_with(
+            1,
+            filters={"stage": "qualified", "q": "Acme"},
+            limit=25,
+            offset=50,
+            sort="created_at",
+            direction="desc",
+        )
+
+    @patch("routes.business.get_current_user_id")
+    @patch("routes.business.enhanced_crm_service")
+    def test_get_leads_page_limit_translates_to_offset_when_offset_omitted(self, mock_crm, mock_get_user):
+        mock_get_user.return_value = 1
+        self._mock_leads_summary(mock_crm, limit=50, offset=100)
+
+        response = self.client.get("/api/crm/leads?page=3&limit=50")
+
+        self.assertEqual(response.status_code, 200)
+        _, kwargs = mock_crm.get_leads_summary.call_args
+        self.assertEqual(kwargs["limit"], 50)
+        self.assertEqual(kwargs["offset"], 100)
+        self.assertEqual(response.get_json()["data"]["pagination"]["page"], 3)
+
+    @patch("routes.business.get_current_user_id")
+    @patch("routes.business.enhanced_crm_service")
+    def test_get_leads_invalid_page_defaults_to_first_page(self, mock_crm, mock_get_user):
+        mock_get_user.return_value = 1
+        self._mock_leads_summary(mock_crm, limit=50, offset=0)
+
+        response = self.client.get("/api/crm/leads?page=not-a-number&limit=50")
+
+        self.assertEqual(response.status_code, 200)
+        _, kwargs = mock_crm.get_leads_summary.call_args
+        self.assertEqual(kwargs["offset"], 0)
+        self.assertEqual(response.get_json()["data"]["pagination"]["page"], 1)
+
+    @patch("routes.business.get_current_user_id")
+    @patch("routes.business.enhanced_crm_service")
+    def test_get_leads_explicit_offset_wins_over_page(self, mock_crm, mock_get_user):
+        mock_get_user.return_value = 1
+        self._mock_leads_summary(mock_crm, limit=50, offset=25)
+
+        response = self.client.get("/api/crm/leads?page=3&limit=50&offset=25")
+
+        self.assertEqual(response.status_code, 200)
+        _, kwargs = mock_crm.get_leads_summary.call_args
+        self.assertEqual(kwargs["offset"], 25)
+
+    @patch("routes.business.get_current_user_id")
+    @patch("routes.business.enhanced_crm_service")
+    def test_get_leads_limit_clamps_to_current_bounds(self, mock_crm, mock_get_user):
+        mock_get_user.return_value = 1
+        self._mock_leads_summary(mock_crm, limit=500, offset=0)
+
+        response = self.client.get("/api/crm/leads?limit=9999")
+
+        self.assertEqual(response.status_code, 200)
+        _, kwargs = mock_crm.get_leads_summary.call_args
+        self.assertEqual(kwargs["limit"], 500)
+
     @patch("routes.business.get_current_user_id")
     @patch("routes.business.enhanced_crm_service")
     def test_create_lead_requires_auth(self, mock_crm, mock_get_user):

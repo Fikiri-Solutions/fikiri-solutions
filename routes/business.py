@@ -144,17 +144,34 @@ def get_leads():
         return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
 
     limit = min(max(request.args.get('limit', type=int, default=100), 1), 500)
-    offset = request.args.get('offset', type=int, default=0)
+    page = max(request.args.get('page', type=int, default=1) or 1, 1)
+    if 'offset' in request.args:
+        offset = request.args.get('offset', type=int, default=0)
+    else:
+        offset = (page - 1) * limit
     
     filters = {}
     if request.args.get('stage'):
         filters['stage'] = request.args.get('stage')
     if request.args.get('time_period'):
         filters['time_period'] = request.args.get('time_period')
-    if request.args.get('company'):
-        filters['company'] = request.args.get('company')
+    company = (request.args.get('company') or '').strip()
+    if company:
+        filters['company'] = company
+    q = (request.args.get('q') or '').strip()
+    if q:
+        filters['q'] = q
 
-    result = enhanced_crm_service.get_leads_summary(user_id, filters=filters, limit=limit, offset=offset)
+    sort = request.args.get('sort', default='created_at')
+    direction = request.args.get('direction', default='desc')
+    result = enhanced_crm_service.get_leads_summary(
+        user_id,
+        filters=filters,
+        limit=limit,
+        offset=offset,
+        sort=sort,
+        direction=direction,
+    )
     if not result.get('success'):
         return create_error_response(result.get('error', 'Failed to retrieve leads'), 500, 'CRM_ERROR')
     
@@ -166,9 +183,11 @@ def get_leads():
             'returned_count': data.get('returned_count', 0),
             'limit': data.get('limit', limit),
             'offset': data.get('offset', offset),
+            'page': (data.get('offset', offset) // data.get('limit', limit)) + 1 if data.get('limit', limit) else 1,
             'has_more': data.get('has_more', False)
         },
-        'analytics': data.get('analytics', {})
+        'analytics': data.get('analytics', {}),
+        'filters_applied': data.get('filters_applied', filters)
     }, 'Leads retrieved successfully')
 
 

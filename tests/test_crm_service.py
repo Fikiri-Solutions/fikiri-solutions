@@ -110,5 +110,100 @@ class TestCRMService(unittest.TestCase):
         self.assertTrue(result.get('success'))
 
 
+    def _lead_row(self):
+        return {
+            'id': 1,
+            'user_id': 1,
+            'email': 'lead@example.com',
+            'name': 'Lead Example',
+            'phone': '555-0100',
+            'company': 'Acme Co',
+            'source': 'manual',
+            'stage': 'new',
+            'score': 50,
+            'created_at': '2024-01-01T00:00:00',
+            'updated_at': '2024-01-02T00:00:00',
+            'last_contact': None,
+            'notes': None,
+            'tags': '[]',
+            'metadata': '{}',
+        }
+
+    def _mock_leads_summary_queries(self, mock_db, total=1):
+        mock_db.execute_query.side_effect = [
+            [self._lead_row()] if total else [],
+            [{'total': total}],
+            [{'stage': 'new', 'cnt': total}] if total else [],
+            [{'source': 'manual', 'cnt': total}] if total else [],
+            [{'avg_score': 50}] if total else [],
+            [{'cnt': 0}] if total else [],
+        ]
+
+    @patch('crm.service.db_optimizer')
+    def test_get_leads_summary_q_search_is_parameterized_across_supported_fields(self, mock_db):
+        self._mock_leads_summary_queries(mock_db)
+
+        result = self.service.get_leads_summary(1, filters={'q': 'Acme'}, limit=10, offset=0)
+
+        self.assertTrue(result.get('success'), msg=result)
+        list_query, list_params = mock_db.execute_query.call_args_list[0].args
+        self.assertIn("LOWER(COALESCE(name, '')) LIKE ?", list_query)
+        self.assertIn("LOWER(COALESCE(email, '')) LIKE ?", list_query)
+        self.assertIn("LOWER(COALESCE(company, '')) LIKE ?", list_query)
+        self.assertIn("LOWER(COALESCE(phone, '')) LIKE ?", list_query)
+        self.assertNotIn('Acme', list_query)
+        self.assertEqual(list_params[:5], (1, '%acme%', '%acme%', '%acme%', '%acme%'))
+        self.assertEqual(list_params[-2:], (10, 0))
+
+    @patch('crm.service.db_optimizer')
+    def test_get_leads_summary_q_and_stage_combine_with_and(self, mock_db):
+        self._mock_leads_summary_queries(mock_db)
+
+        self.service.get_leads_summary(1, filters={'stage': 'qualified', 'q': 'Acme'}, limit=25, offset=50)
+
+        list_query, list_params = mock_db.execute_query.call_args_list[0].args
+        self.assertIn('stage = ?', list_query)
+        self.assertIn("LOWER(COALESCE(name, '')) LIKE ?", list_query)
+        self.assertIn(' AND ', list_query)
+        self.assertEqual(list_params[:6], (1, 'qualified', '%acme%', '%acme%', '%acme%', '%acme%'))
+        self.assertEqual(list_params[-2:], (25, 50))
+
+    @patch('crm.service.db_optimizer')
+    def test_get_leads_summary_sort_allowlist_applies_safe_sort(self, mock_db):
+        self._mock_leads_summary_queries(mock_db)
+
+        self.service.get_leads_summary(1, sort='score', direction='asc')
+
+        list_query = mock_db.execute_query.call_args_list[0].args[0]
+        self.assertIn('ORDER BY score ASC, id DESC', list_query)
+
+    @patch('crm.service.db_optimizer')
+    def test_get_leads_summary_invalid_sort_and_direction_fall_back_safely(self, mock_db):
+        self._mock_leads_summary_queries(mock_db)
+
+        self.service.get_leads_summary(1, sort='email; DROP TABLE leads', direction='sideways')
+
+        list_query = mock_db.execute_query.call_args_list[0].args[0]
+        self.assertIn('ORDER BY created_at DESC, id DESC', list_query)
+        self.assertNotIn('DROP TABLE', list_query)
+        self.assertNotIn('sideways', list_query)
+
+    @patch('crm.service.db_optimizer')
+    def test_get_leads_summary_count_query_uses_same_filters_as_list_query(self, mock_db):
+        self._mock_leads_summary_queries(mock_db)
+
+        self.service.get_leads_summary(
+            1,
+            filters={'stage': 'new', 'company': 'Acme', 'q': 'Jones'},
+            limit=10,
+            offset=20,
+        )
+
+        _list_query, list_params = mock_db.execute_query.call_args_list[0].args
+        count_query, count_params = mock_db.execute_query.call_args_list[1].args
+        self.assertIn('COUNT(*) as total', count_query)
+        self.assertEqual(count_params, list_params[:-2])
+
+
 if __name__ == '__main__':
     unittest.main()

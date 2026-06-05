@@ -22,6 +22,20 @@ gmail_sync_manager = None
 logger = logging.getLogger(__name__)
 
 _ACTIVE_LEADS_SQL = " (withdrawn_at IS NULL) "
+_CRM_LEAD_SORT_COLUMNS = {
+    "created_at": "created_at",
+    "updated_at": "updated_at",
+    "last_contact": "last_contact",
+    "score": "score",
+    "name": "LOWER(name)",
+}
+_CRM_LEAD_DEFAULT_SORT = "created_at"
+_CRM_LEAD_DEFAULT_DIRECTION = "DESC"
+
+
+def normalize_lead_email(value: Any) -> str:
+    """Normalize CRM lead emails consistently across manual, import, webhook, and email paths."""
+    return str(value or "").strip().lower()
 
 
 def normalize_lead_email(value: Any) -> str:
@@ -195,18 +209,45 @@ class EnhancedCRMService:
                 parts.append("created_at >= ?")
                 params.append(cutoff_date.isoformat())
             if filters.get('company'):
-                parts.append("company LIKE ?")
-                params.append(f"%{filters['company']}%")
+                parts.append("LOWER(COALESCE(company, '')) LIKE ?")
+                params.append(f"%{str(filters['company']).strip().lower()}%")
+            if filters.get('q'):
+                search = f"%{str(filters['q']).strip().lower()}%"
+                parts.append(
+                    "(LOWER(COALESCE(name, '')) LIKE ? OR "
+                    "LOWER(COALESCE(email, '')) LIKE ? OR "
+                    "LOWER(COALESCE(company, '')) LIKE ? OR "
+                    "LOWER(COALESCE(phone, '')) LIKE ?)"
+                )
+                params.extend([search, search, search, search])
         return " AND ".join(parts), params
 
-    def get_leads_summary(self, user_id: int, filters: Dict[str, Any] = None, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
+    def _lead_sort_clause(self, sort: Optional[str], direction: Optional[str]) -> Tuple[str, str]:
+        """Return an allowlisted lead list sort expression and direction."""
+        sort_key = str(sort or _CRM_LEAD_DEFAULT_SORT).strip().lower()
+        sort_sql = _CRM_LEAD_SORT_COLUMNS.get(sort_key, _CRM_LEAD_SORT_COLUMNS[_CRM_LEAD_DEFAULT_SORT])
+        direction_sql = str(direction or _CRM_LEAD_DEFAULT_DIRECTION).strip().upper()
+        if direction_sql not in {"ASC", "DESC"}:
+            direction_sql = _CRM_LEAD_DEFAULT_DIRECTION
+        return sort_sql, direction_sql
+
+    def get_leads_summary(
+        self,
+        user_id: int,
+        filters: Dict[str, Any] = None,
+        limit: int = 100,
+        offset: int = 0,
+        sort: str = _CRM_LEAD_DEFAULT_SORT,
+        direction: str = _CRM_LEAD_DEFAULT_DIRECTION,
+    ) -> Dict[str, Any]:
         """Get comprehensive leads summary with analytics and pagination"""
         where_sql, params = self._leads_where_clause(user_id, filters)
+        sort_sql, direction_sql = self._lead_sort_clause(sort, direction)
 
         base_query = f"""SELECT id, user_id, email, name, phone, company, source, stage, score,
                        created_at, updated_at, last_contact, notes, tags, metadata
                        FROM leads WHERE {where_sql}
-                       ORDER BY created_at DESC LIMIT ? OFFSET ?"""
+                       ORDER BY {sort_sql} {direction_sql}, id DESC LIMIT ? OFFSET ?"""
         list_params = list(params) + [limit, offset]
         leads_data = db_optimizer.execute_query(base_query, tuple(list_params))
 

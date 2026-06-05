@@ -3325,10 +3325,13 @@ class DatabaseOptimizer:
         body: str,
         labels_json: str,
         is_read: int,
-    ) -> None:
+    ) -> Optional[int]:
         """
-        Upsert a Gmail row into synced_emails using UNIQUE(user_id, external_id, provider).
-        external_id is set to gmail_id so Postgres ON CONFLICT matches the schema.
+        Upsert a Gmail row into synced_emails and return the inserted/updated row id.
+
+        Uses UNIQUE(user_id, external_id, provider); external_id is set to gmail_id
+        so PostgreSQL ON CONFLICT matches the schema. Returning the id here lets
+        Gmail sync callers avoid a second per-message lookup after each upsert.
         """
         self.ensure_synced_emails_upsert_constraint()
         params = (
@@ -3345,8 +3348,7 @@ class DatabaseOptimizer:
             labels_json,
             self.bind_boolean_column(is_read),
         )
-        self.execute_query(
-            """
+        query = """
             INSERT INTO synced_emails (
                 user_id, gmail_id, external_id, provider, thread_id, subject, sender, recipient,
                 date, body, labels, is_read
@@ -3361,10 +3363,15 @@ class DatabaseOptimizer:
                 body = EXCLUDED.body,
                 labels = EXCLUDED.labels,
                 is_read = EXCLUDED.is_read
-            """,
-            params,
-            fetch=False,
-        )
+            RETURNING id
+        """
+        with self.transaction() as (conn, cursor):
+            cursor.execute(query, params)
+            row = cursor.fetchone()
+            conn.commit()
+
+        row_id = query_row_scalar(row, "id")
+        return int(row_id) if row_id is not None else None
 
     def upsert_oauth_state_row(
         self,

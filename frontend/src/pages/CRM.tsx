@@ -26,6 +26,44 @@ function pipelineColumnForStage(stage: string | undefined): string {
   return 'new'
 }
 
+
+type CsvPreviewRow = {
+  row: number
+  email: string
+  name?: string
+  status: 'ok' | 'duplicate' | 'invalid' | string
+  reason?: string
+}
+
+type CsvPreviewState = {
+  fileName: string
+  totalRows: number
+  validRows: number
+  duplicateRows: number
+  invalidRows: number
+  rows: CsvPreviewRow[]
+}
+
+function buildCsvPreviewState(
+  file: File,
+  preview: { rows?: CsvPreviewRow[]; summary?: { ok?: number; duplicate?: number; invalid?: number; total?: number } }
+): CsvPreviewState {
+  const rows = preview.rows || []
+  const okRows = preview.summary?.ok ?? rows.filter((row) => row.status === 'ok').length
+  const duplicateRows = preview.summary?.duplicate ?? rows.filter((row) => row.status === 'duplicate').length
+  const invalidRows = preview.summary?.invalid ?? rows.filter((row) => row.status === 'invalid').length
+  const totalRows = preview.summary?.total ?? rows.length
+
+  return {
+    fileName: file.name,
+    totalRows,
+    validRows: okRows + duplicateRows,
+    duplicateRows,
+    invalidRows,
+    rows,
+  }
+}
+
 export const CRM: React.FC = () => {
   const [leads, setLeads] = useState<LeadData[]>([])
   const [pipeline, setPipeline] = useState<Record<string, LeadData[]>>({})
@@ -55,6 +93,9 @@ export const CRM: React.FC = () => {
     skipped: number
     skipped_details: Array<{ row: number; reason: string; email?: string }>
   } | null>(null)
+  const [isPreviewingImport, setIsPreviewingImport] = useState(false)
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null)
+  const [csvPreview, setCsvPreview] = useState<CsvPreviewState | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { addToast } = useToast()
 
@@ -147,11 +188,45 @@ export const CRM: React.FC = () => {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
+    setIsPreviewingImport(true)
+    setError(null)
+    setImportResult(null)
+    setPendingImportFile(null)
+    setCsvPreview(null)
+    try {
+      const preview = await apiClient.previewLeadsCsv(file)
+      setPendingImportFile(file)
+      setCsvPreview(buildCsvPreviewState(file, preview))
+    } catch (err) {
+      setError(getUserFriendlyError(err))
+    } finally {
+      setIsPreviewingImport(false)
+    }
+  }
+
+  const handleCancelImportCsv = () => {
+    setPendingImportFile(null)
+    setCsvPreview(null)
+    setError(null)
+  }
+
+  const handleConfirmImportCsv = async () => {
+    if (!pendingImportFile || !csvPreview) return
+
+    if (csvPreview.invalidRows > 0) {
+      setError({
+        type: 'warning',
+        title: 'Fix CSV errors first',
+        message: 'This CSV has invalid rows. Correct the listed errors and upload it again before importing.',
+      })
+      return
+    }
+
     setIsImporting(true)
     setError(null)
     setImportResult(null)
     try {
-      const result = await apiClient.importLeadsCsv(file)
+      const result = await apiClient.importLeadsCsv(pendingImportFile)
       setImportResult({
         imported: result.imported,
         created: result.created,
@@ -159,6 +234,8 @@ export const CRM: React.FC = () => {
         skipped: result.skipped,
         skipped_details: result.skipped_details || []
       })
+      setPendingImportFile(null)
+      setCsvPreview(null)
       addToast({
         type: 'success',
         title: 'Import complete',
@@ -317,11 +394,11 @@ export const CRM: React.FC = () => {
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              disabled={isImporting}
+              disabled={isImporting || isPreviewingImport}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium border border-brand-text/20 dark:border-gray-600 text-brand-text dark:text-gray-200 hover:bg-brand-background/50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Upload className="h-4 w-4" />
-              <span>{isImporting ? 'Importing…' : 'Import CSV'}</span>
+              <span>{isPreviewingImport ? 'Previewing…' : isImporting ? 'Importing…' : 'Import CSV'}</span>
             </button>
             <button
               onClick={handleDownloadTemplate}
@@ -339,6 +416,67 @@ export const CRM: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {csvPreview !== null && (
+          <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4 text-sm">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="font-medium text-blue-900 dark:text-blue-100">CSV preview ready: {csvPreview.fileName}</p>
+                <p className="mt-1 text-blue-800 dark:text-blue-200">
+                  Review the summary below, then confirm when you are ready to import. Duplicate rows are importable and will follow the server import policy.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleConfirmImportCsv}
+                  disabled={isImporting || csvPreview.invalidRows > 0}
+                  className="rounded-lg bg-brand-primary px-4 py-2 font-medium text-white transition-colors hover:bg-brand-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isImporting ? 'Importing…' : 'Confirm import'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelImportCsv}
+                  disabled={isImporting}
+                  className="rounded-lg border border-brand-text/20 px-4 py-2 font-medium text-brand-text transition-colors hover:bg-white/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div className="rounded-md bg-white/70 p-3 dark:bg-gray-900/40">
+                <p className="text-xs uppercase tracking-wide text-blue-700 dark:text-blue-300">Total rows</p>
+                <p className="mt-1 text-lg font-semibold text-blue-950 dark:text-blue-50">{csvPreview.totalRows}</p>
+              </div>
+              <div className="rounded-md bg-white/70 p-3 dark:bg-gray-900/40">
+                <p className="text-xs uppercase tracking-wide text-green-700 dark:text-green-300">Valid rows</p>
+                <p className="mt-1 text-lg font-semibold text-green-800 dark:text-green-100">{csvPreview.validRows}</p>
+              </div>
+              <div className="rounded-md bg-white/70 p-3 dark:bg-gray-900/40">
+                <p className="text-xs uppercase tracking-wide text-amber-700 dark:text-amber-300">Duplicate rows</p>
+                <p className="mt-1 text-lg font-semibold text-amber-800 dark:text-amber-100">{csvPreview.duplicateRows}</p>
+              </div>
+              <div className="rounded-md bg-white/70 p-3 dark:bg-gray-900/40">
+                <p className="text-xs uppercase tracking-wide text-red-700 dark:text-red-300">Invalid rows</p>
+                <p className="mt-1 text-lg font-semibold text-red-800 dark:text-red-100">{csvPreview.invalidRows}</p>
+              </div>
+            </div>
+            {csvPreview.invalidRows > 0 && (
+              <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200">
+                <p className="font-medium">Import blocked until invalid rows are fixed.</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {csvPreview.rows.filter((row) => row.status === 'invalid').slice(0, 5).map((row) => (
+                    <li key={`${row.row}-${row.email || row.reason || 'invalid'}`}>
+                      Row {row.row}: {row.reason || 'Invalid row'}{row.email ? ` (${row.email})` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
 
         {importResult !== null && (
           <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 p-4 text-sm">

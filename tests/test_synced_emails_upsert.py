@@ -11,7 +11,8 @@ import sqlite3
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from contextlib import contextmanager
+from unittest.mock import MagicMock, patch
 
 os.environ.setdefault("FLASK_ENV", "test")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -188,19 +189,19 @@ class TestBindBooleanColumn(unittest.TestCase):
         self.assertEqual(opt.bind_boolean_column(False), 0)
 
     def test_upsert_passes_bool_is_read_on_postgres(self):
-        from unittest.mock import patch
-
         opt = DatabaseOptimizer(db_path=self.db_path)
         opt.db_type = "postgresql"
-        captured = {}
+        conn = MagicMock()
+        cursor = MagicMock()
+        cursor.fetchone.return_value = {"id": 1}
 
-        def _capture(query, params=None, fetch=True, **kwargs):
-            captured["params"] = params
-            return []
+        @contextmanager
+        def fake_transaction():
+            yield conn, cursor
 
-        with patch.object(opt, "execute_query", side_effect=_capture):
+        with patch.object(opt, "transaction", fake_transaction):
             with patch.object(opt, "ensure_synced_emails_upsert_constraint"):
-                opt.upsert_synced_email_from_gmail(
+                row_id = opt.upsert_synced_email_from_gmail(
                     1,
                     "msg_pg_bool",
                     "t1",
@@ -212,10 +213,14 @@ class TestBindBooleanColumn(unittest.TestCase):
                     "[]",
                     1,
                 )
-        self.assertIs(captured["params"][-1], True)
-        with patch.object(opt, "execute_query", side_effect=_capture):
+        self.assertEqual(row_id, 1)
+        self.assertIs(cursor.execute.call_args.args[1][-1], True)
+
+        cursor.reset_mock()
+        cursor.fetchone.return_value = {"id": 2}
+        with patch.object(opt, "transaction", fake_transaction):
             with patch.object(opt, "ensure_synced_emails_upsert_constraint"):
-                opt.upsert_synced_email_from_gmail(
+                row_id = opt.upsert_synced_email_from_gmail(
                     1,
                     "msg_pg_bool",
                     "t1",
@@ -227,7 +232,8 @@ class TestBindBooleanColumn(unittest.TestCase):
                     "[]",
                     0,
                 )
-        self.assertIs(captured["params"][-1], False)
+        self.assertEqual(row_id, 2)
+        self.assertIs(cursor.execute.call_args.args[1][-1], False)
 
 
 class TestSyncedEmailsLegacyUpsertSqlite(unittest.TestCase):
