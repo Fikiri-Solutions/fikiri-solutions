@@ -1,29 +1,25 @@
-import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Mail, Users, Brain, Clock, Bot, UserPlus, Zap, AlertTriangle, CheckCircle2, XCircle, AlertCircle, DollarSign, TrendingUp, BarChart3, PieChart as PieChartIcon, Grid, Layout } from 'lucide-react'
+import { Mail, Users, Brain, UserPlus, Zap, AlertTriangle, DollarSign, Grid, Layout } from 'lucide-react'
 import { ServiceCard } from '../components/ServiceCard'
 import { EnhancedMetricCard } from '../components/EnhancedMetricCard'
 import { MiniTrend } from '../components/MiniTrend'
-import { ChartWidget, CompactChartGrid } from '../components/ChartWidget'
-import { MetricCardSkeleton, ServiceCardSkeleton, ChartSkeleton, ActivitySkeleton } from '../components/Skeleton'
-import { useToast } from '../components/Toast'
+import { ChartWidget } from '../components/ChartWidget'
+import { ServiceCardSkeleton, ActivitySkeleton } from '../components/Skeleton'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useDashboardTimeseries } from '../hooks/useDashboardTimeseries'
-import { config, getFeatureConfig } from '../config'
-import { apiClient } from '../services/apiClient'
+import { getFeatureConfig } from '../config'
+import { apiClient } from '../lib/api'
 import { mockServices, mockMetrics, mockActivity } from '../mockData'
-import { DashboardSection, StatsGrid, DashboardCard } from '../components/DashboardLayout'
+import { StatsGrid, DashboardCard } from '../components/DashboardLayout'
 import { Button } from '@/components/ui/Button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useActivity } from '../contexts/ActivityContext'
 
 export const CompactDashboard: React.FC = () => {
-  const navigate = useNavigate()
   const features = getFeatureConfig()
-  const { addToast } = useToast()
-  const { isConnected, data, requestMetricsUpdate, requestServicesUpdate } = useWebSocket()
-  const { data: timeseriesData, summary, loading: timeseriesLoading, error: timeseriesError } = useDashboardTimeseries()
+  const { isConnected, data } = useWebSocket()
+  const { data: timeseriesData, summary } = useDashboardTimeseries()
   const { getRecentActivities } = useActivity()
 
   const [viewMode, setViewMode] = useState<'grid' | 'compact'>('grid') // State for chart view mode
@@ -36,7 +32,7 @@ export const CompactDashboard: React.FC = () => {
     enabled: true,
   })
 
-  const { data: metricsData = mockMetrics, isLoading: metricsLoading } = useQuery({
+  useQuery({
     queryKey: ['metrics'],
     queryFn: () => features.useMockData ? Promise.resolve(mockMetrics) : apiClient.getMetrics(),
     staleTime: 0,
@@ -52,7 +48,6 @@ export const CompactDashboard: React.FC = () => {
 
   // Combine API data with real-time WebSocket updates and user activities
   const services = data.services?.services || servicesData
-  const metrics = data.metrics || metricsData
   const apiActivity = data.activity ? [data.activity, ...activityData] : activityData
   const userActivities = getRecentActivities(5)
   const activity = userActivities.length > 0 ? userActivities : apiActivity
@@ -72,27 +67,7 @@ export const CompactDashboard: React.FC = () => {
     }))
   }
 
-  // Transform timeseries data for pie charts
-  const transformForPieChart = (data: any[]) => {
-    if (!data || data.length === 0) return []
-    
-    const totals = data.reduce((acc, item) => ({
-      leads: acc.leads + (item.leads || 0),
-      emails: acc.emails + (item.emails || 0),
-      responses: acc.responses + (item.responses || item.aiResponses || 0),
-      revenue: acc.revenue + (item.revenue || 0)
-    }), { leads: 0, emails: 0, responses: 0, revenue: 0 })
-
-    return [
-      { name: 'Leads', value: totals.leads, color: '#3b82f6' },
-      { name: 'Emails', value: totals.emails, color: '#22c55e' },
-      { name: 'AI Responses', value: totals.responses, color: '#f97316' },
-      { name: 'Revenue', value: totals.revenue, color: '#8b5cf6' }
-    ].filter(item => item.value > 0)
-  }
-
   const transformedTimeseriesData = transformTimeseriesData(timeseriesData || [])
-  const pieChartData = transformForPieChart(timeseriesData || [])
 
   return (
     <div className="space-y-6 p-4">
@@ -271,7 +246,7 @@ export const CompactDashboard: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-2">
-              {services.slice(0, 2).map((service) => (
+              {services.slice(0, 2).map((service: any) => (
                 <ServiceCard key={service.id} service={service} compact />
               ))}
             </div>

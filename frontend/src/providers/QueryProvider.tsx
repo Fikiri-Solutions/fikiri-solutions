@@ -12,7 +12,7 @@ const queryClient = new QueryClient({
       refetchOnReconnect: true, // Re-enable refetch on reconnect
       refetchOnMount: true, // Re-enable refetch on mount
       // Keep previous data while fetching new data
-      placeholderData: (previousData) => previousData,
+      placeholderData: (previousData: unknown) => previousData,
     },
     mutations: {
       retry: 1,

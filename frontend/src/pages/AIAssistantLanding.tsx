@@ -1,5 +1,5 @@
 import React from 'react';
-import { Brain, MessageSquare, Zap, BarChart3, Clock, Shield } from 'lucide-react';
+import { Brain, MessageSquare, BarChart3, Clock } from 'lucide-react';
 import { FeatureStatus, getFeatureStatus } from '../components/FeatureStatus';
 
 export const AIAssistantLanding: React.FC = () => {
@@ -140,4 +140,3 @@ export const AIAssistantLanding: React.FC = () => {
     </div>
   );
 };
-

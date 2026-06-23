@@ -1,8 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Brain, Send, Bot, User, Clock, Zap, Mail, Users, Wifi, WifiOff } from 'lucide-react'
-import { apiClient, AIResponse } from '../services/apiClient'
+import { Send, Bot, User, Zap, Mail, Users, Wifi, WifiOff } from 'lucide-react'
+import { apiClient } from '../lib/api'
 import { StatusIcon } from '../components/StatusIcon'
 import { useWebSocket } from '../hooks/useWebSocket'
+
+// AIResponse type definition
+interface AIResponse {
+  response: string
+  confidence?: number
+  context?: any
+  stats?: {
+    enabled?: boolean
+  }
+}
 
 interface ChatMessage {
   id: string
@@ -64,9 +74,9 @@ export const AIAssistant: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [aiStatus, setAiStatus] = useState<AIResponse | null>(null)
-  const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { isConnected } = useWebSocket()
+  const isTyping = messages.some(message => message.isTyping)
 
   useEffect(() => {
     fetchAIStatus()
@@ -188,14 +198,14 @@ export const AIAssistant: React.FC = () => {
           {/* AI Status */}
           {aiStatus && (
             <div className="flex items-center space-x-2">
-              <StatusIcon 
-                status={aiStatus.stats.enabled ? 'active' : 'inactive'} 
-                size="md" 
+              <StatusIcon
+                status={aiStatus.stats?.enabled ? 'active' : 'inactive'}
+                size="md"
               />
               <span className={`text-sm font-medium ${
-                aiStatus.stats.enabled ? 'text-green-600' : 'text-gray-600'
+                aiStatus.stats?.enabled ? 'text-green-600' : 'text-gray-600'
               }`}>
-                {aiStatus.stats.enabled ? 'AI Active' : 'AI Inactive'}
+                {aiStatus.stats?.enabled ? 'AI Active' : 'AI Inactive'}
               </span>
             </div>
           )}

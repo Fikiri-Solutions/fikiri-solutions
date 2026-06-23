@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { CheckCircle, Database, Users, Zap, Settings, Loader2, AlertCircle } from 'lucide-react'
+import { apiGet } from '../lib/api'
 
 interface SyncProgressProps {
   userId: number
@@ -28,34 +29,33 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({ userId, onComplete }
 
   const pollSyncStatus = async () => {
     try {
-      const response = await fetch(`https://fikirisolutions.onrender.com/api/onboarding/status?user_id=${userId}`)
-      const data = await response.json()
-      
-      if (data.success) {
-        const progress = data.progress
-        
-        // Transform the new progress format to match current interface
-        const syncStatus: SyncStatus = {
-          status: progress.status || 'running',
-          current_step: progress.step || 'starting',
-          progress: parseInt(progress.pct || '0'),
-          started_at: new Date().toISOString(), // Will be updated properly in backend
-          error_message: progress.error
-        }
-        
-        setSyncStatus(syncStatus)
-        setIsLoading(false)
-        
-        if (progress.step === 'done' || progress.status === 'completed') {
-          onComplete()
-        } else if (progress.status === 'failed' || progress.step === 'error') {
-          setError(progress.error || 'Sync failed')
-        }
+      const data = await apiGet<{ progress: any }>(`/onboarding/status?user_id=${userId}`)
+
+      const progress = data.progress
+
+      // Transform the new progress format to match current interface
+      const syncStatus: SyncStatus = {
+        status: progress.status || 'running',
+        current_step: progress.step || 'starting',
+        progress: parseInt(progress.pct || '0'),
+        started_at: new Date().toISOString(), // Will be updated properly in backend
+        error_message: progress.error
+      }
+
+      setSyncStatus(syncStatus)
+      setIsLoading(false)
+
+      if (progress.step === 'done' || progress.status === 'completed') {
+        onComplete()
+      } else if (progress.status === 'failed' || progress.step === 'error') {
+        setError(progress.error || 'Sync failed')
       } else {
-        throw new Error(data.error || 'Failed to get status')
+        setError(null)
       }
     } catch (error) {
-      console.error('Error polling sync status:', error)
+      if (import.meta.env.DEV) {
+        console.error('Error polling sync status:', error)
+      }
       setError(error instanceof Error ? error.message : 'Failed to check sync status')
       setIsLoading(false)
     }
@@ -92,21 +92,6 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({ userId, onComplete }
         return 'Preparing your dashboard'
       default:
         return 'Processing...'
-    }
-  }
-
-  const getStepDescription = (step: string) => {
-    switch (step) {
-      case 'gmail_sync':
-        return 'Downloading your recent emails and organizing them'
-      case 'lead_extraction':
-        return 'Identifying potential customers and business contacts'
-      case 'starter_automations':
-        return 'Setting up helpful automation rules'
-      case 'dashboard_seeding':
-        return 'Creating your personalized dashboard'
-      default:
-        return 'Please wait while we set up your workspace'
     }
   }
 
@@ -209,7 +194,6 @@ export const SyncProgress: React.FC<SyncProgressProps> = ({ userId, onComplete }
         {steps.map((step, index) => {
           const isCompleted = index < completedSteps
           const isCurrent = index === currentStepIndex
-          const isPending = index > currentStepIndex
 
           return (
             <div

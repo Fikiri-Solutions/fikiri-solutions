@@ -7,8 +7,6 @@ import { CustomizationPanel } from './CustomizationPanel'
 import { BackToTop } from './BackToTop'
 import { AccountManagement } from './AccountManagement'
 import { OnboardingWizard } from './OnboardingWizard'
-import { useCustomization } from '../contexts/CustomizationContext'
-import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { FikiriLogo } from './FikiriLogo'
 
@@ -22,8 +20,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [accountManagementOpen, setAccountManagementOpen] = useState(false)
   const [onboardingWizardOpen, setOnboardingWizardOpen] = useState(false)
   const location = useLocation()
-  const { customization } = useCustomization()
-  const { resolvedTheme } = useTheme()
   const { user, logout } = useAuth()
 
   // Persist sidebar state in localStorage
@@ -235,4 +231,3 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     </div>
   )
 }
-

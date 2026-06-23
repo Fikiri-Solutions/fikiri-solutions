@@ -1,17 +1,16 @@
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Mail, Users, Brain, Clock, Bot, UserPlus, Zap, AlertTriangle, CheckCircle2, XCircle, AlertCircle, DollarSign, TrendingUp } from 'lucide-react'
+import { Mail, Users, Brain, UserPlus, Zap, AlertTriangle, DollarSign, TrendingUp } from 'lucide-react'
 import { ServiceCard } from '../components/ServiceCard'
 import { EnhancedMetricCard } from '../components/EnhancedMetricCard'
 import { MiniTrend } from '../components/MiniTrend'
 import { EnhancedDashboardCharts } from '../components/EnhancedDashboardCharts'
-import { MetricCardSkeleton, ServiceCardSkeleton, ChartSkeleton, ActivitySkeleton } from '../components/Skeleton'
-import { useToast } from '../components/Toast'
+import { ServiceCardSkeleton, ActivitySkeleton } from '../components/Skeleton'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useDashboardTimeseries } from '../hooks/useDashboardTimeseries'
-import { config, getFeatureConfig } from '../config'
-import { apiClient } from '../services/apiClient'
+import { getFeatureConfig } from '../config'
+import { apiClient } from '../lib/api'
 import { mockServices, mockMetrics, mockActivity } from '../mockData'
 import { useActivity } from '../contexts/ActivityContext'
 import { DashboardSection, StatsGrid, DashboardCard } from '../components/DashboardLayout'
@@ -19,9 +18,8 @@ import { DashboardSection, StatsGrid, DashboardCard } from '../components/Dashbo
 export const EnhancedDashboard: React.FC = () => {
   const navigate = useNavigate()
   const features = getFeatureConfig()
-  const { addToast } = useToast()
-  const { isConnected, data, requestMetricsUpdate, requestServicesUpdate } = useWebSocket()
-  const { data: timeseriesData, summary, loading: timeseriesLoading, error: timeseriesError } = useDashboardTimeseries()
+  const { isConnected, data } = useWebSocket()
+  const { data: timeseriesData, summary } = useDashboardTimeseries()
   const { getRecentActivities } = useActivity()
 
   // TanStack Query hooks for smart data fetching with real-time updates
@@ -32,7 +30,7 @@ export const EnhancedDashboard: React.FC = () => {
     enabled: true,
   })
 
-  const { data: metricsData = mockMetrics, isLoading: metricsLoading } = useQuery({
+  useQuery({
     queryKey: ['metrics'],
     queryFn: () => features.useMockData ? Promise.resolve(mockMetrics) : apiClient.getMetrics(),
     staleTime: 0,
@@ -48,7 +46,6 @@ export const EnhancedDashboard: React.FC = () => {
 
   // Combine API data with real-time WebSocket updates and user activities
   const services = data.services?.services || servicesData
-  const metrics = data.metrics || metricsData
   const apiActivity = data.activity ? [data.activity, ...activityData] : activityData
   const userActivities = getRecentActivities(5)
   const activity = userActivities.length > 0 ? userActivities : apiActivity
@@ -196,7 +193,7 @@ export const EnhancedDashboard: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-3">
-              {services.slice(0, 3).map((service) => (
+              {services.slice(0, 3).map((service: any) => (
                 <ServiceCard key={service.id} service={service} />
               ))}
             </div>

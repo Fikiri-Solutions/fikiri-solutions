@@ -17,6 +17,7 @@ export interface AuthState {
   // State
   user: User | null;
   accessToken: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
@@ -24,20 +25,33 @@ export interface AuthState {
   // Actions
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
+  setRefreshToken: (token: string | null) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
-  login: (user: User, token: string) => void;
+  login: (user: User, token: string, refreshToken?: string | null) => void;
   logout: () => void;
   clearError: () => void;
 }
 
+const clearLegacyAuthStorage = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  localStorage.removeItem('fikiri-token');
+  localStorage.removeItem('fikiri-user');
+  localStorage.removeItem('fikiri-user-id');
+  localStorage.removeItem('fikiri-remember-password');
+};
+
 // Create auth store with persistence for user data only
 export const useAuth = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       // Initial state
       user: null,
       accessToken: null,
+      refreshToken: null,
       isAuthenticated: false,
       isLoading: false,
       error: null,
@@ -49,26 +63,32 @@ export const useAuth = create<AuthState>()(
       }),
       
       setToken: (accessToken) => set({ accessToken }),
+      setRefreshToken: (refreshToken) => set({ refreshToken }),
       
       setLoading: (isLoading) => set({ isLoading }),
       
       setError: (error) => set({ error }),
       
-      login: (user, accessToken) => set({
+      login: (user, accessToken, refreshToken = null) => set({
         user,
         accessToken,
+        refreshToken,
         isAuthenticated: true,
         isLoading: false,
         error: null,
       }),
       
-      logout: () => set({
-        user: null,
-        accessToken: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: null,
-      }),
+      logout: () => {
+        clearLegacyAuthStorage();
+        set({
+          user: null,
+          accessToken: null,
+          refreshToken: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: null,
+        });
+      },
       
       clearError: () => set({ error: null }),
     }),
@@ -87,6 +107,7 @@ export const useAuth = create<AuthState>()(
 export const useUser = () => useAuth((state) => state.user);
 export const useIsAuthenticated = () => useAuth((state) => state.isAuthenticated);
 export const useAccessToken = () => useAuth((state) => state.accessToken);
+export const useRefreshToken = () => useAuth((state) => state.refreshToken);
 export const useAuthLoading = () => useAuth((state) => state.isLoading);
 export const useAuthError = () => useAuth((state) => state.error);
 
@@ -94,6 +115,7 @@ export const useAuthError = () => useAuth((state) => state.error);
 export const useAuthActions = () => useAuth((state) => ({
   setUser: state.setUser,
   setToken: state.setToken,
+  setRefreshToken: state.setRefreshToken,
   setLoading: state.setLoading,
   setError: state.setError,
   login: state.login,

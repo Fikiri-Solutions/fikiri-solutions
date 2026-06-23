@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -15,12 +15,7 @@ import { AnimatedWorkflow } from '../components/AnimatedWorkflow';
 import { FikiriLogo } from '../components/FikiriLogo';
 
 export const RenderInspiredLanding: React.FC = () => {
-  const [isVisible, setIsVisible] = useState(false);
   const [activeDemo, setActiveDemo] = useState(0);
-
-  useEffect(() => {
-    setIsVisible(true);
-  }, []);
 
   const demos = [
     {

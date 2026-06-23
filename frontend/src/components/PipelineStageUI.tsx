@@ -8,7 +8,6 @@ import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'
 import { 
   Plus, 
   Edit3, 
-  Trash2, 
   Users, 
   TrendingUp, 
   Clock, 
@@ -52,12 +51,12 @@ const PipelineStageUI: React.FC<PipelineStageUIProps> = ({
   onStageChange,
   onLeadClick,
   onCreateStage,
-  onUpdateStage,
-  onDeleteStage
+  onUpdateStage: _onUpdateStage,
+  onDeleteStage: _onDeleteStage
 }) => {
   const [stages, setStages] = useState<PipelineStage[]>([])
   const [isCreatingStage, setIsCreatingStage] = useState(false)
-  const [editingStage, setEditingStage] = useState<string | null>(null)
+  const [, setEditingStage] = useState<string | null>(null)
 
   // Default pipeline stages
   const defaultStages: PipelineStage[] = [

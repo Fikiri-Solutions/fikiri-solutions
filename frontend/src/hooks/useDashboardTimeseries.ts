@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiClient } from "../services/apiClient";
+import { apiClient } from "../lib/api";
 
 interface TimeseriesData {
   day: string;
@@ -54,7 +54,10 @@ export function useDashboardTimeseries() {
           throw new Error(response.error || 'Failed to fetch data');
         }
       } catch (err) {
-        console.error("Failed to fetch timeseries:", err);
+        // Log error in dev, use proper error tracking in production
+        if (import.meta.env.DEV) {
+          console.error("Failed to fetch timeseries:", err);
+        }
         setError(err instanceof Error ? err.message : "Failed to fetch data");
         
         // Fallback data for development

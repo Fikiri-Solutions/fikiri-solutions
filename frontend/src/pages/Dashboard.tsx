@@ -1,18 +1,15 @@
-import React, { useState, Suspense } from 'react'
+import React, { Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Mail, Users, Brain, Bot, UserPlus, Zap, AlertTriangle, CheckCircle2, XCircle, AlertCircle, DollarSign, TrendingUp } from 'lucide-react'
+import { Mail, Users, Brain, UserPlus, Zap, AlertTriangle, AlertCircle, DollarSign } from 'lucide-react'
 import { ServiceCard } from '../components/ServiceCard'
-import { MetricCard } from '../components/MetricCard'
-import { MiniTrend } from '../components/MiniTrend'
-import { MetricCardSkeleton, ServiceCardSkeleton, ChartSkeleton, ActivitySkeleton } from '../components/Skeleton'
+import { ServiceCardSkeleton, ChartSkeleton, ActivitySkeleton } from '../components/Skeleton'
 import { SentryTestButton, SentryErrorBoundary } from '../components/SentryTest'
-import { useToast } from '../components/Toast'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useDashboardTimeseries } from '../hooks/useDashboardTimeseries'
 import { useDashboardView } from '../hooks/useDashboardView'
-import { config, getFeatureConfig } from '../config'
-import { apiClient } from '../services/apiClient'
+import { getFeatureConfig } from '../config'
+import { apiClient } from '../lib/api'
 import { mockServices, mockMetrics, mockActivity } from '../mockData'
 
 // Lazy load heavy dashboard components
@@ -23,16 +20,17 @@ const DashboardCharts = React.lazy(() => import('../components/DashboardCharts')
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate()
   const features = getFeatureConfig()
-  const { addToast } = useToast()
-  const { isConnected, data, requestMetricsUpdate, requestServicesUpdate } = useWebSocket()
-  const { data: timeseriesData, summary, loading: timeseriesLoading } = useDashboardTimeseries()
+  const { data } = useWebSocket()
+  const { data: timeseriesData } = useDashboardTimeseries()
   
   // Use dashboard view hook for persistence
-  const { dashboardView, setDashboardView, isEnhanced, isCompact, isOriginal } = useDashboardView()
+  const { dashboardView } = useDashboardView()
   
   // Render different dashboard views with Suspense
   if (dashboardView === 'enhanced') {
-    console.log('Rendering EnhancedDashboard')
+    if (import.meta.env.DEV) {
+      console.log('Rendering EnhancedDashboard')
+    }
     return (
       <Suspense fallback={<ChartSkeleton />}>
         <EnhancedDashboard />
@@ -41,7 +39,9 @@ export const Dashboard: React.FC = () => {
   }
   
   if (dashboardView === 'compact') {
-    console.log('Rendering CompactDashboard')
+    if (import.meta.env.DEV) {
+      console.log('Rendering CompactDashboard')
+    }
     return (
       <Suspense fallback={<ChartSkeleton />}>
         <CompactDashboard />
@@ -49,7 +49,9 @@ export const Dashboard: React.FC = () => {
     )
   }
   
-  console.log('Rendering original dashboard')
+  if (import.meta.env.DEV) {
+    console.log('Rendering original dashboard')
+  }
 
   // Clear specific cache items to force fresh data
   React.useEffect(() => {
@@ -65,7 +67,7 @@ export const Dashboard: React.FC = () => {
     enabled: true, // Always enabled for immediate loading
   })
 
-  const { data: metricsData = mockMetrics, isLoading: metricsLoading } = useQuery({
+  useQuery({
     queryKey: ['metrics'],
     queryFn: () => features.useMockData ? Promise.resolve(mockMetrics) : apiClient.getMetrics(),
     staleTime: 0,
@@ -81,7 +83,6 @@ export const Dashboard: React.FC = () => {
 
   // Combine API data with real-time WebSocket updates
   const services = data.services?.services || servicesData
-  const metrics = data.metrics || metricsData
   const activity = data.activity ? [data.activity, ...activityData] : activityData
 
   // Generate dynamic chart data
@@ -134,7 +135,7 @@ export const Dashboard: React.FC = () => {
   const transformedTimeseriesData = transformTimeseriesData(timeseriesData || [])
   const pieChartData = transformForPieChart(timeseriesData || [])
 
-  const getActivityIcon = (type: string, status: string) => {
+  const getActivityIcon = (type: string, _status: string) => {
     switch (type) {
       case 'email':
         return <Mail className="h-4 w-4 text-blue-500" />
@@ -273,7 +274,7 @@ export const Dashboard: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-3">
-                {services.slice(0, 3).map((service) => (
+                {services.slice(0, 3).map((service: any) => (
                   <ServiceCard key={service.id} service={service} />
                 ))}
               </div>

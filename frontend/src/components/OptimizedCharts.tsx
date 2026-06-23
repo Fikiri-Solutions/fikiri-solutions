@@ -191,12 +191,12 @@ export const OptimizedPieChart: React.FC<{
               cx="50%"
               cy="50%"
               labelLine={false}
-              label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}
+              label={({ payload, percent }: any) => `${payload?.[nameKey] ?? payload?.name} ${(percent * 100).toFixed(0)}%`}
               outerRadius={80}
               fill="#8884d8"
               dataKey={dataKey}
             >
-              {processedData.map((entry: any, index: number) => (
+              {processedData.map((_entry: any, index: number) => (
                 <LazyCell key={`cell-${index}`} fill={colors[index % colors.length]} />
               ))}
             </LazyPie>
@@ -220,4 +220,3 @@ export const ChartWrapper: React.FC<{
     </Suspense>
   );
 };
-

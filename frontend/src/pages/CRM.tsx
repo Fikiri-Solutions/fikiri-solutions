@@ -1,13 +1,27 @@
 import React, { useState, useEffect } from 'react'
-import { Users, Mail, Phone, Building, Calendar, Star, Filter, Search, Plus } from 'lucide-react'
-import { apiClient, LeadData } from '../services/apiClient'
+import { Users, Mail, Building, Star, Filter, Search, Plus } from 'lucide-react'
+import { apiClient } from '../lib/api'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorMessage, getUserFriendlyError } from '../components/ErrorMessage'
 import { FeatureStatus, getFeatureStatus } from '../components/FeatureStatus'
+import { LeadTableSkeleton } from '../components/Skeleton'
+
+// LeadData type definition
+interface LeadData {
+  id: string
+  name: string
+  email: string
+  phone?: string
+  company?: string
+  stage: string
+  score: number
+  lastContact: string
+  source: string
+}
 
 export const CRM: React.FC = () => {
   const [leads, setLeads] = useState<LeadData[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true) // Start with true for initial load
   const [error, setError] = useState<{ type: 'error' | 'warning' | 'info' | 'success'; title: string; message: string } | null>(null)
   const [showAddLeadModal, setShowAddLeadModal] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -87,7 +101,7 @@ export const CRM: React.FC = () => {
   const filteredLeads = leads.filter(lead => {
     const matchesSearch = lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          lead.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         lead.company.toLowerCase().includes(searchTerm.toLowerCase())
+                         (lead.company || '').toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesStage = filterStage === 'all' || lead.stage === filterStage
     
@@ -144,6 +158,7 @@ export const CRM: React.FC = () => {
             title={error.title}
             message={error.message}
             onDismiss={() => setError(null)}
+            onRetry={error.type === 'error' ? () => fetchLeads() : undefined}
           />
         )}
 
@@ -252,89 +267,93 @@ export const CRM: React.FC = () => {
 
       {/* Leads Table */}
       <div className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md border border-brand-text/10">
-        <div className="px-6 py-4 border-b border-brand-text/10">
-          <h3 className="text-lg font-medium text-brand-text dark:text-white">Leads ({filteredLeads.length})</h3>
+        <div className="px-4 sm:px-6 py-4 border-b border-brand-text/10">
+          <h3 className="text-lg font-medium text-brand-text dark:text-white">
+            Leads {!isLoading && `(${filteredLeads.length})`}
+          </h3>
         </div>
         
         {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
-          </div>
+          <LeadTableSkeleton />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-brand-text/10 dark:divide-gray-700">
-              <thead className="bg-brand-background/50 dark:bg-gray-800">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider">
-                    Lead
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider">
-                    Company
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider">
-                    Stage
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider">
-                    Score
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider">
-                    Last Contact
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider">
-                    Source
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-900 divide-y divide-brand-text/10 dark:divide-gray-700">
-                {filteredLeads.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-brand-background/30 dark:hover:bg-gray-800">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 rounded-full bg-brand-accent/20 flex items-center justify-center">
-                            <span className="text-sm font-medium text-brand-primary">
-                              {lead.name.split(' ').map(n => n[0]).join('')}
-                            </span>
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <div className="inline-block min-w-full align-middle">
+              <div className="overflow-hidden">
+                <table className="min-w-full divide-y divide-brand-text/10 dark:divide-gray-700">
+                  <thead className="bg-brand-background/50 dark:bg-gray-800">
+                    <tr>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider">
+                        Lead
+                      </th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">
+                        Company
+                      </th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider">
+                        Stage
+                      </th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell">
+                        Score
+                      </th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">
+                        Last Contact
+                      </th>
+                      <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-brand-text/70 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">
+                        Source
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-900 divide-y divide-brand-text/10 dark:divide-gray-700">
+                    {filteredLeads.map((lead) => (
+                      <tr key={lead.id} className="hover:bg-brand-background/30 dark:hover:bg-gray-800">
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10">
+                              <div className="h-10 w-10 rounded-full bg-brand-accent/20 flex items-center justify-center">
+                                <span className="text-sm font-medium text-brand-primary">
+                                  {lead.name.split(' ').map(n => n[0]).join('')}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="ml-3 sm:ml-4 min-w-0">
+                              <div className="text-sm font-medium text-brand-text dark:text-white truncate">{lead.name}</div>
+                              <div className="text-sm text-brand-text/70 dark:text-gray-400 truncate">{lead.email}</div>
+                              <div className="text-xs text-brand-text/60 dark:text-gray-500 sm:hidden mt-1">{lead.company}</div>
+                            </div>
                           </div>
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-brand-text dark:text-white">{lead.name}</div>
-                          <div className="text-sm text-brand-text/70 dark:text-gray-400">{lead.email}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-brand-text dark:text-white">{lead.company}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStageColor(lead.stage)}`}>
-                        {lead.stage}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className={`text-sm font-medium ${getScoreColor(lead.score)}`}>
-                        {lead.score}/10
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-brand-text/70 dark:text-gray-400">
-                      {lead.lastContact}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-brand-text/70 dark:text-gray-400">
-                      {lead.source}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                          <div className="text-sm text-brand-text dark:text-white truncate max-w-xs">{lead.company}</div>
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStageColor(lead.stage)}`}>
+                            {lead.stage}
+                          </span>
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap hidden md:table-cell">
+                          <div className={`text-sm font-medium ${getScoreColor(lead.score)}`}>
+                            {lead.score}/10
+                          </div>
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-brand-text/70 dark:text-gray-400 hidden lg:table-cell">
+                          {new Date(lead.lastContact).toLocaleDateString()}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-brand-text/70 dark:text-gray-400 hidden lg:table-cell">
+                          {lead.source}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
             
-            {filteredLeads.length === 0 && (
-              <EmptyState 
-                type="crm" 
-                onAction={searchTerm || filterStage !== 'all' ? undefined : () => {
-                  // Add lead functionality would go here
-                  // Add lead clicked
-                }}
-              />
+            {filteredLeads.length === 0 && !isLoading && (
+              <div className="px-4 sm:px-6 py-8">
+                <EmptyState
+                  type="crm"
+                  onAction={searchTerm || filterStage !== 'all' ? undefined : () => setShowAddLeadModal(true)}
+                />
+              </div>
             )}
           </div>
         )}
@@ -342,8 +361,8 @@ export const CRM: React.FC = () => {
 
       {/* Add Lead Modal */}
       {showAddLeadModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border border-brand-text/10 w-96 shadow-lg rounded-md bg-brand-background dark:bg-gray-800">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4">
+          <div className="relative top-10 sm:top-20 mx-auto p-5 border border-brand-text/10 w-full max-w-md shadow-lg rounded-md bg-brand-background dark:bg-gray-800">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-brand-text dark:text-white mb-4">Add New Lead</h3>
               

@@ -1,22 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
-import { useRef } from 'react';
 import { FikiriLogo } from '../components/FikiriLogo';
 import SimpleAnimatedBackground from '../components/SimpleAnimatedBackground';
 import { 
   Check, 
   ArrowRight, 
-  Star,
-  Building2,
-  TrendingUp,
-  Settings,
-  Zap,
-  Shield,
-  Users,
-  Crown,
-  Sparkles
+  Star
 } from 'lucide-react';
 
 interface PricingTier {
@@ -36,17 +27,11 @@ const PricingPage: React.FC = () => {
   const navigate = useNavigate();
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
   
-  // Animation refs
-  const heroRef = useRef(null);
-  const pricingRef = useRef(null);
-  const featuresRef = useRef(null);
-  const industriesRef = useRef(null);
-  
   // Animation states
-  const heroInView = useInView(heroRef, { once: true, margin: "-100px" });
-  const pricingInView = useInView(pricingRef, { once: true, margin: "-100px" });
-  const featuresInView = useInView(featuresRef, { once: true, margin: "-100px" });
-  const industriesInView = useInView(industriesRef, { once: true, margin: "-100px" });
+  const { ref: heroRef, inView: heroInView } = useInView({ triggerOnce: true, rootMargin: "-100px" });
+  const { ref: pricingRef, inView: pricingInView } = useInView({ triggerOnce: true, rootMargin: "-100px" });
+  const { ref: featuresRef, inView: featuresInView } = useInView({ triggerOnce: true, rootMargin: "-100px" });
+  const { ref: industriesRef, inView: industriesInView } = useInView({ triggerOnce: true, rootMargin: "-100px" });
 
   const pricingTiers: PricingTier[] = [
     {
@@ -455,7 +440,7 @@ const PricingPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {comparisonFeatures.map((category, categoryIndex) => (
+                  {comparisonFeatures.map((category) => (
                     <React.Fragment key={category.category}>
                       <tr className="border-b border-gray-700">
                         <td colSpan={5} className="p-4 text-orange-400 font-semibold text-sm uppercase tracking-wider">

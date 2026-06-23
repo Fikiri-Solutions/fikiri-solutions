@@ -1,5 +1,3 @@
-import React from 'react';
-
 export function HeroImage() {
   return (
     <picture>

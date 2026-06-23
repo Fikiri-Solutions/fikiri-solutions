@@ -6,13 +6,14 @@ Extracted from app.py for better maintainability
 
 from flask import Blueprint, request, jsonify, redirect, session
 from functools import wraps
+import json
 import time
 import logging
 from datetime import datetime
 
 # Import our authentication modules
 from core.user_auth import user_auth_manager
-from core.jwt_auth import jwt_auth_manager, jwt_required
+from core.jwt_auth import get_jwt_manager, jwt_auth_manager, jwt_required
 from core.secure_sessions import secure_session_manager
 from core.api_validation import validate_api_request, handle_api_errors, create_success_response, create_error_response
 from core.rate_limiter import rate_limit
@@ -96,6 +97,7 @@ def api_login():
         })
 
         # Create response with secure cookie and onboarding state
+        # Rule 2.1: Always return access_token, refresh_token, and user object
         response_data = {
             'user': {
                 'id': user_data['id'],
@@ -107,6 +109,7 @@ def api_login():
                 'last_login': datetime.now().isoformat()
             },
             'access_token': jwt_tokens['access_token'] if jwt_tokens else None,
+            'refresh_token': jwt_tokens['refresh_token'] if jwt_tokens else None,
             'expires_in': jwt_tokens['expires_in'] if jwt_tokens else None,
             'token_type': 'Bearer'
         }
@@ -183,8 +186,8 @@ def api_signup():
                 event_type="user_registration",
                 severity="info",
                 details={
-                    "user_id": user.id,
-                    "email": user.email
+                    "user_id": user_data['id'],
+                    "email": user_data['email']
                 }
             )
         except Exception as e:
@@ -192,8 +195,8 @@ def api_signup():
 
         try:
             business_analytics.track_event('user_signup', {
-                'user_id': user.id,
-                'email': user.email,
+                'user_id': user_data['id'],
+                'email': user_data['email'],
                 'industry': data.get('industry'),
                 'team_size': data.get('team_size')
             })
@@ -202,9 +205,9 @@ def api_signup():
 
         try:
             email_job_manager.queue_welcome_email(
-                user_id=user.id,
-                email=user.email,
-                name=user.name,
+                user_id=user_data['id'],
+                email=user_data['email'],
+                name=user_data['name'],
                 company_name=data.get('business_name', 'My Company')
             )
         except Exception as e:
@@ -286,7 +289,8 @@ def api_reset_password():
     if len(new_password) < 6:
         return create_error_response("Password must be at least 6 characters", 400, 'WEAK_PASSWORD')
     
-    # Find user with this reset token
+    # Find active user with this reset token. The response remains generic so
+    # callers cannot distinguish missing, inactive, or expired tokens.
     user_data = db_optimizer.execute_query(
         "SELECT id, email, metadata FROM users WHERE json_extract(metadata, '$.reset_token') = ? AND is_active = 1",
         (token,)
@@ -294,16 +298,27 @@ def api_reset_password():
     
     if not user_data:
         return create_error_response("Invalid or expired reset token", 400, 'INVALID_TOKEN')
+
+    user_record = dict(user_data[0]) if hasattr(user_data[0], 'keys') else user_data[0]
+    metadata = json.loads(user_record.get('metadata') or '{}')
+    expires_at = metadata.get('reset_token_expires')
+    try:
+        expires_at = int(expires_at)
+    except (TypeError, ValueError):
+        return create_error_response("Invalid or expired reset token", 400, 'INVALID_TOKEN')
+
+    if expires_at < int(time.time()):
+        return create_error_response("Invalid or expired reset token", 400, 'INVALID_TOKEN')
     
     try:
         # Update user password
-        result = user_auth_manager.reset_user_password(user_data[0]['id'], new_password)
+        result = user_auth_manager.reset_user_password(user_record['id'], new_password)
         
         if result['success']:
             log_security_event(
                 event_type="password_reset_completed",
                 severity="info",
-                details={"user_id": user_data[0]['id'], "email": user_data[0]['email']}
+                details={"user_id": user_record['id'], "email": user_record['email']}
             )
             return create_success_response({"message": "Password reset successfully"}, "Password updated")
         else:
@@ -316,44 +331,34 @@ def api_reset_password():
 @auth_bp.route('/refresh', methods=['POST'])
 @handle_api_errors
 def refresh_token():
-    """Refresh JWT access token"""
+    """Refresh JWT access token using a refresh token."""
     try:
-        # Get current token from Authorization header
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return create_error_response("Authorization header missing or invalid", 401, 'MISSING_AUTH_HEADER')
-        
-        # Extract token
-        token = auth_header.split(' ')[1]
-        
-        # Verify current token
-        from core.jwt_auth import jwt_auth_manager
-        payload = jwt_auth_manager.verify_access_token(token)
-        
-        if not payload:
-            return create_error_response("Invalid or expired token", 401, 'INVALID_TOKEN')
-        
-        # Generate new tokens
-        user_id = payload['user_id']
-        user_data = payload.get('user_data', {})
-        
-        new_tokens = jwt_auth_manager.generate_tokens(
-            user_id=user_id,
-            user_data=user_data,
-            device_info=request.headers.get('User-Agent'),
-            ip_address=request.remote_addr
-        )
+        data = request.get_json(silent=True) or {}
+        refresh_token_value = data.get('refresh_token')
+
+        if not refresh_token_value:
+            auth_header = request.headers.get('Authorization', '')
+            if auth_header.startswith('Bearer '):
+                refresh_token_value = auth_header.split(' ', 1)[1]
+
+        if not refresh_token_value:
+            return create_error_response("Invalid or expired refresh token", 401, 'INVALID_REFRESH_TOKEN')
+
+        new_tokens = get_jwt_manager().refresh_access_token(refresh_token_value)
         
         if new_tokens:
             return create_success_response({
                 'tokens': new_tokens,
-                'user_id': user_id
+                'access_token': new_tokens.get('access_token'),
+                'refresh_token': new_tokens.get('refresh_token'),
+                'expires_in': new_tokens.get('expires_in'),
+                'token_type': new_tokens.get('token_type', 'Bearer')
             }, "Token refreshed successfully")
-        else:
-            return create_error_response("Failed to generate new token", 500, 'TOKEN_GENERATION_ERROR')
+
+        return create_error_response("Invalid or expired refresh token", 401, 'INVALID_REFRESH_TOKEN')
             
     except Exception as e:
-        logger.error(f"Token refresh error: {e}")
+        logger.error(f"Token refresh error: {type(e).__name__}")
         return create_error_response("Failed to refresh token", 500, 'REFRESH_ERROR')
 
 @auth_bp.route('/reset-rate-limit', methods=['POST'])

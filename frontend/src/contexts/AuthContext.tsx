@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { config } from '../config'
+import { useAuth as useAuthStore } from '../store/auth'
 
 export interface User {
   id: number
@@ -62,6 +64,11 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const zustandUser = useAuthStore(state => state.user)
+  const zustandAccessToken = useAuthStore(state => state.accessToken)
+  const zustandIsAuthenticated = useAuthStore(state => state.isAuthenticated)
+  const zustandLogin = useAuthStore(state => state.login)
+  const zustandLogout = useAuthStore(state => state.logout)
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
@@ -76,6 +83,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuthStatus()
   }, [])
 
+  useEffect(() => {
+    const legacyToken = typeof window !== 'undefined'
+      ? localStorage.getItem('fikiri-token')
+      : null
+
+    if (!zustandIsAuthenticated || !zustandUser || (!zustandAccessToken && !legacyToken)) {
+      return
+    }
+
+    const bridgedUser = {
+      ...zustandUser,
+      is_active: true,
+      email_verified: true,
+      created_at: '',
+    } as User
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('fikiri-user', JSON.stringify(bridgedUser))
+      localStorage.setItem('fikiri-user-id', String(bridgedUser.id))
+    }
+
+    setAuthState(prev => ({
+      ...prev,
+      user: bridgedUser,
+      isAuthenticated: true,
+      isLoading: false,
+    }))
+  }, [zustandUser, zustandAccessToken, zustandIsAuthenticated])
+
   const checkAuthStatus = async () => {
     try {
       // Check if we're in the browser environment
@@ -87,10 +123,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return
       }
 
+      const token = localStorage.getItem('fikiri-token')
       const userData = localStorage.getItem('fikiri-user')
       const userId = localStorage.getItem('fikiri-user-id')
       const onboardingData = localStorage.getItem('fikiri-onboarding-data')
 
+      // If we have a token, try to refresh user data from server
+      if (token && userId) {
+        try {
+          // Try to fetch fresh user data from /auth/whoami endpoint
+          const response = await fetch(`${config.apiUrl}/auth/whoami`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            if (data.success && data.data && data.data.user) {
+              const freshUser = data.data.user
+              // Update localStorage with fresh user data
+              localStorage.setItem('fikiri-user', JSON.stringify(freshUser))
+              setAuthState(prev => ({
+                ...prev,
+                user: freshUser,
+                isAuthenticated: true,
+                isLoading: false
+              }))
+              return // Exit early with fresh data
+            }
+          }
+        } catch (error) {
+          // Log warning in dev, but silently fall back to cached data in production
+          if (import.meta.env.DEV) {
+            console.warn('Failed to refresh user from server, using cached data:', error)
+          }
+          // Fall through to use cached data
+        }
+      }
+
+      // Fallback to cached user data
       if (userData && userId) {
         try {
           const user = JSON.parse(userData)
@@ -101,7 +175,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             isLoading: false
           }))
         } catch (error) {
-          console.error('Error parsing user data:', error)
+          if (import.meta.env.DEV) {
+            console.error('Error parsing user data:', error)
+          }
           clearAuthData()
         }
       } else {
@@ -120,11 +196,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             onboardingData: data
           }))
         } catch (error) {
-          console.error('Error parsing onboarding data:', error)
+          if (import.meta.env.DEV) {
+            console.error('Error parsing onboarding data:', error)
+          }
         }
       }
     } catch (error) {
-      console.error('Error checking auth status:', error)
+      if (import.meta.env.DEV) {
+        console.error('Error checking auth status:', error)
+      }
       setAuthState(prev => ({
         ...prev,
         isLoading: false
@@ -134,7 +214,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const response = await fetch('https://fikirisolutions.onrender.com/api/auth/login', {
+      const response = await fetch(`${config.apiUrl}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -153,8 +233,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const data = await response.json()
 
       if (data.success) {
-        const user = data.data.user
-        const tokens = data.data.tokens
+        const authData = data.data || {}
+        const user = authData.user
+        const tokens = authData.tokens || authData
         
         // Store user data and tokens (only in browser)
         if (typeof window !== 'undefined') {
@@ -163,6 +244,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           if (tokens && tokens.access_token) {
             localStorage.setItem('fikiri-token', tokens.access_token)
           }
+        }
+
+        if (tokens && tokens.access_token) {
+          zustandLogin(user, tokens.access_token, tokens.refresh_token || null)
         }
         
         setAuthState(prev => ({
@@ -204,7 +289,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         marketing_consent: onboardingData?.marketingConsent || false
       }
 
-      const response = await fetch('https://fikirisolutions.onrender.com/api/auth/signup', {
+      const response = await fetch(`${config.apiUrl}/auth/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -215,8 +300,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const data = await response.json()
 
       if (data.success) {
-        const user = data.data.user
-        const tokens = data.data.tokens
+        const authData = data.data || {}
+        const user = authData.user
+        const tokens = authData.tokens || authData
         
         // Store user data and tokens (only in browser)
         if (typeof window !== 'undefined') {
@@ -225,6 +311,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           if (tokens && tokens.access_token) {
             localStorage.setItem('fikiri-token', tokens.access_token)
           }
+        }
+
+        if (tokens && tokens.access_token) {
+          zustandLogin(user, tokens.access_token, tokens.refresh_token || null)
         }
         
         // Clear onboarding data as it's now in the user account
@@ -255,7 +345,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async () => {
     try {
       // Call backend logout endpoint to invalidate session
-      await fetch('https://fikirisolutions.onrender.com/api/auth/logout', {
+      await fetch(`${config.apiUrl}/auth/logout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -263,7 +353,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       })
     } catch (error) {
       // Continue with logout even if backend call fails
-      console.warn('Backend logout failed, continuing with local logout')
+      if (import.meta.env.DEV) {
+        console.warn('Backend logout failed, continuing with local logout')
+      }
     } finally {
       // Always clear local auth data
       clearAuthData()
@@ -303,6 +395,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const clearAuthData = () => {
     if (typeof window !== 'undefined') {
+      localStorage.removeItem('fikiri-token')
       localStorage.removeItem('fikiri-user')
       localStorage.removeItem('fikiri-user-id')
       localStorage.removeItem('fikiri-onboarding-data')
@@ -311,6 +404,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       localStorage.removeItem('fikiri-remember-password')
       localStorage.removeItem('fikiri-remember-me')
     }
+    zustandLogout()
     setAuthState({
       user: null,
       isAuthenticated: false,
@@ -329,7 +423,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     // Authenticated - check onboarding status
+    // Check both onboarding_completed flag and step to ensure proper flow
     if (!authState.user?.onboarding_completed) {
+      // If user has a valid step (1-4), redirect to that step
+      const userStep = authState.user?.onboarding_step || 1;
+      if (userStep >= 1 && userStep <= 4) {
+        return `/onboarding?step=${userStep}`;
+      }
       return '/onboarding' // User needs to complete onboarding
     }
 

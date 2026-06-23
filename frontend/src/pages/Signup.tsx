@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
-import { 
-  Mail, 
-  Lock, 
-  User, 
-  Building, 
-  Eye, 
-  EyeOff, 
-  ArrowRight, 
-  Chrome, 
+import {
+  Mail,
+  Lock,
+  User,
+  Building,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  Chrome,
   Github,
   UserPlus,
   CheckCircle,
@@ -18,6 +18,7 @@ import {
 import { FikiriLogo } from '../components/FikiriLogo';
 import { useAuth } from '../contexts/AuthContext';
 import { useUserActivityTracking } from '../contexts/ActivityContext';
+import { config } from '../config';
 
 const Signup: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -30,16 +31,30 @@ const Signup: React.FC = () => {
     agreeToTerms: false,
     subscribeNewsletter: false
   });
-  
+
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  
-  const { signup, getRedirectPath } = useAuth();
+
+  const { signup, getRedirectPath, checkAuthStatus } = useAuth();
   const { trackSignup } = useUserActivityTracking();
   const navigate = useNavigate();
+
+  // Check for Google signup success callback
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('google_signup') === 'success') {
+      // Refresh auth status to get user data
+      checkAuthStatus().then(() => {
+        const redirectPath = getRedirectPath();
+        navigate(redirectPath);
+      });
+    } else if (urlParams.get('error')) {
+      setErrors({ submit: `Google signup failed: ${urlParams.get('error')}` });
+    }
+  }, [checkAuthStatus, getRedirectPath, navigate]);
 
   // Load onboarding data if available
   useEffect(() => {
@@ -55,7 +70,9 @@ const Signup: React.FC = () => {
         // Clear the onboarding data after using it
         localStorage.removeItem('fikiri-onboarding-data');
       } catch (error) {
-        console.error('Error parsing onboarding data:', error);
+        if (import.meta.env.DEV) {
+          console.error('Error parsing onboarding data:', error);
+        }
       }
     }
   }, []);
@@ -114,7 +131,7 @@ const Signup: React.FC = () => {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
-    
+
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
@@ -126,14 +143,14 @@ const Signup: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
     setIsLoading(true);
     setErrors({});
-    
+
     try {
       // Create account using auth context
       const result = await signup(
@@ -141,11 +158,11 @@ const Signup: React.FC = () => {
         formData.password,
         `${formData.firstName} ${formData.lastName}`
       );
-      
+
       if (result.success) {
         // Track successful signup
         trackSignup(formData.email, 'email');
-        
+
         // Get the appropriate redirect path based on user state
         const redirectPath = getRedirectPath();
         navigate(redirectPath);
@@ -159,13 +176,63 @@ const Signup: React.FC = () => {
     }
   };
 
-  const handleSocialSignup = (provider: string) => {
-    // TODO: Implement social signup logic
-    setErrors({ submit: `${provider} signup not yet implemented` });
+  const handleSocialSignup = async (provider: string) => {
+    setIsLoading(true);
+    setErrors({});
+
+    try {
+      if (provider === 'gmail' || provider === 'google') {
+        // Start Google OAuth signup flow
+        const response = await fetch(`${config.apiUrl}/oauth/google/signup?redirect=/onboarding`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          let errorMessage = 'Failed to start Google signup';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorData.message || errorMessage;
+          } catch (e) {
+            errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          }
+          throw new Error(errorMessage);
+        }
+
+        const data = await response.json();
+        if (data.url) {
+          // Validate URL before redirecting
+          if (!data.url.startsWith('https://accounts.google.com/')) {
+            throw new Error('Invalid OAuth URL received');
+          }
+          // Redirect to Google OAuth
+          window.location.href = data.url;
+          return; // Don't set loading to false, we're redirecting
+        } else {
+          throw new Error('No OAuth URL received from server');
+        }
+      } else if (provider === 'github') {
+        // GitHub OAuth not yet implemented
+        setErrors({ submit: 'GitHub signup is coming soon!' });
+        setIsLoading(false);
+      } else {
+        setErrors({ submit: `${provider} signup not yet implemented` });
+        setIsLoading(false);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to start social signup';
+      if (import.meta.env.DEV) {
+        console.error('Social signup error:', error);
+      }
+      setErrors({ submit: errorMessage });
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div 
+    <div
       id="main-content"
       className="min-h-screen bg-brand-tan dark:bg-gray-900 relative overflow-hidden"
       onMouseMove={handleMouseMove}
@@ -173,7 +240,7 @@ const Signup: React.FC = () => {
       {/* Animated Background */}
       <div className="absolute inset-0">
         {/* Floating orbs with brand colors */}
-        <motion.div 
+        <motion.div
           className="absolute w-72 h-72 bg-brand-accent/20 rounded-full blur-3xl"
           animate={{
             x: mousePosition.x * 0.1,
@@ -186,7 +253,7 @@ const Signup: React.FC = () => {
             ease: "easeInOut"
           }}
         />
-        <motion.div 
+        <motion.div
           className="absolute w-96 h-96 bg-brand-secondary/20 rounded-full blur-3xl"
           animate={{
             x: mousePosition.x * 0.05,
@@ -199,7 +266,7 @@ const Signup: React.FC = () => {
             ease: "easeInOut"
           }}
         />
-        <motion.div 
+        <motion.div
           className="absolute w-64 h-64 bg-brand-primary/20 rounded-full blur-3xl"
           animate={{
             x: mousePosition.x * 0.08,
@@ -212,7 +279,7 @@ const Signup: React.FC = () => {
             ease: "easeInOut"
           }}
         />
-        
+
         {/* Geometric shapes */}
         <motion.div
           className="absolute top-20 left-20 w-32 h-32 border-2 border-white/10 rounded-lg"
@@ -250,12 +317,12 @@ const Signup: React.FC = () => {
             ease: "easeInOut"
           }}
         />
-        
+
         {/* Grid pattern */}
         <div className="absolute inset-0 opacity-20" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
         }} />
-        
+
         {/* Floating particles */}
         {[...Array(30)].map((_, i) => (
           <motion.div
@@ -284,7 +351,7 @@ const Signup: React.FC = () => {
       <div className="relative z-10 min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full">
           {/* Logo and Branding */}
-          <motion.div 
+          <motion.div
             className="text-center mb-8"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -293,7 +360,7 @@ const Signup: React.FC = () => {
             <div className="flex items-center justify-center mb-6">
               <FikiriLogo size="xl" variant="full" className="mx-auto" />
             </div>
-            <motion.h1 
+            <motion.h1
               className="text-5xl font-bold text-white mb-2 font-serif tracking-tight"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -301,7 +368,7 @@ const Signup: React.FC = () => {
             >
               Join Fikiri
             </motion.h1>
-            <motion.p 
+            <motion.p
               className="text-xl text-white/90 mb-1 font-medium"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -309,7 +376,7 @@ const Signup: React.FC = () => {
             >
               Start Your Automation Journey
             </motion.p>
-            <motion.p 
+            <motion.p
               className="text-sm text-white/70 font-light"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -320,7 +387,7 @@ const Signup: React.FC = () => {
           </motion.div>
 
           {/* Signup Form */}
-          <motion.div 
+          <motion.div
             className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -334,7 +401,7 @@ const Signup: React.FC = () => {
                 Get started with Fikiri Solutions today
               </p>
             </div>
-            
+
             <form className="space-y-6" onSubmit={handleSubmit}>
               {errors.submit && (
                 <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4 backdrop-blur-sm">
@@ -344,7 +411,7 @@ const Signup: React.FC = () => {
                   </div>
                 </div>
               )}
-              
+
               {/* Name Fields */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -370,7 +437,7 @@ const Signup: React.FC = () => {
                     <p className="mt-2 text-sm text-red-300">{errors.firstName}</p>
                   )}
                 </div>
-                
+
                 <div>
                   <label htmlFor="lastName" className="block text-sm font-medium text-gray-200 mb-2">
                     Last Name
@@ -395,7 +462,7 @@ const Signup: React.FC = () => {
                   )}
                 </div>
               </div>
-              
+
               {/* Email Field */}
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-200 mb-2">
@@ -421,7 +488,7 @@ const Signup: React.FC = () => {
                   <p className="mt-2 text-sm text-red-300">{errors.email}</p>
                 )}
               </div>
-              
+
               {/* Company Field */}
               <div>
                 <label htmlFor="company" className="block text-sm font-medium text-gray-200 mb-2">
@@ -446,7 +513,7 @@ const Signup: React.FC = () => {
                   <p className="mt-2 text-sm text-red-300">{errors.company}</p>
                 )}
               </div>
-              
+
               {/* Password Fields */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -484,7 +551,7 @@ const Signup: React.FC = () => {
                     <p className="mt-2 text-sm text-red-300">{errors.password}</p>
                   )}
                 </div>
-                
+
                 <div>
                   <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-200 mb-2">
                     Confirm Password
@@ -521,7 +588,7 @@ const Signup: React.FC = () => {
                   )}
                 </div>
               </div>
-              
+
               {/* Checkboxes */}
               <div className="space-y-4">
                 <div className="flex items-start">
@@ -551,7 +618,7 @@ const Signup: React.FC = () => {
                     )}
                   </div>
                 </div>
-                
+
                 <div className="flex items-start">
                   <div className="flex items-center h-5">
                     <input
@@ -570,7 +637,7 @@ const Signup: React.FC = () => {
                   </div>
                 </div>
               </div>
-              
+
               {/* Submit Button */}
               <button
                 type="submit"
@@ -627,8 +694,8 @@ const Signup: React.FC = () => {
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-300">
                 Already have an account?{' '}
-                <Link 
-                  to="/login" 
+                <Link
+                  to="/login"
                   className="text-brand-accent hover:text-brand-secondary font-medium underline"
                 >
                   Sign in here
@@ -638,7 +705,7 @@ const Signup: React.FC = () => {
           </motion.div>
 
           {/* Features Preview */}
-          <motion.div 
+          <motion.div
             className="mt-8 grid grid-cols-3 gap-4"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

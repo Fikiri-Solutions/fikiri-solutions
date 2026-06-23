@@ -21,7 +21,9 @@ export const SentryTestButton: React.FC = () => {
         
         // Simulate some work
         setTimeout(() => {
-          console.log('Performance test completed')
+          if (import.meta.env.DEV) {
+            console.log('Performance test completed')
+          }
         }, 100)
       },
     )
@@ -38,7 +40,9 @@ export const SentryTestButton: React.FC = () => {
         timestamp: new Date().toISOString()
       }
     })
-    console.log('Log test completed - check Sentry logs')
+    if (import.meta.env.DEV) {
+      console.log('Log test completed - check Sentry logs')
+    }
   }
 
   return (
@@ -90,7 +94,7 @@ export const SentryErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ c
             🚨 Something went wrong
           </h2>
           <p className="text-red-600 mb-4">
-            An error occurred: {error?.message || 'Unknown error'}
+            An error occurred: {error instanceof Error ? error.message : 'Unknown error'}
           </p>
           <button
             onClick={resetError}
@@ -100,9 +104,11 @@ export const SentryErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ c
           </button>
         </div>
       )}
-      beforeCapture={(scope, error, errorInfo) => {
+      beforeCapture={(scope, _error, errorInfo) => {
         scope.setTag("errorBoundary", true)
-        scope.setContext("errorInfo", errorInfo)
+        scope.setContext("errorInfo", {
+          componentStack: String(errorInfo || '')
+        })
       }}
     >
       {children}

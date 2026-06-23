@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Building2, TrendingUp, Settings, CheckCircle } from 'lucide-react';
+import { ApiError, apiPost } from '../lib/api';
 
 interface IndustryPrompt {
   industry: string;
@@ -76,7 +77,9 @@ export const IndustryAutomation: React.FC = () => {
       };
       setPrompts(mockPrompts);
     } catch (error) {
-      console.error('Failed to fetch industry prompts:', error)
+      if (import.meta.env.DEV) {
+        console.error('Failed to fetch industry prompts:', error)
+      }
       // Set fallback data
       setPrompts({
         landscaping: {
@@ -128,7 +131,9 @@ export const IndustryAutomation: React.FC = () => {
       };
       setPricingTiers(mockTiers);
     } catch (error) {
-      console.error('Failed to fetch pricing tiers:', error)
+      if (import.meta.env.DEV) {
+        console.error('Failed to fetch pricing tiers:', error)
+      }
       // Set fallback data
       setPricingTiers({
         starter: {
@@ -153,7 +158,9 @@ export const IndustryAutomation: React.FC = () => {
       };
       setUsageMetrics(mockAnalytics);
     } catch (error) {
-      console.error('Failed to fetch client analytics:', error)
+      if (import.meta.env.DEV) {
+        console.error('Failed to fetch client analytics:', error)
+      }
       // Set fallback data
       setUsageMetrics({
         tier: 'starter',
@@ -170,32 +177,24 @@ export const IndustryAutomation: React.FC = () => {
 
     setIsLoading(true);
     try {
-        // Use the main AI API endpoint
-        const response = await fetch('https://fikirisolutions.onrender.com/api/ai/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: message,
-          user_id: 1, // Add user_id parameter
-          context: {
-            industry: selectedIndustry,
-            client_id: clientId
-          }
-        }),
+      // Use the main AI API endpoint
+      const data = await apiPost<any>('/ai/chat', {
+        message: message,
+        user_id: 1, // Add user_id parameter
+        context: {
+          industry: selectedIndustry,
+          client_id: clientId
+        }
       });
-
-      const data = await response.json();
-      if (data.success) {
-        setResponse(data.data?.response || 'No response received');
-        setToolsUsed(data.data?.service_queries || []);
-        setMessage('');
-      } else {
-        setResponse(`Error: ${data.error || 'Failed to get response'}`);
-      }
+      setResponse(data?.response || 'No response received');
+      setToolsUsed(data?.service_queries || []);
+      setMessage('');
     } catch (error) {
-      setResponse(`Network error: ${error}`);
+      if (error instanceof ApiError) {
+        setResponse(`Error: ${error.message}`);
+      } else {
+        setResponse(`Network error: ${error}`);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -299,36 +298,6 @@ export const IndustryAutomation: React.FC = () => {
       'ecommerce': 'Retail & E-commerce'
     };
     return categories[industry] || 'General';
-  };
-
-  const getIndustryDescription = (industry: string) => {
-    const descriptions: Record<string, string> = {
-      'restaurant': 'Reservation management, menu recommendations, special promotions',
-      'cafe': 'Loyalty programs, daily specials, event hosting, catering orders',
-      'food_truck': 'Location updates, daily menus, event bookings, social media',
-      'real_estate': 'Property listings, client consultations, market analysis',
-      'property_management': 'Maintenance requests, tenant communication, rent collection',
-      'medical_practice': 'Appointment scheduling, patient reminders, HIPAA compliance',
-      'dental_clinic': 'Treatment plans, insurance claims, patient education',
-      'veterinary': 'Vaccination reminders, emergency protocols, pet records',
-      'landscaping': 'Appointment scheduling, service quotes, seasonal planning',
-      'painting': 'Color consultations, project estimates, weather scheduling',
-      'carpenter': 'Custom designs, project timelines, material sourcing',
-      'drywall': 'Repair estimates, texture matching, project scheduling',
-      'plumber': 'Emergency calls, repair estimates, preventive maintenance',
-      'roofer': 'Weather scheduling, safety protocols, inspection reports',
-      'car_rental': 'Reservation management, vehicle availability, fleet maintenance',
-      'ride_share': 'Driver support, route optimization, earnings tracking',
-      'content_creation': 'Content planning, social media strategy, brand consistency',
-      'marketing_agency': 'Campaign management, client reporting, ROI tracking',
-      'photography': 'Session booking, portfolio management, client galleries',
-      'tax_services': 'Tax preparation, deadline management, IRS compliance',
-      'accounting': 'Bookkeeping, financial reporting, audit preparation',
-      'legal_services': 'Case management, client intake, document preparation',
-      'retail_store': 'Inventory management, customer service, sales tracking',
-      'ecommerce': 'Order management, customer support, inventory sync'
-    };
-    return descriptions[industry] || 'Industry-specific automation and workflows';
   };
 
   const getTierColor = (tier: string) => {
@@ -552,7 +521,9 @@ export const IndustryAutomation: React.FC = () => {
                           : 'border-brand-text/20 dark:border-gray-700 hover:border-brand-accent dark:hover:border-gray-600'
                       }`}
                       onClick={() => {
-                        console.log(`Clicked on ${tier} tier`); // Debug log
+                        if (import.meta.env.DEV) {
+                          console.log(`Clicked on ${tier} tier`); // Debug log
+                        }
                         
                         // Find an industry that uses this tier and select it
                         const industryForTier = Object.keys(prompts).find(
@@ -560,13 +531,17 @@ export const IndustryAutomation: React.FC = () => {
                         );
                         if (industryForTier) {
                           setSelectedIndustry(industryForTier);
-                          console.log(`Selected industry: ${industryForTier}`); // Debug log
+                          if (import.meta.env.DEV) {
+                            console.log(`Selected industry: ${industryForTier}`); // Debug log
+                          }
                         }
                         
                         // Update usage metrics based on selected tier with consistent data
                         const tierConfig = pricingTiers[tier];
                         if (tierConfig) {
-                          console.log(`Updating metrics for ${tier} tier`); // Debug log
+                          if (import.meta.env.DEV) {
+                            console.log(`Updating metrics for ${tier} tier`); // Debug log
+                          }
                           
                           // Define tier-specific usage patterns
                           const tierUsagePatterns = {
@@ -610,10 +585,14 @@ export const IndustryAutomation: React.FC = () => {
                             monthly_cost: tierConfig.price
                           };
                           
-                          console.log(`New metrics:`, newMetrics); // Debug log
+                          if (import.meta.env.DEV) {
+                            console.log(`New metrics:`, newMetrics); // Debug log
+                          }
                           setUsageMetrics(newMetrics);
                         } else {
-                          console.error(`No config found for tier: ${tier}`); // Debug log
+                          if (import.meta.env.DEV) {
+                            console.error(`No config found for tier: ${tier}`); // Debug log
+                          }
                         }
                       }}
                     >

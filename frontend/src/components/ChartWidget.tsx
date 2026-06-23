@@ -4,7 +4,6 @@ import {
   BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/Button"
 import { 
   TrendingUp, BarChart3, PieChart as PieChartIcon, 
@@ -182,7 +181,7 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({
                 dataKey={dataKey}
                 animationDuration={500}
               >
-                {data.map((entry, index) => (
+                {data.map((_entry, index) => (
                   <Cell 
                     key={`cell-${index}`} 
                     fill={color}
@@ -226,7 +225,7 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({
                   {isExpanded ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
                 </Button>
               )}
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" onClick={() => setChartType(type)}>
                 <RotateCcw className="h-3 w-3" />
               </Button>
             </div>
@@ -270,7 +269,8 @@ export const CompactChartGrid: React.FC<CompactChartGridProps> = ({ charts, clas
       charts.length === 1 ? "grid-cols-1" :
       charts.length === 2 ? "grid-cols-1 md:grid-cols-2" :
       charts.length === 3 ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" :
-      "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+      "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+      className
     )}>
       {charts.map((chart, index) => (
         <ChartWidget

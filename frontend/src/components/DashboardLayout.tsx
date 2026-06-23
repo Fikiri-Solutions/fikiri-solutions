@@ -23,7 +23,6 @@ export function DashboardCard({
   children, 
   className,
   compact = false,
-  variant,
   badge 
 }: DashboardCardProps) {
   return (

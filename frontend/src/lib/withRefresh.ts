@@ -23,16 +23,28 @@ export async function withRefresh<T>(fn: () => Promise<T>): Promise<T> {
     // Check if it's a 401 unauthorized error
     if (error.status === 401 || error.message === 'Unauthorized') {
       try {
-        // Attempt to refresh the token
-        const refreshResponse = await authApi.refresh();
+        const { refreshToken } = useAuth.getState();
+        if (!refreshToken) {
+          throw new AuthError('Refresh token missing. Please log in again.', 'REFRESH_TOKEN_MISSING');
+        }
+
+        const refreshResponse = await authApi.refresh(refreshToken);
+        const nextAccessToken = refreshResponse.access_token || refreshResponse.tokens?.access_token;
+        const nextRefreshToken = refreshResponse.refresh_token || refreshResponse.tokens?.refresh_token;
+        if (!nextAccessToken) {
+          throw new AuthError('Refresh response missing access token.', 'REFRESH_RESPONSE_INVALID');
+        }
         
         // Update the token in the store
-        const { setToken } = useAuth.getState();
-        setToken(refreshResponse.access_token);
+        const { setToken, setRefreshToken } = useAuth.getState();
+        setToken(nextAccessToken);
+        if (nextRefreshToken) {
+          setRefreshToken(nextRefreshToken);
+        }
         
         // Dispatch custom event for other components to listen
         window.dispatchEvent(new CustomEvent('auth:token-refreshed', { 
-          detail: refreshResponse.access_token 
+          detail: nextAccessToken
         }));
         
         // Retry the original request

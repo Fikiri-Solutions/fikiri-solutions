@@ -73,7 +73,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ type, onAction }) => {
         {onAction && (
           <button
             onClick={onAction}
-            className="fikiri-button inline-flex items-center space-x-2"
+            className="inline-flex items-center space-x-2 px-6 py-3 bg-brand-primary hover:bg-brand-secondary text-white rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
           >
             <config.actionIcon className="h-4 w-4" />
             <span>{config.actionText}</span>

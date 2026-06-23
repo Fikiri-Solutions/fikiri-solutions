@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Mail, Users, Brain, Settings, Home, Building2 } from 'lucide-react'
+import { Users, Brain, Settings, Home, Building2 } from 'lucide-react'
 
 interface MobileBottomNavProps {
   className?: string

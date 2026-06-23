@@ -9,6 +9,8 @@ import logging
 from functools import wraps
 from typing import Dict, Any, Optional
 
+from core.redis_pool import get_redis_client
+
 # Optional ProxyFix import
 try:
     from werkzeug.middleware.proxy_fix import ProxyFix
@@ -40,7 +42,7 @@ except ImportError:
 
 def init_security(app: Flask):
     """Initialize security middleware and configurations"""
-    
+
     # Trust proxy headers (for rate limiting behind reverse proxy)
     # ProxyFix for production deployments behind reverse proxy
     if PROXY_FIX_AVAILABLE:
@@ -48,39 +50,43 @@ def init_security(app: Flask):
         logger.info("✅ ProxyFix middleware enabled")
     else:
         logger.warning("⚠️ ProxyFix not available - install werkzeug for production deployments")
-    
+
     # Initialize Redis for rate limiting
     redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/1')
-    redis_client = redis.from_url(redis_url, decode_responses=True)
-    
+    redis_client = get_redis_client(decode_responses=True)
+
     # Initialize rate limiter (fixed - use single initialization style)
     limiter = None
     if FLASK_AVAILABLE:
+        storage_uri = redis_url if redis_client else "memory://"
         limiter = Limiter(
             key_func=get_remote_address,
-            storage_uri=redis_url,
+            storage_uri=storage_uri,
             default_limits=["1000 per hour", "100 per minute"]
         )
         limiter.init_app(app)
-        logger.info("✅ Rate limiter initialized")
+        if redis_client:
+            logger.info("✅ Rate limiter initialized with Redis storage")
+        else:
+            logger.info("ℹ️ Rate limiter running in memory mode (Redis disabled)")
     else:
         logger.warning("⚠️ Flask-Limiter not available - rate limiting disabled")
-    
+
     # Configure CORS
     cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')
-    CORS(app, 
+    CORS(app,
          origins=cors_origins,
          methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
          allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
          supports_credentials=True,
          max_age=3600
     )
-    
+
     # Security headers middleware
     @app.after_request
     def add_security_headers(response):
         """Add security headers to all responses"""
-        
+
         # Content Security Policy
         csp_policy = (
             "default-src 'self'; "
@@ -95,23 +101,23 @@ def init_security(app: Flask):
             "form-action 'self'"
         )
         response.headers['Content-Security-Policy'] = csp_policy
-        
+
         # Security headers
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['X-Frame-Options'] = 'DENY'
         response.headers['X-XSS-Protection'] = '1; mode=block'
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
-        
+
         # HSTS (only in production)
         if os.getenv('FLASK_ENV') == 'production':
             response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains; preload'
-        
+
         # Remove server header
         response.headers.pop('Server', None)
-        
+
         return response
-    
+
     # Rate limiting decorators
     def rate_limit_by_user(limit):
         """Rate limit by authenticated user"""
@@ -123,7 +129,10 @@ def init_security(app: Flask):
                     key = f"user:{user_id}"
                 else:
                     key = get_remote_address()
-                
+
+                if not redis_client:
+                    return f(*args, **kwargs)
+
                 # Check rate limit
                 current = redis_client.get(key)
                 if current is None:
@@ -138,11 +147,11 @@ def init_security(app: Flask):
                             'retry_after': 3600
                         }), 429
                     redis_client.incr(key)
-                
+
                 return f(*args, **kwargs)
             return decorated_function
         return decorator
-    
+
     # IP-based rate limiting
     def rate_limit_by_ip(limit):
         """Rate limit by IP address"""
@@ -151,7 +160,10 @@ def init_security(app: Flask):
             def decorated_function(*args, **kwargs):
                 ip = get_remote_address()
                 key = f"ip:{ip}"
-                
+
+                if not redis_client:
+                    return f(*args, **kwargs)
+
                 current = redis_client.get(key)
                 if current is None:
                     redis_client.setex(key, 3600, 1)
@@ -165,37 +177,25 @@ def init_security(app: Flask):
                             'retry_after': 3600
                         }), 429
                     redis_client.incr(key)
-                
+
                 return f(*args, **kwargs)
             return decorated_function
         return decorator
-    
+
     # Store limiter and decorators in app context
     app.limiter = limiter
     app.rate_limit_by_user = rate_limit_by_user
     app.rate_limit_by_ip = rate_limit_by_ip
-    
+
     return app
 
 # Security middleware for specific routes
 def require_auth(f):
-    """Require authentication for protected routes"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return jsonify({
-                'status': 'error',
-                'error_code': 'AUTHENTICATION_REQUIRED',
-                'message': 'Authentication required'
-            }), 401
-        
-        # Validate JWT token here
-        token = auth_header.split(' ')[1]
-        # Add JWT validation logic
-        
-        return f(*args, **kwargs)
-    return decorated_function
+    """Disabled legacy auth decorator. Use core.jwt_auth.jwt_required."""
+    raise RuntimeError(
+        "core.security.require_auth is disabled because it did not validate JWTs. "
+        "Use core.jwt_auth.jwt_required for protected routes."
+    )
 
 def require_role(required_role):
     """Require specific role for access"""
@@ -210,7 +210,7 @@ def require_role(required_role):
                     'error_code': 'INSUFFICIENT_PERMISSIONS',
                     'message': 'Insufficient permissions'
                 }), 403
-            
+
             return f(*args, **kwargs)
         return decorated_function
     return decorator
@@ -230,7 +230,7 @@ def validate_input(schema):
                         'message': 'Invalid input data',
                         'errors': schema.errors
                     }), 400
-                
+
                 return f(*args, **kwargs)
             except Exception as e:
                 return jsonify({
@@ -244,7 +244,7 @@ def validate_input(schema):
 # Security utilities
 class SecurityUtils:
     """Security utility functions"""
-    
+
     @staticmethod
     def sanitize_input(data):
         """Sanitize user input"""
@@ -259,37 +259,37 @@ class SecurityUtils:
         elif isinstance(data, list):
             return [SecurityUtils.sanitize_input(item) for item in data]
         return data
-    
+
     @staticmethod
     def validate_email(email):
         """Validate email format"""
         import re
         pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         return re.match(pattern, email) is not None
-    
+
     @staticmethod
     def validate_password_strength(password):
         """Validate password strength"""
         if len(password) < 8:
             return False, "Password must be at least 8 characters long"
-        
+
         if not any(c.isupper() for c in password):
             return False, "Password must contain at least one uppercase letter"
-        
+
         if not any(c.islower() for c in password):
             return False, "Password must contain at least one lowercase letter"
-        
+
         if not any(c.isdigit() for c in password):
             return False, "Password must contain at least one number"
-        
+
         return True, "Password is strong"
-    
+
     @staticmethod
     def generate_csrf_token():
         """Generate CSRF token"""
         import secrets
         return secrets.token_urlsafe(32)
-    
+
     @staticmethod
     def verify_csrf_token(token, session_token):
         """Verify CSRF token"""
@@ -298,42 +298,42 @@ class SecurityUtils:
 # Security monitoring
 class SecurityMonitor:
     """Monitor security events and suspicious activity"""
-    
+
     def __init__(self, redis_client):
         self.redis = redis_client
-    
+
     def log_failed_login(self, ip, email):
         """Log failed login attempt"""
         key = f"failed_login:{ip}"
         current = self.redis.get(key)
-        
+
         if current is None:
             self.redis.setex(key, 3600, 1)  # 1 hour window
         else:
             count = int(current) + 1
             self.redis.setex(key, 3600, count)
-            
+
             # Alert if too many failed attempts
             if count >= 5:
                 self.alert_suspicious_activity(ip, f"Multiple failed login attempts: {count}")
-    
+
     def log_suspicious_request(self, ip, endpoint, reason):
         """Log suspicious request"""
         key = f"suspicious:{ip}"
         self.redis.lpush(key, f"{time.time()}:{endpoint}:{reason}")
         self.redis.ltrim(key, 0, 99)  # Keep last 100 entries
         self.redis.expire(key, 86400)  # 24 hours
-    
+
     def alert_suspicious_activity(self, ip, reason):
         """Alert on suspicious activity"""
         # Log to security log
         import logging
         security_logger = logging.getLogger('security')
         security_logger.warning(f"Suspicious activity from {ip}: {reason}")
-        
+
         # Send alert (implement based on your alerting system)
         # This could be Slack, email, or other notification system
-    
+
     def check_ip_reputation(self, ip):
         """Check IP reputation (placeholder for actual implementation)"""
         # Implement IP reputation checking

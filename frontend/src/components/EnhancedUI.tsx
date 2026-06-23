@@ -61,7 +61,7 @@ export const EnhancedMetricCard: React.FC<EnhancedMetricCardProps> = ({
         </div>
         
         <AnimatePresence>
-          {change !== null && (
+          {change !== null && change !== undefined && (
             <motion.div 
               className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
                 positive ? "text-green-700 bg-green-50 dark:text-green-300 dark:bg-green-900/20" : "text-red-700 bg-red-50 dark:text-red-300 dark:bg-red-900/20"
@@ -113,7 +113,7 @@ export const EnhancedMetricCard: React.FC<EnhancedMetricCardProps> = ({
 
       {/* Trend indicator */}
       <AnimatePresence>
-        {change !== null && (
+        {change !== null && change !== undefined && (
           <motion.div 
             className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400"
             initial={{ opacity: 0 }}
@@ -283,4 +283,3 @@ export const StaggeredItem: React.FC<{
     </motion.div>
   );
 };
-

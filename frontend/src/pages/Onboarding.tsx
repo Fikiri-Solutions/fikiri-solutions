@@ -2,21 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
+import { config } from '../config';
+import { apiGet, apiPut, apiPost } from '../lib/api';
 
 export const Onboarding: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, checkAuthStatus } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(true);
   const [formData, setFormData] = useState({
     name: '',
     company: '',
     industry: ''
   });
-  
+
   // A/B Testing Hook
-  const [variant, setVariant] = useState<'A' | 'B'>(() => {
+  const [variant] = useState<'A' | 'B'>(() => {
     // Persist variant across sessions
     const savedVariant = localStorage.getItem('fikiri-onboarding-variant');
     if (savedVariant && (savedVariant === 'A' || savedVariant === 'B')) {
@@ -27,17 +30,106 @@ export const Onboarding: React.FC = () => {
     return newVariant;
   });
 
+  // Sync step with server state on mount
   useEffect(() => {
-    // Check URL parameters for step
-    const urlParams = new URLSearchParams(location.search);
-    const stepParam = urlParams.get('step');
-    if (stepParam) {
-      setStep(parseInt(stepParam) || 1);
-    }
-  }, [location.search]);
+    const initializeStep = async () => {
+      try {
+        setInitializing(true);
 
-  const nextStep = () => setStep(prev => prev + 1);
-  const prevStep = () => setStep(prev => prev - 1);
+        // Check URL parameters first
+        const urlParams = new URLSearchParams(location.search);
+        const stepParam = urlParams.get('step');
+
+        // If user exists, sync with server state
+        if (user) {
+          try {
+            // Fetch current onboarding status from server
+            const status = await apiGet<{
+              completed: boolean;
+              step: number;
+              data?: any;
+            }>('/onboarding/status');
+
+            if (status.completed) {
+              // User already completed onboarding, redirect to dashboard
+              navigate('/dashboard');
+              return;
+            }
+
+            // Use server step if available, otherwise use URL param or default to 1
+            const serverStep = status.step || 1;
+            const urlStep = stepParam ? parseInt(stepParam) : null;
+
+            // Validate step is between 1-4
+            const validStep = Math.max(1, Math.min(4, urlStep || serverStep || 1));
+            setStep(validStep);
+
+            // If we have onboarding data, populate form
+            if (status.data) {
+              setFormData({
+                name: status.data.name || '',
+                company: status.data.company || '',
+                industry: status.data.industry || ''
+              });
+            }
+          } catch (error) {
+            if (import.meta.env.DEV) {
+              console.warn('Failed to fetch onboarding status, using local state:', error);
+            }
+            // Fallback to URL param or user's onboarding_step
+            const urlStep = stepParam ? parseInt(stepParam) : null;
+            const userStep = user.onboarding_step || 1;
+            const validStep = Math.max(1, Math.min(4, urlStep || userStep || 1));
+            setStep(validStep);
+          }
+        } else {
+          // No user, use URL param or default to 1
+          const urlStep = stepParam ? parseInt(stepParam) : 1;
+          setStep(Math.max(1, Math.min(4, urlStep)));
+        }
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.error('Error initializing onboarding step:', error);
+        }
+        setStep(1);
+      } finally {
+        setInitializing(false);
+      }
+    };
+
+    initializeStep();
+  }, [location.search, user, navigate]);
+
+  const nextStep = async () => {
+    const newStep = Math.min(4, step + 1);
+
+    // Update step on server
+    try {
+      const token = localStorage.getItem('fikiri-token');
+      if (!token) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      await apiPut('/user/onboarding-step', { step: newStep });
+
+      // Refresh user state to get updated onboarding_step
+      await checkAuthStatus();
+
+      setStep(newStep);
+    } catch (error: any) {
+      if (import.meta.env.DEV) {
+        console.error('Failed to update step:', error);
+      }
+      // Still allow step progression in UI, but log the error
+      setStep(newStep);
+    }
+  };
+
+  const prevStep = () => {
+    const newStep = Math.max(1, step - 1);
+    setStep(newStep);
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -47,11 +139,9 @@ export const Onboarding: React.FC = () => {
   };
 
   const handleGoogleAuth = () => {
-    // Use localhost for development, production URL for production
-    const baseUrl = process.env.NODE_ENV === 'development' 
-      ? 'http://localhost:5000' 
-      : 'https://fikirisolutions.onrender.com';
-    
+    // Use config API URL
+    const baseUrl = config.apiUrl.replace('/api', '');
+
     fetch(`${baseUrl}/api/oauth/gmail/start`)
       .then(response => response.json())
       .then(data => {
@@ -62,7 +152,9 @@ export const Onboarding: React.FC = () => {
         }
       })
       .catch(error => {
-        console.error('OAuth error:', error);
+        if (import.meta.env.DEV) {
+          console.error('OAuth error:', error);
+        }
         toast.error('Failed to connect to Google OAuth');
       });
   };
@@ -74,66 +166,51 @@ export const Onboarding: React.FC = () => {
     }
 
     setLoading(true);
-    
+
     try {
-      const token = localStorage.getItem('fikiri-token');
-      
-      // First update the onboarding step to 4 (completion)
-      const stepResponse = await fetch('http://localhost:5000/api/user/onboarding-step', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ step: 4 })
-      });
+      // First save the onboarding data (this will also mark onboarding as completed)
+      const response = await apiPost('/onboarding', formData);
 
-      if (!stepResponse.ok) {
-        console.warn('Failed to update onboarding step, continuing with completion...');
-      }
+      if (response) {
+        // Refresh user state to get updated onboarding status
+        await checkAuthStatus();
 
-      // Then save the onboarding data
-      const response = await fetch('http://localhost:5000/api/onboarding', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      });
-
-      if (response.ok) {
         toast.success('Onboarding completed!');
         // Set flag to show welcome banner
         localStorage.setItem('fikiri-onboarding-just-completed', 'true');
         navigate('/dashboard');
-      } else {
-        const error = await response.json();
-        toast.error(error.message || 'Failed to save onboarding data');
       }
-    } catch (error) {
-      console.error('Onboarding error:', error);
-      toast.error('Failed to connect to server');
+    } catch (error: any) {
+      if (import.meta.env.DEV) {
+        console.error('Onboarding error:', error);
+      }
+      toast.error(error.message || 'Failed to save onboarding data');
     } finally {
       setLoading(false);
     }
   };
 
   const skipStep = () => {
-    console.log('Skip button clicked!');
-    console.log('User object:', user);
-    console.log('User ID:', user?.id);
-    console.log('Is authenticated:', !!user);
-    
+    if (import.meta.env.DEV) {
+      console.log('Skip button clicked!');
+      console.log('User object:', user);
+      console.log('User ID:', user?.id);
+      console.log('Is authenticated:', !!user);
+    }
+
     try {
-      toast.info('Skipping onboarding...');
-      
+      toast('Skipping onboarding...', { icon: 'ℹ️' });
+
       // Always navigate to login for now - this is the safest approach
       // The login page will handle redirecting authenticated users appropriately
-      console.log('Navigating to login page');
+      if (import.meta.env.DEV) {
+        console.log('Navigating to login page');
+      }
       navigate('/login');
     } catch (error) {
-      console.error('Error in skipStep:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error in skipStep:', error);
+      }
       // Fallback navigation
       navigate('/login');
     }
@@ -149,7 +226,7 @@ export const Onboarding: React.FC = () => {
             <span>{Math.round((step / 4) * 100)}% Complete</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
+            <div
               className="bg-blue-600 h-2 rounded-full transition-all duration-300"
               style={{ width: `${(step / 4) * 100}%` }}
             ></div>
@@ -161,7 +238,7 @@ export const Onboarding: React.FC = () => {
           <div className="text-center">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to Fikiri Solutions</h2>
             <p className="text-gray-600 mb-8">Connect your Google account to get started</p>
-            
+
             <button
               onClick={handleGoogleAuth}
               className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 flex items-center justify-center"
@@ -171,7 +248,7 @@ export const Onboarding: React.FC = () => {
                 <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                 <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                 <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>  
+              </svg>
               Continue with Google
             </button>
 
@@ -251,7 +328,7 @@ export const Onboarding: React.FC = () => {
                 {variant === 'A' ? 'Next' : 'Continue'}
               </button>
             </div>
-            
+
             {/* Skip option on Step 2 */}
             <div className="mt-6 text-center">
               <button
@@ -368,10 +445,22 @@ export const Onboarding: React.FC = () => {
           </div>
         )}
 
+        {/* Loading state */}
+        {initializing && (
+          <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center rounded-2xl">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+              <p className="text-sm text-gray-600">Loading...</p>
+            </div>
+          </div>
+        )}
+
         {/* Debug info for development */}
-        {process.env.NODE_ENV === 'development' && (
+        {process.env.NODE_ENV === 'development' && !initializing && (
           <div className="mt-8 p-4 bg-gray-100 rounded-lg text-xs text-gray-600">
             <div>Current user: {user?.email || 'Not logged in'}</div>
+            <div>User onboarding_step: {user?.onboarding_step || 'N/A'}</div>
+            <div>User onboarding_completed: {user?.onboarding_completed ? 'Yes' : 'No'}</div>
             <div>Current step: {step}</div>
             <div>Form data: {JSON.stringify(formData)}</div>
           </div>

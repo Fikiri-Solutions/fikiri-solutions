@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { Settings, ToggleLeft, ToggleRight, Save, RefreshCw, X, CheckCircle, AlertCircle, Clock, Zap } from 'lucide-react'
-import { apiClient } from '../services/apiClient'
+import { Settings, ToggleLeft, ToggleRight, Save, RefreshCw, X, CheckCircle, AlertCircle, Zap } from 'lucide-react'
+import { apiClient } from '../lib/api'
+import { ServiceCardSkeletonList } from '../components/Skeleton'
+import { ErrorMessage, getUserFriendlyError } from '../components/ErrorMessage'
 
 export const Services: React.FC = () => {
   const [services, setServices] = useState([
@@ -50,8 +52,10 @@ export const Services: React.FC = () => {
     }
   ])
 
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true) // Start with true for initial load
+  const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [hasChanges, setHasChanges] = useState(false)
+  const [error, setError] = useState<{ type: 'error' | 'warning' | 'info' | 'success'; title: string; message: string } | null>(null)
   const [testResult, setTestResult] = useState<{
     serviceId: string
     serviceName: string
@@ -66,10 +70,21 @@ export const Services: React.FC = () => {
   }, [])
 
   const loadServiceConfigurations = async () => {
+    setIsInitialLoading(true)
+    setError(null)
     try {
       // Load service configurations
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500))
+      // In real implementation, fetch from API:
+      // const configs = await apiClient.getServices()
+      // setServices(configs)
     } catch (error) {
       // Failed to load configurations
+      setError(getUserFriendlyError(error))
+    } finally {
+      setIsInitialLoading(false)
+      setIsLoading(false)
     }
   }
 
@@ -375,25 +390,26 @@ export const Services: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-brand-text dark:text-white">🚀 Strategic Service Dashboard</h1>
           <p className="mt-1 text-sm text-brand-text/70 dark:text-gray-400">
             Test and configure all core Fikiri Solutions services with strategic feature flags
           </p>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
           <button
             onClick={() => loadServiceConfigurations()}
-            className="px-4 py-2 text-brand-text bg-brand-background/50 hover:bg-brand-background/80 border border-brand-text/20 rounded-lg font-medium transition-all duration-200 flex items-center"
+            disabled={isLoading}
+            className="px-4 py-2 text-brand-text bg-brand-background/50 hover:bg-brand-background/80 border border-brand-text/20 rounded-lg font-medium transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <RefreshCw className="h-4 w-4 mr-2" />
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh Data
           </button>
           <button
             onClick={saveConfigurations}
             disabled={!hasChanges || isLoading}
-            className="bg-brand-primary hover:bg-brand-secondary text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            className="bg-brand-primary hover:bg-brand-secondary text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
             <Save className="h-4 w-4 mr-2" />
             {isLoading ? 'Saving Changes...' : 'Save Configuration'}
@@ -401,9 +417,23 @@ export const Services: React.FC = () => {
         </div>
       </div>
 
+      {/* Error Display */}
+      {error && (
+        <ErrorMessage
+          type={error.type}
+          title={error.title}
+          message={error.message}
+          onDismiss={() => setError(null)}
+          onRetry={error.type === 'error' ? () => loadServiceConfigurations() : undefined}
+        />
+      )}
+
       {/* Services List */}
-      <div className="space-y-6">
-        {services.map((service) => (
+      {isInitialLoading ? (
+        <ServiceCardSkeletonList count={services.length} />
+      ) : (
+        <div className="space-y-6">
+          {services.map((service) => (
           <div key={service.id} className="bg-brand-background dark:bg-gray-800 rounded-lg shadow-md p-6 border border-brand-text/10">
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -455,7 +485,8 @@ export const Services: React.FC = () => {
             )}
           </div>
         ))}
-      </div>
+        </div>
+      )}
 
       {/* Test Result Modal */}
       {testResult && (

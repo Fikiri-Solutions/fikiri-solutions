@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { CheckCircle, AlertCircle, Mail, Shield, Eye, Clock, Loader2, ExternalLink, Info, AlertTriangle } from 'lucide-react'
+import { CheckCircle, AlertCircle, Mail, Shield, Eye, Clock, Loader2 } from 'lucide-react'
 import { useToast } from './Toast'
+import { apiGet, apiPost } from '../lib/api'
+import { config } from '../config'
 
 interface GmailConnectionProps {
   userId: number
@@ -20,12 +22,7 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
   const [gmailStatus, setGmailStatus] = useState<GmailStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showDetails, setShowDetails] = useState(false)
-  const [retryCount, setRetryCount] = useState(0)
   const { addToast } = useToast()
-
-  useEffect(() => {
-    checkGmailStatus()
-  }, [checkGmailStatus])
 
   const checkGmailStatus = useCallback(async () => {
     if (!userId || userId <= 0) {
@@ -37,41 +34,38 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
-      const response = await fetch(`https://fikirisolutions.onrender.com/api/auth/gmail/status?user_id=${userId}`, {
+      const data = await apiGet<GmailStatus>(`/auth/gmail/status?user_id=${userId}`, {
         signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-        }
       })
       
       clearTimeout(timeoutId)
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
 
-      const data = await response.json()
-      
-      if (data.success) {
-        setGmailStatus(data.data)
+      if (data) {
+        setGmailStatus(data)
         setError(null)
-        if (data.data.connected) {
+        if (data.connected) {
           onConnected()
         }
       } else {
-        throw new Error(data.error || 'Failed to check Gmail status')
+        throw new Error('Failed to check Gmail status')
       }
     } catch (error) {
-      console.error('Error checking Gmail status:', error)
-      if (error.name === 'AbortError') {
+      if (import.meta.env.DEV) {
+        console.error('Error checking Gmail status:', error)
+      }
+      if (error instanceof Error && error.name === 'AbortError') {
         setError('Request timed out. Please check your connection.')
-        addToast('Connection timeout. Please try again.', 'error')
+        addToast({ type: 'error', title: 'Connection timeout. Please try again.' })
       } else {
         setError('Failed to check Gmail connection status')
-        addToast('Unable to check Gmail status. Please try again.', 'error')
+        addToast({ type: 'error', title: 'Unable to check Gmail status. Please try again.' })
       }
     }
   }, [userId, onConnected, addToast])
+
+  useEffect(() => {
+    checkGmailStatus()
+  }, [checkGmailStatus])
 
   const connectGmail = async () => {
     if (!userId || userId <= 0) {
@@ -88,9 +82,8 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
 
       // Use new proven OAuth endpoint - GET request with redirect parameter
       const redirectUri = '/onboarding-flow/sync'  // Will show sync progress step
-      const response = await fetch(`https://fikirisolutions.onrender.com/api/oauth/gmail/start?redirect=${encodeURIComponent(redirectUri)}`, {
+      const response = await fetch(`${config.apiUrl}/oauth/gmail/start?redirect=${encodeURIComponent(redirectUri)}`, {
         method: 'GET',
-        credentials: 'include', // Include session cookies for CSRF protection
         headers: {
           'Content-Type': 'application/json',
         },
@@ -114,42 +107,36 @@ export const GmailConnection: React.FC<GmailConnectionProps> = ({ userId, onConn
 
         // Redirect to Google OAuth
         window.location.href = data.url
-        addToast('Redirecting to Gmail authentication...', 'info')
+        addToast({ type: 'info', title: 'Redirecting to Gmail authentication...' })
       } else {
         throw new Error(data.error || 'Failed to initiate Gmail connection')
       }
     } catch (error) {
-      console.error('Error connecting Gmail:', error)
+      if (import.meta.env.DEV) {
+        console.error('Error connecting Gmail:', error)
+      }
       setIsConnecting(false)
       
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         setError('Request timed out. Please try again.')
-        addToast('Connection timeout. Please try again.', 'error')
+        addToast({ type: 'error', title: 'Connection timeout. Please try again.' })
       } else {
-        setError(error.message || 'Failed to connect Gmail. Please try again.')
-        addToast('Failed to connect Gmail. Please try again.', 'error')
+        setError(error instanceof Error ? error.message : 'Failed to connect Gmail. Please try again.')
+        addToast({ type: 'error', title: 'Failed to connect Gmail. Please try again.' })
       }
     }
   }
 
   const disconnectGmail = async () => {
     try {
-      const response = await fetch('https://fikirisolutions.onrender.com/api/auth/gmail/disconnect', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: userId
-        })
+      const data = await apiPost<any>('/auth/gmail/disconnect', {
+        user_id: userId
       })
-
-      const data = await response.json()
       
-      if (data.success) {
+      if (data) {
         setGmailStatus({ connected: false })
       } else {
-        throw new Error(data.error || 'Failed to disconnect Gmail')
+        throw new Error('Failed to disconnect Gmail')
       }
     } catch (error) {
       setError('Failed to disconnect Gmail. Please try again.')

@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowUp, ArrowDown, TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowUp, ArrowDown, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -27,9 +27,7 @@ export function EnhancedMetricCard({
   children,
   className = "",
   onClick,
-  compact = false,
-  color = 'blue',
-  trend = 'up'
+  compact = false
 }: MetricCardProps) {
   const formatValue = (val: string | number) => {
     if (typeof val === "number") {

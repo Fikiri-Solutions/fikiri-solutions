@@ -1,14 +1,6 @@
-import { useCallback } from 'react'
 import Particles from '@tsparticles/react'
-import { loadSlim } from '@tsparticles/slim'
-import type { Engine } from '@tsparticles/engine'
 
 export default function ParticleBackground() {
-  // Initialize particles engine
-  const particlesInit = useCallback(async (engine: Engine) => {
-    await loadSlim(engine)
-  }, [])
-
   // Particle configuration optimized for mobile
   const particlesConfig = {
     background: {
@@ -27,7 +19,9 @@ export default function ParticleBackground() {
           enable: true,
           mode: "repulse",
         },
-        resize: true,
+        resize: {
+          enable: true,
+        },
       },
       modes: {
         push: {
@@ -51,10 +45,10 @@ export default function ParticleBackground() {
         width: 1,
       },
       move: {
-        direction: "none",
+        direction: "none" as const,
         enable: true,
         outModes: {
-          default: "bounce",
+          default: "bounce" as const,
         },
         random: false,
         speed: 0.5,
@@ -118,7 +112,6 @@ export default function ParticleBackground() {
       />
       <Particles
         id="tsparticles"
-        init={particlesInit}
         options={particlesConfig}
         className="absolute inset-0 w-full h-full"
       />

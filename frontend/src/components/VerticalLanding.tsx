@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CheckCircle, Clock, Users, TrendingUp, Shield, Zap } from 'lucide-react';
+import { ArrowRight, CheckCircle, Zap } from 'lucide-react';
 
 interface VerticalLandingProps {
   industry: string;

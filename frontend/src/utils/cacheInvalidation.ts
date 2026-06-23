@@ -14,7 +14,6 @@
 
 import { config } from '../config'
 
-const CURRENT_APP_VERSION = config.version
 const CURRENT_BUILD_TIMESTAMP = config.buildTimestamp
 const CURRENT_CACHE_VERSION = config.cacheVersion
 
@@ -45,20 +44,28 @@ export class CacheInvalidationManager {
     const storedBuildTimestamp = localStorage.getItem('appBuildTimestamp')
 
     if (storedCacheVersion !== CURRENT_CACHE_VERSION || storedBuildTimestamp !== CURRENT_BUILD_TIMESTAMP) {
-      console.log('🚨 Cache mismatch detected! Clearing all client-side caches.')
+      if (import.meta.env.DEV) {
+        console.log('🚨 Cache mismatch detected! Clearing all client-side caches.')
+      }
       // Delay cache clearing to allow React app to render first
       setTimeout(() => {
         try {
           this.clearAllCaches()
           localStorage.setItem('appCacheVersion', CURRENT_CACHE_VERSION)
           localStorage.setItem('appBuildTimestamp', CURRENT_BUILD_TIMESTAMP)
-          console.log(`✅ New cache version stored: ${CURRENT_CACHE_VERSION} (${CURRENT_BUILD_TIMESTAMP})`)
+          if (import.meta.env.DEV) {
+            console.log(`✅ New cache version stored: ${CURRENT_CACHE_VERSION} (${CURRENT_BUILD_TIMESTAMP})`)
+          }
         } catch (error) {
-          console.error('Error during cache invalidation:', error)
+          if (import.meta.env.DEV) {
+            console.error('Error during cache invalidation:', error)
+          }
         }
       }, 2000) // Wait 2 seconds for React to fully render
     } else {
-      console.log('✅ Client-side cache is up to date.')
+      if (import.meta.env.DEV) {
+        console.log('✅ Client-side cache is up to date.')
+      }
     }
   }
 
@@ -71,17 +78,23 @@ export class CacheInvalidationManager {
     
     // Clear localStorage
     localStorage.clear()
-    console.log('  - localStorage cleared.')
+    if (import.meta.env.DEV) {
+      console.log('  - localStorage cleared.')
+    }
 
     // Restore theme preference
     if (themePreference) {
       localStorage.setItem('fikiri-theme', themePreference)
-      console.log('  - Theme preference restored.')
+      if (import.meta.env.DEV) {
+        console.log('  - Theme preference restored.')
+      }
     }
 
     // Clear sessionStorage
     sessionStorage.clear()
-    console.log('  - sessionStorage cleared.')
+    if (import.meta.env.DEV) {
+      console.log('  - sessionStorage cleared.')
+    }
 
     // Clear IndexedDB (if used)
     if (window.indexedDB) {
@@ -89,10 +102,16 @@ export class CacheInvalidationManager {
         dbs.forEach(db => {
           if (db.name) {
             indexedDB.deleteDatabase(db.name)
-            console.log(`  - IndexedDB database '${db.name}' deleted.`)
+            if (import.meta.env.DEV) {
+              console.log(`  - IndexedDB database '${db.name}' deleted.`)
+            }
           }
         })
-      }).catch(error => console.error('Error clearing IndexedDB:', error))
+      }).catch(error => {
+        if (import.meta.env.DEV) {
+          console.error('Error clearing IndexedDB:', error)
+        }
+      })
     }
 
     // Clear Service Worker caches
@@ -100,13 +119,21 @@ export class CacheInvalidationManager {
       caches.keys().then(cacheNames => {
         cacheNames.forEach(cacheName => {
           caches.delete(cacheName)
-          console.log(`  - Service Worker cache '${cacheName}' deleted.`)
+          if (import.meta.env.DEV) {
+            console.log(`  - Service Worker cache '${cacheName}' deleted.`)
+          }
         })
-      }).catch(error => console.error('Error clearing Service Worker caches:', error))
+      }).catch(error => {
+        if (import.meta.env.DEV) {
+          console.error('Error clearing Service Worker caches:', error)
+        }
+      })
     }
 
     // Don't reload immediately - let the app render first
-    console.log('  - Cache cleared. App will continue loading.')
+    if (import.meta.env.DEV) {
+      console.log('  - Cache cleared. App will continue loading.')
+    }
   }
 
   /**

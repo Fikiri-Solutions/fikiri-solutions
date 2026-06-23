@@ -2,16 +2,15 @@ import React, { useState } from 'react'
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area, Legend,
-  ReferenceLine, Brush
+  Brush
 } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/Button"
 import { 
   TrendingUp, TrendingDown, BarChart3, PieChart as PieChartIcon, 
-  Calendar, Filter, Download, Maximize2, RefreshCw, Eye, EyeOff
+  Filter, Download, Maximize2, Eye, EyeOff
 } from 'lucide-react'
-import { cn } from "@/lib/utils"
 
 interface ChartData {
   name: string
@@ -41,15 +40,7 @@ const COLORS = {
   info: '#06B6D4'
 }
 
-const GRADIENT_COLORS = [
-  { start: '#3B82F6', end: '#1D4ED8' },
-  { start: '#22C55E', end: '#16A34A' },
-  { start: '#F59E0B', end: '#D97706' },
-  { start: '#EF4444', end: '#DC2626' },
-  { start: '#8B5CF6', end: '#7C3AED' }
-]
-
-export const EnhancedDashboardCharts: React.FC<DashboardChartsProps> = ({ data, pieData = [] }) => {
+export const EnhancedDashboardCharts: React.FC<DashboardChartsProps> = ({ data }) => {
   const [activeChart, setActiveChart] = useState<'line' | 'bar' | 'area'>('line')
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('7d')
   const [showLegend, setShowLegend] = useState(true)

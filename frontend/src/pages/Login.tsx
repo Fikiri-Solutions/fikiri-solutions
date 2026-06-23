@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useTransition } from 'react'
 import { Mail, Lock, ArrowRight, Zap, Shield, Rocket, Github, Chrome, UserPlus, Eye, EyeOff, Building2 } from 'lucide-react'
 import { useUserActivityTracking } from '../contexts/ActivityContext'
-import { useAuth, useAuthActions } from '../store/auth'
-import { authApi } from '../lib/api'
+import { useAuthActions } from '../store/auth'
+import { apiPost, authApi } from '../lib/api'
 import { FikiriLogo } from '../components/FikiriLogo'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
@@ -10,7 +10,6 @@ import { useNavigate } from 'react-router-dom'
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [emailError, setEmailError] = useState('')
   const [passwordError, setPasswordError] = useState('')
@@ -23,21 +22,22 @@ export const Login: React.FC = () => {
   const { login, setError: setAuthError, clearError } = useAuthActions()
   const navigate = useNavigate()
 
-  // Load saved credentials on component mount
+  // Load saved email on component mount. Never persist or restore passwords.
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
         const savedEmail = localStorage.getItem('fikiri-remember-email')
-        const savedPassword = localStorage.getItem('fikiri-remember-password')
         const savedRememberMe = localStorage.getItem('fikiri-remember-me')
+        localStorage.removeItem('fikiri-remember-password')
         
-        if (savedEmail && savedPassword && savedRememberMe === 'true') {
+        if (savedEmail && savedRememberMe === 'true') {
           setEmail(savedEmail)
-          setPassword(savedPassword)
           setRememberMe(true)
         }
       } catch (error) {
-        console.error('Error loading saved credentials:', error)
+        if (import.meta.env.DEV) {
+          console.error('Error loading saved credentials:', error)
+        }
       }
     }
   }, [])
@@ -103,22 +103,24 @@ export const Login: React.FC = () => {
         const result = await authApi.login(email, password)
         
         // Update auth state
-        login(result.user, result.access_token)
+        login(result.user, result.access_token, result.refresh_token)
         
         // Handle remember me functionality
         if (typeof window !== 'undefined') {
           try {
             if (rememberMe) {
               localStorage.setItem('fikiri-remember-email', email)
-              localStorage.setItem('fikiri-remember-password', password)
               localStorage.setItem('fikiri-remember-me', 'true')
+              localStorage.removeItem('fikiri-remember-password')
             } else {
               localStorage.removeItem('fikiri-remember-email')
               localStorage.removeItem('fikiri-remember-password')
               localStorage.removeItem('fikiri-remember-me')
             }
           } catch (error) {
-            console.error('Error saving credentials:', error)
+            if (import.meta.env.DEV) {
+              console.error('Error saving credentials:', error)
+            }
           }
         }
         
@@ -161,15 +163,7 @@ export const Login: React.FC = () => {
       }
       
       // Call Microsoft connect endpoint
-      const response = await fetch('https://fikirisolutions.onrender.com/api/auth/microsoft/connect', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ user_id: userId })
-      })
-      
-      const data = await response.json()
+      const data = await apiPost<any>('/auth/microsoft/connect', { user_id: userId })
       
       if (data.success && data.auth_url) {
         // Track Microsoft login attempt

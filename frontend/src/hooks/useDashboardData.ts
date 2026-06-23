@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '../services/apiClient';
+import { apiClient } from '../lib/api';
 
 // Dashboard metrics with real-time data
 export function useDashboardMetrics() {

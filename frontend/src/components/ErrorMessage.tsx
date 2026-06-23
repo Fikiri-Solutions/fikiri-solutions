@@ -1,5 +1,5 @@
 import React from 'react'
-import { AlertCircle, CheckCircle, Info, X } from 'lucide-react'
+import { AlertCircle, CheckCircle, Info, X, RefreshCw } from 'lucide-react'
 
 export type ErrorType = 'error' | 'warning' | 'info' | 'success'
 
@@ -8,6 +8,7 @@ interface ErrorMessageProps {
   title: string
   message: string
   onDismiss?: () => void
+  onRetry?: () => void
   className?: string
 }
 
@@ -47,6 +48,7 @@ export const ErrorMessage: React.FC<ErrorMessageProps> = ({
   title,
   message,
   onDismiss,
+  onRetry,
   className = ''
 }) => {
   const config = errorConfig[type]
@@ -63,15 +65,36 @@ export const ErrorMessage: React.FC<ErrorMessageProps> = ({
           <p className={`text-sm ${config.textColor} mt-1`}>
             {message}
           </p>
+          {onRetry && (
+            <button
+              onClick={onRetry}
+              className={`mt-3 inline-flex items-center space-x-2 px-3 py-1.5 text-sm font-medium ${config.textColor} border ${config.borderColor} rounded-md hover:opacity-80 transition-opacity`}
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span>Retry</span>
+            </button>
+          )}
         </div>
-        {onDismiss && (
-          <button
-            onClick={onDismiss}
-            className={`ml-3 flex-shrink-0 ${config.textColor} hover:opacity-75`}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
+        <div className="flex items-center space-x-2 ml-3">
+          {onRetry && (
+            <button
+              onClick={onRetry}
+              className={`flex-shrink-0 ${config.textColor} hover:opacity-75 p-1`}
+              title="Retry"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          )}
+          {onDismiss && (
+            <button
+              onClick={onDismiss}
+              className={`flex-shrink-0 ${config.textColor} hover:opacity-75 p-1`}
+              title="Dismiss"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

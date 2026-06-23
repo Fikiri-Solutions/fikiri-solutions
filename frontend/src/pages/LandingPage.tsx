@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useState } from 'react'
 import { useInView } from 'react-intersection-observer'
 import { motion } from 'framer-motion'
 import { 
@@ -92,19 +92,12 @@ const LandingPage: React.FC = () => {
     "24/7 customer support"
   ]
 
-  // Refs for scroll-triggered animations
-  const heroRef = useRef(null)
-  const valuePropsRef = useRef(null)
-  const howItWorksRef = useRef(null)
-  const testimonialsRef = useRef(null)
-  const ctaRef = useRef(null)
-
   // Check if elements are in view
-  const heroInView = useInView(heroRef, { once: true, margin: "-100px" })
-  const valuePropsInView = useInView(valuePropsRef, { once: true, margin: "-100px" })
-  const howItWorksInView = useInView(howItWorksRef, { once: true, margin: "-100px" })
-  const testimonialsInView = useInView(testimonialsRef, { once: true, margin: "-100px" })
-  const ctaInView = useInView(ctaRef, { once: true, margin: "-100px" })
+  const { ref: heroRef, inView: heroInView } = useInView({ triggerOnce: true, rootMargin: "-100px" })
+  const { ref: valuePropsRef, inView: valuePropsInView } = useInView({ triggerOnce: true, rootMargin: "-100px" })
+  const { ref: howItWorksRef, inView: howItWorksInView } = useInView({ triggerOnce: true, rootMargin: "-100px" })
+  const { ref: testimonialsRef, inView: testimonialsInView } = useInView({ triggerOnce: true, rootMargin: "-100px" })
+  const { ref: ctaRef, inView: ctaInView } = useInView({ triggerOnce: true, rootMargin: "-100px" })
 
   // Simple navigation handlers without router
   const handleGetStarted = () => {

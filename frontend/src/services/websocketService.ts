@@ -14,6 +14,7 @@ class WebSocketService {
 
   constructor() {
     // Disabled for now - backend doesn't support WebSocket yet
+    void this.connect
     // this.connect()
   }
 
@@ -44,7 +45,7 @@ class WebSocketService {
         this.isConnected = false
       })
 
-      this.socket.on('connect_error', (error) => {
+      this.socket.on('connect_error', (_error) => {
         // WebSocket connection error
         this.reconnectAttempts++
         
@@ -70,11 +71,11 @@ class WebSocketService {
         window.dispatchEvent(new CustomEvent('activityUpdate', { detail: data }))
       })
 
-      this.socket.on('error', (error) => {
+      this.socket.on('error', (_error) => {
         // WebSocket error
       })
 
-    } catch (error) {
+    } catch (_error) {
       // Failed to initialize WebSocket
     }
   }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Shield, Download, Trash2, Settings, AlertTriangle, CheckCircle, Clock, Database } from 'lucide-react'
+import { ApiError, apiGet, apiPost, apiPut } from '../lib/api'
 
 interface PrivacySettings {
   data_retention_days: number
@@ -57,28 +58,16 @@ export const PrivacySettings: React.FC = () => {
       setIsLoading(true)
       
       // Load privacy settings
-      const settingsResponse = await fetch(`https://fikirisolutions.onrender.com/api/privacy/settings?user_id=${userId}`)
-      const settingsData = await settingsResponse.json()
-      
-      if (settingsData.success) {
-        setSettings(settingsData.data)
-      }
+      const settingsData = await apiGet<PrivacySettings>(`/privacy/settings?user_id=${userId}`)
+      setSettings(settingsData)
 
       // Load data summary
-      const summaryResponse = await fetch(`https://fikirisolutions.onrender.com/api/privacy/data-summary?user_id=${userId}`)
-      const summaryData = await summaryResponse.json()
-      
-      if (summaryData.success) {
-        setDataSummary(summaryData.data)
-      }
+      const summaryData = await apiGet<DataSummary>(`/privacy/data-summary?user_id=${userId}`)
+      setDataSummary(summaryData)
 
       // Load consents
-      const consentsResponse = await fetch(`https://fikirisolutions.onrender.com/api/privacy/consents?user_id=${userId}`)
-      const consentsData = await consentsResponse.json()
-      
-      if (consentsData.success) {
-        setConsents(consentsData.data.consents)
-      }
+      const consentsData = await apiGet<{ consents: PrivacyConsent[] }>(`/privacy/consents?user_id=${userId}`)
+      setConsents(consentsData.consents)
 
     } catch (error) {
       setError('Failed to load privacy data')
@@ -94,28 +83,15 @@ export const PrivacySettings: React.FC = () => {
       setIsLoading(true)
       setError(null)
 
-      const response = await fetch('https://fikirisolutions.onrender.com/api/privacy/settings', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: parseInt(userId),
-          [key]: value
-        })
+      const data = await apiPut<{ settings: PrivacySettings }>('/privacy/settings', {
+        user_id: parseInt(userId),
+        [key]: value
       })
-
-      const data = await response.json()
-      
-      if (data.success) {
-        setSettings(data.data.settings)
-        setSuccess('Privacy settings updated successfully')
-        setTimeout(() => setSuccess(null), 3000)
-      } else {
-        setError(data.error || 'Failed to update settings')
-      }
+      setSettings(data.settings)
+      setSuccess('Privacy settings updated successfully')
+      setTimeout(() => setSuccess(null), 3000)
     } catch (error) {
-      setError('Failed to update privacy settings')
+      setError(error instanceof ApiError ? error.message : 'Failed to update privacy settings')
     } finally {
       setIsLoading(false)
     }
@@ -128,27 +104,14 @@ export const PrivacySettings: React.FC = () => {
       setIsLoading(true)
       setError(null)
 
-      const response = await fetch('https://fikirisolutions.onrender.com/api/privacy/cleanup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: parseInt(userId)
-        })
+      const data = await apiPost<{ total_deleted: number }>('/privacy/cleanup', {
+        user_id: parseInt(userId)
       })
-
-      const data = await response.json()
-      
-      if (data.success) {
-        setSuccess(`Data cleanup completed. ${data.data.total_deleted} records deleted.`)
-        setTimeout(() => setSuccess(null), 5000)
-        loadPrivacyData() // Reload data summary
-      } else {
-        setError(data.error || 'Failed to cleanup data')
-      }
+      setSuccess(`Data cleanup completed. ${data.total_deleted} records deleted.`)
+      setTimeout(() => setSuccess(null), 5000)
+      loadPrivacyData() // Reload data summary
     } catch (error) {
-      setError('Failed to cleanup expired data')
+      setError(error instanceof ApiError ? error.message : 'Failed to cleanup expired data')
     } finally {
       setIsLoading(false)
     }
@@ -161,28 +124,22 @@ export const PrivacySettings: React.FC = () => {
       setIsLoading(true)
       setError(null)
 
-      const response = await fetch(`https://fikirisolutions.onrender.com/api/privacy/export?user_id=${userId}`)
-      const data = await response.json()
+      const data = await apiGet<any>(`/privacy/export?user_id=${userId}`)
+      // Download the data as JSON file
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `fikiri-data-export-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
       
-      if (data.success) {
-        // Download the data as JSON file
-        const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `fikiri-data-export-${new Date().toISOString().split('T')[0]}.json`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-        
-        setSuccess('Data exported successfully')
-        setTimeout(() => setSuccess(null), 3000)
-      } else {
-        setError(data.error || 'Failed to export data')
-      }
+      setSuccess('Data exported successfully')
+      setTimeout(() => setSuccess(null), 3000)
     } catch (error) {
-      setError('Failed to export user data')
+      setError(error instanceof ApiError ? error.message : 'Failed to export user data')
     } finally {
       setIsLoading(false)
     }
@@ -195,30 +152,17 @@ export const PrivacySettings: React.FC = () => {
       setIsLoading(true)
       setError(null)
 
-      const response = await fetch('https://fikirisolutions.onrender.com/api/privacy/delete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: parseInt(userId),
-          confirmation: deleteConfirmation
-        })
+      await apiPost('/privacy/delete', {
+        user_id: parseInt(userId),
+        confirmation: deleteConfirmation
       })
-
-      const data = await response.json()
-      
-      if (data.success) {
-        setSuccess('All your data has been deleted successfully')
-        setTimeout(() => {
-          localStorage.clear()
-          window.location.href = '/login'
-        }, 3000)
-      } else {
-        setError(data.error || 'Failed to delete data')
-      }
+      setSuccess('All your data has been deleted successfully')
+      setTimeout(() => {
+        localStorage.clear()
+        window.location.href = '/login'
+      }, 3000)
     } catch (error) {
-      setError('Failed to delete user data')
+      setError(error instanceof ApiError ? error.message : 'Failed to delete user data')
     } finally {
       setIsLoading(false)
       setShowDeleteConfirm(false)

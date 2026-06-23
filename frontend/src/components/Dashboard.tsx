@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Mail, Users, Zap, TrendingUp, ArrowRight, Plus, Clock, CheckCircle, AlertCircle } from 'lucide-react'
+import { Mail, Users, Zap, ArrowRight, AlertCircle } from 'lucide-react'
+import { apiGet, apiPost } from '../lib/api'
 
 interface DashboardData {
   leads_count: number
@@ -40,27 +41,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
   const loadDashboardData = async () => {
     try {
       // Load CRM data
-      const crmResponse = await fetch(`https://fikirisolutions.onrender.com/api/crm/leads?user_id=${userId}`)
-      const crmData = await crmResponse.json()
+      const crmData = await apiGet<any>(`/crm/leads?user_id=${userId}`)
 
       // Load analytics data
-      const analyticsResponse = await fetch(`https://fikirisolutions.onrender.com/api/privacy/data-summary?user_id=${userId}`)
-      const analyticsData = await analyticsResponse.json()
+      const analyticsData = await apiGet<any>(`/privacy/data-summary?user_id=${userId}`)
 
       // Load Gmail status
-      const gmailResponse = await fetch(`https://fikirisolutions.onrender.com/api/auth/gmail/status?user_id=${userId}`)
-      const gmailData = await gmailResponse.json()
+      const gmailData = await apiGet<any>(`/auth/gmail/status?user_id=${userId}`)
 
-      if (crmData.success && analyticsData.success) {
+      if (crmData && analyticsData) {
         setDashboardData({
-          leads_count: crmData.data.total_count,
-          activities_count: analyticsData.data.activities_count,
-          sync_records_count: analyticsData.data.sync_records_count,
-          recent_leads: crmData.data.leads.slice(0, 5),
+          leads_count: crmData.total_count,
+          activities_count: analyticsData.activities_count,
+          sync_records_count: analyticsData.sync_records_count,
+          recent_leads: (crmData.leads || []).slice(0, 5),
           unread_emails: 0, // This would come from email parser
           automations_executed: 0, // This would come from automation engine
-          gmail_connected: gmailData.success && gmailData.data.connected,
-          last_sync: analyticsData.data.privacy_settings?.updated_at || 'Never'
+          gmail_connected: Boolean(gmailData?.connected),
+          last_sync: analyticsData.privacy_settings?.updated_at || 'Never'
         })
       }
     } catch (error) {
@@ -73,21 +71,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
   const askAI = async (question: string) => {
     setIsAiLoading(true)
     try {
-      const response = await fetch('https://fikirisolutions.onrender.com/api/ai/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          message: question
-        })
+      const data = await apiPost<any>('/ai/chat', {
+        user_id: userId,
+        message: question
       })
-
-      const data = await response.json()
       
-      if (data.success) {
-        setAiResponse(data.data.response)
+      if (data?.response) {
+        setAiResponse(data.response)
       } else {
         setAiResponse('I apologize, but I encountered an issue processing your request.')
       }
