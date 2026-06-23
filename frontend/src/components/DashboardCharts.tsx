@@ -2,8 +2,10 @@ import React from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts'
 
 interface ChartData {
+  [key: string]: string | number | undefined
   name: string
   value: number
+  color?: string
   emails?: number
   leads?: number
   responses?: number
@@ -21,6 +23,8 @@ interface DashboardChartsProps {
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
 
 export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, pieData = [] }) => {
+  const serviceDistributionData: ChartData[] = pieData.length > 0 ? pieData : data
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Email Trends Chart */}
@@ -132,7 +136,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, pieData 
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
-                data={pieData.length > 0 ? pieData : data}
+                data={serviceDistributionData}
                 cx="50%"
                 cy="50%"
                 labelLine={false}
@@ -142,14 +146,14 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, pieData 
                 dataKey="value"
                 animationDuration={300}
               >
-                {(pieData.length > 0 ? pieData : data).map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
-                    fill={pieData.length > 0 ? entry.color : COLORS[index % COLORS.length]} 
+                {serviceDistributionData.map((entry, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={entry.color || COLORS[index % COLORS.length]}
                   />
                 ))}
               </Pie>
-              <Tooltip 
+              <Tooltip
                 contentStyle={{
                   backgroundColor: 'white',
                   border: '1px solid #e5e7eb',
