@@ -23,12 +23,12 @@
     "axios": "^1.16.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^1.2.1",
-    "dompurify": "^3.4.2",
+    "dompurify": "^3.4.11",
     "lucide-react": "^0.263.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-helmet-async": "^2.0.5",
-    "react-router-dom": "^6.30.3",
+    "react-router-dom": "^6.30.4",
     "recharts": "^3.2.0",
     "socket.io-client": "^4.8.3",
     "tailwind-merge": "^1.14.0",
@@ -104,6 +104,10 @@
     "k6:stress": "cd .. && mkdir -p k6-results && API_BASE_URL=http://localhost:5000 k6 run scripts/k6-stress-test.js",
     "k6:steady": "cd .. && mkdir -p k6-results && API_BASE_URL=http://localhost:5000 k6 run scripts/k6-steady-automations.js",
     "k6:perf": "cd .. && mkdir -p k6-results && API_BASE_URL=http://localhost:5000 k6 run scripts/k6-performance-test.js"
+  },
+  "overrides": {
+    "form-data": "4.0.6",
+    "ws": "8.21.0"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
