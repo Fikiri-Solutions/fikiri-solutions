@@ -2394,6 +2394,18 @@ class DatabaseOptimizer:
             return f"({self._pg_ts(column_expr)} < CURRENT_TIMESTAMP)"
         return f"(datetime({column_expr}) < datetime('now'))"
 
+    def sql_scheduled_at_due(self, column_expr: str = "scheduled_at") -> str:
+        """True when a job scheduled_at is null or not in the future (ISO-safe on SQLite)."""
+        if self.db_type == "postgresql":
+            return (
+                f"({column_expr} IS NULL OR "
+                f"({self._pg_ts(column_expr)} <= CURRENT_TIMESTAMP))"
+            )
+        return (
+            f"({column_expr} IS NULL OR "
+            f"datetime({column_expr}) <= datetime('now'))"
+        )
+
     def sql_column_newer_than_n_hours_ago(self, column_expr: str, hours: int) -> str:
         """True when column is strictly after (current time - hours). SQLite vs PostgreSQL."""
         h = max(1, int(hours))

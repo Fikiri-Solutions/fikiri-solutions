@@ -544,12 +544,39 @@ class TestAuthRoutes(unittest.TestCase):
     @patch('routes.auth.db_optimizer')
     def test_reset_password_success(self, mock_db, mock_user_auth, mock_log, mock_rate):
         mock_rate.check_rate_limit.return_value = type("R", (), {"allowed": True, "retry_after": 0, "limit": 10, "remaining": 9})()
-        mock_db.execute_query.return_value = [{'id': 1, 'email': 'a@b.com', 'metadata': {}}]
+        mock_db.execute_query.return_value = [{
+            'id': 1,
+            'email': 'a@b.com',
+            'metadata': json.dumps({
+                'reset_token': 't',
+                'reset_token_expires': int(time.time()) + 3600,
+            }),
+        }]
         mock_user_auth.reset_user_password.return_value = {'success': True}
         response = self.client.post('/api/auth/reset-password', json={'token': 't', 'new_password': 'Password123!'})
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
         self.assertTrue(data.get('success'))
+
+    @patch('core.rate_limiter.enhanced_rate_limiter')
+    @patch('routes.auth.db_optimizer')
+    def test_reset_password_expired_token(self, mock_db, mock_rate):
+        mock_rate.check_rate_limit.return_value = type("R", (), {"allowed": True, "retry_after": 0, "limit": 10, "remaining": 9})()
+        mock_db.execute_query.side_effect = [
+            [{
+                'id': 1,
+                'email': 'a@b.com',
+                'metadata': json.dumps({
+                    'reset_token': 't',
+                    'reset_token_expires': int(time.time()) - 60,
+                }),
+            }],
+            None,
+        ]
+        response = self.client.post('/api/auth/reset-password', json={'token': 't', 'new_password': 'Password123!'})
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.data)
+        self.assertEqual(data.get('code'), 'INVALID_TOKEN')
 
     @patch('core.rate_limiter.enhanced_rate_limiter')
     def test_reset_rate_limit_success(self, mock_rate):

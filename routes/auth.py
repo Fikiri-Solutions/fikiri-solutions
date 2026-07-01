@@ -8,6 +8,7 @@ from flask import Blueprint, request, jsonify, redirect, session
 from werkzeug.exceptions import BadRequest
 from functools import wraps
 import time
+import json
 import threading
 import logging
 import os
@@ -526,16 +527,41 @@ def api_reset_password():
     
     if not user_data:
         return create_error_response("Invalid or expired reset token", 400, 'INVALID_TOKEN')
+
+    user_row = user_data[0]
+    if hasattr(user_row, 'keys'):
+        user_dict = dict(user_row)
+    else:
+        user_dict = user_row
+
+    from core.user_auth import _parse_metadata_value
+    metadata = _parse_metadata_value(user_dict.get('metadata'))
+    expires = metadata.get('reset_token_expires')
+    try:
+        expires_int = int(expires) if expires is not None else None
+    except (TypeError, ValueError):
+        expires_int = None
+
+    if not expires_int or int(time.time()) >= expires_int:
+        stale_metadata = metadata.copy()
+        stale_metadata.pop('reset_token', None)
+        stale_metadata.pop('reset_token_expires', None)
+        db_optimizer.execute_query(
+            "UPDATE users SET metadata = ? WHERE id = ?",
+            (json.dumps(stale_metadata), user_dict['id']),
+            fetch=False,
+        )
+        return create_error_response("Invalid or expired reset token", 400, 'INVALID_TOKEN')
     
     try:
         # Update user password
-        result = user_auth_manager.reset_user_password(user_data[0]['id'], new_passphrase)
+        result = user_auth_manager.reset_user_password(user_dict['id'], new_passphrase)
         
         if result['success']:
             log_security_event(
                 event_type="password_reset_completed",
                 severity="info",
-                details={"user_id": user_data[0]['id'], "email": user_data[0]['email']}
+                details={"user_id": user_dict['id'], "email": user_dict['email']}
             )
             return create_success_response({"message": "Password reset successfully"}, "Password updated")
         else:

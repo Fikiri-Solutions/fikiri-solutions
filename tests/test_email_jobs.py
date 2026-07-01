@@ -73,6 +73,20 @@ class TestEmailJobManager:
         assert mgr.redis_client is None
         assert mgr.queue_name == "fikiri:email:jobs"
 
+    @patch("email_automation.jobs.EmailJobManager._initialize_tables")
+    @patch("email_automation.jobs.db_optimizer")
+    def test_process_job_by_id_uses_iso_safe_scheduled_at_predicate(self, mock_db, _mock_init):
+        mock_db.sql_scheduled_at_due.return_value = (
+            "(scheduled_at IS NULL OR datetime(scheduled_at) <= datetime('now'))"
+        )
+        mock_db.execute_query.side_effect = [[], []]
+        from email_automation.jobs import EmailJobManager
+        mgr = EmailJobManager()
+        mgr.process_job_by_id("job-1")
+        first_query = mock_db.execute_query.call_args_list[0][0][0]
+        assert "datetime(scheduled_at)" in first_query
+        mock_db.sql_scheduled_at_due.assert_called_with("scheduled_at")
+
     @patch("email_automation.jobs.db_optimizer")
     def test_queue_welcome_email_returns_job_id(self, mock_db):
         mock_db.execute_query.return_value = None

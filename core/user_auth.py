@@ -15,6 +15,22 @@ from core.database_optimization import db_optimizer
 
 logger = logging.getLogger(__name__)
 
+
+def _normalize_email(email: str) -> str:
+    return (email or "").strip().lower()
+
+
+def _parse_metadata_value(raw_metadata: Any) -> Dict[str, Any]:
+    if isinstance(raw_metadata, str):
+        try:
+            return json.loads(raw_metadata or "{}") if raw_metadata else {}
+        except Exception:
+            return {}
+    if isinstance(raw_metadata, dict):
+        return raw_metadata
+    return {}
+
+
 # PBKDF2 is CPU-heavy; under Gunicorn+gevent it must not run on the main greenlet or the hub
 # stalls (slow signup, health checks, and other requests appear wedged).
 _PBKDF2_ITERATIONS = 100_000
@@ -147,10 +163,14 @@ class UserAuthManager:
                    industry: str = None, team_size: str = None) -> Dict[str, Any]:
         """Create a new user account"""
         try:
+            email = _normalize_email(email)
+            if business_email:
+                business_email = _normalize_email(business_email)
+
             # Check if user already exists
             existing_user = db_optimizer.execute_query(
-                "SELECT id FROM users WHERE email = ?",
-                (email,)
+                "SELECT id FROM users WHERE LOWER(email) = ?",
+                (email,),
             )
             
             if existing_user:
@@ -229,10 +249,12 @@ class UserAuthManager:
                          ip_address: str = None, user_agent: str = None) -> Dict[str, Any]:
         """Authenticate user login"""
         try:
+            email = _normalize_email(email)
+
             # Get user data (rulepack compliance: specific columns, including password_hash for auth)
             active = db_optimizer.sql_cast_int_eq_one("is_active")
             user_data = db_optimizer.execute_query(
-                f"SELECT id, email, name, password_hash, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE email = ? AND {active}",
+                f"SELECT id, email, name, password_hash, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE LOWER(email) = ? AND {active}",
                 (email,),
             )
             
@@ -474,10 +496,12 @@ class UserAuthManager:
     def request_password_reset(self, email: str) -> Dict[str, Any]:
         """Request password reset for user"""
         try:
+            email = _normalize_email(email)
+
             # Check if user exists
             active = db_optimizer.sql_cast_int_eq_one("is_active")
             user_data = db_optimizer.execute_query(
-                f"SELECT id, email, name FROM users WHERE email = ? AND {active}",
+                f"SELECT id, email, name, metadata FROM users WHERE LOWER(email) = ? AND {active}",
                 (email,),
             )
             
@@ -488,13 +512,17 @@ class UserAuthManager:
                     'message': 'If an account exists, a reset link has been sent'
                 }
             
-            user = user_data[0]
-            
+            user_row = user_data[0]
+            if hasattr(user_row, 'keys'):
+                user = dict(user_row)
+            else:
+                user = user_row
+
             # Generate reset token
             reset_token = secrets.token_urlsafe(32)
             
-            # Store reset token in user metadata
-            metadata = json.loads(user.get('metadata', '{}'))
+            # Merge reset token into existing metadata (preserve password salt, etc.)
+            metadata = _parse_metadata_value(user.get('metadata'))
             metadata['reset_token'] = reset_token
             metadata['reset_token_expires'] = int(time.time()) + 3600  # 1 hour
             
@@ -504,13 +532,29 @@ class UserAuthManager:
                 fetch=False
             )
             
-            # Queue password reset email
+            # Queue password reset email and attempt in-process delivery
             from email_automation.jobs import email_job_manager
-            email_job_manager.queue_password_reset_email(
+            job_id = email_job_manager.queue_password_reset_email(
                 email=email,
                 reset_token=reset_token,
                 name=user.get('name', 'User')
             )
+            if job_id:
+                try:
+                    sent = email_job_manager.process_job_by_id(job_id)
+                    if not sent:
+                        logger.warning(
+                            "Password reset email job %s was not sent (check SMTP / email_jobs)",
+                            job_id,
+                        )
+                except Exception as send_exc:
+                    logger.error(
+                        "Password reset email send failed for job %s: %s",
+                        job_id,
+                        send_exc,
+                    )
+            else:
+                logger.error("Failed to queue password reset email for %s", email)
             
             logger.info(f"Password reset requested for {email}")
             

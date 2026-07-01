@@ -7,10 +7,12 @@ import unittest
 from unittest.mock import patch, MagicMock
 import sys
 import os
+import json
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.user_auth import UserAuthManager
+from core.user_auth import UserAuthManager, _normalize_email
 
 
 class TestUserAuthManager(unittest.TestCase):
@@ -42,6 +44,42 @@ class TestUserAuthManager(unittest.TestCase):
         result = self.manager.create_user("test@example.com", "Password123!", "Test")
         self.assertFalse(result.get('success'))
         self.assertEqual(result.get('error_code'), 'USER_EXISTS')
+
+    def test_normalize_email_strips_and_lowercases(self):
+        self.assertEqual(_normalize_email("  User@Example.COM  "), "user@example.com")
+
+    @patch('email_automation.jobs.email_job_manager')
+    @patch('core.user_auth.db_optimizer')
+    def test_request_password_reset_preserves_metadata_salt(self, mock_db, mock_email_mgr):
+        existing_salt = "abc123salt"
+        mock_db.execute_query.side_effect = [
+            [{'id': 7, 'email': 'user@example.com', 'name': 'User', 'metadata': json.dumps({'salt': existing_salt})}],
+            None,
+        ]
+        mock_email_mgr.queue_password_reset_email.return_value = "reset_job_1"
+        mock_email_mgr.process_job_by_id.return_value = 1
+
+        result = self.manager.request_password_reset("User@Example.COM")
+
+        self.assertTrue(result.get('success'))
+        update_call = mock_db.execute_query.call_args_list[1]
+        updated_metadata = json.loads(update_call[0][1][0])
+        self.assertEqual(updated_metadata.get('salt'), existing_salt)
+        self.assertIn('reset_token', updated_metadata)
+        self.assertIn('reset_token_expires', updated_metadata)
+        mock_email_mgr.queue_password_reset_email.assert_called_once()
+        mock_email_mgr.process_job_by_id.assert_called_once_with("reset_job_1")
+
+    @patch('core.user_auth.db_optimizer')
+    def test_authenticate_user_uses_case_insensitive_lookup(self, mock_db):
+        mock_db.sql_cast_int_eq_one.return_value = "is_active = 1"
+        mock_db.execute_query.return_value = []
+
+        self.manager.authenticate_user("User@Example.COM", "Password123!")
+
+        query_sql = mock_db.execute_query.call_args[0][0]
+        self.assertIn("LOWER(email)", query_sql)
+        self.assertEqual(mock_db.execute_query.call_args[0][1], ("user@example.com",))
 
     @patch.object(UserAuthManager, 'revoke_all_user_sessions')
     @patch('core.user_auth.db_optimizer')

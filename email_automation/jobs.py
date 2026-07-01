@@ -478,16 +478,14 @@ class EmailJobManager:
         if not EMAIL_AVAILABLE:
             logger.warning("Email functionality not available")
             return 0
+        due_sql = db_optimizer.sql_scheduled_at_due("scheduled_at")
         rows = db_optimizer.execute_query(
-            """
+            f"""
             SELECT id, type, recipient, subject, template, data, priority, status, created_at, scheduled_at, sent_at, attempts, max_attempts, error_message, metadata
             FROM email_jobs
             WHERE id = ?
             AND status = 'pending'
-            AND (
-                scheduled_at IS NULL
-                OR scheduled_at <= CURRENT_TIMESTAMP
-            )
+            AND {due_sql}
             """,
             (job_id,),
         )
@@ -525,15 +523,13 @@ class EmailJobManager:
         processed = 0
 
         try:
+            due_sql = db_optimizer.sql_scheduled_at_due("scheduled_at")
             jobs = db_optimizer.execute_query(
-                """
+                f"""
                 SELECT id, type, recipient, subject, template, data, priority, status, created_at, scheduled_at, sent_at, attempts, max_attempts, error_message, metadata
                 FROM email_jobs
                 WHERE status = 'pending'
-                AND (
-                    scheduled_at IS NULL
-                    OR scheduled_at <= CURRENT_TIMESTAMP
-                )
+                AND {due_sql}
                 ORDER BY priority ASC, created_at ASC
                 LIMIT ?
                 """,
