@@ -1,6 +1,6 @@
 import React from 'react';
 import { VerticalLanding } from '../components/VerticalLanding';
-import { PublicChatbotWidget } from '../components/PublicChatbotWidget';
+import { MarketingChatWidget } from '../components/MarketingChatWidget';
 
 export const RestaurantLanding: React.FC = () => {
   return (
@@ -66,7 +66,7 @@ export const RestaurantLanding: React.FC = () => {
       ctaText="Boost Your Restaurant Revenue"
       ctaLink="/signup?industry=restaurant"
     />
-    <PublicChatbotWidget />
+    <MarketingChatWidget />
     </>
   );
 };

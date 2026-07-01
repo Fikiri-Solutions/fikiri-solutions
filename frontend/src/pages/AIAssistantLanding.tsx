@@ -1,7 +1,7 @@
 import React from 'react';
 import { Brain, MessageSquare, Zap, BarChart3, Clock, Shield } from 'lucide-react';
 import { FeatureStatus, getFeatureStatus } from '../components/FeatureStatus';
-import { PublicChatbotWidget } from '../components/PublicChatbotWidget';
+import { MarketingChatWidget } from '../components/MarketingChatWidget';
 
 export const AIAssistantLanding: React.FC = () => {
   const capabilities = [
@@ -138,7 +138,7 @@ export const AIAssistantLanding: React.FC = () => {
           </div>
         </div>
       </div>
-      <PublicChatbotWidget />
+      <MarketingChatWidget />
     </div>
   );
 };

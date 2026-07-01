@@ -8,7 +8,7 @@ import { Link } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import { ChevronDown, Mail, Sparkles, Users } from 'lucide-react'
 import { RadiantLayout, Container, Gradient, AnimatedBackground } from '../components/radiant'
-import { PublicChatbotWidget } from '../components/PublicChatbotWidget'
+import { MarketingChatWidget } from '../components/MarketingChatWidget'
 import {
   combineSectorQueries,
   getSectorFitPresentation,
@@ -552,7 +552,7 @@ export const About: React.FC = () => {
           </Container>
         </section>
       </div>
-      <PublicChatbotWidget />
+      <MarketingChatWidget />
     </RadiantLayout>
   )
 }

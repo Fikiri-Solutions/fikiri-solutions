@@ -10,7 +10,7 @@ import {
   Subheading,
   AnimatedBackground,
 } from '@/components/radiant'
-import { PublicChatbotWidget } from '../components/PublicChatbotWidget'
+import { MarketingChatWidget } from '../components/MarketingChatWidget'
 import { publicMedia } from '@/lib/publicMedia'
 
 function Hero() {
@@ -192,7 +192,7 @@ export default function RadiantLandingPage() {
         <Testimonials />
         <Footer />
       </div>
-      <PublicChatbotWidget />
+      <MarketingChatWidget />
     </div>
   )
 }

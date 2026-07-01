@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { RadiantLayout, Container, Gradient, AnimatedBackground } from '../components/radiant'
-import { PublicChatbotWidget } from '../components/PublicChatbotWidget'
+import { MarketingChatWidget } from '../components/MarketingChatWidget'
 import { ArrowRight } from 'lucide-react'
 
 /** Pricing & product FAQs (moved from /pricing). */
@@ -95,7 +95,7 @@ const FaqPage: React.FC = () => {
           </section>
         </div>
       </div>
-      <PublicChatbotWidget />
+      <MarketingChatWidget />
     </RadiantLayout>
   )
 }

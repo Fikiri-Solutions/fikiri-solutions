@@ -1,6 +1,6 @@
 import React from 'react';
 import { VerticalLanding } from '../components/VerticalLanding';
-import { PublicChatbotWidget } from '../components/PublicChatbotWidget';
+import { MarketingChatWidget } from '../components/MarketingChatWidget';
 
 export const LandscapingLanding: React.FC = () => {
   return (
@@ -66,7 +66,7 @@ export const LandscapingLanding: React.FC = () => {
       ctaText="Start Your Free Trial"
       ctaLink="/signup?industry=landscaping"
     />
-    <PublicChatbotWidget />
+    <MarketingChatWidget />
     </>
   );
 };

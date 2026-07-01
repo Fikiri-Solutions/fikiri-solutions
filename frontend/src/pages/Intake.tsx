@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { RadiantLayout, Container, Gradient, AnimatedBackground } from '../components/radiant'
 import { Button } from '../components/radiant/Button'
 import { apiClient } from '../services/apiClient'
-import { PublicChatbotWidget } from '../components/PublicChatbotWidget'
+import { MarketingChatWidget } from '../components/MarketingChatWidget'
 import { AUTOCOMPLETE } from '../constants/autocomplete'
 
 /** Mirrors backend core/contact_api INTAKE_LIMITS */
@@ -600,7 +600,7 @@ export const Intake: React.FC = () => {
           </Container>
         </section>
       </div>
-      <PublicChatbotWidget />
+      <MarketingChatWidget />
     </RadiantLayout>
   )
 }

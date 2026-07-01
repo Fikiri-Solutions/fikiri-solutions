@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Home, Shield } from 'lucide-react';
 import { RadiantLayout } from '../components/radiant';
-import { PublicChatbotWidget } from '../components/PublicChatbotWidget';
+import { MarketingChatWidget } from '../components/MarketingChatWidget';
 import { useAuth } from '../contexts/AuthContext';
 
 const TermsOfService: React.FC = () => {
@@ -239,7 +239,7 @@ const TermsOfService: React.FC = () => {
                 </div>
               </div>
       </div>
-      <PublicChatbotWidget />
+      <MarketingChatWidget />
     </>
     </RadiantLayout>
   );

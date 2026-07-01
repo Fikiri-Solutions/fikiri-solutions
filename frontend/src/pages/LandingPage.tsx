@@ -19,7 +19,7 @@ import SimpleAnimatedBackground from '@/components/SimpleAnimatedBackground'
 import DemoVideoModal from '@/components/DemoVideoModal'
 import LogoTicker from '@/components/LogoTicker'
 import { useAuth } from '@/contexts/AuthContext'
-import { PublicChatbotWidget } from '../components/PublicChatbotWidget'
+import { MarketingChatWidget } from '../components/MarketingChatWidget'
 
 const LandingPage: React.FC = () => {
   // State for mobile menu and demo video
@@ -602,7 +602,7 @@ const LandingPage: React.FC = () => {
         onClose={() => setIsDemoVideoOpen(false)}
         videoUrl="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" // Replace with your Kling AI generated video URL
       />
-      <PublicChatbotWidget />
+      <MarketingChatWidget />
     </div>
   )
 }

@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 import { RadiantLayout, Gradient, Container, AnimatedBackground } from '../components/radiant';
-import { PublicChatbotWidget } from '../components/PublicChatbotWidget';
+import { MarketingChatWidget } from '../components/MarketingChatWidget';
 import { TableScroll } from '../components/TableScroll';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../services/apiClient';
@@ -642,7 +642,7 @@ const PricingPage: React.FC = () => {
       </section>
         </div>
       </div>
-      <PublicChatbotWidget />
+      <MarketingChatWidget />
     </RadiantLayout>
   );
 };
