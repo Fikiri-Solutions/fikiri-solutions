@@ -39,6 +39,7 @@ import {
   lookbackIdFromDays,
   saveGmailLookbackId,
 } from '../utils/gmailLookbackStorage'
+import { isEmailAiDemoEnabled } from '../lib/demoSafety'
 
 interface Attachment {
   id: number
@@ -392,6 +393,7 @@ export const EmailInbox: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [showRawSnippets, setShowRawSnippets] = useState(false)
   const showInboxTechnical = canShowInboxTechnicalDetails({ role: user?.role })
+  const emailAiEnabled = isEmailAiDemoEnabled()
   const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all')
   const [replyText, setReplyText] = useState('')
   const [showReplyComposer, setShowReplyComposer] = useState(false)
@@ -756,6 +758,14 @@ export const EmailInbox: React.FC = () => {
   const handleSyncInbox = useCallback(() => runGmailSync(), [runGmailSync])
 
   const analyzeEmail = async (email: Email) => {
+    if (!emailAiEnabled) {
+      addToast({
+        type: 'info',
+        title: 'Email AI not enabled for this demo',
+        message: 'Enable after OpenAI health check passes (VITE_DEMO_EMAIL_AI_ENABLED). You can still read and reply manually.',
+      })
+      return
+    }
     const rawContent = displayBody || email.body || email.snippet
     const content = emailPlainBodyForCustomerDisplay(rawContent || '') || rawContent
     if (!content?.trim()) {
@@ -783,11 +793,11 @@ export const EmailInbox: React.FC = () => {
         'code' in error &&
         (error as { code?: string }).code === 'ECONNABORTED'
       addToast({
-        type: 'info',
-        title: 'Quick help only',
+        type: 'error',
+        title: 'AI unavailable',
         message: timedOut
-          ? 'This is taking longer than usual. Try again shortly, or reply on your own below.'
-          : 'Full suggestions will be back soon. You can still read and reply normally.',
+          ? 'Analysis timed out. Check OpenAI billing, then try again—or reply manually below.'
+          : 'Live AI analysis requires an active OpenAI account. You can still read and reply manually.',
       })
     } finally {
       setAiLoading(false)
@@ -795,6 +805,14 @@ export const EmailInbox: React.FC = () => {
   }
 
   const generateReply = async (email: Email) => {
+    if (!emailAiEnabled) {
+      addToast({
+        type: 'info',
+        title: 'Email AI not enabled for this demo',
+        message: 'Enable after OpenAI health check and in-app rehearsal. Use Reply to compose manually.',
+      })
+      return
+    }
     const rawContent = displayBody || email.body || email.snippet
     const content = emailPlainBodyForCustomerDisplay(rawContent || '') || rawContent
     if (!content?.trim()) {
@@ -824,9 +842,9 @@ export const EmailInbox: React.FC = () => {
     } catch (error) {
       console.error('Error generating reply:', error)
       addToast({
-        type: 'info',
-        title: 'Draft not ready',
-        message: 'Write your reply below—you stay in control.',
+        type: 'error',
+        title: 'AI unavailable',
+        message: 'Reply drafting requires live OpenAI access. Write your reply below—you stay in control.',
       })
     } finally {
       setAiLoading(false)
@@ -1353,10 +1371,15 @@ export const EmailInbox: React.FC = () => {
                       </div>
                     </div>
                     <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 dark:border-gray-700/90">
+                      {!emailAiEnabled && (
+                        <p className="w-full text-xs text-amber-800 dark:text-amber-200/90">
+                          AI Analyze and Suggest reply are off until OpenAI is verified for this environment.
+                        </p>
+                      )}
                       <button
                         type="button"
                         onClick={() => analyzeEmail(selectedEmail)}
-                        disabled={aiLoading}
+                        disabled={aiLoading || !emailAiEnabled}
                         className="inline-flex min-h-[40px] items-center gap-2 rounded-md bg-brand-primary px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-primary/90 disabled:opacity-50 touch-manipulation"
                       >
                         <Sparkles className="h-4 w-4 shrink-0" />
@@ -1365,7 +1388,7 @@ export const EmailInbox: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => generateReply(selectedEmail)}
-                        disabled={aiLoading}
+                        disabled={aiLoading || !emailAiEnabled}
                         className="inline-flex min-h-[40px] items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700 touch-manipulation"
                       >
                         <Sparkles className="h-4 w-4 shrink-0 text-brand-primary" />

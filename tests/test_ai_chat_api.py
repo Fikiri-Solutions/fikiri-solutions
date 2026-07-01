@@ -58,7 +58,7 @@ class TestAIChatAPI:
 
     @patch("core.ai_chat_api.get_current_user_id")
     @patch("core.ai_chat_api.get_current_user")
-    def test_chat_with_user_id_in_body_succeeds_with_fallback(self, mock_get_user, mock_get_user_id):
+    def test_chat_llm_unavailable_returns_503(self, mock_get_user, mock_get_user_id):
         mock_get_user.side_effect = Exception("no jwt")
         mock_get_user_id.return_value = None
 
@@ -67,12 +67,10 @@ class TestAIChatAPI:
             json={"message": "hello", "user_id": 1},
             content_type="application/json",
         )
-        assert response.status_code == 200
+        assert response.status_code == 503
         data = json.loads(response.data)
-        assert data.get("success") is True
-        assert "data" in data
-        assert "response" in data["data"]
-        assert "suggested_actions" in data["data"]
+        assert data.get("success") is False
+        assert data.get("code") == "AI_UNAVAILABLE"
 
     @patch("core.ai_chat_api.check_tier_usage_cap")
     @patch("core.ai_chat_api._get_llm_router")
@@ -134,11 +132,11 @@ class TestAIChatAPI:
             json={"message": "analyze my leads", "user_id": 1},
             content_type="application/json",
         )
-        assert response.status_code == 200
+        assert response.status_code == 503
         data = json.loads(response.data)
-        assert data.get("success") is True
+        assert data.get("success") is False
+        assert data.get("code") == "AI_UNAVAILABLE"
         mock_record.assert_not_called()
-        assert "lead" in data["data"]["response"].lower() or "crm" in data["data"]["response"].lower()
 
     @patch("core.ai_chat_api.check_tier_usage_cap")
     @patch("core.ai_chat_api._get_llm_router")
@@ -165,7 +163,7 @@ class TestAIChatAPI:
         assert data.get("code") == "AI_BUDGET_SOFT_STOP"
 
     @patch("core.ai_chat_api.get_current_user_id")
-    def test_chat_contextual_fallback_for_lead_query(self, mock_get_user_id):
+    def test_chat_without_live_llm_returns_503(self, mock_get_user_id):
         mock_get_user_id.return_value = 1
 
         response = self.client.post(
@@ -173,10 +171,10 @@ class TestAIChatAPI:
             json={"message": "analyze my leads", "user_id": 1},
             content_type="application/json",
         )
-        assert response.status_code == 200
+        assert response.status_code == 503
         data = json.loads(response.data)
-        assert data.get("success") is True
-        assert "lead" in data["data"]["response"].lower() or "crm" in data["data"]["response"].lower()
+        assert data.get("success") is False
+        assert data.get("code") == "AI_UNAVAILABLE"
 
     def test_status_returns_200_and_services(self):
         response = self.client.get("/api/ai/status")

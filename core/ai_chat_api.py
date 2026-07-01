@@ -231,39 +231,16 @@ def ai_chat():
                         "AI response generated",
                         correlation_id=llm_result.get('correlation_id') or correlation_id,
                     )
-                logger.warning("LLM router failed, falling back: %s", llm_result.get('error'))
+                logger.warning("LLM router failed: %s", llm_result.get('error'))
         except Exception as llm_error:
-            logger.error("LLM chat failed, falling back: %s", llm_error)
+            logger.error("LLM chat failed: %s", llm_error)
 
-        # Contextual fallback
-        try:
-            response = _generate_contextual_fallback(message, user_id)
-            response_data = {
-                'response': response,
-                'service_queries': [],
-                'suggested_actions': _get_suggested_actions(message),
-                'confidence': 0.6,
-                'success': True,
-                'correlation_id': correlation_id,
-            }
-            return create_success_response(
-                response_data, "AI response generated", correlation_id=correlation_id
-            )
-        except Exception as fallback_error:
-            logger.error(f"Response generation failed: {fallback_error}")
-            response_data = {
-                'response': _generate_simple_fallback(message),
-                'service_queries': [],
-                'suggested_actions': _get_suggested_actions(message),
-                'confidence': 0.4,
-                'success': True,
-                'correlation_id': correlation_id,
-            }
-            return create_success_response(
-                response_data,
-                "AI response generated (simple fallback)",
-                correlation_id=correlation_id,
-            )
+        return create_error_response(
+            "AI is temporarily unavailable. Check OpenAI billing and API key configuration.",
+            503,
+            "AI_UNAVAILABLE",
+            correlation_id=correlation_id,
+        )
         
     except Exception as e:
         logger.error(f"AI chat endpoint error: {e}")

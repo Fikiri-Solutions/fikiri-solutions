@@ -15,43 +15,11 @@ interface ChatMessage {
   // Classification removed to prevent debug metadata display
 }
 
-// Fallback responses for when backend is not available
-const getFallbackResponse = (message: string): string => {
-  const lowerMessage = message.toLowerCase()
+const AI_UNAVAILABLE_MESSAGE =
+  'Live AI is unavailable (OpenAI billing or API key). Use CRM and Inbox Analyze after running the pre-demo health check.'
 
-  if (lowerMessage.trim() === 'hi' || lowerMessage.trim() === 'hello' || lowerMessage.includes('hey')) {
-    return 'Hi! How can I help you today with Fikiri Solutions?'
-  }
-
-  if (lowerMessage.includes('today') && lowerMessage.includes('date')) {
-    const today = new Date()
-    const formatted = today.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-    return `Today is ${formatted}.`
-  }
-  
-  if (lowerMessage.includes('contact') || lowerMessage.includes('email') || lowerMessage.includes('phone')) {
-    return 'You can contact Fikiri Solutions at:\n\n📧 Email: info@fikirisolutions.com\n🌐 Website: https://fikirisolutions.com\n📞 Phone: Available through our contact form\n\nWe specialize in AI-powered business automation for landscaping, restaurants, and medical practices.'
-  }
-  
-  if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('pricing')) {
-    return 'Our pricing varies based on your specific needs:\n\n• **Starter Plan**: $49/month - Basic email automation\n• **Growth Plan**: $99/month - Advanced CRM + automation\n• **Business Plan**: $199/month - White-label options\n• **Enterprise Plan**: $499/month - Custom solutions\n\nContact us for a personalized quote based on your industry and requirements.'
-  }
-  
-  if (lowerMessage.includes('service') || lowerMessage.includes('what do you do')) {
-    return 'Fikiri Solutions provides AI-powered business automation:\n\n🏢 **Email Automation**: Smart email responses and workflows\n📊 **CRM Management**: Lead tracking and analysis\n🤖 **AI Assistant**: Intelligent business support\n🏭 **Industry Solutions**: Specialized for landscaping, restaurants, and medical practices\n\nWe help businesses streamline operations and increase efficiency.'
-  }
-  
-  if (lowerMessage.includes('help') || lowerMessage.includes('assist')) {
-    return 'I can help you with:\n\n• Email automation setup\n• Lead analysis and prioritization\n• CRM configuration\n• Business process optimization\n• Industry-specific solutions\n\nWhat specific area would you like assistance with?'
-  }
-  
-  return 'I\'m here to help with Fikiri Solutions\' services including email automation, CRM management, and business process optimization. Could you please provide more details about what you\'d like assistance with?'
-}
+const DEMO_DO_NOT_SHOW_BANNER =
+  'Not recommended for client demos. This page requires live OpenAI access; use CRM and Email Inbox instead.'
 
 // Function to format AI responses with better spacing and structure
 const formatAIResponse = (content: string): string => {
@@ -87,6 +55,8 @@ export const AIAssistant: React.FC = () => {
   const [inboxLoading, setInboxLoading] = useState(false)
   const [suggestedReply, setSuggestedReply] = useState('')
   const [suggestionLoading, setSuggestionLoading] = useState(false)
+  const [aiLive, setAiLive] = useState<boolean | null>(null)
+  const aiChatEnabled = aiLive === true
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { isConnected } = useWebSocket()
   const { addToast } = useToast()
@@ -128,13 +98,19 @@ export const AIAssistant: React.FC = () => {
     try {
       const status = await apiClient.testAIAssistant()
       setAiStatus(status)
-    } catch (error) {
-      // Failed to fetch AI status
+      const enabled = Boolean(status?.stats?.enabled) && status?.success !== false
+      setAiLive(enabled)
+      if (!enabled) {
+        setError(AI_UNAVAILABLE_MESSAGE)
+      }
+    } catch {
+      setAiLive(false)
+      setError(AI_UNAVAILABLE_MESSAGE)
     }
   }
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || isLoading) return
+    if (!inputMessage.trim() || isLoading || !aiChatEnabled) return
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -180,20 +156,13 @@ export const AIAssistant: React.FC = () => {
       }, 25) // 25ms per word for natural typing speed
 
     } catch (error) {
-      // Failed to send message - provide helpful fallback response
-      const fallbackResponse = getFallbackResponse(inputMessage.trim())
-      const formattedFallback = formatAIResponse(fallbackResponse)
-      
-      // Simulate typing effect for fallback response
-      await simulateTyping(formattedFallback, (currentText) => {
-        setMessages(prev => prev.map(msg => 
-          msg.id === aiMessageId 
-            ? { ...msg, content: currentText, isTyping: false }
-            : msg
-        ))
-      }, 25)
-      
-      setError(null) // Clear error since we provided a fallback
+      setMessages(prev => prev.filter(msg => msg.id !== aiMessageId))
+      setError(AI_UNAVAILABLE_MESSAGE)
+      addToast({
+        type: 'error',
+        title: 'AI unavailable',
+        message: 'Live OpenAI access is required. Do not demo this page to clients until the health check passes.',
+      })
     } finally {
       setIsLoading(false)
     }
@@ -262,6 +231,19 @@ Response should include a next step and keep tone professional but warm.`
 
   return (
     <div className="space-y-6">
+      <div
+        className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+        role="status"
+      >
+        <strong>Demo note:</strong> {DEMO_DO_NOT_SHOW_BANNER}
+      </div>
+
+      {aiLive === false && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-100">
+          {AI_UNAVAILABLE_MESSAGE}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -530,6 +512,7 @@ Response should include a next step and keep tone professional but warm.`
                 placeholder="Ask the AI assistant anything... e.g., 'Draft a response to Acme Corp lead'"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
+                disabled={!aiChatEnabled}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
@@ -550,9 +533,9 @@ Response should include a next step and keep tone professional but warm.`
                 </div>
                 <button
                   onClick={handleSendMessage}
-                  disabled={isLoading || !inputMessage.trim()}
+                  disabled={isLoading || !inputMessage.trim() || !aiChatEnabled}
                   className={`inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-xl shadow-sm ${
-                    isLoading || !inputMessage.trim()
+                    isLoading || !inputMessage.trim() || !aiChatEnabled
                       ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
                       : 'bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:shadow-lg hover:translate-y-[-1px] transition'
                   }`}
