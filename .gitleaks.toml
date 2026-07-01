@@ -12,6 +12,8 @@ paths = [
   '''(?i)^AUTHENTICATION_SETUP\.md$''',
   '''(?i)^STRIPE_.*\.md$''',
   '''(?i)^env\.template$''',
+  '''(?i)^\.env\.example$''',
+  '''(?i)^frontend/env\.example$''',
   # Generated reports & local env (gitignored; --no-git still traverses them)
   '''(?i)(^|/)security-reports/''',
   '''(?i)\.env(\.[^/]+)?$''',

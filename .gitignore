@@ -23,7 +23,6 @@ wheels/
 MANIFEST
 
 # Virtual environments
-.env
 .venv
 env/
 venv/
@@ -62,20 +61,42 @@ logs/
 *.h5
 *.model
 
-# Environment variables and secrets
+# Environment variables and secrets (never commit real values)
 .env
 .env.local
 .env.production
+.env.development
+.env.staging
+.env.test
 .env.bak
 .env*.bak
+!.env.example
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+frontend/.env.development
 *SECRETS*.txt
 NEW_SECRETS.txt
+secrets/
+.secrets/
 
-# Credentials
+# Credentials and key material
 credentials.json
+**/credentials.json
 token.pkl
+**/*.pkl
+auth/credentials.json
+auth/*_token.pkl
+auth/sheets_token.pkl
 *.pem
 *.key
+*.p12
+*.pfx
+*.jks
+
+# Local SQLite WAL sidecars
+data/*.db-shm
+data/*.db-wal
 
 # Temporary files
 *.tmp
