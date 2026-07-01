@@ -13,6 +13,7 @@ import {
   Users,
   Zap,
 } from 'lucide-react'
+import { isNavHiddenInDemoSafeMode } from '../lib/demoSafety'
 
 /**
  * Single source of truth for authenticated app navigation.
@@ -43,10 +44,11 @@ const DASHBOARD_NAV_BASE: DashboardNavItem[] = [
 export function getDashboardSidebarNav(
   user: { onboarding_completed?: boolean } | null | undefined
 ): DashboardNavItem[] {
-  const items = [...DASHBOARD_NAV_BASE]
+  let items = [...DASHBOARD_NAV_BASE]
   if (user && !user.onboarding_completed) {
     items.unshift({ name: 'Complete Setup', href: '/onboarding', icon: Zap })
   }
+  items = items.filter((item) => !isNavHiddenInDemoSafeMode(item.href))
   return items
 }
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   getMobileBottomNavItems,
   getDashboardSidebarNav,
@@ -52,5 +52,20 @@ describe('dashboardNav', () => {
       const hrefs = items.map((i) => i.href)
       expect(new Set(hrefs).size, `duplicate href when onboarding_completed=${completed}`).toBe(hrefs.length)
     }
+  })
+
+  it('demo safe mode hides AI Assistant, Services, and Chatbot Builder from sidebar', async () => {
+    vi.stubEnv('VITE_DEMO_SAFE_MODE', 'true')
+    await vi.resetModules()
+    const { getDashboardSidebarNav: navWithDemo } = await import('../navigation/dashboardNav')
+    const items = navWithDemo({ onboarding_completed: true })
+    const hrefs = items.map((i) => i.href)
+    expect(hrefs).toContain('/crm')
+    expect(hrefs).toContain('/inbox')
+    expect(hrefs).not.toContain('/ai')
+    expect(hrefs).not.toContain('/services')
+    expect(hrefs).not.toContain('/ai/chatbot-builder')
+    vi.unstubAllEnvs()
+    await vi.resetModules()
   })
 })

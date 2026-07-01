@@ -11,7 +11,8 @@ import { useWebSocket } from '../hooks/useWebSocket'
 import { useDashboardTimeseries } from '../hooks/useDashboardTimeseries'
 import { getFeatureConfig } from '../config'
 import { apiClient } from '../services/apiClient'
-import { mockServices, mockMetrics, mockActivity } from '../mockData'
+import { isDemoSafeMode } from '../lib/demoSafety'
+import { mockServices, mockActivity } from '../mockData'
 
 // Lazy load heavy dashboard components
 const EmailTrendsChart = React.lazy(() => import('../components/EmailTrendsChart').then(module => ({ default: module.EmailTrendsChart })))
@@ -56,11 +57,11 @@ export const Dashboard: React.FC = () => {
     enabled: true,
   })
 
-  const { data: metricsData = mockMetrics, isLoading: metricsLoading, error: metricsQueryError } = useQuery({
+  const { data: metricsData, isLoading: metricsLoading, error: metricsQueryError } = useQuery({
     queryKey: ['metrics'],
     queryFn: () => {
       console.log('[Dashboard] Fetching metrics...')
-      return features.useMockData ? Promise.resolve(mockMetrics) : apiClient.getMetrics()
+      return features.useMockData ? Promise.resolve(null) : apiClient.getMetrics()
     },
     staleTime: 30 * 1000, // 30 seconds - metrics update more frequently
     gcTime: 5 * 60 * 1000, // 5 minutes
@@ -87,11 +88,11 @@ export const Dashboard: React.FC = () => {
   })
   const failedRuns = automationRuns.filter((r: { status?: string }) => r.status !== 'success')
 
-  // Combine API data with real-time WebSocket updates
+  // Combine API data with real-time WebSocket updates — never substitute mock metrics.
   const services = data.services?.services || servicesData
-  // Use real metrics data, fallback to mock only if API fails
-  const metrics = data.metrics || metricsData || mockMetrics
+  const metrics = data.metrics ?? metricsData ?? null
   const activity = data.activity ? [data.activity, ...activityData] : activityData
+  const metricsUnavailable = !metricsLoading && (Boolean(metricsQueryError) || metrics == null)
 
   // Use real timeseries data for charts, fallback to generated data if needed
   const generateChartData = () => {
@@ -99,15 +100,8 @@ export const Dashboard: React.FC = () => {
     if (transformedTimeseriesData && transformedTimeseriesData.length > 0) {
       return transformedTimeseriesData
     }
-    // Fallback: generate sample data
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    return days.map(day => ({
-      name: day,
-      emails: Math.floor(Math.random() * 40) + 20,
-      leads: Math.floor(Math.random() * 30) + 15,
-      responses: Math.floor(Math.random() * 20) + 10,
-      value: Math.floor(Math.random() * 80) + 20
-    }))
+    // No fabricated chart data — empty state when timeseries is unavailable.
+    return []
   }
 
   // Transform timeseries data for charts
@@ -199,18 +193,25 @@ export const Dashboard: React.FC = () => {
               <MetricCardSkeleton />
               <MetricCardSkeleton />
             </>
-          ) : metricsQueryError ? (
-            <div className="col-span-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+          ) : metricsUnavailable ? (
+            <div className="col-span-4 rounded-lg border border-gray-200 bg-gray-50 p-6 dark:border-gray-700 dark:bg-gray-800/50">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-gray-500 dark:text-gray-400" />
                 <div>
-                  <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Unable to load dashboard metrics</p>
-                  <p className="text-xs text-yellow-600 dark:text-yellow-300 mt-1">
-                    {metricsQueryError instanceof Error ? metricsQueryError.message : 'Please check your connection and try again.'}
+                  <p className="text-sm font-medium text-brand-text dark:text-gray-200">
+                    Dashboard metrics unavailable
                   </p>
-                  <p className="text-xs text-yellow-600 dark:text-yellow-300 mt-1">
-                    Check browser console for details. Using mock data for now.
+                  <p className="mt-1 text-xs text-brand-text/60 dark:text-gray-400">
+                    {metricsQueryError instanceof Error
+                      ? metricsQueryError.message
+                      : 'Connect your account and sync activity to see live numbers here.'}
                   </p>
+                  <Link
+                    to="/crm"
+                    className="mt-3 inline-block text-sm font-medium text-brand-primary hover:text-brand-secondary"
+                  >
+                    Open CRM →
+                  </Link>
                 </div>
               </div>
             </div>
@@ -240,23 +241,25 @@ export const Dashboard: React.FC = () => {
                 <MiniTrend data={trendData} dataKey="emails" />
               </EnhancedMetricCard>
               
+              {!isDemoSafeMode() && (
               <EnhancedMetricCard
                 title="AI Responses"
                 value={metrics?.aiResponses || metrics?.ai?.total || 0}
                 icon={<Brain className="h-5 w-5" />}
-                onClick={() => navigate('/ai')}
+                onClick={() => navigate('/inbox')}
                 description="AI-generated email responses"
                 businessImpact="Faster response times improve customer satisfaction"
                 color="orange"
               >
                 <MiniTrend data={trendData} dataKey="responses" />
               </EnhancedMetricCard>
+              )}
               
               <EnhancedMetricCard
                 title="Avg Response Time"
                 value={`${metrics?.avgResponseTime?.toFixed(1) || 0}h`}
                 icon={<TrendingUp className="h-5 w-5" />}
-                onClick={() => navigate('/services')}
+                onClick={() => navigate('/crm')}
                 description="Average time to respond to leads"
                 businessImpact="Faster responses = Higher conversion rates"
                 color="purple"
@@ -278,6 +281,10 @@ export const Dashboard: React.FC = () => {
             <div className="h-64 min-h-[256px]">
               {timeseriesLoading ? (
                 <ChartSkeleton />
+              ) : chartData.length === 0 ? (
+                <p className="flex h-full items-center justify-center text-sm text-brand-text/50 dark:text-gray-500">
+                  No email trend data yet.
+                </p>
               ) : (
                 <Suspense fallback={<ChartSkeleton />}>
                   <EmailTrendsChart data={chartData} />
@@ -295,6 +302,10 @@ export const Dashboard: React.FC = () => {
             <div className="h-64 min-h-[256px]">
               {timeseriesLoading ? (
                 <ChartSkeleton />
+              ) : chartData.length === 0 ? (
+                <p className="flex h-full items-center justify-center text-sm text-brand-text/50 dark:text-gray-500">
+                  No service performance data yet.
+                </p>
               ) : (
                 <Suspense fallback={<ChartSkeleton />}>
                   <ServicePerformanceChart data={chartData} />
@@ -313,9 +324,13 @@ export const Dashboard: React.FC = () => {
           <div className="h-64 min-h-[256px]">
             {timeseriesLoading ? (
               <ChartSkeleton />
+            ) : pieChartData.length === 0 ? (
+              <p className="flex h-full items-center justify-center text-sm text-brand-text/50 dark:text-gray-500">
+                No distribution data yet.
+              </p>
             ) : (
               <Suspense fallback={<ChartSkeleton />}>
-                <ServiceDistributionChart data={pieChartData.length > 0 ? pieChartData : []} />
+                <ServiceDistributionChart data={pieChartData} />
               </Suspense>
             )}
           </div>

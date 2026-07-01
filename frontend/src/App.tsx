@@ -18,6 +18,7 @@ import { Automations } from './pages/Automations'
 import { AutomationSetupCaptureLeadsEmail } from './pages/AutomationSetupCaptureLeadsEmail'
 import { CorrelationDebugPage } from './pages/CorrelationDebugPage'
 import { ChatbotBuilder } from './pages/ChatbotBuilder'
+import { DemoGatedFeature } from './components/DemoGatedFeature'
 import { ContentMigration } from './pages/ContentMigration'
 import { GmailConnect } from './pages/GmailConnect'
 import { OutlookConnect } from './pages/OutlookConnect'
@@ -203,7 +204,11 @@ function App() {
                           } />
                           <Route path="/services" element={
                             <ProtectedRoute>
-                              <Layout><Services /></Layout>
+                              <Layout>
+                                <DemoGatedFeature route="servicesPreview" previewOnly>
+                                  <Services />
+                                </DemoGatedFeature>
+                              </Layout>
                             </ProtectedRoute>
                           } />
                           <Route path="/crm" element={
@@ -213,22 +218,38 @@ function App() {
                           } />
                           <Route path="/ai" element={
                             <ProtectedRoute>
-                              <Layout><AIAssistant /></Layout>
+                              <Layout>
+                                <DemoGatedFeature route="aiAssistant">
+                                  <AIAssistant />
+                                </DemoGatedFeature>
+                              </Layout>
                             </ProtectedRoute>
                           } />
                           <Route path="/assistant" element={
                             <ProtectedRoute>
-                              <Layout><AIAssistant /></Layout>
+                              <Layout>
+                                <DemoGatedFeature route="aiAssistant">
+                                  <AIAssistant />
+                                </DemoGatedFeature>
+                              </Layout>
                             </ProtectedRoute>
                           } />
                           <Route path="/industry" element={
                             <ProtectedRoute>
-                              <Layout><UsageAnalytics /></Layout>
+                              <Layout>
+                                <DemoGatedFeature route="usageAnalytics">
+                                  <UsageAnalytics />
+                                </DemoGatedFeature>
+                              </Layout>
                             </ProtectedRoute>
                           } />
                           <Route path="/analytics" element={
                             <ProtectedRoute>
-                              <Layout><UsageAnalytics /></Layout>
+                              <Layout>
+                                <DemoGatedFeature route="usageAnalytics">
+                                  <UsageAnalytics />
+                                </DemoGatedFeature>
+                              </Layout>
                             </ProtectedRoute>
                           } />
                           <Route path="/automations" element={
@@ -248,7 +269,11 @@ function App() {
                           } />
                           <Route path="/ai/chatbot-builder" element={
                             <ProtectedRoute>
-                              <Layout><ChatbotBuilder /></Layout>
+                              <Layout>
+                                <DemoGatedFeature route="chatbotBuilder">
+                                  <ChatbotBuilder />
+                                </DemoGatedFeature>
+                              </Layout>
                             </ProtectedRoute>
                           } />
                           <Route path="/import-center" element={

@@ -497,6 +497,14 @@ export const Services: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <div
+        className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+        role="status"
+      >
+        <strong>Product preview:</strong> toggles on this page are not persisted to your account. Fikiri
+        engagements start with workflow discovery, then custom configuration for clients like ColorScalez
+        and Symbolics Technology.
+      </div>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
