@@ -1,0 +1,284 @@
+# Mixed-scope QA conversations — tune via capability map (6e) + miss review (6d).
+# Rule: phrase → capability map → family relations → KB only if factual gap → eval → tests
+#
+# Fields:
+#   messages          — one or more user turns (full bot path)
+#   expected_families — at least one must match detect_needs on final turn
+#   min_families      — optional minimum family count (mixed scope)
+#   expected_bundle   — optional suggested bundle id
+#   expected_mode     — optional orchestrator mode on final turn
+#   must_include      — phrases in final bot response
+#   must_not_include  — forbidden phrases in final response
+#   expected_grounded — default true; set false for honest-fallback cases
+
+cases:
+  - name: website_plus_lead_tracking
+    user_example: true
+    messages:
+      - I need a website but also something to track leads
+    expected_families: [website_and_landing_pages, crm_and_lead_tracking]
+    min_families: 2
+    expected_bundle: lead_intake_system
+    expected_mode: answer
+    must_include:
+      - mix
+    must_not_include:
+      - I don't have enough verified
+
+  - name: book_and_pay_online
+    user_example: true
+    messages:
+      - Can customers book and pay online?
+    expected_families: [payments_and_booking, forms_and_intake]
+    min_families: 2
+    expected_bundle: booking_and_payments_flow
+    expected_mode: answer
+    must_not_include:
+      - I don't have enough verified
+
+  - name: emails_and_followups_connected
+    user_example: true
+    messages:
+      - I want my emails and customer follow-ups connected
+    expected_families: [email_and_inbox_automation, crm_and_lead_tracking]
+    min_families: 2
+    expected_bundle: email_workflow_assistant
+    expected_mode: answer
+
+  - name: forms_nobody_follows_up
+    user_example: true
+    messages:
+      - We have forms but nobody follows up
+    expected_families: [forms_and_intake, crm_and_lead_tracking]
+    expected_capabilities: [send follow-up, capture lead]
+    expected_mode: answer
+    must_not_include:
+      - I don't have enough verified
+
+  - name: chatbot_answers_and_captures_leads
+    user_example: true
+    messages:
+      - I need a chatbot that answers questions and captures leads
+    expected_families: [chatbot_and_knowledge_base, forms_and_intake]
+    min_families: 2
+    expected_bundle: site_chat_knowledge
+    expected_mode: answer
+
+  - name: one_small_workflow_fixed
+    user_example: true
+    messages:
+      - I only need one small workflow fixed
+    expected_families: [consulting_and_workflow_audit, workflow_automation]
+    expected_bundle: workflow_audit_path
+    expected_mode: answer
+
+  - name: messy_office_not_sure
+    user_example: true
+    messages:
+      - I don't know what I need, but my office is messy
+    expected_families: [consulting_and_workflow_audit]
+    expected_mode: answer
+    must_not_include:
+      - HIPAA certified
+
+  - name: website_quotes_tracked_auto
+    messages:
+      - I need a website where customers can request quotes and I want those leads tracked automatically
+    expected_families: [website_and_landing_pages, forms_and_intake, crm_and_lead_tracking]
+    min_families: 3
+    expected_bundle: lead_intake_system
+    expected_mode: answer
+
+  - name: emails_leads_one_place
+    messages:
+      - I want my emails and leads in one place
+    expected_families: [email_and_inbox_automation, crm_and_lead_tracking]
+    expected_bundle: email_workflow_assistant
+    expected_mode: answer
+
+  - name: website_form_nobody_follows
+    messages:
+      - Nobody follows up after we get a website form
+    expected_families: [forms_and_intake, crm_and_lead_tracking]
+    expected_mode: answer
+
+  - name: payment_customer_records_reminders
+    messages:
+      - payments customer records and reminders
+    expected_families: [payments_and_booking, crm_and_lead_tracking]
+    min_families: 2
+    expected_mode: answer
+
+  - name: chatbot_knowledge_and_booking
+    messages:
+      - chatbot knowledge base and booking flow
+    expected_families: [chatbot_and_knowledge_base, payments_and_booking]
+    min_families: 2
+    expected_mode: answer
+
+  - name: intake_crm_email_combo
+    messages:
+      - website intake form CRM and email follow-up
+    expected_families: [forms_and_intake, crm_and_lead_tracking, email_and_inbox_automation]
+    min_families: 2
+    expected_mode: answer
+
+  - name: quote_request_pipeline
+    messages:
+      - quote requests keep getting lost in our pipeline
+    expected_families: [crm_and_lead_tracking, forms_and_intake]
+    expected_mode: answer
+
+  - name: appointment_requests_automate
+    messages:
+      - Can you automate my appointment requests?
+    expected_families: [payments_and_booking, forms_and_intake]
+    expected_mode: answer
+
+  - name: not_sure_website_or_crm
+    messages:
+      - I don't know if we need a website or a CRM
+    expected_families: [consulting_and_workflow_audit]
+    expected_bundle: workflow_audit_path
+    expected_mode: answer
+
+  - name: landscaping_inbox_and_leads
+    messages:
+      - We're a landscaping company drowning in quote emails and losing leads
+    expected_families: [email_and_inbox_automation, crm_and_lead_tracking]
+    min_families: 2
+    expected_mode: answer
+
+  - name: restaurant_reservations_followup
+    messages:
+      - restaurant reservations and customer follow-up by email
+    expected_families: [forms_and_intake, email_and_inbox_automation]
+    min_families: 2
+    expected_mode: answer
+
+  - name: cleaning_business_ai_help
+    messages:
+      - How can AI help my cleaning business with leads and email?
+    expected_families: [email_and_inbox_automation, crm_and_lead_tracking, consulting_and_workflow_audit]
+    min_families: 2
+    expected_mode: answer
+
+  - name: follow_up_automatically_generic
+    messages:
+      - I need something that follows up automatically
+    expected_families: [email_and_inbox_automation, crm_and_lead_tracking]
+    min_families: 1
+    expected_mode: answer
+
+  - name: gmail_and_pipeline
+    messages:
+      - Gmail inbox and a sales pipeline in one system
+    expected_families: [email_and_inbox_automation, crm_and_lead_tracking]
+    min_families: 2
+    expected_mode: answer
+
+  - name: website_design_boundary
+    messages:
+      - Can you build our website and track clients?
+    expected_families: [website_and_landing_pages, crm_and_lead_tracking]
+    min_families: 2
+    expected_mode: answer
+    must_include:
+      - website
+
+  - name: multi_turn_gmail_after_email
+    messages:
+      - Tell me about the AI email assistant
+      - What about Gmail?
+    expected_families: [email_and_inbox_automation]
+    expected_mode: answer
+    must_include:
+      - Gmail
+
+  - name: multi_turn_pricing_interrupts_audit
+    messages:
+      - I'd like a workflow audit
+      - How much is the Starter plan?
+    expected_mode: answer
+    must_include:
+      - $49
+    must_not_include:
+      - What industry
+
+  - name: small_team_crm_and_email
+    messages:
+      - small team needs CRM and email together
+    expected_families: [crm_and_lead_tracking, email_and_inbox_automation]
+    min_families: 2
+    expected_mode: answer
+
+  - name: lead_intake_from_website_form
+    messages:
+      - People fill out the form but nobody follows up
+    expected_families: [forms_and_intake, crm_and_lead_tracking]
+    expected_bundle: lead_intake_system
+    expected_mode: answer
+
+  - name: workflow_audit_mixed_scope
+    messages:
+      - not sure whether we need automation or a new form
+    expected_families: [consulting_and_workflow_audit, forms_and_intake]
+    min_families: 2
+    expected_mode: answer
+
+  - name: chatbot_faqs_on_site
+    messages:
+      - chatbot on our website to answer questions
+    expected_families: [chatbot_and_knowledge_base]
+    expected_bundle: site_chat_knowledge
+    expected_mode: answer
+
+  - name: clinic_booking_payments
+    messages:
+      - dental clinic needs online booking and payment follow-up
+    expected_families: [payments_and_booking, crm_and_lead_tracking]
+    min_families: 2
+    expected_mode: answer
+
+  - name: forms_and_crm_no_website_build
+    messages:
+      - we already have a site we need CRM and intake forms
+    expected_families: [forms_and_intake, crm_and_lead_tracking]
+    min_families: 2
+    expected_mode: answer
+
+  - name: one_quote_workflow_automate
+    messages:
+      - automate just our quote request workflow nothing else
+    expected_families: [workflow_automation, forms_and_intake]
+    min_families: 2
+    expected_mode: answer
+
+  - name: email_assistant_plus_lead_followup
+    messages:
+      - email assistant plus lead follow-up
+    expected_families: [email_and_inbox_automation, crm_and_lead_tracking]
+    min_families: 2
+    expected_mode: answer
+
+  - name: website_intake_crm_payments
+    messages:
+      - website form intake CRM and payments
+    expected_families: [forms_and_intake, crm_and_lead_tracking, payments_and_booking]
+    min_families: 2
+    expected_mode: answer
+
+  - name: messy_help_generic
+    messages:
+      - I need help my office is a mess with leads and email
+    expected_families: [email_and_inbox_automation, crm_and_lead_tracking, consulting_and_workflow_audit]
+    min_families: 2
+    expected_mode: answer
+
+  - name: track_clients_website_mention
+    messages:
+      - I need a website but also something that keeps track of clients
+    expected_families: [website_and_landing_pages, crm_and_lead_tracking]
+    min_families: 2
+    expected_bundle: lead_intake_system
+    expected_mode: answer

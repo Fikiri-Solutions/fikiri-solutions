@@ -182,6 +182,8 @@ from routes.integrations import integrations_bp
 from routes.appointments import appointments_bp
 from routes.google_risc import google_risc_bp
 from routes.email_triage import email_triage_bp
+from routes.site_chatbot_api import site_chatbot_bp
+from routes.admin_site_chat_api import admin_site_chat_bp
 
 # Global services dictionary
 services = {}
@@ -1072,6 +1074,8 @@ def register_blueprints(app):
         (kpi_bp, 'routes_kpi'),
         (integrations_bp, 'integrations'),
         (email_triage_bp, 'email_triage'),
+        (site_chatbot_bp, 'site_chatbot'),
+        (admin_site_chat_bp, 'admin_site_chat'),
     ]
 
     if os.getenv("GOOGLE_RISC_ENABLED", "").strip().lower() in ("1", "true", "yes"):

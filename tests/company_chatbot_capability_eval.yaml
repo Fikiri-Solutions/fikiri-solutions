@@ -1,0 +1,103 @@
+# Capability map eval — Phase 6e (multi-need detection, no LLM).
+cases:
+  - name: form_no_followup
+    query: People fill out the form but nobody follows up
+    expected_families: [forms_and_intake, crm_and_lead_tracking]
+    expected_capabilities: [capture lead, send follow-up]
+    expected_bundle: lead_intake_system
+
+  - name: book_and_pay
+    query: I need customers to book and pay online
+    expected_families: [payments_and_booking, forms_and_intake]
+    expected_capabilities: [book appointment, collect payment]
+    expected_bundle: booking_and_payments_flow
+
+  - name: emails_leads_one_place
+    query: I want my emails and leads in one place
+    expected_families: [email_and_inbox_automation, crm_and_lead_tracking]
+    expected_bundle: email_workflow_assistant
+
+  - name: website_plus_crm
+    query: I need a website but also something that keeps track of clients
+    expected_families: [website_and_landing_pages, crm_and_lead_tracking]
+    min_families: 2
+
+  - name: one_small_workflow
+    query: I just need one small workflow fixed
+    expected_families: [consulting_and_workflow_audit, workflow_automation]
+    expected_bundle: workflow_audit_path
+
+  - name: website_quotes_tracked
+    query: I need a website where customers can request quotes, and I want those leads tracked automatically
+    expected_families: [website_and_landing_pages, forms_and_intake, crm_and_lead_tracking]
+    expected_bundle: lead_intake_system
+    min_families: 3
+
+  - name: website_form_nobody_follows
+    query: Nobody follows up after we get a website form
+    expected_families: [forms_and_intake, crm_and_lead_tracking]
+    expected_capabilities: [send follow-up, capture lead]
+
+  - name: email_assistant_followup_combo
+    query: email assistant plus lead follow-up
+    expected_families: [email_and_inbox_automation, crm_and_lead_tracking]
+    min_families: 2
+
+  - name: workflow_audit_one_automation
+    query: workflow audit and one automation to start
+    expected_families: [consulting_and_workflow_audit, workflow_automation]
+
+  - name: chatbot_knowledge_booking
+    query: chatbot knowledge base and booking flow
+    expected_families: [chatbot_and_knowledge_base, payments_and_booking]
+    min_families: 2
+
+  - name: payments_records_reminders
+    query: payments customer records and reminders
+    expected_families: [payments_and_booking, crm_and_lead_tracking]
+    min_families: 2
+
+  - name: intake_crm_combo
+    query: website intake form and CRM
+    expected_families: [forms_and_intake, crm_and_lead_tracking, website_and_landing_pages]
+    min_families: 2
+
+  - name: not_sure_website_or_crm
+    query: I don't know if we need a website or a CRM
+    expected_families: [consulting_and_workflow_audit]
+    expected_bundle: workflow_audit_path
+
+  - name: automate_inbox_only
+    query: Can you automate my inbox?
+    expected_families: [email_and_inbox_automation]
+    expected_capabilities: [draft reply, route customer request]
+
+  - name: track_customers_only
+    query: Can this track customers?
+    expected_families: [crm_and_lead_tracking]
+    expected_capabilities: [update CRM]
+
+  - name: site_chatbot_faqs
+    query: chatbot on our website to answer questions
+    expected_families: [chatbot_and_knowledge_base]
+    expected_bundle: site_chat_knowledge
+
+  - name: quote_request_intake
+    query: new customer quote request form
+    expected_families: [forms_and_intake]
+    expected_capabilities: [capture lead]
+
+  - name: mixed_scope_audit_first
+    query: not sure whether we need automation or a new form
+    expected_families: [consulting_and_workflow_audit, forms_and_intake]
+    min_families: 2
+
+  - name: appointment_requests
+    query: automate my appointment requests
+    expected_families: [payments_and_booking, forms_and_intake]
+    expected_capabilities: [book appointment]
+
+  - name: drowning_emails_crm
+    query: drowning in emails and losing track of clients
+    expected_families: [email_and_inbox_automation, crm_and_lead_tracking]
+    min_families: 2

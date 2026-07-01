@@ -1,0 +1,280 @@
+# Messy-language variation matrix — manual widget QA seeds (capability map first).
+# Each seed has original + short / simple / long / complex phrasings.
+schema_version: v1
+
+cases:
+  # --- Seed 1: site + lead tracking without manual work ---
+  - name: site_track_original
+    seed: site_track_leads
+    style: original
+    messages:
+      - I need a site but I don't want to manually track every lead.
+    must_qualify: true
+    qualification_any: [interested, quoted, lead, website, intake, crm]
+    prefer_answer: true
+
+  - name: site_track_short
+    seed: site_track_leads
+    style: short
+    messages:
+      - need site track leads
+    must_qualify: true
+    qualification_any: [quoted, lead, website, crm, visitor mentioned]
+    prefer_answer: true
+
+  - name: site_track_simple
+    seed: site_track_leads
+    style: simple
+    messages:
+      - I want a website that tracks my leads for me
+    must_qualify: true
+    qualification_any: [interested, quoted, lead, website, crm]
+    prefer_answer: true
+
+  - name: site_track_long
+    seed: site_track_leads
+    style: long
+    messages:
+      - I'm looking for a website solution because I don't have time to manually track every single lead that comes in
+    must_qualify: true
+    qualification_any: [interested, quoted, lead, website, manual]
+    prefer_answer: true
+
+  - name: site_track_complex
+    seed: site_track_leads
+    style: complex
+    messages:
+      - We require a digital presence with automated lead attribution rather than manual spreadsheet tracking
+    must_qualify: true
+    qualification_any: [interested, quoted, lead, website, visitor mentioned]
+    prefer_answer: true
+
+  # --- Seed 2: booking + reminders ---
+  - name: booking_remind_original
+    seed: booking_reminders
+    style: original
+    messages:
+      - Can you make something that books appointments and reminds people?
+    must_qualify: true
+    qualification_any: [interested, quoted, book, appointment, remind, payment]
+    prefer_answer: true
+
+  - name: booking_remind_short
+    seed: booking_reminders
+    style: short
+    messages:
+      - booking and reminders
+    must_qualify: true
+    qualification_any: [quoted, book, appointment, remind, visitor mentioned]
+    prefer_answer: false
+
+  - name: booking_remind_simple
+    seed: booking_reminders
+    style: simple
+    messages:
+      - something to book people and send reminders
+    must_qualify: true
+    qualification_any: [interested, quoted, book, remind, appointment]
+    prefer_answer: true
+
+  - name: booking_remind_long
+    seed: booking_reminders
+    style: long
+    messages:
+      - we need a system that handles online appointment scheduling and automatically reminds customers before their visit
+    must_qualify: true
+    qualification_any: [interested, quoted, appointment, remind, book]
+    prefer_answer: true
+
+  - name: booking_remind_complex
+    seed: booking_reminders
+    style: complex
+    messages:
+      - appointment scheduling module with automated notification workflows for client reminders
+    must_qualify: true
+    qualification_any: [quoted, appointment, remind, automation, visitor mentioned]
+    prefer_answer: true
+
+  # --- Seed 3: Gmail + spreadsheet + missed follow-ups ---
+  - name: gmail_sheet_original
+    seed: gmail_spreadsheet_followups
+    style: original
+    messages:
+      - We have Gmail, a spreadsheet, and missed follow-ups.
+    must_qualify: true
+    qualification_any: [interested, quoted, email, follow, gmail]
+    prefer_answer: true
+
+  - name: gmail_sheet_short
+    seed: gmail_spreadsheet_followups
+    style: short
+    messages:
+      - gmail spreadsheet missed followups
+    must_qualify: true
+    qualification_any: [quoted, gmail, follow, email, visitor mentioned]
+    prefer_answer: true
+
+  - name: gmail_sheet_simple
+    seed: gmail_spreadsheet_followups
+    style: simple
+    messages:
+      - our leads are in gmail and a sheet and we keep missing follow ups
+    must_qualify: true
+    qualification_any: [quoted, gmail, follow, lead, email]
+    prefer_answer: true
+
+  - name: gmail_sheet_long
+    seed: gmail_spreadsheet_followups
+    style: long
+    messages:
+      - Right now we track everything in Gmail and a Google spreadsheet but follow-ups still slip through the cracks
+    must_qualify: true
+    qualification_any: [quoted, gmail, follow, lead, spreadsheet]
+    prefer_answer: true
+
+  - name: gmail_sheet_complex
+    seed: gmail_spreadsheet_followups
+    style: complex
+    messages:
+      - fragmented inbox and spreadsheet workflow with systemic follow-up leakage on inbound inquiries
+    must_qualify: true
+    qualification_any: [quoted, follow, email, visitor mentioned, workflow]
+    prefer_answer: true
+
+  # --- Seed 4: form → team + track customer ---
+  - name: form_team_original
+    seed: form_team_track
+    style: original
+    messages:
+      - I need a form that sends info to my team and tracks the customer.
+    must_qualify: true
+    qualification_any: [interested, quoted, form, team, customer, intake]
+    prefer_answer: true
+
+  - name: form_team_short
+    seed: form_team_track
+    style: short
+    messages:
+      - form for team track customer
+    must_qualify: true
+    qualification_any: [quoted, form, customer, team, visitor mentioned]
+    prefer_answer: false
+
+  - name: form_team_simple
+    seed: form_team_track
+    style: simple
+    messages:
+      - I want a web form that tells my team about new customers and keeps track of them
+    must_qualify: true
+    qualification_any: [interested, quoted, form, customer, team]
+    prefer_answer: true
+
+  - name: form_team_long
+    seed: form_team_track
+    style: long
+    messages:
+      - We need an intake form that notifies the right people on our team and logs each customer in a tracking system
+    must_qualify: true
+    qualification_any: [interested, quoted, form, customer, intake]
+    prefer_answer: true
+
+  - name: form_team_complex
+    seed: form_team_track
+    style: complex
+    messages:
+      - customer intake capture with staff notification routing and persistent customer record tracking
+    must_qualify: true
+    qualification_any: [quoted, customer, form, visitor mentioned, intake]
+    prefer_answer: true
+
+  # --- Seed 5: CRM vs automation uncertainty ---
+  - name: crm_or_auto_original
+    seed: crm_or_automation
+    style: original
+    messages:
+      - I don't know if I need a CRM or just automation.
+    must_qualify: true
+    qualification_any: [interested, quoted, crm, automation, workflow]
+    prefer_answer: true
+
+  - name: crm_or_auto_short
+    seed: crm_or_automation
+    style: short
+    messages:
+      - crm or automation?
+    must_qualify: true
+    qualification_any: [quoted, crm, automation, visitor mentioned]
+    prefer_answer: false
+
+  - name: crm_or_auto_simple
+    seed: crm_or_automation
+    style: simple
+    messages:
+      - not sure if we need a crm or just some automation
+    must_qualify: true
+    qualification_any: [interested, quoted, crm, automation]
+    prefer_answer: true
+
+  - name: crm_or_auto_long
+    seed: crm_or_automation
+    style: long
+    messages:
+      - Our team keeps debating whether we should buy a CRM or if workflow automation alone would solve the problem
+    must_qualify: true
+    qualification_any: [quoted, crm, automation, workflow]
+    prefer_answer: true
+
+  - name: crm_or_auto_complex
+    seed: crm_or_automation
+    style: complex
+    messages:
+      - undecided between customer relationship management tooling and targeted process automation
+    must_qualify: true
+    qualification_any: [quoted, crm, automation, visitor mentioned]
+    prefer_answer: true
+
+  # --- Seed 6: cleaning business + quote requests ---
+  - name: cleaning_quotes_original
+    seed: cleaning_quote_loss
+    style: original
+    messages:
+      - Can you help my cleaning business stop losing quote requests?
+    must_qualify: true
+    qualification_any: [interested, quoted, cleaning, quote, lead]
+    prefer_answer: true
+
+  - name: cleaning_quotes_short
+    seed: cleaning_quote_loss
+    style: short
+    messages:
+      - cleaning business losing quotes
+    must_qualify: true
+    qualification_any: [quoted, cleaning, quote, lead, visitor mentioned]
+    prefer_answer: true
+
+  - name: cleaning_quotes_simple
+    seed: cleaning_quote_loss
+    style: simple
+    messages:
+      - my cleaning company keeps losing quote requests from new customers
+    must_qualify: true
+    qualification_any: [quoted, cleaning, quote, customer]
+    prefer_answer: true
+
+  - name: cleaning_quotes_long
+    seed: cleaning_quote_loss
+    style: long
+    messages:
+      - I run a residential cleaning business and quote requests from the website keep getting lost before anyone follows up
+    must_qualify: true
+    qualification_any: [quoted, cleaning, quote, follow, lead]
+    prefer_answer: true
+
+  - name: cleaning_quotes_complex
+    seed: cleaning_quote_loss
+    style: complex
+    messages:
+      - field-service cleaning operation with inbound quote leakage on web inquiries
+    must_qualify: true
+    qualification_any: [quoted, quote, cleaning, visitor mentioned]
+    prefer_answer: true

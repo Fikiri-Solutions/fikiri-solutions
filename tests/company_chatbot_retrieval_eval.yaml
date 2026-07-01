@@ -1,0 +1,423 @@
+# Golden retrieval eval set — Phase 6b (deterministic, no LLM).
+cases:
+  - name: ai_email_assistant_direct
+    query: Tell me about the AI email assistant
+    expected_ids: [product_ai_email_assistant]
+    topic: product_email
+
+  - name: email_assisant_typo
+    query: I need to find out about the email assisant
+    expected_ids: [product_ai_email_assistant]
+    topic: product_email
+
+  - name: producsts_typo
+    query: Im asking about one of the producsts, the AI email assistant
+    expected_ids: [product_ai_email_assistant]
+    topic: product_email
+
+  - name: email_automation_phrase
+    query: How does email automation work?
+    expected_ids: [product_email_overview, product_ai_email_assistant, product_email_classify]
+    topic: product_email
+
+  - name: inbox_assistant
+    query: Do you have an inbox assistant?
+    expected_ids: [product_ai_email_assistant, product_email_overview]
+    topic: product_email
+
+  - name: gmail_integration
+    query: Gmail integration
+    expected_ids: [integration_gmail]
+    topic: integrations
+
+  - name: outlook_integration
+    query: Outlook integration
+    expected_ids: [integration_outlook]
+    topic: integrations
+
+  - name: gmail_followup_with_context
+    query: What about Gmail?
+    previous_query: Tell me about the AI email assistant
+    expected_ids: [integration_gmail, product_ai_email_assistant]
+    topic: integrations
+
+  - name: outlook_followup_with_context
+    query: What about Outlook?
+    previous_query: Tell me about email automation
+    expected_ids: [integration_outlook, product_ai_email_assistant, product_email_overview]
+    topic: integrations
+
+  - name: starter_pricing_how_much
+    query: How much is Starter?
+    expected_ids: [pricing_starter]
+    topic: pricing
+
+  - name: starter_plan_price
+    query: What is the Starter plan price?
+    expected_ids: [pricing_starter]
+    topic: pricing
+
+  - name: starter_forty_nine
+    query: Is Starter forty-nine dollars?
+    expected_ids: [pricing_starter]
+    topic: pricing
+
+  - name: growth_pricing
+    query: Growth plan price
+    expected_ids: [pricing_growth]
+    topic: pricing
+
+  - name: business_pricing
+    query: How much is the Business plan?
+    expected_ids: [pricing_business]
+    topic: pricing
+
+  - name: enterprise_pricing
+    query: Enterprise plan cost
+    expected_ids: [pricing_enterprise]
+    topic: pricing
+
+  - name: free_trial
+    query: free trial credit card
+    expected_ids: [faq_free_trial, signup_trial]
+    topic: pricing
+
+  - name: start_free_trial
+    query: How do I start a free trial?
+    expected_ids: [signup_trial, faq_free_trial]
+    topic: pricing
+
+  - name: trial_no_card
+    query: Do I need a credit card for the trial?
+    expected_ids: [faq_free_trial, signup_trial]
+    topic: pricing
+
+  - name: which_plan_fit
+    query: Which plan is right for a small business?
+    expected_ids: [faq_plan_fit]
+    topic: pricing
+
+  - name: change_plans
+    query: Can I upgrade or downgrade my plan?
+    expected_ids: [faq_change_plans]
+    topic: pricing
+
+  - name: ai_response_limit
+    query: What happens if I exceed my monthly AI response limit?
+    expected_ids: [faq_response_limit]
+    topic: pricing
+
+  - name: workflow_audit
+    query: I want a workflow audit
+    expected_ids: [service_workflow_audit, service_workflow_audit_focus]
+    topic: workflow_audit
+
+  - name: workflow_audit_intake
+    query: workflow audit intake
+    expected_ids: [service_workflow_audit, contact_intake_path]
+    topic: workflow_audit
+
+  - name: audit_bottleneck
+    query: Map our workflow bottleneck
+    expected_ids: [service_workflow_audit_focus, service_workflow_audit]
+    topic: workflow_audit
+
+  - name: intake_form
+    query: Where is the intake form?
+    expected_ids: [contact_intake_path, service_workflow_audit]
+    topic: workflow_audit
+
+  - name: crm_overview
+    query: Tell me about your CRM
+    expected_ids: [product_crm_overview]
+    topic: product_crm
+
+  - name: lead_management
+    query: CRM lead management for small teams
+    expected_ids: [product_crm_overview, product_crm_activity]
+    topic: product_crm
+
+  - name: crm_pipeline
+    query: How does the CRM pipeline work?
+    expected_ids: [product_crm_overview, product_crm_activity]
+    topic: product_crm
+
+  - name: lightweight_crm
+    query: lightweight CRM for small teams
+    expected_ids: [product_crm_practical, product_crm_overview]
+    topic: product_crm
+
+  - name: ai_copilot
+    query: What is the AI assistant copilot?
+    expected_ids: [product_ai_copilot, product_ai_context]
+    topic: product_email
+
+  - name: florida_smb
+    query: Do you work with Florida SMB teams?
+    expected_ids: [company_florida_smb]
+    topic: company
+
+  - name: florida_consulting
+    query: Florida SMB consulting
+    expected_ids: [company_florida_smb, service_consulting]
+    topic: services
+
+  - name: landscaping
+    query: landscaping business email follow-up
+    expected_ids: [industry_landscaping]
+    topic: industries
+
+  - name: restaurant
+    query: restaurant customer follow-up
+    expected_ids: [industry_restaurant]
+    topic: industries
+
+  - name: medical_clinic
+    query: dental clinic appointments and email
+    expected_ids: [industry_dental_medical]
+    topic: industries
+
+  - name: home_services
+    query: HVAC quote requests and dispatch
+    expected_ids: [industry_home_services]
+    topic: industries
+
+  - name: professional_services
+    query: professional services pipeline follow-up
+    expected_ids: [industry_professional_services]
+    topic: industries
+
+  - name: contact_email
+    query: How do I contact your team?
+    expected_ids: [contact_info]
+    topic: contact
+
+  - name: contact_page
+    query: contact page email address
+    expected_ids: [contact_info]
+    topic: contact
+
+  - name: what_do_you_do
+    query: what do you do
+    expected_ids: [company_about, company_three_capabilities]
+    topic: company
+
+  - name: what_is_fikiri
+    query: What is Fikiri Solutions?
+    expected_ids: [company_about, company_three_capabilities]
+    topic: company
+
+  - name: three_capabilities
+    query: What products do you offer?
+    expected_ids: [company_three_capabilities, company_about]
+    topic: company
+
+  - name: company_outcomes
+    query: What outcomes does Fikiri focus on?
+    expected_ids: [company_outcomes, company_about]
+    topic: company
+
+  - name: hipaa_unsupported
+    query: Are you HIPAA certified?
+    expected_ids: [boundary_no_fake_compliance]
+    topic: boundaries
+
+  - name: soc2_unsupported
+    query: SOC 2 compliance certification
+    expected_ids: [boundary_no_fake_compliance]
+    topic: boundaries
+
+  - name: case_study_unsupported
+    query: Share your restaurant case study ROI numbers
+    expected_ids: [boundary_no_case_studies]
+    topic: boundaries
+
+  - name: website_service_boundary
+    query: Can you build websites for us?
+    expected_ids: [boundary_websites]
+    topic: boundaries
+
+  - name: wordpress_boundary
+    query: Do you do WordPress website design?
+    expected_ids: [boundary_websites]
+    topic: boundaries
+
+  - name: consulting_services
+    query: Do you offer implementation consulting?
+    expected_ids: [service_consulting]
+    topic: services
+
+  - name: system_fixers
+    query: Are you system fixers or just software?
+    expected_ids: [service_system_fixers]
+    topic: services
+
+  - name: workflow_five_beats
+    query: five beats workflow handoff
+    expected_ids: [workflow_five_beats]
+    topic: services
+
+  - name: inquiry_leak
+    query: missed leads in our inquiry queue
+    expected_ids: [workflow_inquiry_leak, product_email_assistant_goal]
+    topic: services
+
+  - name: email_draft_replies
+    query: draft email replies for my team
+    expected_ids: [product_email_draft, product_ai_email_assistant]
+    topic: product_email
+
+  - name: email_classify_route
+    query: classify and route urgent emails
+    expected_ids: [product_email_classify, product_ai_email_assistant]
+    topic: product_email
+
+  - name: automation_partial_faq
+    query: Is automation studio fully live?
+    expected_ids: [faq_automation_partial]
+    topic: product
+
+  - name: google_workspace
+    query: Google Workspace email integration
+    expected_ids: [integration_gmail]
+    topic: integrations
+
+  - name: microsoft_365
+    query: Microsoft 365 Outlook support
+    expected_ids: [integration_outlook]
+    topic: integrations
+
+  - name: site_chat_widget
+    query: What can this chat assistant do?
+    expected_ids: [site_chat_widget]
+    topic: product
+
+  - name: vague_help_me
+    query: help me
+    expected_ids: [site_chat_widget]
+    topic: product
+
+  - name: pricing_vs_product_email
+    query: Starter plan email automation limits
+    expected_ids: [pricing_starter, faq_response_limit]
+    topic: pricing
+
+  - name: product_not_pricing_starter
+    query: explain the AI email assistant features
+    expected_ids: [product_ai_email_assistant, product_email_assistant_goal]
+    topic: product_email
+
+  - name: pricing_not_product_crm
+    query: Growth plan monthly cost
+    expected_ids: [pricing_growth]
+    topic: pricing
+
+  - name: ai_assistant_hyphen
+    query: ai-email assistant for inbox
+    expected_ids: [product_ai_email_assistant]
+    topic: product_email
+
+  - name: automations_typo
+    query: email automations for small business
+    expected_ids: [product_email_overview, product_ai_email_assistant]
+    topic: product_email
+
+  - name: assit_typo
+    query: can you assit with email triage
+    expected_ids: [product_email_classify, product_ai_email_assistant]
+    topic: product_email
+
+  - name: enterprise_contact_sales
+    query: enterprise plan contact sales
+    expected_ids: [pricing_enterprise]
+    topic: pricing
+
+  - name: signup_get_started
+    query: sign up and get started
+    expected_ids: [signup_trial, faq_free_trial]
+    topic: pricing
+
+  - name: messy_drowning_emails
+    query: I'm drowning in emails
+    expected_ids: [product_ai_email_assistant, product_email_overview, product_email_classify]
+    expected_families: [inbox_email]
+
+  - name: messy_slipping_cracks
+    query: People keep slipping through the cracks
+    expected_ids: [workflow_inquiry_leak, product_crm_overview, product_email_assistant_goal]
+    expected_families: [lead_followup, crm_tracking]
+
+  - name: messy_stop_missing_leads
+    query: Can this help my office stop missing leads?
+    expected_ids: [product_email_assistant_goal, workflow_inquiry_leak, product_crm_overview]
+    expected_families: [lead_followup]
+
+  - name: messy_follows_up_for_me
+    query: I need something that follows up for me
+    expected_ids: [product_email_draft, product_crm_activity, product_ai_email_assistant]
+    expected_families: [lead_followup, inbox_email]
+
+  - name: messy_gmail_stuff
+    query: Do y'all do Gmail stuff?
+    expected_ids: [integration_gmail, product_ai_email_assistant]
+    expected_families: [inbox_email]
+
+  - name: messy_automate_inbox
+    query: Can you automate my inbox?
+    expected_ids: [product_ai_email_assistant, product_email_overview]
+    expected_families: [inbox_email]
+
+  - name: messy_managing_customers
+    query: I need help managing customers
+    expected_ids: [product_crm_overview, product_crm_practical]
+    expected_families: [crm_tracking]
+
+  - name: messy_reply_emails
+    query: I need something that replies to emails
+    expected_ids: [product_email_draft, product_ai_email_assistant]
+    expected_families: [inbox_email]
+
+  - name: messy_cleaning_business
+    query: How can AI help my cleaning business?
+    expected_ids: [company_about, company_florida_smb, product_ai_copilot]
+    expected_families: [consulting, company]
+
+  - name: messy_track_customers
+    query: Can this track customers?
+    expected_ids: [product_crm_overview, product_crm_activity]
+    expected_families: [crm_tracking]
+
+  - name: messy_follow_ups
+    query: I need help with follow ups
+    expected_ids: [product_crm_activity, product_email_draft, workflow_inquiry_leak]
+    expected_families: [lead_followup, crm_tracking]
+
+  - name: messy_small_businesses
+    query: What do you do for small businesses?
+    expected_ids: [company_about, company_florida_smb]
+    expected_families: [company]
+
+  - name: messy_appointment_requests
+    query: Can you automate my appointment requests?
+    expected_ids: [workflow_inquiry_leak, industry_dental_medical]
+    expected_families: [lead_followup]
+
+  - name: messy_like_crm
+    query: Do you build something like a CRM?
+    expected_ids: [product_crm_overview, product_crm_practical]
+    expected_families: [crm_tracking]
+
+  - name: messy_incoming_leads
+    query: I need a system for incoming leads
+    expected_ids: [workflow_inquiry_leak, product_crm_overview, product_email_assistant_goal]
+    expected_families: [lead_followup]
+
+  - name: messy_manual_gmail_replies
+    query: I'm tired of manually replying to leads in Gmail
+    expected_ids: [product_ai_email_assistant, integration_gmail, product_email_draft]
+    expected_families: [inbox_email, lead_followup]
+
+  - name: messy_website_form_followup
+    query: Nobody follows up after we get a website form
+    expected_ids: [workflow_inquiry_leak, product_crm_overview, contact_intake_path]
+    expected_families: [lead_followup, crm_tracking]
