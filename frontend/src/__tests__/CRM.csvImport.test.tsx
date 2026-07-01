@@ -6,6 +6,7 @@ import { CRM } from '../pages/CRM'
 const { apiClientMock, addToastMock } = vi.hoisted(() => ({
   apiClientMock: {
     getLeads: vi.fn(),
+    getLeadsPage: vi.fn(),
     previewLeadsCsv: vi.fn(),
     importLeadsCsv: vi.fn(),
     exportLeadsCsv: vi.fn(),
@@ -58,6 +59,10 @@ describe('CRM CSV import preview', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     apiClientMock.getLeads.mockResolvedValue([])
+    apiClientMock.getLeadsPage.mockResolvedValue({
+      leads: [],
+      pagination: { total_count: 0, returned_count: 0, limit: 50, offset: 0, has_more: false },
+    })
     apiClientMock.previewLeadsCsv.mockResolvedValue({
       rows: [{ row: 2, email: 'a@example.com', name: 'Ada', status: 'ok' }],
       summary: { ok: 1, duplicate: 0, invalid: 0, total: 1 },

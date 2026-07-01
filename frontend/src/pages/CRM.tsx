@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Users, Mail, Phone, Building, Calendar, Star, Filter, Search, Plus, Activity, Download, Upload, GitBranch } from 'lucide-react'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { apiClient, LeadData } from '../services/apiClient'
@@ -26,6 +26,56 @@ function pipelineColumnForStage(stage: string | undefined): string {
   return 'new'
 }
 
+const PIPELINE_STAGE_PAGE_SIZE = 8
+const TABLE_PAGE_SIZE = 50
+
+const pipelineEmptyCopy: Record<(typeof pipelineStages)[number]['id'], string> = {
+  new: 'No new leads yet. New opportunities will appear here.',
+  contacted: 'No contacted leads yet. Drag leads here once outreach starts.',
+  replied: 'No replies yet. Move leads here when a conversation starts.',
+  qualified: 'No qualified leads yet. Move strong-fit leads here after review.',
+  closed: 'No closed leads yet. Move won or closed opportunities here.',
+}
+
+function initialVisibleByStage(): Record<string, number> {
+  return Object.fromEntries(
+    pipelineStages.map((stage) => [stage.id, PIPELINE_STAGE_PAGE_SIZE])
+  )
+}
+
+type ScoreTier = { label: string; className: string }
+
+function scoreTierForLead(lead: LeadData): ScoreTier {
+  const score = lead.score
+  if (score == null || Number.isNaN(Number(score))) {
+    return {
+      label: 'Needs Review',
+      className: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+    }
+  }
+  if (score === 0 && !lead.scoreBreakdown) {
+    return {
+      label: 'Needs Review',
+      className: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+    }
+  }
+  if (score >= 75) {
+    return {
+      label: 'Hot',
+      className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+    }
+  }
+  if (score >= 50) {
+    return {
+      label: 'Warm',
+      className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    }
+  }
+  return {
+    label: 'Low Fit',
+    className: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
+  }
+}
 
 type CsvPreviewRow = {
   row: number
@@ -64,6 +114,19 @@ function buildCsvPreviewState(
   }
 }
 
+/** O(n) single pass; maps legacy stages (e.g. booked) into canonical columns. */
+function groupLeadsByStage(items: LeadData[]) {
+  const grouped: Record<string, LeadData[]> = {}
+  pipelineStages.forEach(stage => {
+    grouped[stage.id] = []
+  })
+  items.forEach(lead => {
+    const col = pipelineColumnForStage(lead.stage)
+    if (grouped[col]) grouped[col].push(lead)
+  })
+  return grouped
+}
+
 export const CRM: React.FC = () => {
   const [leads, setLeads] = useState<LeadData[]>([])
   const [pipeline, setPipeline] = useState<Record<string, LeadData[]>>({})
@@ -96,8 +159,55 @@ export const CRM: React.FC = () => {
   const [isPreviewingImport, setIsPreviewingImport] = useState(false)
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null)
   const [csvPreview, setCsvPreview] = useState<CsvPreviewState | null>(null)
+  const [tableLeads, setTableLeads] = useState<LeadData[]>([])
+  const [tableLoading, setTableLoading] = useState(false)
+  const [tablePagination, setTablePagination] = useState({
+    total_count: 0,
+    returned_count: 0,
+    limit: TABLE_PAGE_SIZE,
+    offset: 0,
+    has_more: false,
+  })
+  const [tableOffset, setTableOffset] = useState(0)
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [visibleByStage, setVisibleByStage] = useState<Record<string, number>>(initialVisibleByStage)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { addToast } = useToast()
+
+  const fetchTableLeads = useCallback(async (offset: number, q: string, stage: string) => {
+    setTableLoading(true)
+    try {
+      const result = await apiClient.getLeadsPage({
+        limit: TABLE_PAGE_SIZE,
+        offset,
+        q: q.trim() || undefined,
+        stage: stage !== 'all' ? stage : undefined,
+      })
+      setTableLeads(result.leads)
+      setTablePagination(result.pagination)
+    } catch (err) {
+      setError(getUserFriendlyError(err))
+    } finally {
+      setTableLoading(false)
+    }
+  }, [])
+
+  const refreshCrmData = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const leadsData = await apiClient.getLeads()
+      setLeads(leadsData)
+      setPipeline(groupLeadsByStage(leadsData))
+    } catch (err) {
+      setError(getUserFriendlyError(err))
+    } finally {
+      setIsLoading(false)
+    }
+
+    await fetchTableLeads(tableOffset, debouncedSearch, filterStage)
+  }, [fetchTableLeads, tableOffset, debouncedSearch, filterStage])
 
   const handleAddLead = async () => {
     if (!newLead.name || !newLead.email) {
@@ -128,7 +238,7 @@ export const CRM: React.FC = () => {
       setShowAddLeadModal(false)
       addToast({ type: 'success', title: 'Lead Added', message: 'The new lead has been added to your CRM.' })
       setError(null)
-      fetchLeads() // Refresh the leads list
+      refreshCrmData()
     } catch (error) {
       // Failed to add lead
       setError(getUserFriendlyError(error))
@@ -138,24 +248,40 @@ export const CRM: React.FC = () => {
   }
 
   useEffect(() => {
-    fetchLeads()
+    let cancelled = false
+    const loadPipeline = async () => {
+      setIsLoading(true)
+      setError(null)
+      try {
+        const leadsData = await apiClient.getLeads()
+        if (cancelled) return
+        setLeads(leadsData)
+        setPipeline(groupLeadsByStage(leadsData))
+      } catch (err) {
+        if (!cancelled) setError(getUserFriendlyError(err))
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+    void loadPipeline()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  const fetchLeads = async () => {
-    setIsLoading(true)
-    setError(null)
-    
-    try {
-      const leadsData = await apiClient.getLeads()
-      setLeads(leadsData)
-      setPipeline(groupLeadsByStage(leadsData))
-    } catch (error) {
-      // Failed to fetch leads
-      setError(getUserFriendlyError(error))
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(searchTerm), 300)
+    return () => window.clearTimeout(timer)
+  }, [searchTerm])
+
+  useEffect(() => {
+    setTableOffset(0)
+    setVisibleByStage(initialVisibleByStage())
+  }, [debouncedSearch, filterStage])
+
+  useEffect(() => {
+    void fetchTableLeads(tableOffset, debouncedSearch, filterStage)
+  }, [tableOffset, debouncedSearch, filterStage, fetchTableLeads])
 
   const handleExportCsv = async () => {
     setIsExporting(true)
@@ -241,25 +367,12 @@ export const CRM: React.FC = () => {
         title: 'Import complete',
         message: `${result.imported} leads imported${result.skipped ? `, ${result.skipped} skipped` : ''}.`
       })
-      fetchLeads()
+      refreshCrmData()
     } catch (err) {
       setError(getUserFriendlyError(err))
     } finally {
       setIsImporting(false)
     }
-  }
-
-  // Optimized: O(n) single pass; maps legacy stages (e.g. booked) into canonical columns.
-  const groupLeadsByStage = (items: LeadData[]) => {
-    const grouped: Record<string, LeadData[]> = {}
-    pipelineStages.forEach(stage => {
-      grouped[stage.id] = []
-    })
-    items.forEach(lead => {
-      const col = pipelineColumnForStage(lead.stage)
-      if (grouped[col]) grouped[col].push(lead)
-    })
-    return grouped
   }
 
   const handleDragEnd = async (result: DropResult) => {
@@ -290,30 +403,26 @@ export const CRM: React.FC = () => {
     try {
       await apiClient.updateLeadStage(result.draggableId, destStage)
       addToast({ type: 'success', title: 'Lead Updated', message: 'Lead stage updated successfully' })
-      fetchLeads()
+      refreshCrmData()
     } catch (err) {
       setPipeline(previous)
       addToast({ type: 'error', title: 'Update Failed', message: 'Failed to update lead. Please try again.' })
     }
   }
 
-  // Optimized: memoize toLowerCase() calls
-  // Optimized: memoize filter results and toLowerCase() calls
-  const filteredLeads = useMemo(() => {
-    if (!searchTerm && filterStage === 'all') return leads
-    
-    const searchLower = searchTerm.toLowerCase()
-    return leads.filter(lead => {
-      const matchesSearch = !searchTerm || 
-        lead.name.toLowerCase().includes(searchLower) ||
-        lead.email.toLowerCase().includes(searchLower) ||
-        lead.company.toLowerCase().includes(searchLower)
-      
-      const matchesStage = filterStage === 'all' || lead.stage === filterStage
-      
-      return matchesSearch && matchesStage
-    })
-  }, [leads, searchTerm, filterStage])
+  const loadMorePipelineStage = (stageId: string) => {
+    setVisibleByStage((prev) => ({
+      ...prev,
+      [stageId]: (prev[stageId] ?? PIPELINE_STAGE_PAGE_SIZE) + PIPELINE_STAGE_PAGE_SIZE,
+    }))
+  }
+
+  const tableRangeStart =
+    tablePagination.total_count === 0 ? 0 : tableOffset + 1
+  const tableRangeEnd =
+    tablePagination.total_count === 0
+      ? 0
+      : Math.min(tableOffset + tableLeads.length, tablePagination.total_count)
 
   // Optimized: memoize stats calculations
   const leadStats = useMemo(() => ({
@@ -584,7 +693,14 @@ export const CRM: React.FC = () => {
 
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
-            {pipelineStages.map((stage) => (
+            {pipelineStages.map((stage) => {
+              const stageLeads = pipeline[stage.id] || []
+              const stageTotal = stageLeads.length
+              const visibleLimit = visibleByStage[stage.id] ?? PIPELINE_STAGE_PAGE_SIZE
+              const visibleLeads = stageLeads.slice(0, visibleLimit)
+              const hiddenCount = stageTotal - visibleLeads.length
+
+              return (
               <Droppable droppableId={stage.id} key={stage.id}>
                 {(provided, snapshot) => (
                   <div
@@ -600,11 +716,18 @@ export const CRM: React.FC = () => {
                         <p className="text-xs text-brand-text/50 dark:text-gray-500">{stage.helper}</p>
                       </div>
                       <span className="text-sm font-semibold text-brand-text dark:text-white">
-                        {pipeline[stage.id]?.length || 0}
+                        {stageTotal}
                       </span>
                     </div>
+                    {stageTotal > 0 && (
+                      <p className="mb-2 text-[11px] text-brand-text/50 dark:text-gray-500">
+                        Showing {visibleLeads.length} of {stageTotal}
+                      </p>
+                    )}
                     <div className="space-y-3 min-h-[120px]">
-                      {(pipeline[stage.id] || []).map((lead, index) => (
+                      {visibleLeads.map((lead, index) => {
+                        const tier = scoreTierForLead(lead)
+                        return (
                         <Draggable draggableId={lead.id} index={index} key={lead.id}>
                           {(dragProvided, dragSnapshot) => (
                             <div
@@ -620,13 +743,17 @@ export const CRM: React.FC = () => {
                                   <p className="font-semibold text-brand-text dark:text-white truncate">{lead.name}</p>
                                   <p className="text-xs text-brand-text/60 dark:text-gray-400 truncate">{lead.email}</p>
                                 </div>
-                                <span className={`shrink-0 whitespace-nowrap text-xs font-semibold px-2 py-1 rounded-full ${
-                                  lead.score >= 70 ? 'bg-emerald-100 text-emerald-700' :
-                                  lead.score >= 40 ? 'bg-amber-100 text-amber-700' :
-                                  'bg-rose-100 text-rose-700'
-                                }`} title={scoreBreakdownSummary(lead) ?? undefined}>
-                                  {lead.score}/100
-                                </span>
+                                <div
+                                  className="flex shrink-0 flex-col items-end gap-1"
+                                  title={scoreBreakdownSummary(lead) ?? undefined}
+                                >
+                                  <span className={`whitespace-nowrap text-xs font-semibold px-2 py-1 rounded-full ${tier.className}`}>
+                                    {tier.label}
+                                  </span>
+                                  <span className={`text-[11px] font-medium ${getScoreColor(lead.score)}`}>
+                                    {lead.score}/100
+                                  </span>
+                                </div>
                               </div>
                               <div className="mt-3 flex items-center justify-between text-xs text-brand-text/60 dark:text-gray-400">
                                 <div className="flex items-center gap-1">
@@ -654,18 +781,27 @@ export const CRM: React.FC = () => {
                             </div>
                           )}
                         </Draggable>
-                      ))}
+                      )})}
                       {provided.placeholder}
-                      {(pipeline[stage.id] || []).length === 0 && (
+                      {stageTotal === 0 && (
                         <div className="rounded-xl border border-dashed border-brand-text/20 dark:border-gray-700 p-4 text-center text-sm text-brand-text/60 dark:text-gray-400">
-                          Drop leads here
+                          {pipelineEmptyCopy[stage.id]}
                         </div>
                       )}
                     </div>
+                    {hiddenCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => loadMorePipelineStage(stage.id)}
+                        className="mt-3 w-full rounded-lg border border-brand-text/15 py-2 text-xs font-medium text-brand-primary hover:bg-brand-primary/5 dark:border-gray-600 dark:text-brand-accent"
+                      >
+                        Load more ({hiddenCount} remaining)
+                      </button>
+                    )}
                   </div>
                 )}
               </Droppable>
-            ))}
+            )})}
           </div>
         </DragDropContext>
       </div>
@@ -721,10 +857,12 @@ export const CRM: React.FC = () => {
       {/* Leads Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-medium text-brand-text dark:text-white">Leads ({filteredLeads.length})</h3>
+          <h3 className="text-lg font-medium text-brand-text dark:text-white">
+            Leads ({tablePagination.total_count})
+          </h3>
         </div>
         
-        {isLoading ? (
+        {tableLoading && tableLeads.length === 0 ? (
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
           </div>
@@ -757,7 +895,9 @@ export const CRM: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-900 divide-y divide-brand-text/10 dark:divide-gray-700">
-                {filteredLeads.map((lead) => (
+                {tableLeads.map((lead) => {
+                  const tier = scoreTierForLead(lead)
+                  return (
                   <tr key={lead.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -784,16 +924,16 @@ export const CRM: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div
-                        className={`text-sm font-medium ${getScoreColor(lead.score)}`}
+                        className="flex flex-col gap-1"
                         title={scoreBreakdownSummary(lead) ?? undefined}
                       >
-                        {lead.score}/100
+                        <span className={`text-sm font-medium ${getScoreColor(lead.score)}`}>
+                          {lead.score}/100
+                        </span>
+                        <span className={`inline-flex w-fit items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${tier.className}`}>
+                          {tier.label}
+                        </span>
                       </div>
-                      {scoreBreakdownSummary(lead) ? (
-                        <div className="mt-0.5 text-[10px] text-brand-text/60 dark:text-gray-500 truncate max-w-[260px]">
-                          {scoreBreakdownSummary(lead)}
-                        </div>
-                      ) : null}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-brand-text/70 dark:text-gray-400">
                       {lead.lastContact}
@@ -812,11 +952,11 @@ export const CRM: React.FC = () => {
                       </button>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
             
-            {filteredLeads.length === 0 && (
+            {tableLeads.length === 0 && !tableLoading && (
               <EmptyState 
                 type="crm" 
                 onAction={searchTerm || filterStage !== 'all' ? undefined : () => {
@@ -824,6 +964,32 @@ export const CRM: React.FC = () => {
                 }}
               />
             )}
+
+            <div className="flex flex-col gap-3 border-t border-gray-200 px-6 py-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-brand-text/70 dark:text-gray-400">
+                Showing {tableRangeStart}–{tableRangeEnd} of {tablePagination.total_count}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Previous"
+                  disabled={tableOffset === 0 || tableLoading}
+                  onClick={() => setTableOffset((prev) => Math.max(0, prev - TABLE_PAGE_SIZE))}
+                  className="rounded-lg border border-brand-text/20 px-4 py-2 text-sm font-medium text-brand-text transition-colors hover:bg-brand-background/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next"
+                  disabled={!tablePagination.has_more || tableLoading}
+                  onClick={() => setTableOffset((prev) => prev + TABLE_PAGE_SIZE)}
+                  className="rounded-lg border border-brand-text/20 px-4 py-2 text-sm font-medium text-brand-text transition-colors hover:bg-brand-background/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </TableScroll>
         )}
       </div>
