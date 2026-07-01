@@ -840,7 +840,7 @@ def sync_gmail():
 
                 if use_inline:
                     logger.info(
-                        "Gmail sync: SQLite database — processing in web process thread"
+                        "Gmail sync: processing in web process thread (inline)"
                     )
                     import threading
 

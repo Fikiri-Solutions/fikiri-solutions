@@ -30,26 +30,41 @@ _STALE_GMAIL_SYNC_ERROR = (
 
 def _reconcile_stale_gmail_sync_queue(user_id: int) -> bool:
     """
-    Reset user_sync_status when a Gmail job stayed pending (no worker / stuck queue).
+    Reset user_sync_status when a Gmail job is orphaned (no worker / stuck processing).
 
-    Returns True when orphaned queued state was cleared.
+    Returns True when in-flight state was cleared.
     """
     try:
         stale_minutes = max(1, int(os.getenv("GMAIL_SYNC_STALE_MINUTES", "2")))
         if not db_optimizer.table_exists("gmail_sync_jobs"):
             return False
-        older_pred = db_optimizer.sql_column_older_than_n_minutes_ago("created_at", stale_minutes)
+
+        older_created = db_optimizer.sql_column_older_than_n_minutes_ago("created_at", stale_minutes)
+        older_started = db_optimizer.sql_column_older_than_n_minutes_ago("started_at", stale_minutes)
+
         stale_rows = db_optimizer.execute_query(
             f"""
             SELECT job_id FROM gmail_sync_jobs
             WHERE user_id = ? AND status = 'pending'
               AND started_at IS NULL
-              AND {older_pred}
+              AND {older_created}
             ORDER BY created_at DESC
             LIMIT 1
             """,
             (user_id,),
         )
+        if not stale_rows:
+            stale_rows = db_optimizer.execute_query(
+                f"""
+                SELECT job_id FROM gmail_sync_jobs
+                WHERE user_id = ? AND status = 'processing'
+                  AND started_at IS NOT NULL
+                  AND {older_started}
+                ORDER BY started_at DESC
+                LIMIT 1
+                """,
+                (user_id,),
+            )
         if not stale_rows:
             return False
         row = stale_rows[0]
@@ -345,7 +360,7 @@ def email_sync_status():
                     except (TypeError, ValueError):
                         syncing_col = 0
 
-                if sync_status == "queued":
+                if sync_status in ("queued", "in_progress", "processing") or syncing_col:
                     if _reconcile_stale_gmail_sync_queue(user_id):
                         sync_status = "connected_pending_sync"
                         syncing_col = 0
@@ -438,8 +453,8 @@ def email_sync_status():
                                 if recent_sync_check and len(recent_sync_check) > 0:
                                     recent_count = recent_sync_check[0].get('count', 0) if isinstance(recent_sync_check[0], dict) else recent_sync_check[0][0] if len(recent_sync_check[0]) > 0 else 0
                                     if recent_count > 0:
-                                        # Estimate progress based on recent activity (rough estimate)
-                                        progress = min(10 + (recent_count * 2), 95)  # Cap at 95% until complete
+                                        # Rough estimate only when mail is actively landing
+                                        progress = min(recent_count * 5, 95)
                                         logger.debug(f"Estimated progress from recent sync activity: {progress}%")
                             except Exception as estimate_error:
                                 logger.debug(f"Could not estimate progress: {estimate_error}")

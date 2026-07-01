@@ -91,6 +91,26 @@ describe('EmailCommandCenter (Organize)', () => {
     classifyEmailTriageUnclassified.mockResolvedValue({ count: 0, classified: [] })
   })
 
+  it('does not trap the UI when sync is stuck server-side without a local session', async () => {
+    getEmailTriage.mockResolvedValue({
+      emails: [],
+      category_counts: { business_lead: 0, action_needed: 0, review_needed: 0 },
+      pagination: { total_count: 0, has_more: false },
+    })
+    getEmailSyncStatus.mockResolvedValue({
+      syncing: true,
+      progress: 10,
+      sync_status: 'queued',
+      total_emails: 0,
+    })
+    renderOrganize()
+    await waitFor(() => {
+      expect(screen.getByText(/Nothing in Opportunities/i)).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/Updating your inbox/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Update & sort/i })).not.toBeDisabled()
+  })
+
   it('renders Organize with queue cards, trust copy, and calm row copy', async () => {
     renderOrganize()
     await waitFor(() => {

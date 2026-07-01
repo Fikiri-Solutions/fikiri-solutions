@@ -31,6 +31,8 @@ import {
   suggestedNextStepLine,
 } from '../constants/organizeRecommendations'
 
+const SYNC_UI_SESSION_MAX_MS = 4 * 60 * 1000
+
 export interface TriageListEmail {
   id: string
   from: string
@@ -86,6 +88,7 @@ export const EmailCommandCenter: React.FC = () => {
   const [activeQueue, setActiveQueue] = useState<OrganizeQueueId>('opportunities')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [syncPending, setSyncPending] = useState(false)
+  const [syncUiSession, setSyncUiSession] = useState(false)
   const [expandedReasonId, setExpandedReasonId] = useState<string | null>(null)
   const [applyingRecommendations, setApplyingRecommendations] = useState(false)
   const prevSyncingRef = useRef(false)
@@ -120,6 +123,7 @@ export const EmailCommandCenter: React.FC = () => {
   })
 
   const syncing = Boolean(syncStatus?.syncing)
+  const syncUiActive = syncing && syncUiSession
   const isListLoading = listQueries.some((q) => q.isLoading)
   const isListFetching = listQueries.some((q) => q.isFetching)
 
@@ -169,8 +173,42 @@ export const EmailCommandCenter: React.FC = () => {
     prevSyncingRef.current = syncing
   }, [syncing, classifyUnclassifiedSilent, invalidateOrganize])
 
+  useEffect(() => {
+    if (!syncUiSession || !syncStatus) return
+    if (syncStatus.sync_status === 'failed') {
+      setSyncUiSession(false)
+      addToast({
+        type: 'error',
+        title: 'Sync did not complete',
+        message: 'Check Gmail connection and tap Update & sort again.',
+      })
+      return
+    }
+    if (
+      syncStatus.sync_status === 'connected_pending_sync' ||
+      ((syncStatus.sync_status === 'completed' || syncStatus.sync_status === 'partial') &&
+        !syncing)
+    ) {
+      setSyncUiSession(false)
+    }
+  }, [syncStatus, syncUiSession, addToast])
+
+  useEffect(() => {
+    if (!syncUiSession) return
+    const timer = window.setTimeout(() => {
+      setSyncUiSession(false)
+      addToast({
+        type: 'info',
+        title: 'Sync is taking longer than expected',
+        message: 'You can keep using Organize — tap Update & sort to retry.',
+      })
+    }, SYNC_UI_SESSION_MAX_MS)
+    return () => window.clearTimeout(timer)
+  }, [syncUiSession, addToast])
+
   const runUpdateAndSort = useCallback(async () => {
     setSyncPending(true)
+    setSyncUiSession(true)
     try {
       await apiClient.triggerGmailSync({ lookback: loadGmailLookbackId('90d') })
       addToast({
@@ -488,8 +526,7 @@ export const EmailCommandCenter: React.FC = () => {
     isListFetching ||
     bulkMutation.isPending ||
     applyingRecommendations ||
-    syncPending ||
-    syncing
+    syncPending
 
   const queueActions = ORGANIZE_QUEUE_ACTIONS[activeQueue]
   const notSureCount = categoryCounts[NOT_SURE_CATEGORY] ?? 0
@@ -530,10 +567,12 @@ export const EmailCommandCenter: React.FC = () => {
             <p className="text-xs text-brand-text/60 dark:text-gray-400">
               Sorted piles for your business mail. You approve every move.
             </p>
-            {syncing ? (
+            {syncUiActive ? (
               <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
                 Updating…
-                {syncStatus?.progress != null ? ` ${syncStatus.progress}%` : ''}
+                {syncStatus?.progress != null && syncStatus.progress > 0
+                  ? ` ${syncStatus.progress}%`
+                  : ''}
               </p>
             ) : unclassifiedCount > 0 ? (
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-500">
@@ -547,7 +586,7 @@ export const EmailCommandCenter: React.FC = () => {
             disabled={busy}
             className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-lg bg-brand-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-sky-600"
           >
-            {syncPending || syncing ? (
+            {syncPending || syncUiActive ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <RefreshCw className="h-4 w-4" />
@@ -654,9 +693,9 @@ export const EmailCommandCenter: React.FC = () => {
         ) : emails.length === 0 ? (
           <EmptyState
             icon={Inbox}
-            title={syncing ? 'Updating your inbox' : `Nothing in ${queueLabel}`}
+            title={syncUiActive ? 'Updating your inbox' : `Nothing in ${queueLabel}`}
             description={
-              syncing
+              syncUiActive
                 ? 'Your piles will refresh in a moment.'
                 : organizeAttentionCount(categoryCounts) === 0
                   ? 'Tap Update & sort to pull in mail and sort it into piles.'
