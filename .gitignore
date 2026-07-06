@@ -113,6 +113,7 @@ data/learning_data/models/
 data/vector_db/
 *.csv
 *.json
+!data/company_chatbot/*.json
 !frontend/package.json
 !frontend/package-lock.json
 

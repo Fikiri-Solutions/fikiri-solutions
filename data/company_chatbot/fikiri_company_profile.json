@@ -1,0 +1,14 @@
+{
+  "company_name": "Fikiri Solutions",
+  "website": "https://fikirisolutions.com",
+  "contact_email": "info@fikirisolutions.com",
+  "public_evidence_only": true,
+  "forbidden_unless_in_kb": [
+    "hipaa",
+    "soc 2",
+    "soc2",
+    "case study",
+    "guarantee",
+    "money-back"
+  ]
+}

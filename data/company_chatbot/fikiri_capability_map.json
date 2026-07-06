@@ -1,0 +1,660 @@
+{
+  "schema_version": "v1",
+  "families": [
+    {
+      "id": "website_and_landing_pages",
+      "label": "website and landing pages",
+      "capabilities": [
+        "publish pages",
+        "capture interest"
+      ],
+      "client_phrases": [
+        "need a website",
+        "landing page",
+        "web page",
+        "build a site",
+        "website but also",
+        "need a website but also",
+        "website but also something",
+        "build our website and track",
+        "keeps track of clients",
+        "need a site",
+        "want a website that tracks",
+        "manually track every lead",
+        "digital presence"
+      ],
+      "related_families": [
+        "forms_and_intake",
+        "crm_and_lead_tracking"
+      ],
+      "kb_chunk_ids": [
+        "boundary_websites",
+        "company_about"
+      ],
+      "legacy_family_ids": [
+        "websites_intake"
+      ],
+      "disambiguation_question": "Is the main need a new website, or fixing what happens after someone visits or submits a form?"
+    },
+    {
+      "id": "forms_and_intake",
+      "label": "forms and intake",
+      "capabilities": [
+        "capture lead",
+        "qualify request",
+        "send to crm",
+        "notify staff"
+      ],
+      "client_phrases": [
+        "people fill out the form",
+        "nobody follows up after we get a website form",
+        "intake form",
+        "quote request",
+        "booking request",
+        "contact form",
+        "website form",
+        "new customer request",
+        "request quotes",
+        "new form",
+        "we have forms but nobody follows up",
+        "forms but nobody follows up",
+        "intake form crm",
+        "website intake form",
+        "already have a site we need",
+        "quote requests keep getting lost",
+        "automate just our quote request workflow",
+        "restaurant reservations",
+        "we already have a site we need crm and intake forms",
+        "website form intake crm and payments",
+        "need a form",
+        "sends info to my team",
+        "form that sends info",
+        "tracks the customer",
+        "web form that tells my team",
+        "intake form that notifies",
+        "customer intake capture"
+      ],
+      "related_families": [
+        "crm_and_lead_tracking",
+        "email_and_inbox_automation",
+        "website_and_landing_pages"
+      ],
+      "kb_chunk_ids": [
+        "contact_intake_path",
+        "workflow_inquiry_leak",
+        "service_workflow_audit"
+      ],
+      "legacy_family_ids": [
+        "websites_intake",
+        "lead_followup"
+      ]
+    },
+    {
+      "id": "crm_and_lead_tracking",
+      "label": "CRM and lead tracking",
+      "capabilities": [
+        "track customer",
+        "update crm",
+        "track status",
+        "assign ownership"
+      ],
+      "client_phrases": [
+        "keep track of clients",
+        "leads tracked automatically",
+        "track customers",
+        "managing customers",
+        "something like a crm",
+        "emails and leads in one place",
+        "customer records",
+        "stop losing leads",
+        "slipping through the cracks",
+        "track leads",
+        "something to track leads",
+        "emails and customer follow-ups connected",
+        "follow-ups connected",
+        "small team needs crm and email",
+        "crm and email together",
+        "sales pipeline in one system",
+        "payment follow-up",
+        "customer records and reminders",
+        "manually track",
+        "track my leads",
+        "stop losing quote requests",
+        "losing quote requests",
+        "missed follow-ups",
+        "spreadsheet"
+      ],
+      "related_families": [
+        "forms_and_intake",
+        "email_and_inbox_automation",
+        "workflow_automation"
+      ],
+      "kb_chunk_ids": [
+        "product_crm_overview",
+        "product_crm_activity",
+        "product_crm_practical",
+        "workflow_inquiry_leak"
+      ],
+      "legacy_family_ids": [
+        "crm_tracking",
+        "lead_followup"
+      ]
+    },
+    {
+      "id": "email_and_inbox_automation",
+      "label": "email and inbox automation",
+      "capabilities": [
+        "summarize email",
+        "draft reply",
+        "route customer request",
+        "send follow-up"
+      ],
+      "client_phrases": [
+        "drowning in emails",
+        "automate my inbox",
+        "reply to emails",
+        "emails and leads in one place",
+        "gmail stuff",
+        "outlook automation",
+        "manually replying",
+        "too many emails",
+        "inbox",
+        "emails and customer follow-ups",
+        "emails and follow-ups connected",
+        "gmail inbox and a sales pipeline",
+        "drowning in quote emails",
+        "email assistant plus lead follow-up",
+        "ai email assistant",
+        "tell me about the ai email assistant",
+        "what about gmail",
+        "restaurant reservations and customer follow-up by email",
+        "customer follow-up by email",
+        "gmail, a spreadsheet"
+      ],
+      "related_families": [
+        "crm_and_lead_tracking",
+        "workflow_automation"
+      ],
+      "kb_chunk_ids": [
+        "product_ai_email_assistant",
+        "product_email_overview",
+        "product_email_draft",
+        "integration_gmail",
+        "integration_outlook"
+      ],
+      "legacy_family_ids": [
+        "inbox_email"
+      ]
+    },
+    {
+      "id": "workflow_automation",
+      "label": "workflow automation",
+      "capabilities": [
+        "route customer request",
+        "notify staff",
+        "track status",
+        "generate quote"
+      ],
+      "client_phrases": [
+        "one small workflow",
+        "workflow fixed",
+        "automate",
+        "workflow automation",
+        "follow up automatically",
+        "follows up automatically",
+        "something that follows up automatically",
+        "one workflow",
+        "only need one small workflow fixed",
+        "automate just our quote request workflow",
+        "quote request workflow"
+      ],
+      "related_families": [
+        "forms_and_intake",
+        "email_and_inbox_automation",
+        "consulting_and_workflow_audit"
+      ],
+      "kb_chunk_ids": [
+        "faq_automation_partial",
+        "workflow_five_beats",
+        "workflow_inquiry_leak"
+      ],
+      "legacy_family_ids": [
+        "lead_followup"
+      ]
+    },
+    {
+      "id": "chatbot_and_knowledge_base",
+      "label": "chatbot and knowledge base",
+      "capabilities": [
+        "answer faqs",
+        "route customer request"
+      ],
+      "client_phrases": [
+        "chatbot",
+        "this chat",
+        "answer questions on the site",
+        "knowledge base",
+        "site assistant",
+        "chatbot that answers questions and captures leads",
+        "chatbot on our website to answer questions",
+        "chatbot knowledge base"
+      ],
+      "related_families": [
+        "forms_and_intake",
+        "consulting_and_workflow_audit"
+      ],
+      "kb_chunk_ids": [
+        "site_chat_widget",
+        "product_ai_copilot"
+      ],
+      "legacy_family_ids": [
+        "site_chatbot"
+      ]
+    },
+    {
+      "id": "payments_and_booking",
+      "label": "payments and booking",
+      "capabilities": [
+        "collect payment",
+        "book appointment"
+      ],
+      "client_phrases": [
+        "book and pay online",
+        "customers to book and pay",
+        "appointment requests",
+        "online booking",
+        "take payments",
+        "can customers book and pay online",
+        "online booking and payment",
+        "dental clinic needs online booking",
+        "restaurant reservations",
+        "restaurant reservations and customer follow-up",
+        "books appointments",
+        "appointment scheduling",
+        "book people and send reminders"
+      ],
+      "related_families": [
+        "forms_and_intake",
+        "workflow_automation",
+        "crm_and_lead_tracking"
+      ],
+      "kb_chunk_ids": [
+        "workflow_inquiry_leak",
+        "industry_dental_medical",
+        "service_workflow_audit"
+      ],
+      "legacy_family_ids": []
+    },
+    {
+      "id": "reporting_and_dashboards",
+      "label": "reporting and dashboards",
+      "capabilities": [
+        "track status",
+        "reporting"
+      ],
+      "client_phrases": [
+        "dashboard",
+        "analytics",
+        "reporting",
+        "see what's working"
+      ],
+      "related_families": [
+        "crm_and_lead_tracking"
+      ],
+      "kb_chunk_ids": [
+        "pricing_starter",
+        "company_outcomes"
+      ],
+      "legacy_family_ids": []
+    },
+    {
+      "id": "consulting_and_workflow_audit",
+      "label": "consulting and workflow audit",
+      "capabilities": [
+        "map process",
+        "recommend first automation"
+      ],
+      "client_phrases": [
+        "workflow audit",
+        "map the workflow",
+        "not sure where to start",
+        "just need one small workflow fixed",
+        "done for you",
+        "consulting",
+        "don't know if we need",
+        "not sure whether we need",
+        "not sure if we need",
+        "website or a crm",
+        "website or crm",
+        "automation or a new form",
+        "don't know what i need",
+        "office is messy",
+        "my office is a mess",
+        "office is a mess with leads",
+        "landscaping company drowning",
+        "how can ai help my cleaning business",
+        "how can ai help my cleaning business with leads and email",
+        "help my cleaning business",
+        "cleaning business stop losing",
+        "cleaning company keeps losing",
+        "field-service cleaning",
+        "quote leakage"
+      ],
+      "related_families": [
+        "workflow_automation",
+        "forms_and_intake"
+      ],
+      "kb_chunk_ids": [
+        "service_workflow_audit",
+        "service_workflow_audit_focus",
+        "service_consulting",
+        "service_system_fixers"
+      ],
+      "legacy_family_ids": [
+        "workflow_audit",
+        "consulting"
+      ]
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "capture_lead",
+      "label": "capture lead",
+      "client_phrases": [
+        "capture leads",
+        "incoming leads",
+        "quote request",
+        "new inquiry",
+        "website form",
+        "captures leads"
+      ],
+      "family_ids": [
+        "forms_and_intake",
+        "crm_and_lead_tracking"
+      ]
+    },
+    {
+      "id": "send_follow_up",
+      "label": "send follow-up",
+      "client_phrases": [
+        "follow up",
+        "follow-up",
+        "follows up",
+        "nobody follows up",
+        "reminders",
+        "follow-ups connected",
+        "follow up automatically",
+        "follows up automatically",
+        "something that follows up automatically",
+        "customer follow-up by email",
+        "reminds people",
+        "send reminders"
+      ],
+      "family_ids": [
+        "email_and_inbox_automation",
+        "crm_and_lead_tracking",
+        "workflow_automation"
+      ]
+    },
+    {
+      "id": "update_crm",
+      "label": "update CRM",
+      "client_phrases": [
+        "update crm",
+        "crm record",
+        "track customers",
+        "customer records",
+        "pipeline"
+      ],
+      "family_ids": [
+        "crm_and_lead_tracking"
+      ]
+    },
+    {
+      "id": "notify_staff",
+      "label": "notify staff",
+      "client_phrases": [
+        "notify staff",
+        "alert the team",
+        "someone needs to know",
+        "sends info to my team",
+        "staff notification"
+      ],
+      "family_ids": [
+        "forms_and_intake",
+        "workflow_automation"
+      ]
+    },
+    {
+      "id": "collect_payment",
+      "label": "collect payment",
+      "client_phrases": [
+        "pay online",
+        "take payments",
+        "collect payment",
+        "book and pay",
+        "book and pay online"
+      ],
+      "family_ids": [
+        "payments_and_booking"
+      ]
+    },
+    {
+      "id": "book_appointment",
+      "label": "book appointment",
+      "client_phrases": [
+        "book appointment",
+        "appointment requests",
+        "scheduling",
+        "book online",
+        "can customers book",
+        "online booking",
+        "books appointments",
+        "appointment scheduling"
+      ],
+      "family_ids": [
+        "payments_and_booking",
+        "forms_and_intake"
+      ]
+    },
+    {
+      "id": "answer_faqs",
+      "label": "answer FAQs",
+      "client_phrases": [
+        "answer faqs",
+        "answer questions",
+        "knowledge base",
+        "chatbot",
+        "chatbot that answers questions"
+      ],
+      "family_ids": [
+        "chatbot_and_knowledge_base"
+      ]
+    },
+    {
+      "id": "draft_reply",
+      "label": "draft reply",
+      "client_phrases": [
+        "draft replies",
+        "reply to emails",
+        "structure replies",
+        "automate my inbox"
+      ],
+      "family_ids": [
+        "email_and_inbox_automation"
+      ]
+    },
+    {
+      "id": "route_request",
+      "label": "route customer request",
+      "client_phrases": [
+        "route messages",
+        "triage",
+        "sort my inbox",
+        "urgent requests"
+      ],
+      "family_ids": [
+        "email_and_inbox_automation",
+        "workflow_automation"
+      ]
+    },
+    {
+      "id": "map_process",
+      "label": "map process",
+      "client_phrases": [
+        "map workflow",
+        "workflow audit",
+        "where things break",
+        "one small workflow"
+      ],
+      "family_ids": [
+        "consulting_and_workflow_audit"
+      ]
+    }
+  ],
+  "bundles": [
+    {
+      "id": "lead_intake_system",
+      "label": "Lead Intake System",
+      "summary": "The website or form captures the request, intake collects the right details, and CRM/follow-up keeps the lead from getting lost.",
+      "family_ids": [
+        "website_and_landing_pages",
+        "forms_and_intake",
+        "crm_and_lead_tracking"
+      ],
+      "capability_ids": [
+        "capture_lead",
+        "update_crm",
+        "send_follow_up",
+        "notify_staff"
+      ],
+      "client_phrases": [
+        "website where customers can request quotes",
+        "leads tracked automatically",
+        "form but nobody follows up",
+        "website form and crm",
+        "need a website but also something to track leads",
+        "keeps track of clients",
+        "need a site but don't want to manually track",
+        "website that tracks my leads",
+        "stop losing quote requests"
+      ],
+      "kb_chunk_ids": [
+        "workflow_inquiry_leak",
+        "contact_intake_path",
+        "product_crm_overview",
+        "service_workflow_audit"
+      ],
+      "next_step": "Fikiri would usually start with a workflow audit or a scoped intake build."
+    },
+    {
+      "id": "email_workflow_assistant",
+      "label": "Email Workflow Assistant",
+      "summary": "Inbox triage, draft replies, lead detection, and follow-up reminders work together so email stops being the bottleneck.",
+      "family_ids": [
+        "email_and_inbox_automation",
+        "crm_and_lead_tracking"
+      ],
+      "capability_ids": [
+        "draft_reply",
+        "route_request",
+        "capture_lead",
+        "send_follow_up"
+      ],
+      "client_phrases": [
+        "emails and leads in one place",
+        "want my emails and leads in one place",
+        "tired of manually replying",
+        "inbox and follow-up",
+        "emails and customer follow-ups connected"
+      ],
+      "kb_chunk_ids": [
+        "product_ai_email_assistant",
+        "product_email_assistant_goal",
+        "product_crm_overview"
+      ],
+      "next_step": "If Gmail or Outlook is where work piles up, email automation is usually the first scoped build."
+    },
+    {
+      "id": "workflow_audit_path",
+      "label": "Workflow Audit",
+      "summary": "Map the current process, find manual handoffs, and recommend the first automation instead of guessing which product to buy.",
+      "family_ids": [
+        "consulting_and_workflow_audit",
+        "workflow_automation"
+      ],
+      "capability_ids": [
+        "map_process"
+      ],
+      "client_phrases": [
+        "just need one small workflow fixed",
+        "not sure whether we need",
+        "don't know if we need",
+        "don't know if we need a website or crm",
+        "map that out",
+        "automation or a new form",
+        "crm or just automation"
+      ],
+      "kb_chunk_ids": [
+        "service_workflow_audit",
+        "service_workflow_audit_focus",
+        "service_system_fixers"
+      ],
+      "next_step": "A workflow audit at fikirisolutions.com/intake is the safest first step when the scope is still mixed."
+    },
+    {
+      "id": "booking_and_payments_flow",
+      "label": "Booking and Payments Flow",
+      "summary": "Booking requests, payment collection, and follow-up need a defined handoff between intake, records, and reminders.",
+      "family_ids": [
+        "payments_and_booking",
+        "forms_and_intake",
+        "crm_and_lead_tracking"
+      ],
+      "capability_ids": [
+        "book_appointment",
+        "collect_payment",
+        "send_follow_up",
+        "update_crm"
+      ],
+      "client_phrases": [
+        "book and pay online",
+        "customers to book and pay",
+        "appointment and payment",
+        "books appointments and reminds people",
+        "book people and send reminders"
+      ],
+      "kb_chunk_ids": [
+        "workflow_inquiry_leak",
+        "industry_dental_medical",
+        "service_workflow_audit"
+      ],
+      "next_step": "Fikiri would map the booking-to-payment workflow before recommending a build scope."
+    },
+    {
+      "id": "site_chat_knowledge",
+      "label": "Site Chat and Knowledge Assistant",
+      "summary": "A site assistant can answer common questions and route visitors to intake or contact without replacing your CRM or email workflows.",
+      "family_ids": [
+        "chatbot_and_knowledge_base",
+        "forms_and_intake"
+      ],
+      "capability_ids": [
+        "answer_faqs",
+        "capture_lead"
+      ],
+      "client_phrases": [
+        "chatbot on our website",
+        "answer questions automatically",
+        "chatbot that answers questions and captures leads",
+        "need a chatbot that answers questions and captures leads"
+      ],
+      "kb_chunk_ids": [
+        "site_chat_widget",
+        "product_ai_copilot",
+        "contact_intake_path"
+      ],
+      "next_step": "This site assistant is one example; scoped chatbot work usually starts after the core workflow is clear."
+    }
+  ]
+}
