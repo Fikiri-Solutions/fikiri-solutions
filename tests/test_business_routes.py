@@ -425,7 +425,10 @@ class TestBusinessRoutes(unittest.TestCase):
 
     @patch.dict(
         "os.environ",
-        {"DATABASE_URL": "postgresql://user:pass@host:5432/db"},
+        {
+            "DATABASE_URL": "postgresql://user:pass@host:5432/db",
+            "FIKIRI_GMAIL_SYNC_WORKER_ONLY": "1",
+        },
         clear=False,
     )
     @patch("routes.business.oauth_token_manager")
@@ -434,6 +437,7 @@ class TestBusinessRoutes(unittest.TestCase):
     def test_sync_gmail_postgres_without_redis_returns_503(
         self, mock_get_user, mock_db, mock_oauth
     ):
+        """Worker-only mode requires Redis; inline sync (default) does not."""
         mock_get_user.return_value = 1
         mock_db.execute_query.return_value = [{"id": 1}]
         mock_oauth.get_token_status.return_value = {"success": True}
@@ -1140,10 +1144,10 @@ class TestBusinessRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.get_json().get("success"))
 
-    @patch("routes.business.db_optimizer")
+    @patch("core.email_attachments.list_email_attachments")
     @patch("routes.business.get_current_user_id", return_value=1)
-    def test_get_email_attachments_success(self, mock_user_id, mock_db):
-        mock_db.execute_query.return_value = [
+    def test_get_email_attachments_success(self, mock_user_id, mock_list):
+        mock_list.return_value = [
             {"id": 1, "attachment_id": "att1", "filename": "file.txt", "mime_type": "text/plain", "size": 10, "created_at": "2025-01-01"},
         ]
         response = self.client.get("/api/email/abc/attachments")
@@ -1165,11 +1169,30 @@ class TestBusinessRoutes(unittest.TestCase):
         mock_db.execute_query.return_value = [
             {"attachment_id": "att1", "filename": "file.txt", "mime_type": "text/plain", "size": 10, "stored_path": None},
         ]
-        with patch("integrations.gmail.gmail_client.gmail_client") as mock_gmail:
-            mock_gmail.get_attachment.return_value = {"data": b"hello"}
-            response = self.client.get("/api/email/abc/attachments/att1/download")
+        with patch("core.email_attachments.resolve_email_provider", return_value="gmail"):
+            with patch("integrations.gmail.gmail_client.gmail_client") as mock_gmail:
+                mock_gmail.get_attachment.return_value = {"data": b"hello"}
+                response = self.client.get("/api/email/abc/attachments/att1/download")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data, b"hello")
+
+    @patch("routes.business.db_optimizer")
+    @patch("routes.business.get_current_user_id", return_value=1)
+    def test_sync_imap_requires_config(self, mock_user_id, mock_db):
+        with patch("core.imap_mail_helpers.get_user_imap_settings", return_value=None):
+            response = self.client.post("/api/crm/sync-imap", json={})
+        self.assertEqual(response.status_code, 403)
+
+    @patch("routes.business.db_optimizer")
+    @patch("routes.business.get_current_user_id", return_value=1)
+    def test_sync_imap_success(self, mock_user_id, mock_db):
+        with patch("core.imap_mail_helpers.get_user_imap_settings", return_value={"username": "u", "password": "p", "imap_server": "imap.mail.yahoo.com"}):
+            with patch("integrations.imap.imap_sync.sync_imap_emails", return_value={"success": True, "count": 2, "provider": "yahoo", "message": "ok"}):
+                response = self.client.post("/api/crm/sync-imap", json={})
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data.get("success"))
+        self.assertEqual(data.get("data", {}).get("emails_synced"), 2)
 
     @patch("routes.business.get_current_user_id", return_value=1)
     def test_get_embedded_image_success(self, mock_user_id):
