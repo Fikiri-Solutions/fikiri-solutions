@@ -11,6 +11,7 @@ from typing import Dict, List, Sequence
 from company_chatbot import config
 from company_chatbot.retrieval import KBChunk, RetrievalResult, is_standalone_topic_query, retrieve
 from company_chatbot.capabilities import (
+    NeedsDetectionResult,
     compose_capability_bridge,
     detect_needs,
     should_use_capability_bridge,
@@ -98,9 +99,7 @@ def _confidence_from_score(score: float) -> float:
     return round(min(1.0, max(0.0, score)), 4)
 
 
-def _needs_from_result(query: str, result: RetrievalResult) -> "NeedsDetectionResult":
-    from company_chatbot.capabilities import NeedsDetectionResult
-
+def _needs_from_result(query: str, result: RetrievalResult) -> NeedsDetectionResult:
     if result.needs:
         return NeedsDetectionResult(
             query=result.query,

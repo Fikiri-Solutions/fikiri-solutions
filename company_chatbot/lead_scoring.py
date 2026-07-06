@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 from company_chatbot import config
+from company_chatbot.capabilities import NeedsDetectionResult
 from company_chatbot.intake import INTAKE_MODES, IntakeSlots, filled_core_count, slot_satisfied
 from company_chatbot.schemas import HandoffMetadata
 
@@ -133,7 +134,7 @@ def recommend_handoff(
 
 
 def build_qualification_synopsis(
-    needs: Optional["NeedsDetectionResult"],
+    needs: Optional[NeedsDetectionResult],
     message: str,
     signals: List[str],
 ) -> str:
