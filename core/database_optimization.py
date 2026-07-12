@@ -193,7 +193,10 @@ class DatabaseOptimizer:
         # SQLite (default): file on disk or Render persistent disk
         self.db_type = "sqlite"
         if db_path is None:
-            if os.path.exists("/opt/render/project/data"):
+            sqlite_override = (os.getenv("FIKIRI_SQLITE_PATH") or "").strip()
+            if sqlite_override:
+                db_path = sqlite_override
+            elif os.path.exists("/opt/render/project/data"):
                 db_path = "/opt/render/project/data/fikiri.db"
             else:
                 db_path = "data/fikiri.db"

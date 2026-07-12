@@ -97,6 +97,9 @@ auth/sheets_token.pkl
 # Local SQLite WAL sidecars
 data/*.db-shm
 data/*.db-wal
+# pytest-xdist per-worker DBs
+data/fikiri_pytest_*.db
+data/fikiri_pytest_*.db-*
 
 # Temporary files
 *.tmp

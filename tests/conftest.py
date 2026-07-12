@@ -34,6 +34,27 @@ except ImportError:
 # .env may set FIKIRI_TEST_MODE=0 for local dev servers; pytest must not call live LLMs.
 os.environ["FIKIRI_TEST_MODE"] = "1"
 
+# pytest-xdist: isolate SQLite (and Redis DB index) per worker AFTER .env load.
+_xdist_worker = (os.environ.get("PYTEST_XDIST_WORKER") or "").strip()
+if _xdist_worker:
+    os.environ["FIKIRI_FORCE_SQLITE"] = "1"
+    os.environ["FIKIRI_SQLITE_PATH"] = os.path.join(
+        PROJECT_ROOT, "data", f"fikiri_pytest_{_xdist_worker}.db"
+    )
+    # Avoid shared Postgres/SQLite from local .env across workers.
+    os.environ.pop("DATABASE_URL", None)
+    _redis_url = (os.environ.get("REDIS_URL") or "").strip()
+    if _redis_url:
+        try:
+            _worker_n = int(_xdist_worker.replace("gw", ""))
+            if _redis_url.rstrip("/").endswith(tuple(f"/{i}" for i in range(16))):
+                _base = _redis_url.rsplit("/", 1)[0]
+            else:
+                _base = _redis_url.rstrip("/")
+            os.environ["REDIS_URL"] = f"{_base}/{(_worker_n % 14) + 1}"
+        except ValueError:
+            pass
+
 
 class FakeRedis:
     """In-memory Redis stub for unit tests. No real Redis required."""
