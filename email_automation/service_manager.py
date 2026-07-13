@@ -451,6 +451,14 @@ PROVIDER_CONFIGS = {
         'smtp_port': 587,
         'use_ssl': True
     },
+    'icloud': {
+        'service_name': 'Apple iCloud Mail',
+        'imap_server': 'imap.mail.me.com',
+        'imap_port': 993,
+        'smtp_server': 'smtp.mail.me.com',
+        'smtp_port': 587,
+        'use_ssl': True
+    },
     'aol': {
         'service_name': 'AOL Mail',
         'imap_server': 'imap.aol.com',

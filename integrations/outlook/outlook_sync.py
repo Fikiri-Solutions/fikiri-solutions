@@ -225,11 +225,26 @@ def sync_outlook_emails(user_id: int, limit: int = 50, days: int = 30) -> Dict[s
                 
                 # Check if email already exists
                 existing = db_optimizer.execute_query("""
-                    SELECT id FROM synced_emails 
+                    SELECT id, attachments FROM synced_emails
                     WHERE user_id = ? AND external_id = ? AND provider = 'outlook'
                 """, (user_id, email_id))
                 
                 if existing and len(existing) > 0:
+                    if has_attachments and email_id:
+                        from core.email_attachments import (
+                            fetch_outlook_attachments,
+                            synced_email_needs_attachment_backfill,
+                        )
+
+                        if synced_email_needs_attachment_backfill(existing[0].get("attachments")):
+                            try:
+                                fetch_outlook_attachments(user_id, email_id, cache=True)
+                            except Exception as att_exc:
+                                logger.debug(
+                                    "Outlook attachment backfill skipped for %s: %s",
+                                    email_id,
+                                    att_exc,
+                                )
                     continue  # Skip if already synced
                 
                 # Format sender for compatibility with existing schema
@@ -254,6 +269,14 @@ def sync_outlook_emails(user_id: int, limit: int = 50, days: int = 30) -> Dict[s
                 ), fetch=False)
                 
                 emails_synced += 1
+
+                if has_attachments and email_id:
+                    try:
+                        from core.email_attachments import fetch_outlook_attachments
+
+                        fetch_outlook_attachments(user_id, email_id, cache=True)
+                    except Exception as att_exc:
+                        logger.debug("Outlook attachment cache skipped for %s: %s", email_id, att_exc)
 
                 try:
                     ow_rows = db_optimizer.execute_query(

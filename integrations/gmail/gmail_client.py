@@ -262,6 +262,32 @@ class GmailClient:
             logger.error("Gmail plain-text send failed user_id=%s: %s", user_id, exc)
             return {"success": False, "error": str(exc), "channel": "gmail"}
 
+    def get_attachment(self, user_id: int, message_id: str, attachment_id: str) -> Optional[Dict[str, Any]]:
+        """Download attachment bytes from Gmail."""
+        try:
+            gmail_service = self.get_gmail_service_for_user(user_id)
+            attachment = (
+                gmail_service.users()
+                .messages()
+                .attachments()
+                .get(userId="me", messageId=message_id, id=attachment_id)
+                .execute()
+            )
+            raw = attachment.get("data")
+            if not raw:
+                return None
+            data = base64.urlsafe_b64decode(raw.encode("utf-8") if isinstance(raw, str) else raw)
+            return {"data": data, "size": attachment.get("size", len(data))}
+        except Exception as exc:
+            logger.error(
+                "Gmail get_attachment failed user_id=%s message=%s attachment=%s: %s",
+                user_id,
+                message_id,
+                attachment_id,
+                exc,
+            )
+            return None
+
 
 # Global client instance
 gmail_client = GmailClient()

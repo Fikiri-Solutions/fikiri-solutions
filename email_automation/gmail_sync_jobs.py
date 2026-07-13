@@ -1230,6 +1230,18 @@ class GmailSyncJobManager:
                 is_read,
             )
 
+            try:
+                from core.email_attachments import (
+                    cache_attachments,
+                    extract_attachments_from_gmail_payload,
+                )
+
+                attachments = extract_attachments_from_gmail_payload(message.get("payload"))
+                if attachments:
+                    cache_attachments(user_id, message["id"], attachments, provider="gmail")
+            except Exception as att_exc:
+                logger.debug("Attachment cache skipped for %s: %s", message.get("id"), att_exc)
+
             return int(synced_email_id) if synced_email_id is not None else None
             
         except Exception as e:

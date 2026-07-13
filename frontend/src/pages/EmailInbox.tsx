@@ -42,7 +42,7 @@ import {
 import { isEmailAiDemoEnabled } from '../lib/demoSafety'
 
 interface Attachment {
-  id: number
+  id?: number
   attachment_id: string
   filename: string
   mime_type: string
@@ -400,6 +400,8 @@ export const EmailInbox: React.FC = () => {
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [loadingAttachments, setLoadingAttachments] = useState(false)
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string | null>(null)
+  const [previewObjectUrl, setPreviewObjectUrl] = useState<string | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
   const debouncedSearch = useDebouncedValue(searchQuery.trim(), 400)
   const INBOX_PAGE_SIZE = 50
   const [syncInboxPending, setSyncInboxPending] = useState(false)
@@ -470,6 +472,102 @@ export const EmailInbox: React.FC = () => {
     const preferred = attachments.find((att) => canPreviewAttachment(att.mime_type))
     setPreviewAttachmentId(preferred?.attachment_id ?? null)
   }, [attachments])
+
+  // Authenticated blob URL for preview (Bearer JWT; bare <img>/<iframe> src would 401)
+  useEffect(() => {
+    if (!selectedEmail?.id || !previewAttachmentId) {
+      setPreviewObjectUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev)
+        return null
+      })
+      setPreviewLoading(false)
+      return
+    }
+
+    let cancelled = false
+    let objectUrl: string | null = null
+    setPreviewLoading(true)
+    setPreviewObjectUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return null
+    })
+
+    void (async () => {
+      try {
+        const blob = await apiClient.downloadEmailAttachment(
+          selectedEmail.id,
+          previewAttachmentId,
+          { inline: true }
+        )
+        if (cancelled) return
+        const url = URL.createObjectURL(blob)
+        if (cancelled) {
+          URL.revokeObjectURL(url)
+          return
+        }
+        objectUrl = url
+        setPreviewObjectUrl(url)
+      } catch (error) {
+        console.error('Failed to load attachment preview:', error)
+        if (!cancelled) {
+          addToast({
+            type: 'error',
+            title: 'Preview failed',
+            message: 'Could not load attachment preview. Try Download instead.',
+          })
+          setPreviewObjectUrl(null)
+        }
+      } finally {
+        if (!cancelled) setPreviewLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [selectedEmail?.id, previewAttachmentId, addToast])
+
+  const openOrDownloadAttachment = useCallback(
+    async (att: Attachment, mode: 'open' | 'download') => {
+      if (!selectedEmail?.id || !att.attachment_id) return
+      try {
+        const blob = await apiClient.downloadEmailAttachment(
+          selectedEmail.id,
+          att.attachment_id,
+          { inline: mode === 'open' }
+        )
+        const url = URL.createObjectURL(blob)
+        if (mode === 'open') {
+          const opened = window.open(url, '_blank', 'noopener,noreferrer')
+          if (!opened) {
+            // Popup blocked — fall back to download
+            const a = document.createElement('a')
+            a.href = url
+            a.download = att.filename || 'attachment'
+            a.click()
+          }
+          window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+        } else {
+          const a = document.createElement('a')
+          a.href = url
+          a.download = att.filename || 'attachment'
+          document.body.appendChild(a)
+          a.click()
+          a.remove()
+          URL.revokeObjectURL(url)
+        }
+      } catch (error) {
+        console.error('Failed to fetch attachment:', error)
+        addToast({
+          type: 'error',
+          title: 'Attachment unavailable',
+          message: 'Could not download this file. Try syncing your mailbox again.',
+        })
+      }
+    },
+    [selectedEmail?.id, addToast]
+  )
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 Bytes'
@@ -944,14 +1042,6 @@ export const EmailInbox: React.FC = () => {
       filter === 'unread' ? email.unread : !email.unread
     )
   }, [emails, searchQuery, typingAheadOfSearch, filter])
-
-  const getAttachmentDownloadUrl = useCallback(
-    (attachmentId: string) => {
-      if (!selectedEmail?.id) return '#'
-      return `/api/email/${selectedEmail.id}/attachments/${attachmentId}/download`
-    },
-    [selectedEmail?.id]
-  )
 
   const selectedPreviewAttachment = useMemo(() => {
     if (!previewAttachmentId) return null
@@ -1528,12 +1618,11 @@ export const EmailInbox: React.FC = () => {
                     ) : null}
                     <div className="space-y-2">
                       {attachments.map((att) => {
-                        const url = getAttachmentDownloadUrl(att.attachment_id)
                         const previewable = canPreviewAttachment(att.mime_type)
                         const isPreviewSelected = previewAttachmentId === att.attachment_id
                         return (
                           <div
-                            key={att.id}
+                            key={att.attachment_id || String(att.id)}
                             className={`rounded-lg border bg-white p-3 transition-colors dark:bg-gray-700 ${
                               isPreviewSelected
                                 ? 'border-brand-primary/50'
@@ -1571,23 +1660,22 @@ export const EmailInbox: React.FC = () => {
                                     Preview
                                   </button>
                                 ) : null}
-                                <a
-                                  href={url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                                <button
+                                  type="button"
+                                  onClick={() => void openOrDownloadAttachment(att, 'open')}
                                   className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-brand-text hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-600"
                                 >
                                   <ExternalLink className="h-3.5 w-3.5" />
                                   Open
-                                </a>
-                                <a
-                                  href={url}
-                                  download={att.filename}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void openOrDownloadAttachment(att, 'download')}
                                   className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-brand-text hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-600"
                                 >
                                   <Download className="h-3.5 w-3.5" />
                                   Download
-                                </a>
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -1602,32 +1690,40 @@ export const EmailInbox: React.FC = () => {
                             Previewing {selectedPreviewAttachment.filename}
                           </span>
                         </div>
-                        {isImageMime(selectedPreviewAttachment.mime_type) ? (
+                        {previewLoading ? (
+                          <div className="flex items-center gap-2 py-8 text-sm text-brand-text/70 dark:text-gray-400">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Loading preview…
+                          </div>
+                        ) : !previewObjectUrl ? (
+                          <p className="text-sm text-brand-text/70 dark:text-gray-400">
+                            Preview could not be loaded. Use Open or Download.
+                          </p>
+                        ) : isImageMime(selectedPreviewAttachment.mime_type) ? (
                           <img
-                            src={getAttachmentDownloadUrl(selectedPreviewAttachment.attachment_id)}
+                            src={previewObjectUrl}
                             alt={selectedPreviewAttachment.filename}
                             className="max-h-80 w-auto max-w-full rounded border border-gray-200 dark:border-gray-600"
-                            loading="lazy"
                           />
                         ) : isAudioMime(selectedPreviewAttachment.mime_type) ? (
                           <audio
                             controls
                             preload="metadata"
                             className="w-full"
-                            src={getAttachmentDownloadUrl(selectedPreviewAttachment.attachment_id)}
+                            src={previewObjectUrl}
                           />
                         ) : isVideoMime(selectedPreviewAttachment.mime_type) ? (
                           <video
                             controls
                             preload="metadata"
                             className="max-h-80 w-full rounded border border-gray-200 dark:border-gray-600"
-                            src={getAttachmentDownloadUrl(selectedPreviewAttachment.attachment_id)}
+                            src={previewObjectUrl}
                           />
                         ) : isPdfMime(selectedPreviewAttachment.mime_type) ? (
                           <iframe
                             title={selectedPreviewAttachment.filename}
                             className="h-72 w-full rounded border border-gray-200 dark:border-gray-600"
-                            src={getAttachmentDownloadUrl(selectedPreviewAttachment.attachment_id)}
+                            src={previewObjectUrl}
                           />
                         ) : (
                           <p className="text-sm text-brand-text/70 dark:text-gray-400">
@@ -1635,6 +1731,7 @@ export const EmailInbox: React.FC = () => {
                           </p>
                         )}
                       </div>
+                    )}
                     )}
                   </div>
                 )}

@@ -1723,9 +1723,14 @@ class ApiClient {
     return response.data?.data || response.data || []
   }
 
-  async downloadEmailAttachment(emailId: string, attachmentId: string): Promise<Blob> {
+  async downloadEmailAttachment(
+    emailId: string,
+    attachmentId: string,
+    options?: { inline?: boolean }
+  ): Promise<Blob> {
     const response = await this.client.get(`/email/${emailId}/attachments/${attachmentId}/download`, {
-      responseType: 'blob'
+      responseType: 'blob',
+      params: options?.inline ? { inline: '1' } : undefined,
     })
     return response.data
   }

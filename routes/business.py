@@ -1085,6 +1085,61 @@ def sync_outlook():
         return create_error_response("Failed to sync Outlook", 500, 'OUTLOOK_SYNC_ERROR')
 
 
+@business_bp.route('/crm/sync-imap', methods=['POST'])
+@handle_api_errors
+def sync_imap():
+    """Sync Yahoo, Apple iCloud, or other IMAP mailboxes into the inbox."""
+    try:
+        user_id = resolve_request_user_id(request, current_user_id=get_current_user_id(), allow_body=True)
+        if not user_id:
+            return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
+
+        from core.imap_mail_helpers import get_user_imap_settings
+        from integrations.imap.imap_sync import sync_imap_emails
+
+        if not get_user_imap_settings(user_id):
+            return create_error_response(
+                "IMAP not configured. Add Yahoo, iCloud, or IMAP settings under Email integrations.",
+                403,
+                'IMAP_NOT_CONFIGURED',
+            )
+
+        body = request.get_json(silent=True) or {}
+        limit = int(body.get('limit', 50))
+        days = int(body.get('days', 30))
+        sync_result = sync_imap_emails(user_id, limit=limit, days=days)
+
+        if sync_result.get('success'):
+            provider = sync_result.get('provider', 'imap')
+            try:
+                total_emails_result = db_optimizer.execute_query(
+                    "SELECT COUNT(*) as total FROM synced_emails WHERE user_id = ? AND provider = ?",
+                    (user_id, provider),
+                )
+                total_emails = total_emails_result[0]['total'] if total_emails_result else 0
+                db_optimizer.upsert_user_sync_status_completed(user_id, total_emails)
+            except Exception as status_error:
+                logger.warning("Could not update IMAP sync status: %s", status_error)
+
+            return create_success_response(
+                {
+                    'emails_synced': sync_result.get('count', 0),
+                    'provider': provider,
+                    'message': sync_result.get('message', 'IMAP sync completed'),
+                },
+                'IMAP sync completed successfully',
+            )
+
+        return create_error_response(
+            sync_result.get('error', 'IMAP sync failed'),
+            500,
+            'IMAP_SYNC_ERROR',
+        )
+    except Exception as e:
+        logger.error("IMAP sync error: %s", e)
+        return create_error_response("Failed to sync IMAP mailbox", 500, 'IMAP_SYNC_ERROR')
+
+
 def _gmail_metadata_message_to_email_dict(msg_detail):
     """Inbox list row without body (Gmail format=metadata)."""
     headers = msg_detail.get('payload', {}).get('headers', [])
@@ -1224,7 +1279,7 @@ def get_emails():
                 # List without full body: SUBSTR only (less I/O + smaller payloads). Tests may mock `body` without body_preview.
                 if include_body:
                     synced_sql = """
-                        SELECT COALESCE(external_id, gmail_id) as email_id, provider, subject, sender, recipient, date, body, labels, is_read
+                        SELECT COALESCE(external_id, gmail_id) as email_id, provider, subject, sender, recipient, date, body, labels, is_read, attachments
                         FROM synced_emails
                         WHERE user_id = ?""" + label_filter_sql + """
                         ORDER BY date DESC
@@ -1233,7 +1288,7 @@ def get_emails():
                 else:
                     synced_sql = """
                         SELECT COALESCE(external_id, gmail_id) as email_id, provider, subject, sender, recipient, date,
-                               SUBSTR(COALESCE(body, ''), 1, 500) as body_preview, labels, is_read
+                               SUBSTR(COALESCE(body, ''), 1, 500) as body_preview, labels, is_read, attachments
                         FROM synced_emails
                         WHERE user_id = ?""" + label_filter_sql + """
                         ORDER BY date DESC
@@ -1272,6 +1327,15 @@ def get_emails():
                         email_id = email_row.get('email_id') or email_row.get('gmail_id')
                         provider = email_row.get('provider', 'gmail')
 
+                        has_attachments = False
+                        raw_attachments = email_row.get('attachments')
+                        if raw_attachments:
+                            try:
+                                att_list = json.loads(raw_attachments) if isinstance(raw_attachments, str) else raw_attachments
+                                has_attachments = bool(att_list)
+                            except (json.JSONDecodeError, TypeError):
+                                has_attachments = False
+
                         if include_body:
                             raw_body = email_row.get('body') or ''
                             snippet = _plain_email_snippet(raw_body, 160)
@@ -1294,8 +1358,8 @@ def get_emails():
                             'snippet': snippet,
                             'body': out_body,
                             'unread': unread,
-                            'has_attachments': False,  # Not stored in synced_emails
-                            'thread_id': None  # Not stored in synced_emails
+                            'has_attachments': has_attachments,
+                            'thread_id': email_row.get('thread_id')
                         })
                     
                     if emails:
@@ -3216,15 +3280,10 @@ def get_email_attachments(email_id):
         user_id = get_current_user_id()
         if not user_id:
             return create_error_response("Authentication required", 401, 'AUTHENTICATION_REQUIRED')
-        
-        attachments = db_optimizer.execute_query("""
-            SELECT id, attachment_id, filename, mime_type, size, created_at
-            FROM email_attachments 
-            WHERE user_id = ? AND email_id = ?
-            ORDER BY filename
-        """, (user_id, email_id))
-        
-        result = [dict(att) for att in attachments]
+
+        from core.email_attachments import list_email_attachments
+
+        result = list_email_attachments(user_id, email_id)
         return create_success_response(result, "Attachments retrieved successfully")
     except Exception as e:
         logger.error(f"❌ Get attachments failed: {e}")
@@ -3248,6 +3307,21 @@ def download_attachment(email_id, attachment_id):
         """, (user_id, email_id, attachment_id))
         
         if not attachment:
+            try:
+                from core.email_attachments import fetch_attachments_for_provider, resolve_email_provider
+
+                provider = resolve_email_provider(user_id, email_id)
+                fetch_attachments_for_provider(user_id, email_id, provider, cache=True)
+                attachment = db_optimizer.execute_query("""
+                    SELECT attachment_id, filename, mime_type, size, stored_path
+                    FROM email_attachments
+                    WHERE user_id = ? AND email_id = ? AND attachment_id = ?
+                    LIMIT 1
+                """, (user_id, email_id, attachment_id))
+            except Exception as cache_exc:
+                logger.debug("Attachment cache refresh failed: %s", cache_exc)
+
+        if not attachment:
             return create_error_response("Attachment not found", 404, 'ATTACHMENT_NOT_FOUND')
         
         att = dict(attachment[0])
@@ -3255,20 +3329,39 @@ def download_attachment(email_id, attachment_id):
         # If stored locally, serve from file
         if att.get('stored_path') and os.path.exists(att['stored_path']):
             from flask import send_file
-            return send_file(att['stored_path'], as_attachment=True, download_name=att['filename'])
+            inline = request.args.get('inline') in ('1', 'true', 'yes')
+            return send_file(
+                att['stored_path'],
+                as_attachment=not inline,
+                download_name=att['filename'],
+            )
         
-        # Otherwise, fetch from Gmail API
         try:
-            from integrations.gmail.gmail_client import gmail_client
-            attachment_data = gmail_client.get_attachment(user_id, email_id, attachment_id)
+            from core.email_attachments import download_attachment_bytes, resolve_email_provider
+
+            provider = resolve_email_provider(user_id, email_id)
+            attachment_data = download_attachment_bytes(
+                user_id,
+                email_id,
+                attachment_id,
+                provider=provider,
+            )
             
             if attachment_data:
                 from flask import Response
+                mimetype = (
+                    attachment_data.get("mime_type")
+                    or att.get("mime_type")
+                    or "application/octet-stream"
+                )
+                inline = request.args.get('inline') in ('1', 'true', 'yes')
+                disposition = 'inline' if inline else 'attachment'
+                filename = att.get("filename") or "attachment"
                 response = Response(
-                    attachment_data['data'],
-                    mimetype=att.get('mime_type', 'application/octet-stream'),
+                    attachment_data["data"],
+                    mimetype=mimetype,
                     headers={
-                        'Content-Disposition': f'attachment; filename="{att["filename"]}"'
+                        'Content-Disposition': f'{disposition}; filename="{filename}"'
                     }
                 )
                 return response
