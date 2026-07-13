@@ -141,6 +141,9 @@ export interface LeadData {
   name: string
   email: string
   company: string
+  phone?: string
+  /** Lead SMS follow-up consent (CRM only; not account-holder consent). */
+  sms_consent?: boolean
   stage: string
   /** 0–100 from backend `LeadScoringService`. */
   score: number
@@ -1834,6 +1837,8 @@ class ApiClient {
       name: lead.name || 'Unknown',
       email: lead.email || '',
       company: lead.company || '',
+      phone: lead.phone || '',
+      sms_consent: metadata?.sms_consent === true,
       stage: lead.stage || 'new',
       score: lead.score || 0,
       scoreBreakdown: breakdown,
@@ -1841,6 +1846,24 @@ class ApiClient {
       lastContact: lead.last_contact || lead.updated_at || lead.created_at || new Date().toISOString(),
       source: lead.source || 'manual'
     }
+  }
+
+  async updateLead(
+    leadId: string | number,
+    updates: Partial<{
+      name: string
+      email: string
+      phone: string
+      company: string
+      source: string
+      stage: string
+      notes: string
+      sms_consent: boolean
+    }>
+  ): Promise<LeadData> {
+    const response = await this.client.put(`/crm/leads/${leadId}`, updates)
+    const lead = response.data?.data?.lead ?? response.data?.lead ?? response.data
+    return this.mapLead(lead)
   }
 
   /** Include user_id in params/body only when known; backend resolves tenant from JWT first. */

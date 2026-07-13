@@ -15,7 +15,8 @@ import {
   AlertTriangle,
   PlayCircle,
   CheckCircle2,
-  BarChart3
+  BarChart3,
+  MessageSquare,
 } from 'lucide-react'
 import { apiClient, AutomationLog, AutomationRule, AutomationSafetyStatus } from '../services/apiClient'
 import { useToast } from '../components/Toast'
@@ -146,7 +147,7 @@ const automationPresets: AutomationPreset[] = [
   {
     id: 'calendar_followups',
     name: 'Calendar follow-ups',
-    description: 'Auto-create follow-up reminders for hot leads.',
+    description: 'Auto-create follow-up reminders for hot leads (email by default). For SMS, use Send SMS to lead.',
     icon: Calendar,
     triggerType: 'lead_stage_changed',
     actionType: 'schedule_follow_up',
@@ -159,7 +160,28 @@ const automationPresets: AutomationPreset[] = [
         helper: 'Time after lead is qualified'
       }
     ]
-  }
+  },
+  {
+    id: 'send_sms_to_lead',
+    name: 'Send SMS to lead',
+    description: 'Requires a valid phone number and recorded SMS consent for the lead.',
+    icon: MessageSquare,
+    triggerType: 'lead_stage_changed',
+    actionType: 'send_sms',
+    honestyNote:
+      'Uses platform Twilio when configured. Account Settings SMS consent does not authorize texts to CRM leads.',
+    defaultConfig: {
+      message: 'Hi — following up from our team. Reply STOP to opt out.',
+    },
+    configFields: [
+      {
+        key: 'message',
+        label: 'SMS message',
+        type: 'text',
+        helper: 'Sent only when the lead has phone + SMS consent recorded in CRM',
+      },
+    ],
+  },
 ]
 
 const findRuleForPreset = (rules: AutomationRule[] = [], presetId: string) => {
@@ -803,7 +825,17 @@ export const Automations: React.FC = () => {
             const lastLog = presetLogs[0]
             const statusKey = lastLog?.status || 'idle'
             const statusClass = statusBadgeClass[statusKey] || statusBadgeClass.idle
-            const lastMessage = lastLog?.action_result?.message || lastLog?.error_message
+            const lastMessage = (() => {
+              const code = lastLog?.action_result?.error_code || lastLog?.error_message
+              if (
+                code === 'SMS_CONSENT_REQUIRED' ||
+                String(lastLog?.action_result?.error || '').includes('sms_consent') ||
+                String(lastLog?.error_message || '').includes('sms_consent')
+              ) {
+                return 'SMS was not sent because this lead has not consented to SMS follow-ups.'
+              }
+              return lastLog?.action_result?.message || lastLog?.error_message
+            })()
             const isTesting = testPresetMutation.isPending && testPresetMutation.variables === preset.id
             return (
               <div key={preset.id} className="rounded-xl border border-brand-text/10 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm flex flex-col gap-3">
@@ -1003,6 +1035,17 @@ export const Automations: React.FC = () => {
             {automationLogs.slice(0, 12).map(log => {
               const isSuccess = log.status === 'success'
               const StatusIcon = isSuccess ? CheckCircle2 : AlertTriangle
+              const consentBlocked =
+                log.action_result?.error_code === 'SMS_CONSENT_REQUIRED' ||
+                log.error_message === 'SMS_CONSENT_REQUIRED' ||
+                String(log.action_result?.error || '').includes('sms_consent') ||
+                String(log.error_message || '').includes('sms_consent')
+              const detail = consentBlocked
+                ? 'SMS was not sent because this lead has not consented to SMS follow-ups.'
+                : log.action_result?.message ||
+                  log.action_result?.summary ||
+                  log.error_message ||
+                  'Automation completed successfully'
               return (
                 <div key={log.execution_id} className="flex items-start justify-between gap-3 rounded-lg border border-brand-text/10 dark:border-gray-700 p-3">
                   <div className="flex items-start gap-2 min-w-0">
@@ -1012,7 +1055,7 @@ export const Automations: React.FC = () => {
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-brand-text dark:text-white break-words">{log.rule_name}</p>
                       <p className="text-xs text-brand-text/70 dark:text-gray-300 mt-0.5 line-clamp-2">
-                        {log.action_result?.message || log.action_result?.summary || log.error_message || 'Automation completed successfully'}
+                        {detail}
                       </p>
                     </div>
                   </div>

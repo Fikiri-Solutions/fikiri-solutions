@@ -224,6 +224,17 @@ const errorMap: Record<string, FriendlyError> = {
       'Or use a different email address'
     ],
     type: 'info'
+  },
+
+  'SMS_CONSENT_REQUIRED': {
+    title: 'SMS Consent Required',
+    message: 'SMS was not sent because this lead has not consented to SMS follow-ups.',
+    steps: [
+      'Open the lead in CRM and enable “Consent to receive SMS follow-ups”',
+      'Only after the lead agreed to receive texts from this business',
+      'Then retry the SMS automation or follow-up'
+    ],
+    type: 'warning'
   }
 }
 
@@ -232,8 +243,13 @@ const errorMap: Record<string, FriendlyError> = {
  */
 export function getFriendlyError(error: any): FriendlyError {
   // Check for specific error codes first
-  if (error?.error_code && errorMap[error.error_code]) {
-    return errorMap[error.error_code]
+  const code =
+    error?.error_code ||
+    error?.code ||
+    error?.response?.data?.code ||
+    error?.response?.data?.error_code
+  if (code && errorMap[code]) {
+    return errorMap[code]
   }
 
   // Check status codes

@@ -13,7 +13,7 @@ from core.database_optimization import db_optimizer
 from core.automation_run_events import record_automation_cancelled
 from core.idempotency_manager import idempotency_manager
 from core.automation_safety import automation_safety_manager
-from core.sms_consent import lead_row_allows_sms
+from core.sms_consent import lead_row_allows_sms, sms_consent_denial_payload
 from crm.service import enhanced_crm_service
 
 logger = logging.getLogger(__name__)
@@ -385,7 +385,7 @@ def execute_due_follow_ups(user_id: int, now_iso: Optional[str] = None) -> Dict[
                         )
                     except Exception as log_err:
                         logger.debug("sms_messages log skipped: %s", log_err)
-                    result = {"success": False, "error": consent_reason}
+                    result = sms_consent_denial_payload(consent_reason)
                 else:
                     safety = automation_safety_manager.check_rate_limits(
                         user_id=user_id,

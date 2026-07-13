@@ -275,6 +275,29 @@ def api_signup():
             'role': user_dict.get('role', 'user')
         }
 
+        # Persist optional account SMS fields via the same profile metadata path as Settings.
+        # Account consent is for Fikiri user alerts only — never applies to CRM leads.
+        try:
+            phone_raw = data.get("phone")
+            phone = (str(phone_raw).strip() if phone_raw is not None else "") or None
+            sms_consent = bool(data.get("sms_consent"))
+            if phone is not None or "sms_consent" in data:
+                meta_updates = {
+                    "phone": phone,
+                    "sms_consent": sms_consent,
+                    "sms_consent_at": (
+                        datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+                        if sms_consent
+                        else None
+                    ),
+                }
+                user_auth_manager.update_user_profile(
+                    user_data["id"],
+                    metadata_updates=meta_updates,
+                )
+        except Exception as e:
+            logger.warning("Signup phone/sms_consent metadata update failed: %s", e)
+
         _tok_t0 = time.monotonic()
         tokens = get_jwt_manager().generate_tokens(
             user_data['id'],

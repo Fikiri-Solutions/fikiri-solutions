@@ -273,6 +273,8 @@ def create_lead():
         'notes': data.get('notes', ''),
         'correlation_id': correlation_id,
     }
+    if 'sms_consent' in data:
+        lead_data['sms_consent'] = data.get('sms_consent') is True
 
     result = enhanced_crm_service.create_lead(user_id, lead_data)
     if not result.get('success'):

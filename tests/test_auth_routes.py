@@ -197,6 +197,113 @@ class TestAuthRoutes(unittest.TestCase):
     @patch('routes.auth.get_jwt_manager')
     @patch('routes.auth.check_email_domain_has_mx_for_signup')
     @patch('routes.auth.user_auth_manager')
+    def test_signup_persists_phone_and_sms_consent(
+        self,
+        mock_user_auth,
+        mock_check_email_domain_has_mx,
+        mock_get_jwt_mgr,
+        mock_session_mgr,
+        mock_log,
+        mock_analytics,
+        mock_email_jobs,
+    ):
+        mock_user_auth.create_user.return_value = {
+            'success': True,
+            'user': {
+                'id': 42,
+                'email': 'sms@example.com',
+                'name': 'SMS User',
+                'role': 'user'
+            }
+        }
+        mock_user_auth.update_user_profile.return_value = {'success': True}
+        mock_check_email_domain_has_mx.return_value = {
+            "domain": "example.com",
+            "has_mx": True,
+            "mx_records": 1,
+            "reason": "OK",
+        }
+        jwt_mgr = MagicMock()
+        jwt_mgr.generate_tokens.return_value = {
+            'access_token': 'access',
+            'refresh_token': 'refresh',
+            'expires_in': 1800,
+            'token_type': 'Bearer'
+        }
+        mock_get_jwt_mgr.return_value = jwt_mgr
+        mock_session_mgr.create_session.return_value = (
+            'session-id',
+            {'name': 'fikiri_session', 'value': 'session-id', 'httponly': True},
+        )
+
+        response = self.client.post('/api/auth/signup', json={
+            'email': 'sms@example.com',
+            'password': 'Password123!',
+            'name': 'SMS User',
+            'phone': ' +13525550100 ',
+            'sms_consent': True,
+        })
+        self.assertEqual(response.status_code, 200)
+        mock_user_auth.update_user_profile.assert_called_once()
+        args, kwargs = mock_user_auth.update_user_profile.call_args
+        self.assertEqual(args[0], 42)
+        meta = kwargs.get('metadata_updates') or {}
+        self.assertEqual(meta.get('phone'), '+13525550100')
+        self.assertIs(meta.get('sms_consent'), True)
+        self.assertTrue(meta.get('sms_consent_at'))
+
+    @patch('routes.auth.email_job_manager')
+    @patch('routes.auth.business_analytics')
+    @patch('routes.auth.log_security_event')
+    @patch('routes.auth.secure_session_manager')
+    @patch('routes.auth.get_jwt_manager')
+    @patch('routes.auth.check_email_domain_has_mx_for_signup')
+    @patch('routes.auth.user_auth_manager')
+    def test_signup_unchecked_sms_consent_persists_false(
+        self,
+        mock_user_auth,
+        mock_check_email_domain_has_mx,
+        mock_get_jwt_mgr,
+        mock_session_mgr,
+        mock_log,
+        mock_analytics,
+        mock_email_jobs,
+    ):
+        mock_user_auth.create_user.return_value = {
+            'success': True,
+            'user': {'id': 43, 'email': 'nosms@example.com', 'name': 'No SMS', 'role': 'user'},
+        }
+        mock_user_auth.update_user_profile.return_value = {'success': True}
+        mock_check_email_domain_has_mx.return_value = {
+            "domain": "example.com", "has_mx": True, "mx_records": 1, "reason": "OK",
+        }
+        jwt_mgr = MagicMock()
+        jwt_mgr.generate_tokens.return_value = {
+            'access_token': 'access', 'refresh_token': 'refresh', 'expires_in': 1800, 'token_type': 'Bearer'
+        }
+        mock_get_jwt_mgr.return_value = jwt_mgr
+        mock_session_mgr.create_session.return_value = (
+            'session-id', {'name': 'fikiri_session', 'value': 'session-id', 'httponly': True},
+        )
+
+        response = self.client.post('/api/auth/signup', json={
+            'email': 'nosms@example.com',
+            'password': 'Password123!',
+            'name': 'No SMS',
+            'sms_consent': False,
+        })
+        self.assertEqual(response.status_code, 200)
+        meta = mock_user_auth.update_user_profile.call_args.kwargs.get('metadata_updates') or {}
+        self.assertIs(meta.get('sms_consent'), False)
+        self.assertIsNone(meta.get('sms_consent_at'))
+
+    @patch('routes.auth.email_job_manager')
+    @patch('routes.auth.business_analytics')
+    @patch('routes.auth.log_security_event')
+    @patch('routes.auth.secure_session_manager')
+    @patch('routes.auth.get_jwt_manager')
+    @patch('routes.auth.check_email_domain_has_mx_for_signup')
+    @patch('routes.auth.user_auth_manager')
     def test_signup_session_failure_still_returns_tokens(
         self,
         mock_user_auth,

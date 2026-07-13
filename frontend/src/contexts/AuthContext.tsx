@@ -47,6 +47,10 @@ export interface SignupExtras {
   termsAccepted?: boolean
   privacyConsent?: boolean
   marketingConsent?: boolean
+  /** Account-holder phone only (not CRM lead consent). */
+  phone?: string
+  /** Account alerts / security SMS; unchecked = false. */
+  smsConsent?: boolean
 }
 
 interface AuthContextType extends AuthState {
@@ -548,6 +552,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         privacy_consent: extras?.privacyConsent ?? onboardingData?.privacyConsent ?? false,
         terms_accepted: extras?.termsAccepted ?? onboardingData?.termsAccepted ?? false,
         marketing_consent: extras?.marketingConsent ?? onboardingData?.marketingConsent ?? false,
+        phone: (extras?.phone ?? '').trim(),
+        sms_consent: extras?.smsConsent === true,
       }
 
       const data = await apiClient.signup(signupData)

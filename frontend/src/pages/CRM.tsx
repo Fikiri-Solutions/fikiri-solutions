@@ -144,8 +144,12 @@ export const CRM: React.FC = () => {
     stage: 'new',
     score: 0,
     lastContact: new Date().toISOString(),
-    source: 'web'
+    source: 'web',
+    sms_consent: false,
   })
+  const [editingLead, setEditingLead] = useState<LeadData | null>(null)
+  const [editSmsConsent, setEditSmsConsent] = useState(false)
+  const [editPhone, setEditPhone] = useState('')
   const [isExporting, setIsExporting] = useState(false)
   const [traceLead, setTraceLead] = useState<LeadData | null>(null)
   const [isImporting, setIsImporting] = useState(false)
@@ -223,7 +227,10 @@ export const CRM: React.FC = () => {
     setError(null)
 
     try {
-      await apiClient.addLead(newLead)
+      await apiClient.addLead({
+        ...newLead,
+        sms_consent: newLead.sms_consent === true,
+      })
       setNewLead({ 
         id: '', 
         name: '', 
@@ -233,7 +240,8 @@ export const CRM: React.FC = () => {
         stage: 'new', 
         score: 0, 
         lastContact: new Date().toISOString(), 
-        source: 'web' 
+        source: 'web',
+        sms_consent: false,
       })
       setShowAddLeadModal(false)
       addToast({ type: 'success', title: 'Lead Added', message: 'The new lead has been added to your CRM.' })
@@ -241,6 +249,35 @@ export const CRM: React.FC = () => {
       refreshCrmData()
     } catch (error) {
       // Failed to add lead
+      setError(getUserFriendlyError(error))
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const openEditLead = (lead: LeadData) => {
+    setEditingLead(lead)
+    setEditPhone(lead.phone || '')
+    setEditSmsConsent(lead.sms_consent === true)
+  }
+
+  const handleSaveEditLead = async () => {
+    if (!editingLead) return
+    setIsLoading(true)
+    setError(null)
+    try {
+      await apiClient.updateLead(editingLead.id, {
+        phone: editPhone.trim(),
+        sms_consent: editSmsConsent === true,
+      })
+      addToast({
+        type: 'success',
+        title: 'Lead Updated',
+        message: 'Phone and SMS consent were saved for this lead.',
+      })
+      setEditingLead(null)
+      refreshCrmData()
+    } catch (error) {
       setError(getUserFriendlyError(error))
     } finally {
       setIsLoading(false)
@@ -942,14 +979,23 @@ export const CRM: React.FC = () => {
                       {lead.source}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 rounded-md border border-brand-text/15 px-2 py-1 text-xs font-medium text-brand-primary hover:bg-brand-primary/5 dark:border-gray-600 dark:text-brand-accent"
-                        onClick={() => setTraceLead(lead)}
-                      >
-                        <GitBranch className="h-3.5 w-3.5" />
-                        View trace
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 rounded-md border border-brand-text/15 px-2 py-1 text-xs font-medium text-brand-text hover:bg-brand-text/5 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+                          onClick={() => openEditLead(lead)}
+                        >
+                          Edit SMS
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 rounded-md border border-brand-text/15 px-2 py-1 text-xs font-medium text-brand-primary hover:bg-brand-primary/5 dark:border-gray-600 dark:text-brand-accent"
+                          onClick={() => setTraceLead(lead)}
+                        >
+                          <GitBranch className="h-3.5 w-3.5" />
+                          View trace
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )})}
@@ -1051,6 +1097,22 @@ export const CRM: React.FC = () => {
                     onChange={(e) => setNewLead({...newLead, phone: e.target.value})}
                     placeholder="Enter phone number"
                   />
+                  <div className="mt-3 flex items-start gap-2">
+                    <input
+                      id="new-lead-sms-consent"
+                      name="sms_consent"
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-accent"
+                      checked={newLead.sms_consent === true}
+                      onChange={(e) => setNewLead({ ...newLead, sms_consent: e.target.checked })}
+                    />
+                    <label htmlFor="new-lead-sms-consent" className="text-sm text-brand-text/80 dark:text-gray-300">
+                      <span className="font-medium text-brand-text dark:text-white">Consent to receive SMS follow-ups</span>
+                      <span className="block text-xs text-brand-text/60 dark:text-gray-400 mt-0.5">
+                        Only enable this after the lead has agreed to receive text messages from this business.
+                      </span>
+                    </label>
+                  </div>
                 </div>
                 
                 <div>
@@ -1101,6 +1163,68 @@ export const CRM: React.FC = () => {
                   className="px-4 py-2 text-sm font-medium text-white bg-brand-primary hover:bg-brand-secondary disabled:opacity-50 disabled:cursor-not-allowed rounded-lg"
                 >
                   {isLoading ? 'Adding...' : 'Add Lead'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Edit lead phone + SMS consent */}
+      {editingLead && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border border-gray-200 dark:border-gray-700 w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-brand-text dark:text-white mb-1">Edit SMS settings</h3>
+              <p className="text-sm text-brand-text/70 dark:text-gray-400 mb-4">
+                {editingLead.name} · {editingLead.email}
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="edit-lead-phone" className="block text-sm font-medium text-brand-text dark:text-gray-300 mb-1">
+                    Phone
+                  </label>
+                  <input
+                    id="edit-lead-phone"
+                    name="tel"
+                    type="tel"
+                    className="bg-white dark:bg-gray-800 text-brand-text dark:text-white placeholder-brand-text/60 dark:placeholder-gray-400 border border-brand-text/20 dark:border-gray-600 focus:border-brand-accent focus:ring-brand-accent rounded-lg px-4 py-2 w-full"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    placeholder="Enter phone number"
+                  />
+                </div>
+                <div className="flex items-start gap-2">
+                  <input
+                    id="edit-lead-sms-consent"
+                    name="sms_consent"
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-accent"
+                    checked={editSmsConsent}
+                    onChange={(e) => setEditSmsConsent(e.target.checked)}
+                  />
+                  <label htmlFor="edit-lead-sms-consent" className="text-sm text-brand-text/80 dark:text-gray-300">
+                    <span className="font-medium text-brand-text dark:text-white">Consent to receive SMS follow-ups</span>
+                    <span className="block text-xs text-brand-text/60 dark:text-gray-400 mt-0.5">
+                      Only enable this after the lead has agreed to receive text messages from this business.
+                    </span>
+                  </label>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setEditingLead(null)}
+                  className="px-4 py-2 text-sm font-medium text-brand-text dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEditLead}
+                  disabled={isLoading}
+                  className="px-4 py-2 text-sm font-medium text-white bg-brand-primary hover:bg-brand-secondary disabled:opacity-50 disabled:cursor-not-allowed rounded-lg"
+                >
+                  {isLoading ? 'Saving...' : 'Save'}
                 </button>
               </div>
             </div>

@@ -87,7 +87,83 @@ class TestCRMService(unittest.TestCase):
         metadata = json.loads(metadata_json)
         self.assertIn('lead_quality', metadata)
         self.assertIn('score_breakdown', metadata)
+        self.assertIs(metadata.get('sms_consent'), False)
 
+    @patch('crm.service.record_crm_event')
+    @patch('crm.service.db_optimizer')
+    def test_create_lead_saves_sms_consent_true(self, mock_db, _mock_events):
+        mock_db.execute_query.side_effect = [
+            [],
+            1,
+            [{'id': 202}],
+        ]
+        result = self.service.create_lead(
+            1,
+            {
+                'email': 'consent@example.com',
+                'name': 'Consent Lead',
+                'phone': '+15551234567',
+                'sms_consent': True,
+            },
+        )
+        self.assertTrue(result.get('success'), msg=result)
+        metadata = json.loads(mock_db.execute_query.call_args_list[1].args[1][-1])
+        self.assertIs(metadata.get('sms_consent'), True)
+        self.assertTrue(metadata.get('sms_consent_at'))
+        self.assertEqual(metadata.get('sms_consent_source'), 'manual_crm')
+
+    @patch('crm.service.record_crm_event')
+    @patch('crm.service.db_optimizer')
+    def test_update_lead_sms_consent_revoke_and_preserve(self, mock_db, _mock_events):
+        self.service._get_lead_activity_metrics = lambda _lead_id: (0, None)
+        self.service._score_lead_data = lambda _lead, _count, _last: {
+            'score': 40, 'quality': 'C', 'breakdown': {}
+        }
+        meta = json.dumps({
+            'sms_consent': True,
+            'sms_consent_at': '2026-01-01T00:00:00Z',
+            'sms_consent_source': 'manual_crm',
+            'lead_quality': 'C',
+        })
+        row = {
+            'id': 1, 'user_id': 1, 'email': 'a@b.com', 'name': 'A', 'phone': '+15550001111',
+            'company': None, 'source': 'manual', 'stage': 'new', 'score': 40,
+            'created_at': '2024-01-01T00:00:00', 'updated_at': '2024-01-01T00:00:00',
+            'last_contact': None, 'notes': None, 'tags': '[]', 'metadata': meta,
+        }
+        # revoke consent
+        mock_db.execute_query.side_effect = [
+            [dict(row)],
+            None,
+            [dict(row)],
+            None,
+        ]
+        revoked = self.service.update_lead(1, 1, {'sms_consent': False})
+        self.assertTrue(revoked.get('success'))
+        update_sql = mock_db.execute_query.call_args_list[1].args[0]
+        self.assertIn('metadata', update_sql)
+        update_params = mock_db.execute_query.call_args_list[1].args[1]
+        saved_meta = json.loads(update_params[0])
+        self.assertIs(saved_meta.get('sms_consent'), False)
+        self.assertIsNone(saved_meta.get('sms_consent_at'))
+
+        # edit unrelated field must not clear consent when sms_consent not in updates
+        row_consented = dict(row)
+        mock_db.reset_mock()
+        mock_db.execute_query.side_effect = [
+            [row_consented],
+            None,
+            [row_consented],
+            None,
+        ]
+        named = self.service.update_lead(1, 1, {'name': 'Renamed'})
+        self.assertTrue(named.get('success'))
+        name_update_params = mock_db.execute_query.call_args_list[1].args[1]
+        # name update should not include metadata unless consent was sent
+        self.assertEqual(name_update_params[0], 'Renamed')
+        # Original consented metadata must remain on the lead row used for update
+        self.assertIn('sms_consent', json.loads(row_consented['metadata']))
+        self.assertIs(json.loads(row_consented['metadata']).get('sms_consent'), True)
     @patch('crm.service.record_crm_event')
     @patch('crm.service.db_optimizer')
     def test_update_lead_recalculates_score(self, mock_db, _mock_events):

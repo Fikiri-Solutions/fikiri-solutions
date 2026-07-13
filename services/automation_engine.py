@@ -114,7 +114,7 @@ _ACTION_CAPABILITY_DESCRIPTIONS: Dict[ActionType, str] = {
     ActionType.SEND_NOTIFICATION: "Works when Slack webhook URL is configured (action param or SLACK_WEBHOOK_URL).",
     ActionType.TRIGGER_WEBHOOK: "Real HTTP POST with timeout and retries; optional HMAC signature.",
     ActionType.GENERATE_DOCUMENT: "Depends on document templates.",
-    ActionType.SEND_SMS: "Works when Twilio is configured.",
+    ActionType.SEND_SMS: "Send SMS to lead. Requires a valid phone number and recorded SMS consent for the lead.",
 }
 
 @dataclass

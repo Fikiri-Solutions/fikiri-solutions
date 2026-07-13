@@ -20,7 +20,11 @@ class SmsActionHandler:
     ) -> Dict[str, Any]:
         """Send SMS via Twilio when configured; requires lead_id and leads.metadata.sms_consent."""
         try:
-            from core.sms_consent import lead_row_allows_sms, lead_sms_destination_matches
+            from core.sms_consent import (
+                lead_row_allows_sms,
+                lead_sms_destination_matches,
+                sms_consent_denial_payload,
+            )
 
             lead_id = action_data.get("lead_id") or trigger_data.get("lead_id")
             phone_number = action_data.get("phone_number")
@@ -42,11 +46,7 @@ class SmsActionHandler:
             lead = row[0]
             ok, reason = lead_row_allows_sms(lead)
             if not ok:
-                return {
-                    "success": False,
-                    "error": reason,
-                    "error_code": "SMS_CONSENT_REQUIRED",
-                }
+                return sms_consent_denial_payload(reason)
             lead_phone = lead.get("phone") or ""
             if not str(lead_phone).strip():
                 return {"success": False, "error": "Lead has no phone number"}

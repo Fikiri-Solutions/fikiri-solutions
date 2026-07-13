@@ -289,6 +289,11 @@ class EnhancedCRMService:
             "SELECT id, withdrawn_at FROM leads WHERE user_id = ? AND lower(email) = lower(?)",
             (user_id, lead_data['email'])
         )
+        consent_provided = "sms_consent" in lead_data
+        raw_consent = lead_data.pop("sms_consent", False) if consent_provided else False
+        consent_flag = raw_consent is True
+        lead_data.pop("sms_consent_source", None)
+
         if existing:
             row = existing[0]
             if not row.get("withdrawn_at"):
@@ -321,6 +326,8 @@ class EnhancedCRMService:
                 and v is not None
                 and v != ""
             }
+            if consent_provided:
+                re_upd["sms_consent"] = consent_flag
             if re_upd:
                 return self.update_lead(lead_id, user_id, re_upd)
             self._add_lead_activity(lead_id, "note_added", "Lead reactivated after withdraw")
@@ -331,11 +338,19 @@ class EnhancedCRMService:
         
         score_result = self._score_lead_data(lead_data, activity_count=0, last_activity=None)
         lead_data['score'] = score_result['score']
+        from core.sms_consent import apply_lead_sms_consent_to_metadata
+
         lead_data['metadata'] = {
-            **lead_data.get('metadata', {}),
+            **(lead_data.get('metadata') if isinstance(lead_data.get('metadata'), dict) else {}),
             'lead_quality': score_result['quality'],
-            'score_breakdown': score_result['breakdown']
+            'score_breakdown': score_result['breakdown'],
         }
+        # New leads default to false; explicit true records consent + source via merge helper.
+        lead_data['metadata'] = apply_lead_sms_consent_to_metadata(
+            lead_data['metadata'],
+            consent_flag if consent_provided else False,
+            source="manual_crm",
+        )
         db_optimizer.execute_query(
             """INSERT INTO leads (user_id, email, name, phone, company, source, stage, score, notes, tags, metadata) 
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -447,17 +462,21 @@ class EnhancedCRMService:
             correlation_id = str(updates.get("correlation_id") or uuid4())
 
             if "sms_consent" in updates:
-                consent_flag = bool(updates.pop("sms_consent"))
+                from core.sms_consent import apply_lead_sms_consent_to_metadata
+
+                consent_flag = updates.pop("sms_consent") is True
                 base_meta = _crm_meta_dict(lead_data[0].get("metadata"))
-                base_meta["sms_consent"] = consent_flag
-                base_meta["sms_consent_at"] = (
-                    datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-                    if consent_flag
-                    else None
+                base_meta = apply_lead_sms_consent_to_metadata(
+                    base_meta, consent_flag, source="manual_crm"
                 )
                 extra_meta = updates.pop("metadata", None)
                 if isinstance(extra_meta, dict):
                     base_meta.update(extra_meta)
+                    # Re-apply consent after merge so unrelated metadata cannot clear an
+                    # explicit sms_consent update in this request.
+                    base_meta = apply_lead_sms_consent_to_metadata(
+                        base_meta, consent_flag, source="manual_crm"
+                    )
                 updates["metadata"] = base_meta
 
             # Build update query

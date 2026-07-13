@@ -151,6 +151,8 @@ const Signup: React.FC = () => {
           termsAccepted: formData.agreeToTerms,
           privacyConsent: formData.agreeToTerms,
           marketingConsent: formData.subscribeNewsletter,
+          phone: formData.phone.trim(),
+          smsConsent: formData.smsConsent === true,
         },
       );
       
