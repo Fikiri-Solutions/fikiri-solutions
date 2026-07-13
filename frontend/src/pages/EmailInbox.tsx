@@ -1732,7 +1732,6 @@ export const EmailInbox: React.FC = () => {
                         )}
                       </div>
                     )}
-                    )}
                   </div>
                 )}
                 </div>
