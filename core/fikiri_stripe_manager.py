@@ -691,7 +691,7 @@ class FikiriStripeManager:
             raise
 
     def get_subscription(self, subscription_id: str) -> Dict[str, Any]:
-        """Retrieve subscription for billing API (same shape as core.billing_manager.BillingManager)."""
+        """Retrieve subscription for billing API."""
         if not STRIPE_AVAILABLE:
             raise RuntimeError("Stripe is not available")
         try:

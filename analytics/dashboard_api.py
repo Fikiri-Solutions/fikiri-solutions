@@ -15,10 +15,11 @@ from core.api_validation import handle_api_errors, create_success_response, crea
 from core.secure_sessions import get_current_user_id
 from core.database_optimization import db_optimizer
 from core.jwt_auth import jwt_required, get_current_user
-from core.billing_manager import FikiriBillingManager
+from core.fikiri_stripe_manager import FikiriStripeManager
 
 logger = logging.getLogger(__name__)
-billing_manager = FikiriBillingManager()
+# Canonical production billing manager (same class as core/billing_api.py).
+stripe_manager = FikiriStripeManager()
 
 # Short TTL cache: pricing tiers rarely change; k6 + dashboards hit this path heavily on single workers.
 _industry_pricing_cache: Optional[Tuple[float, Dict[str, Any]]] = None
@@ -798,14 +799,16 @@ def get_industry_pricing():
         if cached is not None and (now - cached[0]) < _INDUSTRY_PRICING_CACHE_TTL_SEC:
             return create_success_response({"pricing_tiers": cached[1]}, "Industry pricing retrieved")
     try:
-        tiers = billing_manager.get_pricing_tiers()
+        tiers = stripe_manager.get_pricing_tiers()
         pricing = {}
         for tier_key, tier_data in tiers.items():
-            limits = tier_data.get('limits', {})
+            limits = tier_data.get('limits', {}) or {}
+            # FikiriStripeManager uses ai_response_limit; preserve legacy ai_responses key for UI.
+            responses_limit = limits.get('ai_responses', limits.get('ai_response_limit', 0))
             pricing[tier_key] = {
                 "name": tier_data.get('name', tier_key.title()),
                 "price": tier_data.get('monthly_price', 0),
-                "responses_limit": limits.get('ai_responses', 0),
+                "responses_limit": responses_limit,
                 "features": tier_data.get('features', []),
             }
         with _industry_pricing_lock:
@@ -838,7 +841,7 @@ def get_industry_usage():
         except Exception:
             pass
 
-        pricing_tiers = billing_manager.get_pricing_tiers()
+        pricing_tiers = stripe_manager.get_pricing_tiers()
         if tier in pricing_tiers:
             monthly_cost = float(pricing_tiers[tier].get('monthly_price', monthly_cost) or monthly_cost)
 

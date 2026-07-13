@@ -225,7 +225,7 @@ class TestDashboardAPI(unittest.TestCase):
         self.assertTrue(data.get("success"))
         self.assertIn("prompts", data.get("data", {}))
 
-    @patch("analytics.dashboard_api.billing_manager")
+    @patch("analytics.dashboard_api.stripe_manager")
     def test_dashboard_industry_pricing_success(self, mock_billing):
         mock_billing.get_pricing_tiers.return_value = {
             "starter": {
@@ -241,8 +241,51 @@ class TestDashboardAPI(unittest.TestCase):
         self.assertTrue(data.get("success"))
         self.assertIn("pricing_tiers", data.get("data", {}))
 
+    @patch("analytics.dashboard_api.stripe_manager")
+    def test_dashboard_industry_pricing_uses_stripe_manager_limit_keys(self, mock_billing):
+        """Canonical manager returns ai_response_limit; API still exposes responses_limit."""
+        mock_billing.get_pricing_tiers.return_value = {
+            "starter": {
+                "name": "Fikiri Starter",
+                "monthly_price": 49.0,
+                "features": ["basic_ai"],
+                "limits": {"ai_response_limit": 200, "email_limit": 500},
+            },
+            "growth": {
+                "name": "Fikiri Growth",
+                "monthly_price": 99.0,
+                "features": ["advanced_ai"],
+                "limits": {"ai_response_limit": 800},
+            },
+        }
+        # Bypass short TTL cache from other tests
+        import analytics.dashboard_api as dash
+
+        dash._industry_pricing_cache = None
+        response = self.client.get("/api/dashboard/industry/pricing")
+        self.assertEqual(response.status_code, 200)
+        tiers = response.get_json()["data"]["pricing_tiers"]
+        self.assertEqual(tiers["starter"]["price"], 49.0)
+        self.assertEqual(tiers["starter"]["responses_limit"], 200)
+        self.assertEqual(tiers["growth"]["price"], 99.0)
+        self.assertEqual(tiers["growth"]["responses_limit"], 800)
+        mock_billing.get_pricing_tiers.assert_called()
+
+    @patch("analytics.dashboard_api.stripe_manager")
+    def test_dashboard_industry_pricing_error_when_manager_raises(self, mock_billing):
+        import analytics.dashboard_api as dash
+
+        dash._industry_pricing_cache = None
+        mock_billing.get_pricing_tiers.side_effect = RuntimeError("stripe down")
+        response = self.client.get("/api/dashboard/industry/pricing")
+        self.assertEqual(response.status_code, 500)
+        data = response.get_json()
+        self.assertFalse(data.get("success", True))
+        self.assertEqual(data.get("code"), "INDUSTRY_PRICING_ERROR")
+        self.assertIn("pricing", (data.get("error") or "").lower())
+
     @patch("analytics.dashboard_api.db_optimizer")
-    @patch("analytics.dashboard_api.billing_manager")
+    @patch("analytics.dashboard_api.stripe_manager")
     @patch("analytics.dashboard_api.get_current_user_id", return_value=1)
     def test_dashboard_industry_usage_success(self, mock_user_id, mock_billing, mock_db):
         mock_billing.get_pricing_tiers.return_value = {

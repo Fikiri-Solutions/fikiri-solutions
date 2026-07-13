@@ -17,14 +17,6 @@ except ImportError:
     STRIPE_AVAILABLE = False
     stripe = None
 
-try:
-    from core.billing_manager import FikiriBillingManager, SubscriptionStatus
-    BILLING_AVAILABLE = True
-except ImportError:
-    BILLING_AVAILABLE = False
-    FikiriBillingManager = None
-    SubscriptionStatus = None
-
 from core.email_branding import wrap_html_email_body
 
 logger = logging.getLogger(__name__)
@@ -33,10 +25,6 @@ class StripeWebhookHandler:
     """Handles Stripe webhook events"""
     
     def __init__(self):
-        if BILLING_AVAILABLE:
-            self.billing_manager = FikiriBillingManager()
-        else:
-            self.billing_manager = None
         self.webhook_secret = os.getenv('STRIPE_WEBHOOK_SECRET')
         self._billing_from_email = os.getenv('BILLING_FROM_EMAIL', 'info@fikirisolutions.com')
     

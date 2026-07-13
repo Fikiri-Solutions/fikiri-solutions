@@ -11,7 +11,7 @@ Each path is a 36-month monthly episode. Hybrid mode models:
 
 Pure low-MRR SaaS only: pass --pure-saas (legacy tier-mix + single churn band).
 
-Sources: docs/FINANCIAL_MODEL_AND_RATE_LIMITING.md, core/billing_manager.py,
+Sources: docs/FINANCIAL_MODEL_AND_RATE_LIMITING.md, core/fikiri_stripe_manager.py,
   docs/archive/business/FAMILY_HELP_LOAN_TEMPLATE.md (optional loan).
 
 Examples:

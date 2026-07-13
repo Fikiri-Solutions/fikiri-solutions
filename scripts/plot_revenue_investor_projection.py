@@ -2,7 +2,7 @@
 """
 Generate MRR + investor payout (12%) charts for 25–100 clients, by plan tier.
 
-Uses the same list prices as core/billing_manager (monthly).
+Uses the same list prices as core/fikiri_stripe_manager (monthly).
 Requires: pip install matplotlib
 
 Usage:
@@ -24,7 +24,7 @@ except ImportError as e:
         "matplotlib is required: pip install matplotlib"
     ) from e
 
-# Monthly list prices (USD) — aligned with core/billing_manager.get_pricing_tiers
+# Monthly list prices (USD) — aligned with core/fikiri_stripe_manager.get_pricing_tiers
 TIERS: tuple[tuple[str, float, str], ...] = (
     ("Starter", 49.0, "#0f766e"),      # teal
     ("Growth", 99.0, "#c2410c"),       # orange

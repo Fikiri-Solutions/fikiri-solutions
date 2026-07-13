@@ -68,7 +68,7 @@ OBSERVABILITY_TARGETS = {
     "crm_leads": ["core/webhook_intake_service.py"],
     "mailbox_automation": ["email_automation/pipeline.py"],
     "workflows": ["core/workflow_followups.py", "core/appointment_reminders.py"],
-    "billing": ["core/billing_manager.py", "core/stripe_webhooks.py"],
+    "billing": ["core/fikiri_stripe_manager.py", "core/stripe_webhooks.py"],
     "security": ["core/secure_sessions.py", "core/api_key_manager.py"],
 }
 

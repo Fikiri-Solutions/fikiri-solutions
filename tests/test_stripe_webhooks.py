@@ -264,6 +264,29 @@ class TestStripeWebhookHandler(unittest.TestCase):
                 handler.verify_webhook_signature(b"{}", "bad-sig")
         mock_claim.assert_not_called()
 
+    def test_handler_init_without_fikiri_billing_manager(self):
+        """Webhook handler must not depend on residual FikiriBillingManager."""
+        import core.stripe_webhooks as wh
+
+        self.assertFalse(hasattr(wh, "FikiriBillingManager"))
+        self.assertNotIn("billing_manager", open(wh.__file__).read())
+        from core.stripe_webhooks import StripeWebhookHandler
+
+        handler = StripeWebhookHandler()
+        self.assertFalse(hasattr(handler, "billing_manager"))
+        self.assertTrue(hasattr(handler, "webhook_secret"))
+
+    @patch("core.stripe_webhooks.stripe")
+    def test_handle_event_after_billing_manager_removal(self, mock_stripe):
+        from core.stripe_webhooks import StripeWebhookHandler
+
+        handler = StripeWebhookHandler()
+        with patch.object(handler, "handle_payment_succeeded", return_value={"status": "success"}):
+            result = handler.handle_event(
+                {"type": "invoice.payment_succeeded", "data": {"object": {}}}
+            )
+        self.assertEqual(result.get("status"), "success")
+
 
 if __name__ == "__main__":
     unittest.main()
