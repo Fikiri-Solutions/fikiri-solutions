@@ -1144,10 +1144,10 @@ class TestBusinessRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.get_json().get("success"))
 
-    @patch("routes.business.db_optimizer")
+    @patch("core.email_attachments.list_email_attachments")
     @patch("routes.business.get_current_user_id", return_value=1)
-    def test_get_email_attachments_success(self, mock_user_id, mock_db):
-        mock_db.execute_query.return_value = [
+    def test_get_email_attachments_success(self, mock_user_id, mock_list):
+        mock_list.return_value = [
             {"id": 1, "attachment_id": "att1", "filename": "file.txt", "mime_type": "text/plain", "size": 10, "created_at": "2025-01-01"},
         ]
         response = self.client.get("/api/email/abc/attachments")
@@ -1160,7 +1160,10 @@ class TestBusinessRoutes(unittest.TestCase):
     @patch("routes.business.get_current_user_id", return_value=1)
     def test_download_attachment_not_found(self, mock_user_id, mock_db):
         mock_db.execute_query.return_value = []
-        response = self.client.get("/api/email/abc/attachments/att1/download")
+        with patch("core.email_attachments.fetch_attachments_for_provider", return_value=[]), patch(
+            "core.email_attachments.resolve_email_provider", return_value="gmail"
+        ):
+            response = self.client.get("/api/email/abc/attachments/att1/download")
         self.assertEqual(response.status_code, 404)
 
     @patch("routes.business.db_optimizer")
@@ -1169,9 +1172,10 @@ class TestBusinessRoutes(unittest.TestCase):
         mock_db.execute_query.return_value = [
             {"attachment_id": "att1", "filename": "file.txt", "mime_type": "text/plain", "size": 10, "stored_path": None},
         ]
-        with patch("integrations.gmail.gmail_client.gmail_client") as mock_gmail:
-            mock_gmail.get_attachment.return_value = {"data": b"hello"}
-            response = self.client.get("/api/email/abc/attachments/att1/download")
+        with patch("core.email_attachments.resolve_email_provider", return_value="gmail"):
+            with patch("integrations.gmail.gmail_client.gmail_client") as mock_gmail:
+                mock_gmail.get_attachment.return_value = {"data": b"hello"}
+                response = self.client.get("/api/email/abc/attachments/att1/download")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data, b"hello")
 
