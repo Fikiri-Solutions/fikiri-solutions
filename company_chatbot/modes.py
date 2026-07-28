@@ -1,7 +1,8 @@
 """Mode constants and lightweight deterministic detector."""
 
 import re
-from typing import Dict, List, Pattern, Tuple
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Pattern, TYPE_CHECKING
 
 from company_chatbot.config import (
     MODE_ANSWER,
@@ -13,7 +14,8 @@ from company_chatbot.config import (
 )
 from company_chatbot.retrieval import normalize_query_text
 
-ModeRule = Tuple[str, Pattern[str]]
+if TYPE_CHECKING:
+    from company_chatbot.routing_trace import RoutingTrace
 
 _EMAIL_ASSISTANT_RE = re.compile(
     r"\b(?:ai )?email (?:automation )?assistant\b|"
@@ -53,8 +55,17 @@ _VAGUE_OFFICE_RE = re.compile(
     re.I,
 )
 
+
+@dataclass(frozen=True)
+class ModeRule:
+    rule_id: str
+    mode: str
+    pattern: Pattern[str]
+
+
 _MODE_RULES: List[ModeRule] = [
-    (
+    ModeRule(
+        "contact_request",
         MODE_CONTACT,
         re.compile(
             r"\b(talk (?:to|with) (?:someone|a human|sales|support|your team|the team)|"
@@ -62,7 +73,8 @@ _MODE_RULES: List[ModeRule] = [
             re.I,
         ),
     ),
-    (
+    ModeRule(
+        "workflow_audit_request",
         MODE_WORKFLOW_AUDIT,
         re.compile(
             r"\b(workflow audit|process audit|operations audit|"
@@ -72,7 +84,8 @@ _MODE_RULES: List[ModeRule] = [
             re.I,
         ),
     ),
-    (
+    ModeRule(
+        "consulting_request",
         MODE_CONSULTING,
         re.compile(
             r"\b(consulting|implementation help|custom (build|project)|"
@@ -81,7 +94,8 @@ _MODE_RULES: List[ModeRule] = [
             re.I,
         ),
     ),
-    (
+    ModeRule(
+        "explore_fit",
         MODE_EXPLORE_FIT,
         re.compile(
             r"\b(is fikiri (?:right|good|a fit)|"
@@ -92,14 +106,16 @@ _MODE_RULES: List[ModeRule] = [
             re.I,
         ),
     ),
-    (
+    ModeRule(
+        "compliance_boundary",
         MODE_ANSWER,
         re.compile(
             r"\b(hipaa|soc\s*2|case stud(?:y|ies)|certified|compliance|guarantee)\b",
             re.I,
         ),
     ),
-    (
+    ModeRule(
+        "product_pricing_integrations",
         MODE_ANSWER,
         re.compile(
             r"\b(pricing|price|cost|how much|free trial|features?|"
@@ -118,9 +134,9 @@ _MODE_RULES: List[ModeRule] = [
             re.I,
         ),
     ),
-    (MODE_ANSWER, _MIXED_SCOPE_ANSWER_RE),
-    (MODE_ANSWER, _VAGUE_OFFICE_RE),
-    (MODE_ANSWER, _EMAIL_ASSISTANT_RE),
+    ModeRule("mixed_scope_answer", MODE_ANSWER, _MIXED_SCOPE_ANSWER_RE),
+    ModeRule("vague_office_pain", MODE_ANSWER, _VAGUE_OFFICE_RE),
+    ModeRule("email_assistant_product", MODE_ANSWER, _EMAIL_ASSISTANT_RE),
 ]
 
 
@@ -138,6 +154,8 @@ _BUSINESS_NEED_RE = re.compile(
 )
 
 _MIN_NEEDS_CONFIDENCE_FOR_ANSWER = 0.35
+_MATCHED_RULE_EMPTY_MESSAGE = "empty_message"
+_MATCHED_RULE_BUSINESS_NEED_BRIDGE = "business_need_bridge"
 
 
 def _needs_imply_answer(message: str, previous_query: str | None = None) -> bool:
@@ -150,19 +168,77 @@ def _needs_imply_answer(message: str, previous_query: str | None = None) -> bool
     return bool(needs.detected_families) and needs.confidence >= _MIN_NEEDS_CONFIDENCE_FOR_ANSWER
 
 
-def detect_mode(message: str, previous_query: str | None = None) -> str:
+def _match_mode_rule(text: str) -> Optional[ModeRule]:
+    for candidate in (text, _normalize_mode_text(text)):
+        for rule in _MODE_RULES:
+            if rule.pattern.search(candidate):
+                return rule
+    return None
+
+
+def _record_mode_detection(
+    routing_trace: Optional["RoutingTrace"],
+    *,
+    detected: str,
+    matched_rule: Optional[str],
+    previous_query_used: bool,
+) -> None:
+    if routing_trace is None:
+        return
+    from company_chatbot.routing_trace import record_mode
+
+    record_mode(
+        routing_trace,
+        detected=detected,
+        matched_rule=matched_rule,
+        previous_query_used=previous_query_used,
+    )
+
+
+def detect_mode(
+    message: str,
+    previous_query: str | None = None,
+    *,
+    routing_trace: Optional["RoutingTrace"] = None,
+) -> str:
     """Return the first matching primary mode, else fallback."""
     text = (message or "").strip()
+    previous_query_used = bool((previous_query or "").strip())
+
     if not text:
+        _record_mode_detection(
+            routing_trace,
+            detected=MODE_FALLBACK,
+            matched_rule=_MATCHED_RULE_EMPTY_MESSAGE,
+            previous_query_used=previous_query_used,
+        )
         return MODE_FALLBACK
 
-    for candidate in (text, _normalize_mode_text(text)):
-        for mode, pattern in _MODE_RULES:
-            if pattern.search(candidate):
-                return mode
+    matched = _match_mode_rule(text)
+    if matched is not None:
+        _record_mode_detection(
+            routing_trace,
+            detected=matched.mode,
+            matched_rule=matched.rule_id,
+            previous_query_used=previous_query_used,
+        )
+        return matched.mode
 
     if _needs_imply_answer(text, previous_query):
+        _record_mode_detection(
+            routing_trace,
+            detected=MODE_ANSWER,
+            matched_rule=_MATCHED_RULE_BUSINESS_NEED_BRIDGE,
+            previous_query_used=previous_query_used,
+        )
         return MODE_ANSWER
+
+    _record_mode_detection(
+        routing_trace,
+        detected=MODE_FALLBACK,
+        matched_rule=None,
+        previous_query_used=previous_query_used,
+    )
     return MODE_FALLBACK
 
 

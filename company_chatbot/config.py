@@ -69,6 +69,16 @@ def is_test_mode() -> bool:
     )
 
 
+def routing_trace_enabled() -> bool:
+    """When true, attach inline routing_trace to MessageResult (default off)."""
+    return os.getenv("FIKIRI_SITE_BOT_ROUTING_TRACE", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
 def is_llm_polish_enabled() -> bool:
     """LLM polish is off until scenario tests pass (Phase 2+)."""
     if is_test_mode():

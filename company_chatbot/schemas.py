@@ -1,7 +1,10 @@
 """Request/response shapes for the Fikiri site bot."""
 
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from company_chatbot.routing_trace import RoutingTrace
 
 
 @dataclass
@@ -50,6 +53,7 @@ class MessageResult:
     sources: List[Dict[str, Any]] = field(default_factory=list)
     intake: Dict[str, Any] = field(default_factory=dict)
     lead_assessment: LeadAssessmentMetadata = field(default_factory=LeadAssessmentMetadata)
+    routing_trace: Optional["RoutingTrace"] = None
 
     def to_dict(self, schema_version: str) -> Dict[str, Any]:
         payload = {
@@ -66,6 +70,8 @@ class MessageResult:
         }
         if self.intake:
             payload["intake"] = self.intake
+        if self.routing_trace is not None:
+            payload["routing_trace"] = self.routing_trace.to_dict()
         return payload
 
 

@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from company_chatbot.routing_trace import RoutingTrace
 
 MAX_TURN_CAP = 12
 MAX_IDENTICAL_RESPONSES = 2
@@ -38,7 +41,10 @@ class GuardResult:
     suggest_handoff: bool = False
 
 
-def evaluate_guards(ctx: GuardContext) -> GuardResult:
+def evaluate_guards(
+    ctx: GuardContext,
+    routing_trace: Optional["RoutingTrace"] = None,
+) -> GuardResult:
     checks = (
         _check_turn_cap,
         _check_frustration,
@@ -48,7 +54,15 @@ def evaluate_guards(ctx: GuardContext) -> GuardResult:
     for check in checks:
         result = check(ctx)
         if result.triggered:
+            if routing_trace is not None:
+                from company_chatbot.routing_trace import record_guard
+
+                record_guard(routing_trace, triggered=True, reason=result.reason)
             return result
+    if routing_trace is not None:
+        from company_chatbot.routing_trace import record_guard
+
+        record_guard(routing_trace, triggered=False, reason=None)
     return GuardResult()
 
 

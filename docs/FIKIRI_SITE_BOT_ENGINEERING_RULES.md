@@ -100,6 +100,14 @@ Core rules:
 * If grounding fails, the bot should say it does not have enough information and offer contact or intake.
 * If the conversation loops, summarize and hand off instead of asking more questions.
 
+## Routing trace
+
+Inline routing decisions are documented in [FIKIRI_SITE_BOT_ROUTING_TRACE.md](FIKIRI_SITE_BOT_ROUTING_TRACE.md).
+
+- Trace is captured during `handle_message()` only when `FIKIRI_SITE_BOT_ROUTING_TRACE=1`.
+- Tracing must not change routing behavior or add detector calls when disabled.
+- Miss-review replay is triage, not ground truth.
+
 ## Testing Strategy
 
 Testing should be efficient, not massive.

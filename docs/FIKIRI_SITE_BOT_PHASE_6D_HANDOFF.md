@@ -22,7 +22,7 @@ API-only. No frontend admin UI. No LLM. No automatic KB edits.
 | `user_frustration_followup` | next user message matches guard frustration patterns |
 | `user_correction_followup` | “that’s not what I meant”, etc. |
 | `repeated_clarification` | generic fallback + repeated user phrase |
-| `low_retrieval_score` | replay `retrieve()` below grounding threshold |
+| `low_retrieval_score` | replay `retrieve()` below grounding threshold (triage only; not inline ground truth) |
 | `warm_lead_ungrounded` / `hot_lead_ungrounded` | warm/hot tier without grounded answer |
 
 Priority: `critical` (warm/hot miss) → `high` → `medium` → `low`.
@@ -44,7 +44,7 @@ Miss ID format: `site_<uuid>:<turn_index>` (e.g. `site_abc123:1`).
 Each proposal includes:
 
 - `suggested_alias` — normalized visitor phrase
-- `suggested_service_families` — from retrieval replay
+- `suggested_service_families` — from retrieval replay (prefer inline `routing_trace` when available in later phases)
 - `suggested_chunk_ids` — top retrieval chunks
 - `suggested_eval_case` — YAML-ready eval snippet
 - `cursor_patch` — paste into Cursor for human-reviewed patch

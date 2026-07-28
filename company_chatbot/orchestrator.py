@@ -24,6 +24,7 @@ from company_chatbot.intake import (
 )
 from company_chatbot.lead_scoring import assess_lead
 from company_chatbot.modes import detect_mode
+from company_chatbot.routing_trace import RoutingTrace, record_outcome
 from company_chatbot.schemas import (
     HandoffMetadata,
     LeadAssessmentMetadata,
@@ -76,6 +77,8 @@ def handle_message(session_id: str, message: str) -> MessageResult:
     if session is None:
         raise KeyError("session_not_found")
 
+    routing_trace = RoutingTrace() if config.routing_trace_enabled() else None
+
     text = (message or "").strip()
     session.turn_count += 1
     previous_user_message = session.last_user_message
@@ -87,25 +90,26 @@ def handle_message(session_id: str, message: str) -> MessageResult:
             message=text,
             intake_active=session.intake_active,
             response_history=session.response_history,
-        )
+        ),
+        routing_trace=routing_trace,
     )
     if guard.suggest_handoff:
         result = _guard_handoff_result(session, guard.reason or "guard", previous_user_message)
         save_session(session)
-        return result
+        return _attach_routing_trace(result, routing_trace)
 
     if session.intake_active:
-        interrupt_mode = detect_mode(text)
+        interrupt_mode = detect_mode(text, routing_trace=routing_trace)
         if interrupt_mode in (config.MODE_ANSWER, config.MODE_CONTACT):
             session.intake_active = False
             result = _dispatch_mode(interrupt_mode, text, session, previous_user_message)
             save_session(session)
-            return result
+            return _attach_routing_trace(result, routing_trace)
         result = _run_intake_turn(session, text, session.intake_mode, previous_user_message)
         save_session(session)
-        return result
+        return _attach_routing_trace(result, routing_trace)
 
-    mode = detect_mode(text)
+    mode = detect_mode(text, routing_trace=routing_trace)
     session.last_mode = mode
 
     if should_start_intake(mode):
@@ -113,10 +117,26 @@ def handle_message(session_id: str, message: str) -> MessageResult:
         session.intake_mode = mode
         result = _run_intake_turn(session, text, mode, previous_user_message)
         save_session(session)
-        return result
+        return _attach_routing_trace(result, routing_trace)
 
     result = _dispatch_mode(mode, text, session, previous_user_message)
     save_session(session)
+    return _attach_routing_trace(result, routing_trace)
+
+
+def _attach_routing_trace(
+    result: MessageResult,
+    routing_trace: RoutingTrace | None,
+) -> MessageResult:
+    if routing_trace is None:
+        return result
+    record_outcome(
+        routing_trace,
+        mode=result.mode,
+        grounded=result.grounded,
+        confidence=result.confidence,
+    )
+    result.routing_trace = routing_trace
     return result
 
 
