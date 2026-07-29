@@ -107,3 +107,28 @@ services:
     healthCheckPath: /api/health/live
     autoDeploy: true
     branch: develop
+
+  # Slice A — daily retention for marketing site-bot transcripts (site_chat_*).
+  # Does not affect chatbot routing. Requires DATABASE_URL + persist flag in the dashboard
+  # (or Blueprint sync). Safe no-op when FIKIRI_SITE_BOT_PERSIST_TRANSCRIPTS is off.
+  - type: cron
+    name: fikiri-site-chat-transcript-purge
+    env: python
+    region: virginia
+    plan: starter
+    schedule: "0 4 * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/purge_site_chat_transcripts.py
+    autoDeploy: true
+    branch: main
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: FIKIRI_SITE_BOT_PERSIST_TRANSCRIPTS
+        value: "1"
+      - key: FIKIRI_SITE_BOT_TRANSCRIPT_RETENTION_DAYS
+        value: "90"
+      - key: FIKIRI_SITE_BOT_TRANSCRIPT_HASH_SALT
+        sync: false

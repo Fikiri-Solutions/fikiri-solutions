@@ -200,3 +200,89 @@ def test_purge_expired_transcripts_respects_retention(monkeypatch):
     removed = purge_expired_transcripts()
     assert removed == 1
     assert get_transcript_session("site_old") is None
+
+
+def test_purge_dry_run_does_not_delete(monkeypatch):
+    monkeypatch.setenv("FIKIRI_SITE_BOT_PERSIST_TRANSCRIPTS", "1")
+    monkeypatch.setenv("FIKIRI_SITE_BOT_TRANSCRIPT_RETENTION_DAYS", "1")
+    ensure_site_chat_transcript_tables()
+
+    old_ts = "2020-01-01T00:00:00+00:00"
+    db_optimizer.execute_query(
+        """
+        INSERT INTO site_chat_sessions (
+            session_id, first_seen_at, last_seen_at, turn_count, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        ("site_dry", old_ts, old_ts, 1, old_ts, old_ts),
+        fetch=False,
+    )
+    counted = purge_expired_transcripts(dry_run=True)
+    assert counted == 1
+    assert get_transcript_session("site_dry") is not None
+
+
+def test_purge_is_idempotent_and_batches(monkeypatch):
+    monkeypatch.setenv("FIKIRI_SITE_BOT_PERSIST_TRANSCRIPTS", "1")
+    monkeypatch.setenv("FIKIRI_SITE_BOT_TRANSCRIPT_RETENTION_DAYS", "1")
+    ensure_site_chat_transcript_tables()
+
+    old_ts = "2020-01-01T00:00:00+00:00"
+    for i in range(5):
+        db_optimizer.execute_query(
+            """
+            INSERT INTO site_chat_sessions (
+                session_id, first_seen_at, last_seen_at, turn_count, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (f"site_batch_{i}", old_ts, old_ts, 1, old_ts, old_ts),
+            fetch=False,
+        )
+        db_optimizer.execute_query(
+            """
+            INSERT INTO site_chat_messages (
+                session_id, role, content, created_at
+            ) VALUES (?, ?, ?, ?)
+            """,
+            (f"site_batch_{i}", "user", "old", old_ts),
+            fetch=False,
+        )
+
+    first = purge_expired_transcripts(batch_size=2)
+    assert first == 5
+    second = purge_expired_transcripts(batch_size=2)
+    assert second == 0
+    for i in range(5):
+        assert get_transcript_session(f"site_batch_{i}") is None
+
+
+def test_purge_noop_when_persist_disabled(monkeypatch):
+    monkeypatch.delenv("FIKIRI_SITE_BOT_PERSIST_TRANSCRIPTS", raising=False)
+    assert purge_expired_transcripts() == 0
+    assert purge_expired_transcripts(dry_run=True) == 0
+
+
+def test_purge_preserves_recent_sessions(monkeypatch):
+    monkeypatch.setenv("FIKIRI_SITE_BOT_PERSIST_TRANSCRIPTS", "1")
+    monkeypatch.setenv("FIKIRI_SITE_BOT_TRANSCRIPT_RETENTION_DAYS", "90")
+    ensure_site_chat_transcript_tables()
+
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc).isoformat()
+    old_ts = "2020-01-01T00:00:00+00:00"
+    for sid, ts in (("site_keep", now), ("site_drop", old_ts)):
+        db_optimizer.execute_query(
+            """
+            INSERT INTO site_chat_sessions (
+                session_id, first_seen_at, last_seen_at, turn_count, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (sid, ts, ts, 1, ts, ts),
+            fetch=False,
+        )
+
+    removed = purge_expired_transcripts()
+    assert removed == 1
+    assert get_transcript_session("site_keep") is not None
+    assert get_transcript_session("site_drop") is None

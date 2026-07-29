@@ -108,6 +108,14 @@ Inline routing decisions are documented in [FIKIRI_SITE_BOT_ROUTING_TRACE.md](FI
 - Tracing must not change routing behavior or add detector calls when disabled.
 - Miss-review replay is triage, not ground truth.
 
+## Resolution window & software handoff
+
+Planning contract (no runtime change until approved): [FIKIRI_SITE_BOT_RESOLUTION_HANDOFF_CONTRACT.md](FIKIRI_SITE_BOT_RESOLUTION_HANDOFF_CONTRACT.md).
+
+- The 12-turn cap protects infrastructure; conversation design must resolve or hand off before the cliff.
+- Do not regress transcript design, turn-cap value, or routing while implementing escalation.
+- Slack notifications must be fail-open and never block the visitor response.
+
 ## Testing Strategy
 
 Testing should be efficient, not massive.

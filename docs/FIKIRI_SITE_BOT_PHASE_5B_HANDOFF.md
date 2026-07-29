@@ -36,7 +36,24 @@ Permission: `site_chat.read_transcripts` — enforced as **owner** or **admin** 
 
 ## Retention
 
-Call `purge_expired_transcripts()` from a scheduled job (not wired to cron in this slice). Deletes sessions with `last_seen_at` older than retention days.
+`purge_expired_transcripts()` deletes sessions with `last_seen_at` older than
+`FIKIRI_SITE_BOT_TRANSCRIPT_RETENTION_DAYS` (default 90).
+
+**Slice A (scheduled):**
+
+| Piece | Location |
+|-------|----------|
+| CLI | `python scripts/purge_site_chat_transcripts.py` (`--dry-run`, `--batch-size`) |
+| Blueprint cron | `fikiri-site-chat-transcript-purge` in `render.yaml` — daily `0 4 * * *` UTC |
+| Behavior | Bounded batches; fail-safe; no-op when persist flag is off; does not touch chat routing |
+
+Manual:
+
+```bash
+FIKIRI_SITE_BOT_PERSIST_TRANSCRIPTS=1 python3 scripts/purge_site_chat_transcripts.py --dry-run
+FIKIRI_SITE_BOT_PERSIST_TRANSCRIPTS=1 python3 scripts/purge_site_chat_transcripts.py
+```
+
 
 ## Test command
 

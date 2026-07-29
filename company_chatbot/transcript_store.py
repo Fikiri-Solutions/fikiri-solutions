@@ -257,42 +257,98 @@ def _persist_message_turn_impl(
     )
 
 
-def purge_expired_transcripts() -> int:
-    """Delete sessions/messages older than retention window. Returns rows removed (approx)."""
+def count_expired_transcript_sessions() -> int:
+    """Return how many sessions are older than the retention window (0 if persist off)."""
     if not is_persist_enabled():
+        return 0
+    ensure_site_chat_transcript_tables()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=config.transcript_retention_days())).isoformat()
+    rows = db_optimizer.execute_query(
+        "SELECT COUNT(*) AS cnt FROM site_chat_sessions WHERE last_seen_at < ?",
+        (cutoff,),
+    )
+    if not rows:
+        return 0
+    row = rows[0]
+    if hasattr(row, "keys"):
+        return int(row["cnt"] if "cnt" in row.keys() else list(row)[0] or 0)
+    return int(row[0] or 0)
+
+
+def purge_expired_transcripts(*, dry_run: bool = False, batch_size: int = 500) -> int:
+    """Delete sessions/messages older than retention window. Returns sessions removed (or count if dry_run).
+
+    Deletes in bounded batches so a large backlog does not load every session id into memory.
+    Safe to run repeatedly. Does nothing when transcript persistence is disabled.
+    """
+    if not is_persist_enabled():
+        logger.info("Site chat transcript purge skipped: persistence disabled")
         return 0
 
     ensure_site_chat_transcript_tables()
     cutoff = (datetime.now(timezone.utc) - timedelta(days=config.transcript_retention_days())).isoformat()
+    limit = max(1, min(int(batch_size), 5000))
+    started = datetime.now(timezone.utc)
 
-    old_sessions = db_optimizer.execute_query(
-        "SELECT session_id FROM site_chat_sessions WHERE last_seen_at < ?",
-        (cutoff,),
-    )
-    session_ids = [
-        row["session_id"] if hasattr(row, "keys") else row[0] for row in (old_sessions or [])
-    ]
-    if not session_ids:
-        return 0
+    if dry_run:
+        count = count_expired_transcript_sessions()
+        elapsed_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
+        logger.info(
+            "Site chat transcript purge dry-run: would_remove=%s cutoff=%s elapsed_ms=%s",
+            count,
+            cutoff,
+            elapsed_ms,
+        )
+        return count
 
     removed = 0
-    for sid in session_ids:
+    while True:
+        batch = db_optimizer.execute_query(
+            """
+            SELECT session_id FROM site_chat_sessions
+            WHERE last_seen_at < ?
+            ORDER BY last_seen_at ASC
+            LIMIT ?
+            """,
+            (cutoff, limit),
+        )
+        if not batch:
+            break
+
+        session_ids = [
+            row["session_id"] if hasattr(row, "keys") else row[0] for row in batch
+        ]
+        placeholders = ", ".join(["?"] * len(session_ids))
+        params = tuple(session_ids)
+
         db_optimizer.execute_query(
-            "DELETE FROM site_chat_messages WHERE session_id = ?",
-            (sid,),
+            f"DELETE FROM site_chat_messages WHERE session_id IN ({placeholders})",
+            params,
             fetch=False,
         )
         db_optimizer.execute_query(
-            "DELETE FROM site_chat_transcript_reads WHERE session_id = ?",
-            (sid,),
+            f"DELETE FROM site_chat_transcript_reads WHERE session_id IN ({placeholders})",
+            params,
             fetch=False,
         )
         db_optimizer.execute_query(
-            "DELETE FROM site_chat_sessions WHERE session_id = ?",
-            (sid,),
+            f"DELETE FROM site_chat_sessions WHERE session_id IN ({placeholders})",
+            params,
             fetch=False,
         )
-        removed += 1
+        removed += len(session_ids)
+
+        if len(session_ids) < limit:
+            break
+
+    elapsed_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
+    logger.info(
+        "Site chat transcript purge complete: removed=%s cutoff=%s batch_size=%s elapsed_ms=%s",
+        removed,
+        cutoff,
+        limit,
+        elapsed_ms,
+    )
     return removed
 
 
