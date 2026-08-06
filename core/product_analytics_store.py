@@ -25,9 +25,9 @@ def ensure_product_analytics_tables() -> None:
     global _TABLES_READY
     if _TABLES_READY and db_optimizer.table_exists("product_events"):
         return
-    # SQLite-friendly AUTOINCREMENT; Postgres path uses migration 009 (BIGSERIAL).
-    is_pg = getattr(db_optimizer, "db_type", "") == "postgresql"
-    pk = "BIGSERIAL PRIMARY KEY" if is_pg else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    # Prefer BIGSERIAL; db_optimizer translates to SQLite INTEGER PRIMARY KEY on local.
+    # Production Postgres schema: scripts/migrations/009_product_analytics.sql
+    pk = "BIGSERIAL PRIMARY KEY"
     db_optimizer.execute_query(
         f"""
         CREATE TABLE IF NOT EXISTS product_events (
@@ -85,26 +85,16 @@ def ensure_product_analytics_tables() -> None:
             db_optimizer.execute_query(sql, fetch=False)
         except Exception as exc:
             logger.debug("product analytics index ensure skipped: %s", type(exc).__name__)
-    # Unique dedupe: allow multiple NULLs
+    # Unique dedupe: allow multiple NULLs (partial unique index)
     try:
-        if is_pg:
-            db_optimizer.execute_query(
-                """
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_product_events_outcome_dedupe
-                ON product_events (tenant_id, outcome_dedupe_key)
-                WHERE outcome_dedupe_key IS NOT NULL
-                """,
-                fetch=False,
-            )
-        else:
-            db_optimizer.execute_query(
-                """
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_product_events_outcome_dedupe
-                ON product_events (tenant_id, outcome_dedupe_key)
-                WHERE outcome_dedupe_key IS NOT NULL
-                """,
-                fetch=False,
-            )
+        db_optimizer.execute_query(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_product_events_outcome_dedupe
+            ON product_events (tenant_id, outcome_dedupe_key)
+            WHERE outcome_dedupe_key IS NOT NULL
+            """,
+            fetch=False,
+        )
     except Exception as exc:
         logger.debug("product analytics dedupe index ensure skipped: %s", type(exc).__name__)
     # Ops counters (rollout observability — additive, tiny)

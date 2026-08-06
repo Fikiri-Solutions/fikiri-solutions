@@ -31,7 +31,7 @@ def ensure_admin_audit_table() -> None:
     db_optimizer.execute_query(
         """
         CREATE TABLE IF NOT EXISTS admin_audit_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGSERIAL PRIMARY KEY,
             actor_user_id INTEGER NOT NULL,
             action TEXT NOT NULL,
             target_type TEXT,
@@ -78,7 +78,7 @@ def ensure_admin_audit_table() -> None:
 def _ensure_audit_columns() -> None:
     """Additive columns for older DBs that created the table before Phase 1.5.
 
-    Uses dialect-aware column listing — never PRAGMA on PostgreSQL.
+    Uses dialect-aware column listing via list_table_columns (not SQLite catalog SQL).
     """
     try:
         names = {str(c).lower() for c in (db_optimizer.list_table_columns("admin_audit_log") or [])}
