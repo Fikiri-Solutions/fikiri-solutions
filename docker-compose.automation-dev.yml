@@ -1,0 +1,77 @@
+# Opt-in Windmill CE development stack only.
+# Usage: docker compose -f docker-compose.automation-dev.yml --env-file .env.automation-dev up -d
+# Does not modify production Compose (none in this repo) or app Redis.
+
+name: fikiri-automation-dev
+
+services:
+  windmill-postgres:
+    image: postgres:16.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${WINDMILL_DB_NAME:-windmill}
+      POSTGRES_USER: ${WINDMILL_DB_USER:-windmill}
+      POSTGRES_PASSWORD: ${WINDMILL_DB_PASSWORD:-changeme-local-only}
+    volumes:
+      - windmill_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - automation_dev
+    # Database port not published to the host.
+
+  windmill_server:
+    image: ghcr.io/windmill-labs/windmill:1.775.2
+    restart: unless-stopped
+    pull_policy: if_not_present
+    environment:
+      DATABASE_URL: postgres://${WINDMILL_DB_USER:-windmill}:${WINDMILL_DB_PASSWORD}@windmill-postgres:5432/${WINDMILL_DB_NAME:-windmill}?sslmode=disable
+      MODE: server
+      BASE_URL: ${WINDMILL_BASE_URL:-http://127.0.0.1:8000}
+    depends_on:
+      windmill-postgres:
+        condition: service_healthy
+    ports:
+      # Host-only UI exposure. Other Compose services can still reach this
+      # container on the internal network (expected for workers).
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/api/version || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - automation_dev
+    security_opt:
+      - no-new-privileges:true
+    # No docker.sock, no privileged, no debugger/indexer/native worker.
+
+  windmill_worker:
+    image: ghcr.io/windmill-labs/windmill:1.775.2
+    restart: unless-stopped
+    pull_policy: if_not_present
+    environment:
+      DATABASE_URL: postgres://${WINDMILL_DB_USER:-windmill}:${WINDMILL_DB_PASSWORD}@windmill-postgres:5432/${WINDMILL_DB_NAME:-windmill}?sslmode=disable
+      MODE: worker
+      WORKER_GROUP: default
+    depends_on:
+      windmill-postgres:
+        condition: service_healthy
+      windmill_server:
+        condition: service_healthy
+    networks:
+      - automation_dev
+    security_opt:
+      - no-new-privileges:true
+    # Single standard worker only — do not add native worker for this pilot.
+
+volumes:
+  windmill_pg_data:
+
+networks:
+  automation_dev:
+    driver: bridge

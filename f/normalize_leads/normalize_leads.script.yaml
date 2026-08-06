@@ -1,0 +1,12 @@
+summary: Lead normalization pilot
+description: ''
+lock: '!inline f/normalize_leads/normalize_leads.script.lock'
+kind: script
+schema:
+  type: object
+  properties:
+    records:
+      type: array
+      default: []
+      items:
+        type: object

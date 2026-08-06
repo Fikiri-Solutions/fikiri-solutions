@@ -185,6 +185,7 @@ from routes.email_triage import email_triage_bp
 from routes.site_chatbot_api import site_chatbot_bp
 from routes.admin_site_chat_api import admin_site_chat_bp
 from routes.admin_platform_api import admin_platform_bp
+from routes.internal_automation_api import internal_automation_bp
 from routes.product_analytics_api import product_analytics_bp
 
 # Global services dictionary
@@ -1089,6 +1090,7 @@ def register_blueprints(app):
         (site_chatbot_bp, 'site_chatbot'),
         (admin_site_chat_bp, 'admin_site_chat'),
         (admin_platform_bp, 'admin_platform'),
+        (internal_automation_bp, 'internal_automation'),
         (product_analytics_bp, 'product_analytics'),
     ]
 
