@@ -2,6 +2,7 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { GettingStartedWizard } from '../components/GettingStartedWizard'
 
 const { apiClientMock } = vi.hoisted(() => ({
@@ -29,36 +30,37 @@ describe('GettingStartedWizard business health check', () => {
     apiClientMock.getLeads.mockResolvedValue([])
     apiClientMock.getDashboardTimeseries.mockResolvedValue({
       data: {
-        timeseries: [
-          { date: '2025-01-01', emails: 0 },
-        ],
+        timeseries: [{ date: '2025-01-01', emails: 0 }],
       },
     })
     apiClientMock.getAutomationRules.mockResolvedValue([])
   })
 
-  const renderWizard = () =>
-    render(
-      <MemoryRouter>
-        <GettingStartedWizard />
-      </MemoryRouter>
+  const renderWizard = () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 0 } },
+    })
+    return render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <GettingStartedWizard />
+        </MemoryRouter>
+      </QueryClientProvider>
     )
+  }
 
   it('shows dynamic business health results based on backend data', async () => {
     renderWizard()
 
-    // Move from the welcome step to the health check step
     fireEvent.click(
       screen.getByRole('button', { name: /Start Your Business Health Check/i })
     )
 
     await waitFor(() => {
-      expect(
-        screen.getByText('Your Business Health Check')
-      ).toBeInTheDocument()
+      expect(screen.getByText('Your Business Health Check')).toBeInTheDocument()
+      expect(screen.getAllByText('Lead Management').length).toBeGreaterThan(0)
     })
 
-    expect(screen.getAllByText('Lead Management').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Score: 0/100').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Email Automation').length).toBeGreaterThan(0)
     expect(screen.getAllByText('critical').length).toBeGreaterThan(0)
@@ -66,9 +68,15 @@ describe('GettingStartedWizard business health check', () => {
     expect(
       screen.getAllByText('Connect your email to automatically capture leads').length
     ).toBeGreaterThan(0)
-    expect(
-      screen.getAllByText('No leads in your CRM').length
-    ).toBeGreaterThan(0)
+    expect(screen.getAllByText('No leads in your CRM').length).toBeGreaterThan(0)
+  })
+
+  it('shares dashboard timeseries and gmail query keys (single fetch each)', async () => {
+    renderWizard()
+
+    await waitFor(() => {
+      expect(apiClientMock.getGmailConnectionStatus).toHaveBeenCalledTimes(1)
+      expect(apiClientMock.getDashboardTimeseries).toHaveBeenCalledTimes(1)
+    })
   })
 })
-

@@ -13,17 +13,8 @@ export function useDashboardMetrics() {
   });
 }
 
-// Dashboard timeseries with advanced caching
-export function useDashboardTimeseries(period: 'week' | 'month' | 'quarter' = 'week') {
-  return useQuery({
-    queryKey: ['dashboard', 'timeseries', period],
-    queryFn: () => apiClient.getDashboardTimeseries(undefined, period),
-    staleTime: 60000, // 1 minute
-    refetchInterval: 300000, // Refetch every 5 minutes
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-  });
-}
+// Shared with pages/Dashboard + GettingStartedWizard (see useDashboardTimeseries.ts).
+export { useDashboardTimeseries, dashboardTimeseriesQueryKey } from './useDashboardTimeseries'
 
 // Real-time activity feed
 export function useActivityFeed(limit: number = 10) {

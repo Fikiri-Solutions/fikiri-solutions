@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { 
   Mail, Users, Zap, TrendingUp, CheckCircle, AlertCircle, 
   ArrowRight, Clock, Target, BarChart3, Sparkles, Rocket
@@ -9,6 +10,7 @@ import { Button } from './ui/Button'
 import { Badge } from './ui/badge'
 import { apiClient } from '../services/apiClient'
 import { useAuth } from '../contexts/AuthContext'
+import { dashboardTimeseriesQueryKey } from '../hooks/useDashboardTimeseries'
 
 interface HealthCheckResult {
   category: string
@@ -19,127 +21,13 @@ interface HealthCheckResult {
   priority: 'high' | 'medium' | 'low'
 }
 
-export const GettingStartedWizard: React.FC<{ onComplete?: () => void }> = ({ onComplete }) => {
-  const navigate = useNavigate()
-  const { user } = useAuth()
-  const [step, setStep] = useState(1)
-  const [healthCheck, setHealthCheck] = useState<HealthCheckResult[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [gmailConnected, setGmailConnected] = useState(false)
-  const [leadsCount, setLeadsCount] = useState(0)
-  const [emailsProcessed, setEmailsProcessed] = useState(0)
-  const [showDebugData, setShowDebugData] = useState(false)
-  const [debugData, setDebugData] = useState<any>(null)
-
-  useEffect(() => {
-    loadBusinessHealth()
-  }, [])
-
-  const loadBusinessHealth = async () => {
-    setIsLoading(true)
-    let gmailStatus = { connected: false }
-    let leadsData: any[] = []
-    let totalEmails = 0
-    let automationsActive = 0
-    const debugInfo: any = {
-      timestamp: new Date().toISOString(),
-      gmail: { raw: null, error: null },
-      leads: { raw: null, error: null },
-      emails: { raw: null, error: null },
-      automations: { raw: null, error: null }
-    }
-
-    try {
-      // Check Gmail connection
-      try {
-        gmailStatus = await apiClient.getGmailConnectionStatus()
-        debugInfo.gmail.raw = gmailStatus
-        setGmailConnected(gmailStatus?.connected || false)
-      } catch (error: any) {
-        debugInfo.gmail.error = error?.message || 'Unknown error'
-        setGmailConnected(false)
-      }
-
-      // Get leads count
-      try {
-        const leads = await apiClient.getLeads()
-        leadsData = Array.isArray(leads) ? leads : (leads as { data?: unknown[] })?.data ?? []
-        debugInfo.leads.raw = leads
-        setLeadsCount(Array.isArray(leadsData) ? leadsData.length : 0)
-      } catch (error: any) {
-        debugInfo.leads.error = error?.message || 'Unknown error'
-        setLeadsCount(0)
-      }
-
-      // Get dashboard data for email count
-      try {
-        const userId = user?.id || 1
-        const dashboardData = await apiClient.getDashboardTimeseries(userId)
-        debugInfo.emails.raw = dashboardData
-        const timeseries = dashboardData?.data?.timeseries || dashboardData?.timeseries || []
-        totalEmails = Array.isArray(timeseries) 
-          ? timeseries.reduce((sum: number, day: any) => sum + (day.emails || 0), 0) 
-          : 0
-        setEmailsProcessed(totalEmails)
-      } catch (error: any) {
-        debugInfo.emails.error = error?.message || 'Unknown error'
-        setEmailsProcessed(0)
-      }
-
-      // Get automations count
-      try {
-        const automations = await apiClient.getAutomationRules()
-        const activeAutomations = Array.isArray(automations) 
-          ? automations.filter((rule: any) => rule.status === 'active' || rule.enabled === true).length
-          : 0
-        automationsActive = activeAutomations
-        debugInfo.automations.raw = automations
-      } catch (error: any) {
-        debugInfo.automations.error = error?.message || 'Unknown error'
-        automationsActive = 0
-      }
-      
-      // Store debug data
-      debugInfo.calculated = {
-        gmailConnected: gmailStatus?.connected || false,
-        leadsCount: Array.isArray(leadsData) ? leadsData.length : 0,
-        emailsProcessed: totalEmails,
-        automationsActive: automationsActive
-      }
-      setDebugData(debugInfo)
-
-      // Perform health check with collected data
-      const healthResults = performHealthCheck({
-        gmailConnected: gmailStatus?.connected || false,
-        leadsCount: Array.isArray(leadsData) ? leadsData.length : 0,
-        emailsProcessed: totalEmails,
-        automationsActive: automationsActive,
-        responseTime: null // TODO: Calculate from data
-      })
-      setHealthCheck(healthResults)
-    } catch (error) {
-      console.error('Error loading business health:', error)
-      // Set default health check if everything fails
-      setHealthCheck([{
-        category: 'System Status',
-        score: 0,
-        status: 'critical',
-        issues: ['Unable to load business health data'],
-        recommendations: ['Please refresh the page or contact support'],
-        priority: 'high'
-      }])
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const performHealthCheck = (data: {
-    gmailConnected: boolean
-    leadsCount: number
-    emailsProcessed: number
-    automationsActive: number
-    responseTime: number | null
-  }): HealthCheckResult[] => {
+function performHealthCheck(data: {
+  gmailConnected: boolean
+  leadsCount: number
+  emailsProcessed: number
+  automationsActive: number
+  responseTime: number | null
+}): HealthCheckResult[] {
     const results: HealthCheckResult[] = []
 
     // Email Connection Health
@@ -268,6 +156,152 @@ export const GettingStartedWizard: React.FC<{ onComplete?: () => void }> = ({ on
     }
 
     return results
+}
+
+export const GettingStartedWizard: React.FC<{ onComplete?: () => void }> = ({ onComplete }) => {
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const [step, setStep] = useState(1)
+  const [showDebugData, setShowDebugData] = useState(false)
+
+  const gmailQuery = useQuery({
+    queryKey: ['gmail-connection', user?.id],
+    queryFn: () => apiClient.getGmailConnectionStatus(),
+    enabled: Boolean(user?.id),
+    staleTime: 2 * 60 * 1000,
+  })
+
+  const leadsQuery = useQuery({
+    queryKey: ['crm-leads', user?.id],
+    queryFn: () => apiClient.getLeads(),
+    enabled: Boolean(user?.id),
+    staleTime: 60_000,
+  })
+
+  const timeseriesQuery = useQuery({
+    queryKey: dashboardTimeseriesQueryKey('week'),
+    queryFn: () => apiClient.getDashboardTimeseries(undefined, 'week'),
+    enabled: Boolean(user?.id),
+    staleTime: 60_000,
+  })
+
+  const automationsQuery = useQuery({
+    queryKey: ['automation-rules', user?.id],
+    queryFn: () => apiClient.getAutomationRules(),
+    enabled: Boolean(user?.id),
+    staleTime: 60_000,
+  })
+
+  const isLoading =
+    gmailQuery.isLoading ||
+    leadsQuery.isLoading ||
+    timeseriesQuery.isLoading ||
+    automationsQuery.isLoading
+
+  const gmailConnected = Boolean(gmailQuery.data?.connected)
+  const leadsData = useMemo(() => {
+    const leads = leadsQuery.data
+    if (Array.isArray(leads)) return leads
+    return (leads as { data?: unknown[] } | undefined)?.data ?? []
+  }, [leadsQuery.data])
+  const leadsCount = Array.isArray(leadsData) ? leadsData.length : 0
+
+  const emailsProcessed = useMemo(() => {
+    const dashboardData = timeseriesQuery.data
+    const timeseries = dashboardData?.data?.timeseries || dashboardData?.timeseries || []
+    if (!Array.isArray(timeseries)) return 0
+    return timeseries.reduce((sum: number, day: { emails?: number }) => sum + (day.emails || 0), 0)
+  }, [timeseriesQuery.data])
+
+  const automationsActive = useMemo(() => {
+    const automations = automationsQuery.data
+    if (!Array.isArray(automations)) return 0
+    return automations.filter(
+      (rule: { status?: string; enabled?: boolean }) =>
+        rule.status === 'active' || rule.enabled === true
+    ).length
+  }, [automationsQuery.data])
+
+  const debugData = useMemo(
+    () => ({
+      timestamp: new Date().toISOString(),
+      gmail: {
+        raw: gmailQuery.data ?? null,
+        error: gmailQuery.error instanceof Error ? gmailQuery.error.message : null,
+      },
+      leads: {
+        raw: leadsQuery.data ?? null,
+        error: leadsQuery.error instanceof Error ? leadsQuery.error.message : null,
+      },
+      emails: {
+        raw: timeseriesQuery.data ?? null,
+        error: timeseriesQuery.error instanceof Error ? timeseriesQuery.error.message : null,
+      },
+      automations: {
+        raw: automationsQuery.data ?? null,
+        error: automationsQuery.error instanceof Error ? automationsQuery.error.message : null,
+      },
+      calculated: {
+        gmailConnected,
+        leadsCount,
+        emailsProcessed,
+        automationsActive,
+      },
+    }),
+    [
+      gmailQuery.data,
+      gmailQuery.error,
+      leadsQuery.data,
+      leadsQuery.error,
+      timeseriesQuery.data,
+      timeseriesQuery.error,
+      automationsQuery.data,
+      automationsQuery.error,
+      gmailConnected,
+      leadsCount,
+      emailsProcessed,
+      automationsActive,
+    ]
+  )
+
+  const healthCheck = useMemo(() => {
+    const allFailed =
+      gmailQuery.isError && leadsQuery.isError && timeseriesQuery.isError && automationsQuery.isError
+    if (allFailed) {
+      return [
+        {
+          category: 'System Status',
+          score: 0,
+          status: 'critical' as const,
+          issues: ['Unable to load business health data'],
+          recommendations: ['Please refresh the page or contact support'],
+          priority: 'high' as const,
+        },
+      ]
+    }
+    return performHealthCheck({
+      gmailConnected,
+      leadsCount,
+      emailsProcessed,
+      automationsActive,
+      responseTime: null,
+    })
+  }, [
+    gmailQuery.isError,
+    leadsQuery.isError,
+    timeseriesQuery.isError,
+    automationsQuery.isError,
+    gmailConnected,
+    leadsCount,
+    emailsProcessed,
+    automationsActive,
+  ])
+
+  const refreshBusinessHealth = () => {
+    void gmailQuery.refetch()
+    void leadsQuery.refetch()
+    void timeseriesQuery.refetch()
+    void automationsQuery.refetch()
   }
 
   const getStatusColor = (status: string) => {
@@ -384,7 +418,7 @@ export const GettingStartedWizard: React.FC<{ onComplete?: () => void }> = ({ on
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => loadBusinessHealth()}>
+              <Button variant="outline" onClick={refreshBusinessHealth}>
                 <Clock className="h-4 w-4 mr-2" />
                 Refresh Data
               </Button>

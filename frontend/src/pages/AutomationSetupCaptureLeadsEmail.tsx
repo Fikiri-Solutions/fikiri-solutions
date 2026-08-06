@@ -12,6 +12,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { apiClient, AutomationRule } from '../services/apiClient'
+import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../components/Toast'
 import {
   buildInboundCrmSyncActionParameters,
@@ -41,6 +42,7 @@ function findInboundCrmSyncRule(rules: AutomationRule[]): AutomationRule | undef
 export const AutomationSetupCaptureLeadsEmail: React.FC = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   const { addToast } = useToast()
   const [step, setStep] = useState(1)
   const [targetStage, setTargetStage] = useState<string>('new')
@@ -53,9 +55,10 @@ export const AutomationSetupCaptureLeadsEmail: React.FC = () => {
   })
 
   const { data: gmailStatus, isFetching: gmailLoading } = useQuery({
-    queryKey: ['gmail-connection-status'],
+    queryKey: ['gmail-connection', user?.id],
     queryFn: () => apiClient.getGmailConnectionStatus(),
-    staleTime: 30 * 1000,
+    enabled: Boolean(user?.id),
+    staleTime: 2 * 60 * 1000,
   })
 
   const { data: outlookStatus, isFetching: outlookLoading } = useQuery({

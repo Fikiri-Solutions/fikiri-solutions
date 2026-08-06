@@ -1,84 +1,59 @@
-import { useEffect, useState } from "react";
-import { apiClient } from "../services/apiClient";
+import { useQuery } from '@tanstack/react-query'
+import { apiClient } from '../services/apiClient'
 
 interface TimeseriesData {
-  day: string;
-  leads: number;
-  emails: number;
-  responses: number;
-  revenue: number;
+  day: string
+  leads: number
+  emails: number
+  responses: number
+  revenue: number
 }
 
 interface SummaryData {
-  leads: {
-    change_pct: number | null;
-    positive: boolean;
-  };
-  emails: {
-    change_pct: number | null;
-    positive: boolean;
-  };
-  responses: {
-    change_pct: number | null;
-    positive: boolean;
-  };
-  revenue: {
-    change_pct: number | null;
-    positive: boolean;
-  };
+  leads: { change_pct: number | null; positive: boolean }
+  emails: { change_pct: number | null; positive: boolean }
+  responses: { change_pct: number | null; positive: boolean }
+  revenue: { change_pct: number | null; positive: boolean }
 }
 
-export function useDashboardTimeseries() {
-  const [data, setData] = useState<TimeseriesData[]>([]);
-  const [summary, setSummary] = useState<SummaryData>({
-    leads: { change_pct: null, positive: true },
-    emails: { change_pct: null, positive: true },
-    responses: { change_pct: null, positive: true },
-    revenue: { change_pct: null, positive: true }
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+const EMPTY_SUMMARY: SummaryData = {
+  leads: { change_pct: null, positive: true },
+  emails: { change_pct: null, positive: true },
+  responses: { change_pct: null, positive: true },
+  revenue: { change_pct: null, positive: true },
+}
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const response = await apiClient.getDashboardTimeseries(undefined);
-        
-        if (response.success) {
-          setData(response.data.timeseries);
-          setSummary(response.data.summary);
-        } else {
-          throw new Error(response.error || 'Failed to fetch data');
-        }
-      } catch (err) {
-        console.error("Failed to fetch timeseries:", err);
-        setError(err instanceof Error ? err.message : "Failed to fetch data");
-        
-        // Fallback data for development
-        setData([
-          { day: "2024-01-01", leads: 5, emails: 12, responses: 8, revenue: 1500 },
-          { day: "2024-01-02", leads: 8, emails: 18, responses: 12, revenue: 2200 },
-          { day: "2024-01-03", leads: 12, emails: 25, responses: 18, revenue: 3100 },
-          { day: "2024-01-04", leads: 7, emails: 15, responses: 10, revenue: 1800 },
-          { day: "2024-01-05", leads: 15, emails: 32, responses: 22, revenue: 4200 },
-          { day: "2024-01-06", leads: 9, emails: 21, responses: 14, revenue: 2600 },
-          { day: "2024-01-07", leads: 11, emails: 28, responses: 19, revenue: 3400 }
-        ]);
-        setSummary({
-          leads: { change_pct: 15.2, positive: true },
-          emails: { change_pct: 8.7, positive: true },
-          responses: { change_pct: 12.3, positive: true },
-          revenue: { change_pct: 22.1, positive: true }
-        });
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
-  }, []);
+/** Shared React Query key — must match useDashboardData / GettingStartedWizard. */
+export function dashboardTimeseriesQueryKey(period: 'week' | 'month' | 'quarter' = 'week') {
+  return ['dashboard', 'timeseries', period] as const
+}
 
-  return { data, summary, loading, error };
+/**
+ * Dashboard timeseries via shared React Query cache (dedupes Strict Mode + sibling mounts).
+ */
+export function useDashboardTimeseries(period: 'week' | 'month' | 'quarter' = 'week') {
+  const query = useQuery({
+    queryKey: dashboardTimeseriesQueryKey(period),
+    queryFn: () => apiClient.getDashboardTimeseries(undefined, period),
+    staleTime: 60_000,
+    refetchInterval: 300_000,
+    retry: 2,
+  })
+
+  const payload = query.data
+  const raw = payload?.data?.timeseries ?? payload?.timeseries ?? []
+  const data: TimeseriesData[] = Array.isArray(raw) ? raw : []
+  const summary: SummaryData = payload?.data?.summary ?? payload?.summary ?? EMPTY_SUMMARY
+
+  return {
+    data,
+    summary,
+    loading: query.isLoading,
+    error: query.error
+      ? query.error instanceof Error
+        ? query.error.message
+        : 'Failed to fetch data'
+      : null,
+    refetch: query.refetch,
+  }
 }
