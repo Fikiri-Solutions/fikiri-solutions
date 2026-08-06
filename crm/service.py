@@ -433,6 +433,41 @@ class EnhancedCRMService:
             )
         except Exception:
             pass
+        # Product analytics — after durable lead commit; never affects CRM result.
+        # emit_server_product_event never raises; this boundary only covers import failures.
+        try:
+            from core.product_analytics_emit import (
+                emit_server_product_event,
+                map_lead_creation_channel,
+                map_lead_source_category,
+            )
+
+            emit_server_product_event(
+                tenant_id=int(user_id),
+                actor_user_id=int(user_id),
+                event_name="outcome.lead_captured",
+                object_type="lead",
+                object_id=str(lead_id),
+                correlation_id=str(correlation_id) if correlation_id else None,
+                properties={
+                    "feature_key": "crm",
+                    "workflow_key": "lead_capture",
+                    "outcome": "lead_captured",
+                    "completed": True,
+                    "source_category": map_lead_source_category(lead_data.get("source")),
+                    "creation_channel": map_lead_creation_channel(lead_data.get("source")),
+                },
+            )
+        except Exception as analytics_exc:
+            logger.warning(
+                "product analytics emit boundary failure after lead create",
+                extra={
+                    "event": "product_analytics.emit_boundary_failure",
+                    "exception_class": type(analytics_exc).__name__,
+                    "correlation_id": correlation_id,
+                    "phase": "lead_captured",
+                },
+            )
         return {
             'success': True,
             'data': {
