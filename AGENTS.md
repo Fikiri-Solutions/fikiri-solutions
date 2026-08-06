@@ -54,10 +54,10 @@ See `README.md` for canonical commands. Quick reference:
 ### Admin routes (when building)
 
 - **No separate admin portal.** Keep one app; add an `/admin` section with role-based access.
-- **RBAC + server-side enforcement:** Use capability-based permissions (e.g. `budget.approve`, `users.manage_roles`); backend decorators/middleware must enforce every admin action. Never rely on frontend hiding alone.
-- **Audit log** all admin actions (actor, action, target, before/after, timestamp, IP).
-- **First lean slice:** One admin endpoint for approve/revoke budget soft-stop override + one `/admin/budgets` UI for pending approvals.
-- Full strategy: [docs/ADMIN_ROUTES_STRATEGY.md](docs/ADMIN_ROUTES_STRATEGY.md).
+- **Privileged system:** Follow [docs/ADMIN_PORTAL_SECURITY.md](docs/ADMIN_PORTAL_SECURITY.md). Phase **1.5** (MFA/step-up, audit, session controls, rate limits, privilege-escalation tests) **gates** all destructive ops and billing overrides.
+- **RBAC + server-side enforcement:** Capability-based permissions; backend must enforce every admin action. Never rely on frontend hiding alone.
+- **Audit log** all admin actions (success and denied): actor, action, target, capability, outcome, timestamp, IP, correlation id — never passwords/tokens.
+- Strategy overview: [docs/ADMIN_ROUTES_STRATEGY.md](docs/ADMIN_ROUTES_STRATEGY.md).
 
 ### Quality gate (automation, queues, workflows)
 
@@ -70,3 +70,5 @@ Before marking queue/workflow/automation features "done", follow the protocol in
 - Report findings by **severity** (critical / high / medium / low).
 
 Prompt to use: *"Before writing code, create a contract-vs-implementation checklist for this feature. Then implement with explicit state-transition guarantees. After coding, run a failure-first review: partial failure handling, retries, idempotency, auth scoping, and HTTP contract consistency. Do not report success until each claim has code evidence and test coverage for success + failure branches."*
+
+@AGENTS.wmill.md

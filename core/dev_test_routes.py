@@ -77,9 +77,9 @@ def database_health_check():
         return jsonify({"error": "Not available in production"}), 403
     
     try:
-        from core.database_optimization import DatabaseOptimizer
+        from core.database_optimization import db_optimizer
         
-        db_optimizer = DatabaseOptimizer()
+        db = db_optimizer
         
         # Check critical tables exist
         expected_tables = {'users', 'query_performance_log', 'email_jobs', 'leads'}
@@ -155,9 +155,9 @@ def metrics_recording_test():
         return jsonify({"error": "Not available in production"}), 403
     
     try:
-        from core.database_optimization import DatabaseOptimizer
+        from core.database_optimization import db_optimizer
         
-        db_optimizer = DatabaseOptimizer()
+        db = db_optimizer
         
         # Test a simple query that should trigger metrics recording
         test_query = "SELECT 1 as test_value"

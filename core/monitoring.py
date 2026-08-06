@@ -70,13 +70,66 @@ class AlertManager:
         self.admin_email = os.getenv('ADMIN_EMAIL')
         self.support_email = os.getenv('SUPPORT_EMAIL')
         self.environment = os.getenv('SENTRY_ENVIRONMENT', 'development')
-        
-    def send_slack_alert(self, message: str, level: str = 'error', context: Optional[Dict[str, Any]] = None):
-        """Send alert to Slack"""
+        self._alert_lock = threading.Lock()
+        self._recent_alerts: Dict[str, float] = {}
+        self._alert_cooldown_seconds = float(
+            os.getenv('FIKIRI_SLACK_ALERT_COOLDOWN_SECONDS', '120')
+        )
+
+    def _alert_dedupe_key(self, message: str, level: str) -> str:
+        import re
+        normalized = re.sub(r"\d+(?:\.\d+)?", "N", message)
+        return f"{level}:{normalized[:240]}"
+
+    def _should_send_alert(self, message: str, level: str) -> bool:
+        key = self._alert_dedupe_key(message, level)
+        now = time.time()
+        with self._alert_lock:
+            last = self._recent_alerts.get(key)
+            if last is not None and (now - last) < self._alert_cooldown_seconds:
+                return False
+            self._recent_alerts[key] = now
+            if len(self._recent_alerts) > 500:
+                cutoff = now - self._alert_cooldown_seconds
+                self._recent_alerts = {
+                    k: v for k, v in self._recent_alerts.items() if v >= cutoff
+                }
+            return True
+
+    def send_slack_alert(
+        self,
+        message: str,
+        level: str = 'error',
+        context: Optional[Dict[str, Any]] = None,
+        *,
+        blocking: bool = False,
+    ):
+        """Send alert to Slack (non-blocking by default; cooldown/deduped)."""
         if not self.slack_webhook:
             logger.warning("Slack webhook not configured")
             return
-            
+        if not self._should_send_alert(message, level):
+            logger.debug("Slack alert suppressed by cooldown: %s", message[:120])
+            return
+
+        def _deliver():
+            self._send_slack_alert_sync(message, level, context)
+
+        if blocking or _is_test_mode():
+            _deliver()
+            return
+        threading.Thread(target=_deliver, daemon=True, name="slack-alert").start()
+
+    def _send_slack_alert_sync(
+        self,
+        message: str,
+        level: str = 'error',
+        context: Optional[Dict[str, Any]] = None,
+    ):
+        """Synchronous Slack POST."""
+        if not self.slack_webhook:
+            return
+
         # Determine color based on level
         color_map = {
             'error': '#FF0000',      # Red

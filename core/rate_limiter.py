@@ -103,6 +103,13 @@ class EnhancedRateLimiter:
                 '',
                 'Public consultation intake form per IP per hour',
             ),
+            'product_analytics_ingest': RateLimit(
+                'product_analytics_ingest',
+                RateLimitType.USER,
+                120,
+                3600,
+                'Product analytics event batches per user per hour',
+            ),
         }
         self._connect_redis()
         self._initialize_tables()

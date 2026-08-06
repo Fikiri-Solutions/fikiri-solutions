@@ -230,10 +230,10 @@ def init_security(app: Flask):
             "frame-src 'none'; "
             "object-src 'none'; "
             "base-uri 'self'; "
-            "form-action 'self'"
+            "form-action 'self'; "
+            "frame-ancestors 'none'"
         )
         response.headers["Content-Security-Policy"] = csp_policy
-
         # Security headers
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"

@@ -188,7 +188,13 @@ class AIBudgetGuardrails:
                 # Alerts should never break request flow.
                 pass
 
-    def evaluate(self, user_id: Optional[int], projected_increment: int = 1) -> AIBudgetDecision:
+    def evaluate(
+        self,
+        user_id: Optional[int],
+        projected_increment: int = 1,
+        *,
+        emit_alerts: bool = True,
+    ) -> AIBudgetDecision:
         if not user_id:
             return AIBudgetDecision(
                 allowed=True,
@@ -210,7 +216,8 @@ class AIBudgetGuardrails:
         projected = round((used + max(0, projected_increment)) * per_response, 4)
         ratio = (projected / cap) if cap > 0 else 0.0
 
-        self._emit_alerts(user_id, month, ratio, projected, cap)
+        if emit_alerts:
+            self._emit_alerts(user_id, month, ratio, projected, cap)
 
         # Hard stop for non-enterprise tiers at 100% of monthly budget cap
         if tier in ("free", "starter", "growth", "business"):
@@ -251,6 +258,10 @@ class AIBudgetGuardrails:
             budget_cap_usd=cap,
             threshold_ratio=ratio,
         )
+
+    def snapshot(self, user_id: Optional[int]) -> AIBudgetDecision:
+        """Read-only budget view for diagnostics; never emits alerts or writes usage."""
+        return self.evaluate(user_id, projected_increment=0, emit_alerts=False)
 
     def record_ai_usage(self, user_id: Optional[int], quantity: int = 1):
         if not user_id or quantity <= 0:

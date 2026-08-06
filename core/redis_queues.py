@@ -203,15 +203,19 @@ class RedisQueue:
         logger.info(f"✅ Registered task: {task_name}")
     
     def enqueue_job(self, task: str, args: Dict[str, Any] = None, 
-                   max_retries: int = 3, delay: int = 0) -> str:
-        """Enqueue a new job"""
+                   max_retries: int = 3, delay: int = 0,
+                   job_id: Optional[str] = None) -> str:
+        """Enqueue a new job. Optional job_id enables deduplicated re-submission."""
         if not self.is_connected():
             raise Exception("Redis queue not connected")
         
         try:
-            job_id = str(uuid.uuid4())
+            job_id = str(job_id).strip() if job_id else str(uuid.uuid4())
+            if not job_id:
+                job_id = str(uuid.uuid4())
             args = args or {}
-            
+
+            job_key = f"{self.job_prefix}{job_id}"
             job = Job(
                 id=job_id,
                 task=task,
@@ -220,16 +224,15 @@ class RedisQueue:
                 created_at=time.time(),
                 max_retries=max_retries
             )
-            
-            # Store job data
-            job_key = f"{self.job_prefix}{job_id}"
-            self.redis_client.setex(
-                job_key, 
-                86400,  # 24 hours TTL
-                json.dumps(job.__dict__, default=str)
-            )
-            
-            # Add to queue
+            payload = json.dumps(job.__dict__, default=str)
+
+            # Atomic claim of the stable queue id (prevents multi-worker duplicate LPUSH).
+            created = self.redis_client.set(job_key, payload, nx=True, ex=86400)
+            if not created:
+                logger.info(f"ℹ️ Queue job {job_id} already present; reusing")
+                return job_id
+
+            # Add to queue only after we uniquely created the job record.
             if delay > 0:
                 # Delayed job
                 self.redis_client.zadd(
