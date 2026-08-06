@@ -15,18 +15,30 @@ from core import database_init
 class TestDatabaseInit:
     """Test database initialization and health check."""
 
+    @patch("core.database_init.schema_bootstrap_allowed", return_value=True)
     @patch("core.database_init.db_optimizer")
-    def test_init_database_success(self, mock_db):
+    def test_init_database_success(self, mock_db, _allowed):
         mock_db._initialize_database = MagicMock()
         result = database_init.init_database()
         assert result is True
         mock_db._initialize_database.assert_called_once()
 
+    @patch("core.database_init.schema_bootstrap_allowed", return_value=True)
     @patch("core.database_init.db_optimizer")
-    def test_init_database_failure_returns_false(self, mock_db):
+    def test_init_database_failure_returns_false(self, mock_db, _allowed):
         mock_db._initialize_database.side_effect = RuntimeError("db error")
         result = database_init.init_database()
         assert result is False
+
+    @patch("core.database_init.schema_bootstrap_allowed", return_value=False)
+    @patch("core.database_init.check_database_health", return_value=True)
+    @patch("core.database_init.db_optimizer")
+    def test_init_database_skips_bootstrap_on_postgres(self, mock_db, health, _allowed):
+        mock_db.execute_query.return_value = [{"ok": 1}]
+        result = database_init.init_database()
+        assert result is True
+        mock_db._initialize_database.assert_not_called()
+        health.assert_called_once()
 
     @patch("core.database_init.db_optimizer")
     def test_check_database_health_ok_when_tables_exist(self, mock_db):
@@ -39,6 +51,7 @@ class TestDatabaseInit:
     def test_check_database_health_false_when_table_missing(self, mock_db):
         def exists(name):
             return name != "users"
+
         mock_db.table_exists.side_effect = exists
         result = database_init.check_database_health()
         assert result is False

@@ -67,22 +67,18 @@ class TestBillingAPI(unittest.TestCase):
         self.assertEqual(data.get("customer", {}).get("id"), "cus_123")
         mock_stripe_manager.create_customer.assert_called_once()
 
-    @patch("core.database_optimization.DatabaseOptimizer")
-    def test_get_stripe_customer_id_reads_postgres_dict_cached_row(self, mock_db_cls):
+    @patch("core.database_optimization.db_optimizer")
+    def test_get_stripe_customer_id_reads_postgres_dict_cached_row(self, mock_db):
         """RealDictCursor rows are dicts; indexed [0][0] access must not KeyError (production PG)."""
-        mock_db = MagicMock()
         mock_db.execute_query.return_value = [{"stripe_customer_id": "cus_pg"}]
-        mock_db_cls.return_value = mock_db
 
         from core.billing_api import get_stripe_customer_id
 
         self.assertEqual(get_stripe_customer_id("u@example.com", user_id=5), "cus_pg")
 
-    @patch("core.database_optimization.DatabaseOptimizer")
-    def test_get_stripe_customer_id_reads_sqlite_tuple_cached_row(self, mock_db_cls):
-        mock_db = MagicMock()
+    @patch("core.database_optimization.db_optimizer")
+    def test_get_stripe_customer_id_reads_sqlite_tuple_cached_row(self, mock_db):
         mock_db.execute_query.return_value = [("cus_sqlite",)]
-        mock_db_cls.return_value = mock_db
 
         from core.billing_api import get_stripe_customer_id
 
@@ -138,12 +134,10 @@ class TestBillingAPI(unittest.TestCase):
 
     @patch.dict(os.environ, {"ENABLE_TEST_ACCESS_CODES": "true", "TEST_ACCESS_CODES": "QA-CODE-1"}, clear=False)
     @patch("core.jwt_auth.get_jwt_manager")
-    @patch("core.database_optimization.DatabaseOptimizer")
-    def test_redeem_test_access_code_grants_trialing_access(self, mock_db_cls, mock_jwt_manager):
+    @patch("core.database_optimization.db_optimizer")
+    def test_redeem_test_access_code_grants_trialing_access(self, mock_db, mock_jwt_manager):
         mock_jwt_manager.return_value.verify_access_token.return_value = {"user_id": 42}
-        mock_db = MagicMock()
         mock_db.execute_query.return_value = []
-        mock_db_cls.return_value = mock_db
 
         response = self.client.post(
             "/api/billing/test-access/redeem",
@@ -196,11 +190,9 @@ class TestBillingAPI(unittest.TestCase):
 
     @patch.dict(os.environ, {"ENABLE_TEST_ACCESS_CODES": "true", "ADMIN_USER_IDS": "1"}, clear=False)
     @patch("core.jwt_auth.get_jwt_manager")
-    @patch("core.database_optimization.DatabaseOptimizer")
-    def test_test_access_audit_requires_admin(self, mock_db_cls, mock_jwt_manager):
+    @patch("core.database_optimization.db_optimizer")
+    def test_test_access_audit_requires_admin(self, mock_db, mock_jwt_manager):
         mock_jwt_manager.return_value.verify_access_token.return_value = {"user_id": 2}
-        mock_db = MagicMock()
-        mock_db_cls.return_value = mock_db
 
         response = self.client.get(
             "/api/billing/test-access/audit",
@@ -210,10 +202,9 @@ class TestBillingAPI(unittest.TestCase):
 
     @patch.dict(os.environ, {"ENABLE_TEST_ACCESS_CODES": "true", "ADMIN_USER_IDS": "1"}, clear=False)
     @patch("core.jwt_auth.get_jwt_manager")
-    @patch("core.database_optimization.DatabaseOptimizer")
-    def test_test_access_audit_returns_redemptions_for_admin(self, mock_db_cls, mock_jwt_manager):
+    @patch("core.database_optimization.db_optimizer")
+    def test_test_access_audit_returns_redemptions_for_admin(self, mock_db, mock_jwt_manager):
         mock_jwt_manager.return_value.verify_access_token.return_value = {"user_id": 1}
-        mock_db = MagicMock()
 
         def _db_side_effect(query, params=None, fetch=True, user_id=None, endpoint=None):
             if "SELECT" in query and "FROM test_access_redemptions" in query:
@@ -229,7 +220,6 @@ class TestBillingAPI(unittest.TestCase):
             return []
 
         mock_db.execute_query.side_effect = _db_side_effect
-        mock_db_cls.return_value = mock_db
 
         response = self.client.get(
             "/api/billing/test-access/audit?limit=10",

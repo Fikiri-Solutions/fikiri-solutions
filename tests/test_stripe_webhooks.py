@@ -127,7 +127,7 @@ class TestStripeWebhookHandler(unittest.TestCase):
         ]
         mock_db.upsert_stripe_subscription_row = MagicMock()
 
-        with patch("core.database_optimization.DatabaseOptimizer", return_value=mock_db):
+        with patch("core.database_optimization.db_optimizer", mock_db):
             handler = StripeWebhookHandler()
             handler._update_user_subscription("sub_1", "cus_1", "active")
 
@@ -228,26 +228,22 @@ class TestStripeWebhookHandler(unittest.TestCase):
         mock_handle.assert_not_called()
         mock_complete.assert_not_called()
 
-    @patch("core.database_optimization.DatabaseOptimizer")
+    @patch("core.database_optimization.db_optimizer")
     @patch("core.stripe_webhooks.stripe")
-    def test_claim_stripe_webhook_event_inserts_once(self, mock_stripe, mock_db_cls):
+    def test_claim_stripe_webhook_event_inserts_once(self, mock_stripe, mock_db):
         from core.stripe_webhooks import StripeWebhookHandler
 
-        mock_db = MagicMock()
-        mock_db_cls.return_value = mock_db
         mock_db.execute_query.return_value = 1
 
         handler = StripeWebhookHandler()
         self.assertEqual(handler._claim_stripe_webhook_event("evt_1", "invoice.paid"), "claimed")
         mock_db.execute_query.assert_called_once()
 
-    @patch("core.database_optimization.DatabaseOptimizer")
+    @patch("core.database_optimization.db_optimizer")
     @patch("core.stripe_webhooks.stripe")
-    def test_claim_stripe_webhook_event_detects_duplicate(self, mock_stripe, mock_db_cls):
+    def test_claim_stripe_webhook_event_detects_duplicate(self, mock_stripe, mock_db):
         from core.stripe_webhooks import StripeWebhookHandler
 
-        mock_db = MagicMock()
-        mock_db_cls.return_value = mock_db
         mock_db.execute_query.side_effect = [0, [{"status": "completed"}]]
 
         handler = StripeWebhookHandler()

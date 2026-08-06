@@ -10,6 +10,7 @@ import time
 import sys
 import uuid
 import logging
+import threading
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
@@ -32,7 +33,7 @@ try:
 except ImportError:
     GMAIL_API_AVAILABLE = False
 
-from core.database_optimization import db_optimizer
+from core.database_optimization import db_optimizer, schema_bootstrap_allowed
 from core.gmail_sync_options import (
     DEFAULT_LOOKBACK_DAYS,
     DEFAULT_MAX_MESSAGES_PER_JOB,
@@ -44,6 +45,9 @@ from core.gmail_sync_options import (
 from integrations.gmail.gmail_client import gmail_client
 
 logger = logging.getLogger(__name__)
+
+_gmail_sync_tables_lock = threading.Lock()
+_gmail_sync_tables_ready = False
 
 
 def should_process_gmail_sync_inline() -> bool:
@@ -176,7 +180,26 @@ class GmailSyncJobManager:
             self.redis_client = None
     
     def _initialize_tables(self):
-        """Initialize database tables for Gmail sync tracking"""
+        """Initialize database tables for Gmail sync tracking (process-once; no PG request DDL)."""
+        global _gmail_sync_tables_ready
+        with _gmail_sync_tables_lock:
+            if _gmail_sync_tables_ready:
+                return
+            if not schema_bootstrap_allowed():
+                logger.info(
+                    "Skipping Gmail sync schema bootstrap on PostgreSQL "
+                    "(use numbered migrations / FIKIRI_ALLOW_SCHEMA_BOOTSTRAP=1)"
+                )
+                _gmail_sync_tables_ready = True
+                return
+            try:
+                self._initialize_tables_unlocked()
+                _gmail_sync_tables_ready = True
+            except Exception as e:
+                logger.error(f"❌ Gmail sync table initialization failed: {e}")
+
+    def _initialize_tables_unlocked(self):
+        """DDL body for Gmail sync tables (caller holds process lock + bootstrap gate)."""
         try:
             # Create Gmail sync jobs table
             db_optimizer.execute_query("""
@@ -334,6 +357,7 @@ class GmailSyncJobManager:
             
         except Exception as e:
             logger.error(f"❌ Gmail sync table initialization failed: {e}")
+            raise
     
     def get_latest_sync_cursor(self, user_id: int) -> Dict[str, Any]:
         """Return pagination cursor from the most recent completed sync job."""
@@ -616,6 +640,50 @@ class GmailSyncJobManager:
                     "has_more": bool(completed_meta.get("has_more")),
                 },
             )
+
+            # Product analytics — after job row committed completed; never alters sync result.
+            # emit_server_product_event never raises; boundary only covers import failures.
+            try:
+                from core.product_analytics_emit import (
+                    emit_server_product_event,
+                    map_gmail_sync_type,
+                    processed_count_bucket,
+                )
+
+                result_category = (
+                    "partial_completed" if completed_meta.get("has_more") else "completed"
+                )
+                sync_type = map_gmail_sync_type(completed_meta)
+                emit_server_product_event(
+                    tenant_id=int(user_id),
+                    actor_user_id=int(user_id),
+                    event_name="outcome.sync_completed",
+                    object_type="gmail_sync_job",
+                    object_id=str(job_id),
+                    correlation_id=str(trace_id) if trace_id else None,
+                    properties={
+                        "feature_key": "integrations",
+                        "workflow_key": "email_sync",
+                        "outcome": "sync_completed",
+                        "completed": True,
+                        "provider": "gmail",
+                        "sync_type": sync_type,
+                        "result_category": result_category,
+                        "processed_count_bucket": processed_count_bucket(
+                            int(sync_result.get("emails_synced") or 0)
+                        ),
+                    },
+                )
+            except Exception as analytics_exc:
+                logger.warning(
+                    "product analytics emit boundary failure after gmail sync complete",
+                    extra={
+                        "event": "product_analytics.emit_boundary_failure",
+                        "exception_class": type(analytics_exc).__name__,
+                        "correlation_id": trace_id,
+                        "phase": "sync_completed",
+                    },
+                )
 
             try:
                 if durable_bg_id:

@@ -110,8 +110,8 @@ def retry_stripe_api(max_retries=3, delay=1, backoff=2):
 
 def get_user_email(user_id):
     """Get user email from database"""
-    from core.database_optimization import DatabaseOptimizer
-    db = DatabaseOptimizer()
+    from core.database_optimization import db_optimizer
+    db = db_optimizer
     user_data = db.execute_query("SELECT email FROM users WHERE id = ?", (user_id,))
     if not user_data:
         return None
@@ -120,8 +120,8 @@ def get_user_email(user_id):
 
 def get_user_name(user_id):
     """Get user name from database"""
-    from core.database_optimization import DatabaseOptimizer
-    db = DatabaseOptimizer()
+    from core.database_optimization import db_optimizer
+    db = db_optimizer
     user_data = db.execute_query("SELECT name FROM users WHERE id = ?", (user_id,))
     if not user_data:
         return None
@@ -180,8 +180,8 @@ def _verify_subscription_owned_by_user(subscription_id):
     user_id = get_jwt_identity()
     if not user_id:
         return False
-    from core.database_optimization import DatabaseOptimizer
-    db = DatabaseOptimizer()
+    from core.database_optimization import db_optimizer
+    db = db_optimizer
     try:
         row = db.execute_query(
             "SELECT 1 FROM subscriptions WHERE stripe_subscription_id = ? AND user_id = ?",
@@ -281,8 +281,8 @@ def _get_user_role(user_id):
     """Get role for a user id from local database."""
     if not user_id:
         return None
-    from core.database_optimization import DatabaseOptimizer
-    db = DatabaseOptimizer()
+    from core.database_optimization import db_optimizer
+    db = db_optimizer
     rows = db.execute_query("SELECT role FROM users WHERE id = ? LIMIT 1", (user_id,))
     if not rows:
         return None
@@ -315,8 +315,8 @@ def _fetch_customer_from_stripe(user_email):
 
 def get_stripe_customer_id(user_email, user_id=None):
     """Get Stripe customer ID - cached in database for performance"""
-    from core.database_optimization import DatabaseOptimizer
-    db = DatabaseOptimizer()
+    from core.database_optimization import db_optimizer
+    db = db_optimizer
     
     # First check database cache (FAST - no API call)
     if user_id:
@@ -484,8 +484,8 @@ def create_subscription():
 @jwt_required()
 def get_current_subscription():
     """Get current user's subscription - optimized with database cache"""
-    from core.database_optimization import DatabaseOptimizer
-    db = DatabaseOptimizer()
+    from core.database_optimization import db_optimizer
+    db = db_optimizer
     
     try:
         user_id = get_jwt_identity()
@@ -630,8 +630,8 @@ def redeem_test_access_code():
         if not _test_access_code_matches(submitted_code):
             return jsonify({'success': False, 'error': 'Invalid access code'}), 403
 
-        from core.database_optimization import DatabaseOptimizer
-        db = DatabaseOptimizer()
+        from core.database_optimization import db_optimizer
+        db = db_optimizer
         _ensure_test_access_grants_table(db)
 
         now_ts = int(time.time())
@@ -684,8 +684,8 @@ def get_test_access_audit():
         if not _is_admin_user(user_id):
             return jsonify({'success': False, 'error': 'Admin access required'}), 403
 
-        from core.database_optimization import DatabaseOptimizer
-        db = DatabaseOptimizer()
+        from core.database_optimization import db_optimizer
+        db = db_optimizer
         _ensure_test_access_grants_table(db)
 
         try:
@@ -1173,8 +1173,8 @@ def track_usage():
         if not usage_type or not isinstance(usage_type, str):
             return jsonify({'success': False, 'error': 'Usage type is required'}), 400
         month = time.strftime('%Y-%m')
-        from core.database_optimization import DatabaseOptimizer
-        db = DatabaseOptimizer()
+        from core.database_optimization import db_optimizer
+        db = db_optimizer
         db.execute_query(
             "INSERT INTO billing_usage (user_id, month, usage_type, quantity) VALUES (?, ?, ?, ?)",
             (user_id, month, usage_type.strip(), quantity),
@@ -1195,8 +1195,8 @@ def get_current_usage():
         if not user_id:
             return jsonify({'success': False, 'error': 'User not found'}), 404
         month = time.strftime('%Y-%m')
-        from core.database_optimization import DatabaseOptimizer
-        db = DatabaseOptimizer()
+        from core.database_optimization import db_optimizer
+        db = db_optimizer
         rows = db.execute_query(
             "SELECT usage_type, SUM(quantity) as total FROM billing_usage WHERE user_id = ? AND month = ? GROUP BY usage_type",
             (user_id, month)

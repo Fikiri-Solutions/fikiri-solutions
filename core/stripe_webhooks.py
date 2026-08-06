@@ -167,9 +167,9 @@ class StripeWebhookHandler:
 
     def _claim_stripe_webhook_event(self, event_id: str, event_type: str) -> str:
         """Return 'claimed', 'duplicate', or 'failed'."""
-        from core.database_optimization import DatabaseOptimizer
+        from core.database_optimization import db_optimizer
 
-        db = DatabaseOptimizer()
+        db = db_optimizer
         try:
             inserted = db.execute_query(
                 """
@@ -218,9 +218,9 @@ class StripeWebhookHandler:
         status: str,
         result: Optional[Dict[str, Any]] = None,
     ) -> None:
-        from core.database_optimization import DatabaseOptimizer
+        from core.database_optimization import db_optimizer
 
-        db = DatabaseOptimizer()
+        db = db_optimizer
         try:
             db.execute_query(
                 """
@@ -794,8 +794,8 @@ class StripeWebhookHandler:
     # Private helper methods
     def _update_user_subscription(self, subscription_id: str, customer_id: str, status: str):
         """Update user subscription in database - persists webhook data"""
-        from core.database_optimization import DatabaseOptimizer
-        db = DatabaseOptimizer()
+        from core.database_optimization import db_optimizer
+        db = db_optimizer
         
         try:
             # Get subscription details from Stripe

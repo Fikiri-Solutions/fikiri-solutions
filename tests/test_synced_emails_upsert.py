@@ -167,6 +167,10 @@ class TestBindBooleanColumn(unittest.TestCase):
     """Regression: Postgres rejects INTEGER for BOOLEAN columns (Gmail sync storage)."""
 
     def setUp(self):
+        self._prev_force = os.environ.get("FIKIRI_FORCE_SQLITE")
+        self._prev_dsn = os.environ.get("DATABASE_URL")
+        os.environ["FIKIRI_FORCE_SQLITE"] = "1"
+        os.environ.pop("DATABASE_URL", None)
         self._tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
         self.db_path = self._tmp.name
         self._tmp.close()
@@ -174,6 +178,14 @@ class TestBindBooleanColumn(unittest.TestCase):
     def tearDown(self):
         if os.path.exists(self.db_path):
             os.unlink(self.db_path)
+        if self._prev_force is None:
+            os.environ.pop("FIKIRI_FORCE_SQLITE", None)
+        else:
+            os.environ["FIKIRI_FORCE_SQLITE"] = self._prev_force
+        if self._prev_dsn is None:
+            os.environ.pop("DATABASE_URL", None)
+        else:
+            os.environ["DATABASE_URL"] = self._prev_dsn
 
     def test_postgres_binds_bool(self):
         opt = DatabaseOptimizer(db_path=self.db_path)
@@ -238,6 +250,10 @@ class TestBindBooleanColumn(unittest.TestCase):
 
 class TestSyncedEmailsLegacyUpsertSqlite(unittest.TestCase):
     def setUp(self):
+        self._prev_force = os.environ.get("FIKIRI_FORCE_SQLITE")
+        self._prev_dsn = os.environ.get("DATABASE_URL")
+        os.environ["FIKIRI_FORCE_SQLITE"] = "1"
+        os.environ.pop("DATABASE_URL", None)
         self._tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
         self.db_path = self._tmp.name
         self._tmp.close()
@@ -246,6 +262,14 @@ class TestSyncedEmailsLegacyUpsertSqlite(unittest.TestCase):
     def tearDown(self):
         if os.path.exists(self.db_path):
             os.unlink(self.db_path)
+        if self._prev_force is None:
+            os.environ.pop("FIKIRI_FORCE_SQLITE", None)
+        else:
+            os.environ["FIKIRI_FORCE_SQLITE"] = self._prev_force
+        if self._prev_dsn is None:
+            os.environ.pop("DATABASE_URL", None)
+        else:
+            os.environ["DATABASE_URL"] = self._prev_dsn
 
     def test_legacy_shape_ensure_then_upsert_on_conflict(self):
         conn = sqlite3.connect(self.db_path)
@@ -372,6 +396,8 @@ class TestSyncedEmailsLegacyUpsertPostgres(unittest.TestCase):
         self.assertIsNone(cur.fetchone())
 
         with self.assertRaises(Exception) as ctx:
+            params = list(_upsert_params())
+            params[-1] = True  # PostgreSQL BOOLEAN column
             cur.execute(
                 psql.SQL(
                     """
@@ -383,7 +409,7 @@ class TestSyncedEmailsLegacyUpsertPostgres(unittest.TestCase):
                         subject = EXCLUDED.subject
                     """
                 ),
-                _upsert_params(),
+                params,
             )
             conn.commit()
         self.assertIn("conflict", str(ctx.exception).lower())
@@ -393,7 +419,7 @@ class TestSyncedEmailsLegacyUpsertPostgres(unittest.TestCase):
 
         opt = DatabaseOptimizer()
         self.assertEqual(opt.db_type, "postgresql")
-        opt.ensure_synced_emails_upsert_constraint()
+        opt.ensure_synced_emails_upsert_constraint(force=True)
 
         conn = psycopg2.connect(self.dsn)
         cur = conn.cursor()

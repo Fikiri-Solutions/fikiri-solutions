@@ -55,6 +55,50 @@ def _production_requires_postgres_uri() -> bool:
     )
 
 
+# Process-level schema bootstrap / upsert-constraint guards.
+# Ordinary request handling must never re-run DDL or table-wide repair.
+_schema_bootstrap_lock = threading.Lock()
+_schema_bootstrap_completed = False
+_schema_bootstrap_in_progress = False
+_synced_emails_constraint_lock = threading.Lock()
+_synced_emails_constraint_ready = False
+_schema_bootstrap_skip_logged = False
+
+
+def _env_flag_true(name: str) -> bool:
+    return (os.getenv(name) or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def schema_bootstrap_allowed() -> bool:
+    """
+    Whether legacy CREATE/ALTER/index/UPDATE schema bootstrap may run.
+
+    PostgreSQL: opt-in only via FIKIRI_ALLOW_SCHEMA_BOOTSTRAP (numbered migrations
+    are the durable schema path). SQLite local/test: allowed once per process so
+    CREATE TABLE IF NOT EXISTS still works without a separate migrator.
+    """
+    if _env_flag_true("FIKIRI_ALLOW_SCHEMA_BOOTSTRAP"):
+        return True
+    if _env_flag_true("FIKIRI_FORCE_SQLITE"):
+        return True
+    dsn = (os.getenv("DATABASE_URL") or "").strip()
+    if dsn and is_postgresql_dsn(dsn):
+        return False
+    return True
+
+
+def reset_schema_bootstrap_state_for_tests() -> None:
+    """Reset process guards (tests only)."""
+    global _schema_bootstrap_completed, _schema_bootstrap_in_progress
+    global _synced_emails_constraint_ready, _schema_bootstrap_skip_logged
+    with _schema_bootstrap_lock:
+        _schema_bootstrap_completed = False
+        _schema_bootstrap_in_progress = False
+        _schema_bootstrap_skip_logged = False
+    with _synced_emails_constraint_lock:
+        _synced_emails_constraint_ready = False
+
+
 def safe_json(obj):
     """Convert unsupported types to JSON-friendly values."""
     if isinstance(obj, sqlite3.Row):
@@ -295,38 +339,97 @@ class DatabaseOptimizer:
         else:
             logger.info("ℹ️ Database encryption disabled (no ENCRYPTION_KEY)")
     
-    def _initialize_database(self):
-        """Initialize database with optimized schema"""
-        if self.db_type == "postgresql":
-            with self.get_connection() as conn:
-                wrapped = PostgresBootstrapCursor(conn.cursor())
-                self._create_optimized_tables(wrapped)
-                self._create_indexes(wrapped)
-                self._create_metrics_table(wrapped)
-                self._run_migrations(wrapped)
-                conn.commit()
-            logger.info("PostgreSQL schema bootstrap complete (SQLite DDL translated + PRAGMA shim)")
-            return
+    def _initialize_database(self, force: bool = False):
+        """Initialize database with optimized schema.
 
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            
-            # Create optimized tables with proper indexes
-            self._create_optimized_tables(cursor)
-            self._create_indexes(cursor)
-            self._create_views(cursor)
-            
-            # Create metrics persistence table
-            self._create_metrics_table(cursor)
-            
-            # Run migrations
-            self._run_migrations(cursor)
-            
-            conn.commit()
-            logger.info("Database initialized with optimized schema")
-    
+        PostgreSQL: opt-in via FIKIRI_ALLOW_SCHEMA_BOOTSTRAP + process-once.
+        SQLite: once per DatabaseOptimizer instance (local/test CREATE TABLE path).
+        """
+        global _schema_bootstrap_completed, _schema_bootstrap_in_progress
+        global _schema_bootstrap_skip_logged
+
+        if self.db_type == "postgresql":
+            if not force and not schema_bootstrap_allowed():
+                if not _schema_bootstrap_skip_logged:
+                    logger.info(
+                        "Skipping legacy schema bootstrap on PostgreSQL "
+                        "(set FIKIRI_ALLOW_SCHEMA_BOOTSTRAP=1 for a controlled one-shot; "
+                        "use numbered migrations for durable schema changes)"
+                    )
+                    _schema_bootstrap_skip_logged = True
+                return False
+
+            with _schema_bootstrap_lock:
+                if _schema_bootstrap_completed and not force:
+                    logger.debug(
+                        "PostgreSQL schema bootstrap already completed in this process; skipping"
+                    )
+                    return True
+                if _schema_bootstrap_in_progress and not force:
+                    logger.debug(
+                        "PostgreSQL schema bootstrap already in progress; skipping concurrent call"
+                    )
+                    return False
+                _schema_bootstrap_in_progress = True
+        else:
+            if getattr(self, "_instance_bootstrap_done", False) and not force:
+                logger.debug("SQLite schema bootstrap already done for this instance; skipping")
+                return True
+
+        started = time.perf_counter()
+        try:
+            if self.db_type == "postgresql":
+                with self.get_connection() as conn:
+                    wrapped = PostgresBootstrapCursor(conn.cursor())
+                    self._create_optimized_tables(wrapped)
+                    self._create_indexes(wrapped)
+                    self._create_metrics_table(wrapped)
+                    migrations_ok = self._run_migrations(wrapped)
+                    if not migrations_ok:
+                        raise RuntimeError(
+                            "PostgreSQL schema migration failed; "
+                            "not marking bootstrap complete"
+                        )
+                    conn.commit()
+                elapsed_ms = (time.perf_counter() - started) * 1000
+                logger.info(
+                    "PostgreSQL schema bootstrap complete "
+                    "(SQLite DDL translated + PRAGMA shim) in %.1fms",
+                    elapsed_ms,
+                )
+                with _schema_bootstrap_lock:
+                    _schema_bootstrap_completed = True
+            else:
+                with self.get_connection() as conn:
+                    cursor = conn.cursor()
+                    self._create_optimized_tables(cursor)
+                    self._create_indexes(cursor)
+                    self._create_views(cursor)
+                    self._create_metrics_table(cursor)
+                    migrations_ok = self._run_migrations(cursor)
+                    if not migrations_ok:
+                        raise RuntimeError(
+                            "SQLite schema migration failed; "
+                            "not marking bootstrap complete"
+                        )
+                    conn.commit()
+                elapsed_ms = (time.perf_counter() - started) * 1000
+                logger.info(
+                    "Database initialized with optimized schema in %.1fms",
+                    elapsed_ms,
+                )
+                self._instance_bootstrap_done = True
+            return True
+        except Exception:
+            logger.exception("Schema bootstrap failed; will not log successful completion")
+            raise
+        finally:
+            if self.db_type == "postgresql":
+                with _schema_bootstrap_lock:
+                    _schema_bootstrap_in_progress = False
+
     def _run_migrations(self, cursor):
-        """Run database migrations for schema updates"""
+        """Run database migrations for schema updates. Returns True on success."""
         try:
             # Migration: Add stripe_customer_id to users table if it doesn't exist
             cursor.execute("PRAGMA table_info(users)")
@@ -334,6 +437,11 @@ class DatabaseOptimizer:
             if 'stripe_customer_id' not in columns:
                 cursor.execute("ALTER TABLE users ADD COLUMN stripe_customer_id TEXT")
                 logger.info("✅ Added stripe_customer_id column to users table")
+            if "auth_session_version" not in columns:
+                cursor.execute(
+                    "ALTER TABLE users ADD COLUMN auth_session_version INTEGER NOT NULL DEFAULT 1"
+                )
+                logger.info("✅ Added auth_session_version column to users table")
 
             # Migration: Add missing lead columns if they don't exist
             cursor.execute("PRAGMA table_info(leads)")
@@ -486,8 +594,10 @@ class DatabaseOptimizer:
             if cf_columns and 'metadata' not in cf_columns:
                 cursor.execute("ALTER TABLE conversation_feedback ADD COLUMN metadata TEXT")
                 logger.info("✅ Added metadata column to conversation_feedback")
+            return True
         except Exception as e:
             logger.warning(f"Migration warning: {e}")
+            return False
 
     def _migrate_chatbot_tables_user_id(self, cursor) -> None:
         """Align chatbot_* tables with canonical user_id; remove tenant_user_id."""
@@ -640,6 +750,7 @@ class DatabaseOptimizer:
                 last_login TIMESTAMP,
                 onboarding_completed BOOLEAN DEFAULT 0,
                 onboarding_step INTEGER DEFAULT 0,
+                auth_session_version INTEGER NOT NULL DEFAULT 1,
                 metadata TEXT  -- JSON object for additional user data
             )
         """)
@@ -3303,43 +3414,59 @@ class DatabaseOptimizer:
             )
         return removed
 
-    def ensure_synced_emails_upsert_constraint(self) -> None:
+    def ensure_synced_emails_upsert_constraint(self, force: bool = False) -> None:
         """
         Ensure UNIQUE(user_id, external_id, provider) exists for synced_emails upserts.
 
         Legacy SQLite DBs only had UNIQUE(user_id, gmail_id); column adds alone do not
         satisfy ON CONFLICT (user_id, external_id, provider).
+
+        PostgreSQL: migration-owned; skipped unless FIKIRI_ALLOW_SCHEMA_BOOTSTRAP=1
+        or force=True (process-once). SQLite: allowed when explicitly called.
+        Never invoke from per-message upsert hot paths.
         """
-        if not self.table_exists("synced_emails"):
+        global _synced_emails_constraint_ready
+        if self.db_type == "postgresql" and not force and not schema_bootstrap_allowed():
             return
-        try:
-            self.execute_query(
-                """
-                UPDATE synced_emails
-                SET external_id = gmail_id
-                WHERE (external_id IS NULL OR external_id = '')
-                  AND gmail_id IS NOT NULL
-                """,
-                fetch=False,
-            )
-            self.execute_query(
-                """
-                UPDATE synced_emails
-                SET provider = 'gmail'
-                WHERE provider IS NULL OR provider = ''
-                """,
-                fetch=False,
-            )
-            self._dedupe_synced_emails_for_upsert_key()
-            self.execute_query(
-                """
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_synced_emails_user_external_provider
-                ON synced_emails (user_id, external_id, provider)
-                """,
-                fetch=False,
-            )
-        except Exception as e:
-            logger.warning("synced_emails upsert constraint ensure failed: %s", e)
+        with _synced_emails_constraint_lock:
+            if (
+                self.db_type == "postgresql"
+                and _synced_emails_constraint_ready
+                and not force
+            ):
+                return
+            if not self.table_exists("synced_emails"):
+                return
+            try:
+                self.execute_query(
+                    """
+                    UPDATE synced_emails
+                    SET external_id = gmail_id
+                    WHERE (external_id IS NULL OR external_id = '')
+                      AND gmail_id IS NOT NULL
+                    """,
+                    fetch=False,
+                )
+                self.execute_query(
+                    """
+                    UPDATE synced_emails
+                    SET provider = 'gmail'
+                    WHERE provider IS NULL OR provider = ''
+                    """,
+                    fetch=False,
+                )
+                self._dedupe_synced_emails_for_upsert_key()
+                self.execute_query(
+                    """
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_synced_emails_user_external_provider
+                    ON synced_emails (user_id, external_id, provider)
+                    """,
+                    fetch=False,
+                )
+                if self.db_type == "postgresql":
+                    _synced_emails_constraint_ready = True
+            except Exception as e:
+                logger.warning("synced_emails upsert constraint ensure failed: %s", e)
 
     def upsert_synced_email_from_gmail(
         self,
@@ -3360,8 +3487,10 @@ class DatabaseOptimizer:
         Uses UNIQUE(user_id, external_id, provider); external_id is set to gmail_id
         so PostgreSQL ON CONFLICT matches the schema. Returning the id here lets
         Gmail sync callers avoid a second per-message lookup after each upsert.
+
+        Does not run schema repair — constraint preparation belongs to migrations
+        or an explicit ensure_synced_emails_upsert_constraint() under bootstrap opt-in.
         """
-        self.ensure_synced_emails_upsert_constraint()
         params = (
             user_id,
             gmail_id,
