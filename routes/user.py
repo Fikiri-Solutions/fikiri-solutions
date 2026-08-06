@@ -30,6 +30,32 @@ user_bp = Blueprint("user", __name__, url_prefix="/api")
 LOGO_MAX_BYTES = 1024 * 1024  # 1 MB
 ALLOWED_LOGO_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
+
+def _profile_impersonation_context(jwt_payload):
+    if not isinstance(jwt_payload, dict) or not jwt_payload.get("impersonating"):
+        return None
+    actor_id = jwt_payload.get("actor_user_id")
+    actor_email = None
+    actor_name = None
+    if actor_id is not None:
+        try:
+            actor_rows = db_optimizer.execute_query(
+                "SELECT email, name FROM users WHERE id = ? LIMIT 1",
+                (int(actor_id),),
+            )
+            if actor_rows:
+                row = actor_rows[0]
+                actor_email = row.get("email") if hasattr(row, "keys") else row[0]
+                actor_name = row.get("name") if hasattr(row, "keys") else row[1]
+        except Exception:
+            pass
+    return {
+        "active": True,
+        "actor_user_id": actor_id,
+        "actor_email": actor_email,
+        "actor_name": actor_name,
+    }
+
 @user_bp.route('/user/profile', methods=['GET'])
 @handle_api_errors
 @jwt_required
@@ -85,7 +111,8 @@ def get_user_profile():
             out['notification_preferences'] = metadata.get('notification_preferences')
         
         return create_success_response({
-            'user': out
+            'user': out,
+            'impersonation': _profile_impersonation_context(user_data),
         }, "User profile retrieved")
         
     except Exception as e:

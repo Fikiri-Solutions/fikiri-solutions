@@ -10,6 +10,7 @@ import {
   PlugZap,
   Settings,
   Shield,
+  ShieldCheck,
   Users,
   Zap,
 } from 'lucide-react'
@@ -42,11 +43,15 @@ const DASHBOARD_NAV_BASE: DashboardNavItem[] = [
 ]
 
 export function getDashboardSidebarNav(
-  user: { onboarding_completed?: boolean } | null | undefined
+  user: { onboarding_completed?: boolean } | null | undefined,
+  options?: { showAdmin?: boolean }
 ): DashboardNavItem[] {
   let items = [...DASHBOARD_NAV_BASE]
   if (user && !user.onboarding_completed) {
     items.unshift({ name: 'Complete Setup', href: '/onboarding', icon: Zap })
+  }
+  if (options?.showAdmin) {
+    items.push({ name: 'Admin', href: '/admin', icon: ShieldCheck })
   }
   items = items.filter((item) => !isNavHiddenInDemoSafeMode(item.href))
   return items
@@ -79,6 +84,7 @@ const MOBILE_BOTTOM_HREFS_ONBOARDING = [
 export function isDashboardNavItemActive(pathname: string, href: string): boolean {
   if (href === '/dashboard') return pathname === '/dashboard' || pathname === '/home'
   if (href === '/onboarding') return pathname === '/onboarding' || pathname.startsWith('/onboarding/')
+  if (href === '/admin') return pathname === '/admin' || pathname.startsWith('/admin/')
   if (href === '/ai')
     return pathname === '/ai' || pathname === '/assistant' || pathname.startsWith('/ai/')
   if (href === '/integrations/gmail') return pathname.startsWith('/integrations')

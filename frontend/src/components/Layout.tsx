@@ -11,8 +11,10 @@ import { useCustomization } from '../contexts/CustomizationContext'
 import { useAuth } from '../contexts/AuthContext'
 import { FikiriLogo } from './FikiriLogo'
 import { EmailVerificationBanner } from './EmailVerificationBanner'
+import { ImpersonationBanner } from './ImpersonationBanner'
 import { SubscriptionGate } from './SubscriptionGate'
 import { LegalFooterLinks } from './LegalFooterLinks'
+import { usePlatformAdmin } from '../hooks/usePlatformAdmin'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -36,6 +38,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation()
   const { customization } = useCustomization()
   const { user, logout } = useAuth()
+  const { showAdminNav } = usePlatformAdmin()
 
   useEffect(() => {
     try {
@@ -52,15 +55,43 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
   }, [location.pathname])
 
+  // Privacy-safe product analytics (no-op when disabled / admin / impersonating)
+  useEffect(() => {
+    if (!user?.id) return
+    void import('../services/productAnalytics').then(({ trackSessionStarted }) => {
+      trackSessionStarted()
+    })
+  }, [user?.id])
+
+  useEffect(() => {
+    if (!user?.id) return
+    void import('../services/productAnalytics').then(({ trackFeatureOpened }) => {
+      const path = location.pathname
+      let feature = 'other'
+      if (path.startsWith('/dashboard')) feature = 'dashboard'
+      else if (path.startsWith('/crm')) feature = 'crm'
+      else if (path.startsWith('/inbox')) feature = 'inbox'
+      else if (path.startsWith('/automations')) feature = 'automations'
+      else if (path.startsWith('/integrations') || path.startsWith('/gmail') || path.startsWith('/outlook'))
+        feature = 'integrations'
+      else if (path.startsWith('/billing')) feature = 'billing'
+      else if (path.startsWith('/onboarding')) feature = 'onboarding'
+      else if (path.startsWith('/support')) feature = 'support'
+      else if (path.startsWith('/appointments')) feature = 'appointments'
+      trackFeatureOpened(feature)
+    })
+  }, [user?.id, location.pathname])
+
   // Handle sign out
   const handleSignOut = () => {
     logout()
   }
 
-  const navigation = getDashboardSidebarNav(user)
+  const navigation = getDashboardSidebarNav(user, { showAdmin: showAdminNav })
 
   return (
     <div className="mobile-layout-root min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
+      <ImpersonationBanner />
       {/* Mobile sidebar */}
       <div className={`fixed inset-0 z-50 lg:hidden ${mobileMenuOpen ? 'block' : 'hidden'}`}>
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-75" onClick={() => setMobileMenuOpen(false)} />

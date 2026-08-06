@@ -1173,10 +1173,13 @@ class ApiClient {
     return response.data
   }
 
-  async getProfile(): Promise<{ user: { phone?: string; sms_consent?: boolean; sms_consent_at?: string; [k: string]: any } }> {
+  async getProfile(): Promise<{
+    user: { phone?: string; sms_consent?: boolean; sms_consent_at?: string; [k: string]: any }
+    impersonation?: { active: boolean; actor_user_id?: number; actor_email?: string | null; actor_name?: string | null } | null
+  }> {
     const response = await this.client.get('/user/profile')
     const data = response.data?.data ?? response.data
-    return { user: data?.user ?? {} }
+    return { user: data?.user ?? {}, impersonation: data?.impersonation ?? null }
   }
 
   async updateProfile(payload: {
@@ -2105,6 +2108,293 @@ class ApiClient {
     const { getFriendlyError } = require('../utils/errorMessages')
     const friendly = getFriendlyError(error)
     return friendly.message
+  }
+
+  async getPlatformAdminContext(): Promise<{
+    is_platform_admin: boolean
+    capabilities: string[]
+    impersonating: boolean
+    actor_user_id: number | null
+    effective_user_id: number | null
+    security?: import('../types/admin').PlatformOperatorSecurity
+  }> {
+    const response = await this.client.get('/admin/platform/me')
+    const data = response.data?.data ?? response.data
+    return data
+  }
+
+  async getPlatformAdminStatus(): Promise<import('../types/admin').PlatformAdminStatus> {
+    const response = await this.client.get('/admin/platform/status')
+    const data = response.data?.data ?? response.data
+    return data
+  }
+
+  async listAdminTenants(params?: { search?: string; limit?: number; offset?: number }): Promise<{
+    items: Array<Record<string, any>>
+    total: number
+    limit: number
+    offset: number
+  }> {
+    const response = await this.client.get('/admin/platform/tenants', { params })
+    const data = response.data?.data ?? response.data
+    return data
+  }
+
+  async getAdminTenant(tenantId: number): Promise<import('../types/admin').AdminTenantDetailResponse> {
+    const response = await this.client.get(`/admin/platform/tenants/${tenantId}`)
+    const data = response.data?.data ?? response.data
+    return data
+  }
+
+  async listAdminTenantSyncJobs(
+    tenantId: number,
+    params?: { limit?: number },
+  ): Promise<{ items: Array<Record<string, any>>; tenant_id: number }> {
+    const response = await this.client.get(`/admin/platform/tenants/${tenantId}/sync-jobs`, {
+      params,
+    })
+    return response.data?.data ?? response.data
+  }
+
+  async retryAdminTenantSyncJob(
+    tenantId: number,
+    jobId: string,
+    payload: { confirm: 'retry'; tenant_id: number; idempotency_key: string },
+  ): Promise<{
+    retried: boolean
+    original_job_id: string
+    new_job_id: string
+    enqueue_mode?: string
+  }> {
+    const response = await this.client.post(
+      `/admin/platform/tenants/${tenantId}/sync-jobs/${encodeURIComponent(jobId)}/retry`,
+      payload,
+      { headers: { 'Idempotency-Key': payload.idempotency_key } },
+    )
+    return response.data?.data ?? response.data
+  }
+
+  async startPlatformImpersonation(
+    targetUserId: number,
+    stepUpToken?: string,
+  ): Promise<{
+    tokens: { access_token: string; expires_in?: number }
+    target_user: Record<string, any>
+  }> {
+    const headers: Record<string, string> = {}
+    if (stepUpToken) {
+      headers['X-Admin-Step-Up'] = stepUpToken
+    }
+    const response = await this.client.post(
+      '/admin/platform/impersonate',
+      { target_user_id: targetUserId },
+      Object.keys(headers).length ? { headers } : undefined,
+    )
+    const data = response.data?.data ?? response.data
+    return data
+  }
+
+  async createAdminStepUp(payload: {
+    action: string
+    password: string
+    mfa_code?: string
+  }): Promise<{ step_up_token: string; expires_in: number; action: string }> {
+    const response = await this.client.post('/admin/platform/step-up', payload)
+    const data = response.data?.data ?? response.data
+    return data
+  }
+
+  async reauthenticateAdmin(payload: {
+    password: string
+    mfa_code?: string
+    recovery_code?: string
+  }): Promise<{
+    step_up_confirmed: boolean
+    expires_in: number
+    method: string
+    mfa_completed: boolean
+    access_token?: string
+    refresh_token?: string
+    session_rotated?: boolean
+  }> {
+    const response = await this.client.post('/admin/platform/security/reauthenticate', payload)
+    const data = response.data?.data ?? response.data
+    // Prefer rotated bearer token when server issues one; never persist MFA/password material.
+    if (data?.access_token && typeof window !== 'undefined') {
+      localStorage.setItem('fikiri-token', data.access_token)
+      if (data.refresh_token) {
+        localStorage.setItem('fikiri-refresh-token', data.refresh_token)
+      }
+    }
+    return data
+  }
+
+  async getAdminMfaStatus(): Promise<{
+    enrolled: boolean
+    totp_enabled: boolean
+    recovery_codes_remaining: number
+    verifier_enabled: boolean
+  }> {
+    const response = await this.client.get('/admin/platform/security/mfa/status')
+    return response.data?.data ?? response.data
+  }
+
+  async startAdminMfaEnrollment(): Promise<{
+    enrollment_started: boolean
+    expires_in: number
+    secret: string
+    provisioning_uri: string
+  }> {
+    const response = await this.client.post('/admin/platform/security/mfa/totp/enroll', {})
+    return response.data?.data ?? response.data
+  }
+
+  async confirmAdminMfaEnrollment(totpCode: string): Promise<{
+    activated: boolean
+    recovery_codes: string[]
+    replaced_device?: boolean
+  }> {
+    const response = await this.client.post('/admin/platform/security/mfa/totp/confirm', {
+      totp_code: totpCode,
+    })
+    return response.data?.data ?? response.data
+  }
+
+  async regenerateAdminRecoveryCodes(): Promise<{ recovery_codes: string[] }> {
+    const response = await this.client.post(
+      '/admin/platform/security/mfa/recovery-codes/regenerate',
+      {}
+    )
+    return response.data?.data ?? response.data
+  }
+
+  async disableAdminMfa(payload: {
+    password: string
+    mfa_code?: string
+    recovery_code?: string
+  }): Promise<{ disabled: boolean }> {
+    const response = await this.client.post('/admin/platform/security/mfa/disable', payload)
+    return response.data?.data ?? response.data
+  }
+
+  async stopPlatformImpersonation(): Promise<{
+    stopped: boolean
+    tokens?: { access_token?: string; refresh_token?: string }
+    require_relogin?: boolean
+    admin_access_revoked?: boolean
+  }> {
+    const response = await this.client.post('/admin/platform/impersonate/stop')
+    const data = response.data?.data ?? response.data
+    if (data?.tokens?.access_token && typeof window !== 'undefined') {
+      localStorage.setItem('fikiri-token', data.tokens.access_token)
+      if (data.tokens.refresh_token) {
+        localStorage.setItem('fikiri-refresh-token', data.tokens.refresh_token)
+      }
+    }
+    return data
+  }
+
+  async listAdminAudit(params?: {
+    limit?: number
+    offset?: number
+    actor_user_id?: number
+    target_type?: string
+    target_id?: string
+    outcome?: string
+  }): Promise<{
+    items: Array<Record<string, any>>
+    total: number
+    limit?: number
+    offset?: number
+  }> {
+    const query: Record<string, string | number> = {}
+    if (params?.limit != null) query.limit = params.limit
+    if (params?.offset != null) query.offset = params.offset
+    if (params?.actor_user_id != null) query.actor_user_id = params.actor_user_id
+    if (params?.target_type) query.target_type = params.target_type
+    if (params?.target_id) query.target_id = params.target_id
+    if (params?.outcome) query.outcome = params.outcome
+    const response = await this.client.get('/admin/platform/audit', { params: query })
+    const data = response.data?.data ?? response.data
+    return data
+  }
+
+  async exportAdminAudit(payload: {
+    format?: 'json' | 'csv'
+    limit?: number
+    offset?: number
+    actor_user_id?: number
+    target_type?: string
+    target_id?: string
+    outcome?: string
+  }): Promise<{
+    format: string
+    count: number
+    body: string
+    content_type: string
+    total_matching?: number
+  }> {
+    const response = await this.client.post('/admin/platform/audit/export', payload)
+    return response.data?.data ?? response.data
+  }
+
+  async listPlatformSyncJobs(params?: {
+    status?: string
+    limit?: number
+    offset?: number
+  }): Promise<{
+    available: boolean
+    items: Array<Record<string, any>>
+    total: number
+    limit: number
+    offset: number
+    statuses?: string[]
+    reason?: string
+  }> {
+    const response = await this.client.get('/admin/platform/sync-jobs', { params })
+    return response.data?.data ?? response.data
+  }
+
+  async suspendAdminTenant(tenantId: number, payload: { confirm: string }): Promise<{
+    tenant_id: number
+    is_active: boolean
+    unchanged?: boolean
+    reason?: string
+  }> {
+    const response = await this.client.post(`/admin/platform/tenants/${tenantId}/suspend`, payload)
+    return response.data?.data ?? response.data
+  }
+
+  async resumeAdminTenant(tenantId: number, payload: { confirm: string }): Promise<{
+    tenant_id: number
+    is_active: boolean
+    unchanged?: boolean
+    reason?: string
+  }> {
+    const response = await this.client.post(`/admin/platform/tenants/${tenantId}/resume`, payload)
+    return response.data?.data ?? response.data
+  }
+
+  async getProductAnalyticsStatus(): Promise<{
+    analytics_enabled: boolean
+    accessibility_signals_enabled: boolean
+    impersonating: boolean
+  }> {
+    const response = await this.client.get('/analytics/status')
+    const data = response.data?.data ?? response.data
+    return {
+      analytics_enabled: Boolean(data?.analytics_enabled),
+      accessibility_signals_enabled: Boolean(data?.accessibility_signals_enabled),
+      impersonating: Boolean(data?.impersonating),
+    }
+  }
+
+  async postProductAnalyticsEvents(payload: {
+    surface?: string
+    events: Array<Record<string, unknown>>
+  }): Promise<Record<string, unknown>> {
+    const response = await this.client.post('/analytics/events', payload)
+    return response.data?.data ?? response.data
   }
 }
 

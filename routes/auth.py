@@ -1113,6 +1113,16 @@ def api_logout():
                 secure_session_manager.delete_session(session_id)
             except Exception as e:
                 logger.warning(f"Session deletion warning: {e}")
+
+        try:
+            from core.admin_security import invalidate_admin_step_up_for_user
+            from core.secure_sessions import get_current_user_id as _admin_uid
+
+            uid = _admin_uid()
+            if uid:
+                invalidate_admin_step_up_for_user(int(uid), reason="logout")
+        except Exception as e:
+            logger.warning(f"Admin step-up invalidation on logout failed: {e}")
         
         # Clear Flask session
         session.clear()

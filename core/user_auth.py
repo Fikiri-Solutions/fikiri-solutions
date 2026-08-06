@@ -418,18 +418,39 @@ class UserAuthManager:
     def deactivate_user(self, user_id: int) -> Dict[str, Any]:
         """Soft-delete user by marking inactive and revoking all sessions."""
         try:
+            from core.auth_session_version import bump_auth_session_version, ensure_auth_session_version_column
+
+            ensure_auth_session_version_column()
             false_lit = db_optimizer.sql_false_literal()
-            db_optimizer.execute_query(
-                f"UPDATE users SET is_active = {false_lit}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (user_id,),
-                fetch=False,
-            )
+            with db_optimizer.transaction() as (conn, cursor):
+                cursor.execute(
+                    f"UPDATE users SET is_active = {false_lit}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (user_id,),
+                )
+                bump_auth_session_version(user_id, cursor=cursor)
+                conn.commit()
             self.revoke_all_user_sessions(user_id)
             try:
                 from core.jwt_auth import get_jwt_manager
-                get_jwt_manager().revoke_all_refresh_tokens(user_id)
+                mgr = get_jwt_manager()
+                db_optimizer.execute_query(
+                    "UPDATE refresh_tokens SET is_revoked = TRUE WHERE user_id = ?",
+                    (user_id,),
+                    fetch=False,
+                )
+                if getattr(mgr, "redis_client", None):
+                    pattern = f"{mgr.session_prefix}{user_id}:*"
+                    keys = mgr.redis_client.keys(pattern)
+                    if keys:
+                        mgr.redis_client.delete(*keys)
             except Exception as revoke_error:
                 logger.warning("Failed to revoke refresh tokens on deactivate: %s", revoke_error)
+            try:
+                from core.admin_security import invalidate_admin_step_up_for_user
+
+                invalidate_admin_step_up_for_user(user_id, reason="account_deactivated")
+            except Exception as step_up_error:
+                logger.warning("Failed to invalidate admin step-up on deactivate: %s", step_up_error)
             logger.info("User %s deactivated", user_id)
             return {'success': True, 'message': 'Account deactivated successfully'}
         except Exception as e:
@@ -766,18 +787,42 @@ class UserAuthManager:
             # Remove reset token
             metadata.pop('reset_token', None)
             metadata.pop('reset_token_expires', None)
+
+            from core.auth_session_version import bump_auth_session_version, ensure_auth_session_version_column
+
+            ensure_auth_session_version_column()
+            # Password hash + session version must commit together; otherwise old
+            # access tokens could remain valid after a reported-success reset.
+            with db_optimizer.transaction() as (conn, cursor):
+                cursor.execute(
+                    "UPDATE users SET password_hash = ?, metadata = ? WHERE id = ?",
+                    (new_password_hash, json.dumps(metadata), user_id),
+                )
+                bump_auth_session_version(user_id, cursor=cursor)
+                conn.commit()
             
-            db_optimizer.execute_query(
-                "UPDATE users SET password_hash = ?, metadata = ? WHERE id = ?",
-                (new_password_hash, json.dumps(metadata), user_id),
-                fetch=False
-            )
-            
-            # Revoke all existing sessions
+            # Revoke all existing sessions (post-commit best effort)
             self.revoke_all_user_sessions(user_id)
             try:
+                from core.admin_security import invalidate_admin_step_up_for_user
+
+                invalidate_admin_step_up_for_user(user_id, reason="password_reset")
+            except Exception as step_up_err:
+                logger.warning("Failed to invalidate admin step-up on password reset: %s", step_up_err)
+            try:
                 from core.jwt_auth import get_jwt_manager
-                get_jwt_manager().revoke_all_refresh_tokens(user_id)
+                # Refresh cleanup only — version already bumped in the transaction.
+                mgr = get_jwt_manager()
+                db_optimizer.execute_query(
+                    "UPDATE refresh_tokens SET is_revoked = TRUE WHERE user_id = ?",
+                    (user_id,),
+                    fetch=False,
+                )
+                if getattr(mgr, "redis_client", None):
+                    pattern = f"{mgr.session_prefix}{user_id}:*"
+                    keys = mgr.redis_client.keys(pattern)
+                    if keys:
+                        mgr.redis_client.delete(*keys)
             except Exception as revoke_error:
                 logger.warning("Failed to revoke refresh tokens on password reset: %s", revoke_error)
             
@@ -822,17 +867,38 @@ class UserAuthManager:
             
             # Update password and salt
             metadata['salt'] = str(new_salt)
-            db_optimizer.execute_query(
-                "UPDATE users SET password_hash = ?, metadata = ? WHERE id = ?",
-                (new_password_hash, json.dumps(metadata), user_id),
-                fetch=False
-            )
+            from core.auth_session_version import bump_auth_session_version, ensure_auth_session_version_column
+
+            ensure_auth_session_version_column()
+            with db_optimizer.transaction() as (conn, cursor):
+                cursor.execute(
+                    "UPDATE users SET password_hash = ?, metadata = ? WHERE id = ?",
+                    (new_password_hash, json.dumps(metadata), user_id),
+                )
+                bump_auth_session_version(user_id, cursor=cursor)
+                conn.commit()
             
             # Revoke all existing sessions
             self.revoke_all_user_sessions(user_id)
             try:
+                from core.admin_security import invalidate_admin_step_up_for_user
+
+                invalidate_admin_step_up_for_user(user_id, reason="password_change")
+            except Exception as step_up_err:
+                logger.warning("Failed to invalidate admin step-up on password change: %s", step_up_err)
+            try:
                 from core.jwt_auth import get_jwt_manager
-                get_jwt_manager().revoke_all_refresh_tokens(user_id)
+                mgr = get_jwt_manager()
+                db_optimizer.execute_query(
+                    "UPDATE refresh_tokens SET is_revoked = TRUE WHERE user_id = ?",
+                    (user_id,),
+                    fetch=False,
+                )
+                if getattr(mgr, "redis_client", None):
+                    pattern = f"{mgr.session_prefix}{user_id}:*"
+                    keys = mgr.redis_client.keys(pattern)
+                    if keys:
+                        mgr.redis_client.delete(*keys)
             except Exception as revoke_error:
                 logger.warning("Failed to revoke refresh tokens on password change: %s", revoke_error)
             

@@ -452,8 +452,50 @@ def init_secure_sessions(app):
 
         g.session_id = None
         g.user_id = None
+        g.actor_user_id = None
+        g.impersonating = False
+        g.access_token_jti = None
         g.user_data = {}
         g.session_data = {}
+
+        def _load_bearer_identity(set_user: bool) -> None:
+            """Parse Authorization Bearer for jti (and optionally user) onto g."""
+            auth_header = request.headers.get('Authorization')
+            if not auth_header or not auth_header.startswith('Bearer '):
+                return
+            parts = auth_header.split(' ', 1)
+            token = parts[1].strip() if len(parts) > 1 else ''
+            if not token:
+                return
+            from core.jwt_auth import get_jwt_manager
+
+            payload = get_jwt_manager().verify_access_token(token)
+            if not payload or not isinstance(payload, dict) or 'error' in payload:
+                return
+            g.access_token_jti = payload.get('jti')
+            if not set_user:
+                return
+            uid = payload.get('user_id')
+            if uid is None:
+                uid = payload.get('id')
+            if uid is None:
+                return
+            try:
+                g.user_id = int(uid)
+            except (TypeError, ValueError):
+                g.user_id = None
+            if g.user_id is None:
+                return
+            g.user_data = {'user_id': g.user_id}
+            g.session_data = {}
+            actor_raw = payload.get('actor_user_id')
+            if payload.get('impersonating') and actor_raw is not None:
+                try:
+                    g.actor_user_id = int(actor_raw)
+                    g.impersonating = True
+                except (TypeError, ValueError):
+                    g.actor_user_id = None
+                    g.impersonating = False
 
         session_id = request.cookies.get(secure_session_manager.cookie_name)
         if session_id:
@@ -463,28 +505,12 @@ def init_secure_sessions(app):
                 g.user_id = session_data.get('user_id')
                 g.user_data = session_data.get('user_data', {})
                 g.session_data = session_data
+                # SPA often sends cookie + Bearer; capture jti so admin step-up
+                # binds to the JWT path used by apiClient after rotation.
+                _load_bearer_identity(set_user=False)
                 return
 
-        auth_header = request.headers.get('Authorization')
-        if auth_header and auth_header.startswith('Bearer '):
-            parts = auth_header.split(' ', 1)
-            token = parts[1].strip() if len(parts) > 1 else ''
-            if token:
-                from core.jwt_auth import get_jwt_manager
-
-                payload = get_jwt_manager().verify_access_token(token)
-                if payload and isinstance(payload, dict) and 'error' not in payload:
-                    uid = payload.get('user_id')
-                    if uid is None:
-                        uid = payload.get('id')
-                    if uid is not None:
-                        try:
-                            g.user_id = int(uid)
-                        except (TypeError, ValueError):
-                            g.user_id = None
-                        if g.user_id is not None:
-                            g.user_data = {'user_id': g.user_id}
-                            g.session_data = {}
+        _load_bearer_identity(set_user=True)
     
     @app.after_request
     def save_secure_session(response):
@@ -518,6 +544,23 @@ def get_current_user_id() -> Optional[int]:
         return None
     
     return getattr(g, 'user_id', None)
+
+
+def get_actor_user_id() -> Optional[int]:
+    """Platform operator id when impersonating; otherwise same as current user id."""
+    if not FLASK_AVAILABLE:
+        return None
+    actor_id = getattr(g, 'actor_user_id', None)
+    if actor_id is not None:
+        return actor_id
+    return getattr(g, 'user_id', None)
+
+
+def is_impersonating() -> bool:
+    if not FLASK_AVAILABLE:
+        return False
+    return bool(getattr(g, 'impersonating', False))
+
 
 def require_session(f):
     """Decorator to require valid session"""

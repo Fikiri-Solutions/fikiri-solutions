@@ -54,6 +54,13 @@ import { ScrollToTop } from './components/ScrollToTop'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { PageLoader } from './components/PageLoader'
 import { ProtectedRoute, AuthRoute, OnboardingRoute } from './components/RouteGuard'
+import { AdminRoute } from './components/AdminRoute'
+import { AdminLayout } from './pages/admin/AdminLayout'
+import { AdminDashboard } from './pages/admin/AdminDashboard'
+import { TenantDirectory } from './pages/admin/TenantDirectory'
+import { TenantDetail } from './pages/admin/TenantDetail'
+import { AdminAuditLog } from './pages/admin/AdminAuditLog'
+import { AdminMfaSecurity } from './pages/admin/AdminMfaSecurity'
 import { LandingThemeGuard } from './components/LandingThemeGuard'
 import { getFeatureConfig } from './config'
 import { useWarmRoutes } from './hooks/useWarmRoutes'
@@ -315,6 +322,20 @@ function App() {
                               <Layout><PrivacySettings /></Layout>
                             </ProtectedRoute>
                           } />
+
+                          <Route path="/admin" element={
+                            <ProtectedRoute>
+                              <AdminRoute>
+                                <AdminLayout />
+                              </AdminRoute>
+                            </ProtectedRoute>
+                          }>
+                            <Route index element={<AdminDashboard />} />
+                            <Route path="tenants" element={<TenantDirectory />} />
+                            <Route path="tenants/:tenantId" element={<TenantDetail />} />
+                            <Route path="audit" element={<AdminAuditLog />} />
+                            <Route path="security" element={<AdminMfaSecurity />} />
+                          </Route>
                           
                           {/* 404 route */}
                           <Route path="*" element={<NotFoundPage />} />

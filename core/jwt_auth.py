@@ -144,6 +144,11 @@ class JWTAuthManager:
             
             # Generate unique device ID for multi-device support
             device_id = secrets.token_hex(4)
+
+            from core.auth_session_version import CLAIM_KEY, ensure_auth_session_version_column, get_auth_session_version
+
+            ensure_auth_session_version_column()
+            asv = get_auth_session_version(int(user_id), prefer_cache=False)
             
             # Access token payload with Unix timestamps
             access_payload = {
@@ -152,6 +157,7 @@ class JWTAuthManager:
                 'role': user_data.get('role', 'user'),
                 'type': 'access',
                 'jti': secrets.token_urlsafe(16),  # JWT ID for blacklisting
+                CLAIM_KEY: int(asv),
                 'iat': int(current_time.timestamp()),
                 'exp': int((current_time + timedelta(seconds=self.access_token_expiry)).timestamp())
             }
@@ -224,6 +230,69 @@ class JWTAuthManager:
         except Exception as e:
             logger.error(f"❌ Token generation failed: {e}")
             raise
+
+    def generate_impersonation_access_token(
+        self,
+        *,
+        actor_user_id: int,
+        target_user_id: int,
+        target_user_data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Short-lived access token for platform admin viewing as a tenant user."""
+        if not JWT_AVAILABLE:
+            raise Exception("JWT library not available")
+
+        current_time = datetime.now()
+        try:
+            from core.admin_security import impersonation_ttl_seconds
+
+            expiry_seconds = impersonation_ttl_seconds()
+        except Exception:
+            expiry_seconds = int(os.getenv("IMPERSONATION_TOKEN_EXPIRY_SECONDS", "1800"))
+            expiry_seconds = max(300, min(expiry_seconds, 3600))
+
+        access_payload = {
+            "user_id": target_user_id,
+            "email": target_user_data.get("email"),
+            "role": target_user_data.get("role", "user"),
+            "type": "access",
+            "impersonating": True,
+            "actor_user_id": actor_user_id,
+            # Impersonation tokens are not refreshable; actor identity is immutable.
+            "jti": secrets.token_urlsafe(16),
+            "iat": int(current_time.timestamp()),
+            "exp": int((current_time + timedelta(seconds=expiry_seconds)).timestamp()),
+        }
+        try:
+            from core.auth_session_version import (
+                ACTOR_CLAIM_KEY,
+                CLAIM_KEY,
+                ensure_auth_session_version_column,
+                get_auth_session_version,
+            )
+
+            ensure_auth_session_version_column()
+            access_payload[CLAIM_KEY] = int(get_auth_session_version(int(target_user_id), prefer_cache=False))
+            access_payload[ACTOR_CLAIM_KEY] = int(
+                get_auth_session_version(int(actor_user_id), prefer_cache=False)
+            )
+        except Exception as asv_err:
+            logger.warning("Impersonation token missing asv claims: %s", asv_err)
+
+        access_token = jwt.encode(access_payload, self.secret_key, algorithm=self.algorithm)
+        if isinstance(access_token, (bytes, bytearray, memoryview)):
+            access_token = bytes(access_token).decode("utf-8", errors="replace")
+        else:
+            access_token = str(access_token)
+
+        return {
+            "access_token": access_token,
+            "expires_in": expiry_seconds,
+            "token_type": "Bearer",
+            "impersonating": True,
+            "actor_user_id": actor_user_id,
+            "target_user_id": target_user_id,
+        }
     
     def verify_access_token(self, token: str) -> Optional[Dict[str, Any]]:
         """Verify and decode access token with blacklist checking"""
@@ -249,14 +318,30 @@ class JWTAuthManager:
             
             # Check if user still exists and is active
             # Rulepack compliance: specific columns, not SELECT *
+            from core.auth_session_version import ensure_auth_session_version_column, token_version_matches
+
+            ensure_auth_session_version_column()
             active = db_optimizer.sql_cast_int_eq_one("is_active")
             user_data = db_optimizer.execute_query(
-                f"SELECT id, email, name, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata FROM users WHERE id = ? AND {active}",
+                f"SELECT id, email, name, role, business_name, business_email, industry, team_size, is_active, email_verified, created_at, updated_at, last_login, onboarding_completed, onboarding_step, metadata, auth_session_version FROM users WHERE id = ? AND {active}",
                 (payload['user_id'],)
             )
             
             if not user_data:
                 return {"error": "user_inactive"}
+
+            row = user_data[0]
+            row_version = None
+            try:
+                raw_v = row.get("auth_session_version") if hasattr(row, "keys") else None
+                if raw_v is not None:
+                    row_version = int(raw_v)
+            except (TypeError, ValueError):
+                row_version = None
+
+            if not token_version_matches(payload, user_row_version=row_version):
+                logger.warning("Access token session version mismatch for user %s", payload.get("user_id"))
+                return {"error": "session_version_mismatch"}
             
             # Update Redis session if available
             if self.redis_client:
@@ -354,7 +439,14 @@ class JWTAuthManager:
             return False
     
     def revoke_all_user_tokens(self, user_id: int) -> bool:
-        """Revoke all refresh tokens for a user"""
+        """Revoke all refresh tokens for a user and bump auth session version."""
+        try:
+            from core.auth_session_version import bump_auth_session_version
+
+            bump_auth_session_version(int(user_id))
+        except Exception as bump_err:
+            logger.error("Auth session version bump failed during revoke_all: %s", bump_err)
+            return False
         try:
             # Revoke all database tokens
             db_optimizer.execute_query("""
@@ -375,6 +467,10 @@ class JWTAuthManager:
         except Exception as e:
             logger.error(f"❌ Token revocation failed: {e}")
             return False
+
+    def revoke_all_refresh_tokens(self, user_id: int) -> bool:
+        """Alias for revoke_all_user_tokens (password reset / change call sites)."""
+        return self.revoke_all_user_tokens(user_id)
     
     def get_user_session(self, user_id: int, device_id: str = None) -> Optional[Dict[str, Any]]:
         """Get user session from Redis with device support"""
@@ -525,6 +621,12 @@ def jwt_required(f):
                     'error': 'Token has been revoked',
                     'error_code': 'TOKEN_REVOKED'
                 }), 401
+            elif error_code == 'session_version_mismatch':
+                return jsonify({
+                    'success': False,
+                    'error': 'Token has been revoked',
+                    'error_code': 'TOKEN_REVOKED'
+                }), 401
             elif error_code == 'user_inactive':
                 return jsonify({
                     'success': False,
@@ -547,7 +649,15 @@ def jwt_required(f):
         
         # Add user info to request context
         request.current_user = payload
-        
+        try:
+            from flask import g
+
+            jti = payload.get("jti") if isinstance(payload, dict) else None
+            if jti:
+                g.access_token_jti = jti
+        except Exception:
+            pass
+
         return f(*args, **kwargs)
     
     return decorated_function

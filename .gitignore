@@ -70,7 +70,9 @@ logs/
 .env.test
 .env.bak
 .env*.bak
+.env.automation-dev
 !.env.example
+!.env.automation-dev.example
 frontend/.env
 frontend/.env.local
 frontend/.env.production
@@ -155,3 +157,13 @@ frontend/node_modules/
 .agents/
 .claude/
 .continue/
+
+# Local structural audit reports (Phase 1–4 tooling output; regenerate with audit scripts)
+.audit/
+
+.windmill-dev-session
+.windmill-dev-cli-token
+.windmill-dev-fikiri-api-key
+.env.automation-dev
+data/fikiri_automation_val.db
+.windmill-dev-login-temp

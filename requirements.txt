@@ -81,6 +81,9 @@ psutil>=5.9.0
 # Security and Encryption
 cryptography>=41.0.0
 
+# Admin MFA (TOTP)
+pyotp>=2.9.0
+
 # Development and Testing Tools
 pytest>=7.0.0
 pytest-asyncio>=0.21.0

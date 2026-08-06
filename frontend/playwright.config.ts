@@ -102,6 +102,16 @@ export default defineConfig({
         ...process.env,
         PORT: process.env.PORT || process.env.BACKEND_PORT || '5000',
         FLASK_ENV: process.env.FLASK_ENV || 'development',
+        // Prefer ADMIN_E2E_USER_IDS so a production-like ADMIN_USER_IDS in .env does not break local E2E.
+        ADMIN_USER_IDS: process.env.ADMIN_E2E_USER_IDS || '110',
+        ADMIN_SECURITY_STORE: process.env.ADMIN_SECURITY_STORE || 'memory',
+        ADMIN_MFA_REQUIRED: process.env.ADMIN_MFA_REQUIRED || 'false',
+        ADMIN_MFA_VERIFIER_ENABLED: process.env.ADMIN_MFA_VERIFIER_ENABLED || 'false',
+        ADMIN_DESTRUCTIVE_ENABLED: 'false',
+        IMPERSONATION_ENABLED: process.env.IMPERSONATION_ENABLED || 'false',
+        // Keep E2E on local SQLite even when .env has a Postgres DATABASE_URL.
+        FIKIRI_FORCE_SQLITE: '1',
+        FIKIRI_TEST_MODE: process.env.FIKIRI_TEST_MODE || '1',
       },
       stdout: 'pipe',
       stderr: 'pipe',

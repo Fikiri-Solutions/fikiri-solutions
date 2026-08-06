@@ -184,6 +184,7 @@ from routes.google_risc import google_risc_bp
 from routes.email_triage import email_triage_bp
 from routes.site_chatbot_api import site_chatbot_bp
 from routes.admin_site_chat_api import admin_site_chat_bp
+from routes.admin_platform_api import admin_platform_bp
 
 # Global services dictionary
 services = {}
@@ -565,6 +566,16 @@ def register_request_middleware(app):
         logger.warning(f"⚠️ Trace context middleware initialization failed: {e}")
 
     init_security(app)
+
+    try:
+        from core.admin_security import validate_admin_security_config
+
+        validate_admin_security_config()
+        logger.info("✅ Admin security configuration validated")
+    except RuntimeError:
+        raise
+    except Exception as e:
+        logger.warning("⚠️ Admin security config validation skipped: %s", e)
 
     from core.monitoring import init_monitoring
     init_monitoring(app)
@@ -1076,6 +1087,7 @@ def register_blueprints(app):
         (email_triage_bp, 'email_triage'),
         (site_chatbot_bp, 'site_chatbot'),
         (admin_site_chat_bp, 'admin_site_chat'),
+        (admin_platform_bp, 'admin_platform'),
     ]
 
     if os.getenv("GOOGLE_RISC_ENABLED", "").strip().lower() in ("1", "true", "yes"):
@@ -1181,19 +1193,24 @@ if __name__ == '__main__':
     # Use app already created at module level (create_app() above) — avoid duplicate init
     port = int(os.getenv('PORT') or os.getenv('FLASK_RUN_PORT', 8081))
     debug = os.getenv('FLASK_ENV') == 'development'
+    # Default to loopback; set FIKIRI_BIND_LAN=1 (or FLASK_BIND_HOST=0.0.0.0) for LAN access.
+    if (os.getenv('FIKIRI_BIND_LAN') or '').strip().lower() in ('1', 'true', 'yes', 'on'):
+        host = '0.0.0.0'
+    else:
+        host = (os.getenv('FLASK_BIND_HOST') or '127.0.0.1').strip() or '127.0.0.1'
 
     if app.socketio:
-        logger.info(f"🚀 Starting Flask server with SocketIO on port {port}")
+        logger.info(f"🚀 Starting Flask server with SocketIO on {host}:{port}")
         # Flask-SocketIO 5.6+ refuses to run Werkzeug in non-TTY environments unless
         # we explicitly allow it. Safe to allow only in development.
         app.socketio.run(
             app,
-            host='0.0.0.0',
+            host=host,
             port=port,
             debug=debug,
             use_reloader=False,
             allow_unsafe_werkzeug=debug,
         )
     else:
-        logger.info(f"🚀 Starting Flask server on port {port}")
-        app.run(host='0.0.0.0', port=port, debug=debug, threaded=True, use_reloader=False)
+        logger.info(f"🚀 Starting Flask server on {host}:{port}")
+        app.run(host=host, port=port, debug=debug, threaded=True, use_reloader=False)

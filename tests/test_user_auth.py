@@ -84,17 +84,34 @@ class TestUserAuthManager(unittest.TestCase):
     @patch.object(UserAuthManager, 'revoke_all_user_sessions')
     @patch('core.user_auth.db_optimizer')
     @patch('core.jwt_auth.get_jwt_manager')
-    def test_reset_user_password_revokes_refresh_tokens(self, mock_jwt_mgr, mock_db, mock_revoke_sessions):
+    @patch('core.auth_session_version.bump_auth_session_version', return_value=2)
+    @patch('core.auth_session_version.ensure_auth_session_version_column')
+    def test_reset_user_password_revokes_refresh_tokens(
+        self, _ensure, mock_bump, mock_jwt_mgr, mock_db, mock_revoke_sessions
+    ):
         mock_db.execute_query.side_effect = [
             [{'metadata': '{}'}],
-            None
+            None,  # refresh revoke UPDATE
         ]
-        mock_jwt_mgr.return_value.revoke_all_refresh_tokens = MagicMock()
+        conn = MagicMock()
+        cursor = MagicMock()
+        mock_db.transaction.return_value.__enter__.return_value = (conn, cursor)
+        mock_db.transaction.return_value.__exit__.return_value = None
+        mock_jwt_mgr.return_value.redis_client = None
+        mock_jwt_mgr.return_value.session_prefix = "sess:"
 
         result = self.manager.reset_user_password(1, "NewPassword123!")
-        self.assertTrue(result.get('success'))
+        self.assertTrue(result.get('success'), result)
         mock_revoke_sessions.assert_called_once()
-        mock_jwt_mgr.return_value.revoke_all_refresh_tokens.assert_called_once_with(1)
+        mock_bump.assert_called_once()
+        conn.commit.assert_called_once()
+        # Refresh tokens cleared post-commit (version already bumped in txn)
+        self.assertTrue(
+            any(
+                "refresh_tokens" in str(c)
+                for c in mock_db.execute_query.call_args_list
+            )
+        )
 
 
 if __name__ == '__main__':

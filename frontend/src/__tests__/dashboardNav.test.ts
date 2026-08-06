@@ -36,6 +36,23 @@ describe('dashboardNav', () => {
     expect(done.find((i) => i.href === '/onboarding')).toBeUndefined()
   })
 
+  it('getDashboardSidebarNav includes Admin only when showAdmin is true', () => {
+    const without = getDashboardSidebarNav({ onboarding_completed: true })
+    expect(without.find((i) => i.href === '/admin')).toBeUndefined()
+    const withAdmin = getDashboardSidebarNav({ onboarding_completed: true }, { showAdmin: true })
+    expect(withAdmin.find((i) => i.href === '/admin')?.name).toBe('Admin')
+    // Tenant nav items remain
+    expect(withAdmin.map((i) => i.href)).toEqual(
+      expect.arrayContaining(['/dashboard', '/crm', '/billing', '/admin'])
+    )
+  })
+
+  it('isDashboardNavItemActive treats /admin nested paths as active', () => {
+    expect(isDashboardNavItemActive('/admin', '/admin')).toBe(true)
+    expect(isDashboardNavItemActive('/admin/tenants', '/admin')).toBe(true)
+    expect(isDashboardNavItemActive('/dashboard', '/admin')).toBe(false)
+  })
+
   it('getMobileBottomNavItems uses default tab bar when user is null (auth loading)', () => {
     const nullUser = getMobileBottomNavItems(null)
     const undefinedUser = getMobileBottomNavItems(undefined)

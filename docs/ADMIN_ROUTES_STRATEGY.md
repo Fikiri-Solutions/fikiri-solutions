@@ -1,76 +1,95 @@
-# Admin Routes Strategy — Lean, In-App, RBAC-First
+# Admin Routes Strategy — Lean, In-App, Security-Gated
 
-Use this doc when building admin functionality. **Do not build a separate admin portal** at the current stage.
+Use this doc when building admin functionality. **Do not build a separate admin portal**
+at the current stage.
+
+**Binding security standard:** [ADMIN_PORTAL_SECURITY.md](./ADMIN_PORTAL_SECURITY.md)
+
+The admin portal is a **high-risk privileged system**. Security is Phase **1.5** and
+**gates** all destructive / override capabilities. Do not treat `/admin` as “just another dashboard.”
 
 ---
 
 ## Principles
 
 - **One app.** Admin lives inside the existing app as an `/admin` section.
-- **RBAC with strict server-side checks.** Hide admin UI for non-admins, but **never rely on frontend hiding alone** — enforce every admin action on the backend.
-- **Audit logs** for all admin actions.
-- **Permission model** = capabilities (e.g. `budget.approve`, `users.manage_roles`, `billing.manage`), not just role strings.
+- **Capability-based auth (deny-by-default).** Server-side checks on every admin endpoint.
+  Frontend hiding is never authorization.
+- **Platform operator ≠ tenant org admin.** `ADMIN_USER_IDS` / platform capabilities are
+  distinct from customer `role=admin`.
+- **Audit logs** for successful **and** denied admin actions (no secrets).
+- **Step-up + MFA** for impersonation, billing, suspend, OAuth disconnect, role changes,
+  exports, and destructive actions — see security standard §4.
 
 ---
 
-## Recommended Minimal Roles
+## Roles (two layers)
 
-| Role       | Scope |
-|-----------|--------|
-| **owner** | Billing, team/roles, plan overrides, AI budget approvals, destructive actions, ownership transfer |
-| **admin** | Operational controls (rate limits, budgets, support tools). No ownership transfer. |
-| **member** | Normal product use only |
-| **support** (optional) | Read-only diagnostics + limited tenant-assist actions |
+### Platform operators (Fikiri staff)
 
----
+| Capability | Scope |
+|------------|--------|
+| `platform.tenants.read` | Directory + infra summary |
+| `platform.tenants.impersonate` | View-as-user (step-up required) |
+| `platform.audit.read` | Audit log |
+| `platform.ops.read` | Read-only ops diagnostics |
+| `platform.ops.retry_sync` | Retry **failed** Gmail sync for one tenant/job (step-up; not `ADMIN_DESTRUCTIVE_ENABLED`) |
+| `platform.ops.write` | **Blocked until** explicit destructive enablement after gate review |
+| `platform.emergency` | Lockdown / kill-switch related actions |
 
-## What to Build (Lean + Safe)
+### Tenant org roles (customers)
 
-### 1. Permission model
-
-- Define **permissions as capabilities**, e.g.:
-  - `budget.approve`, `budget.revoke`
-  - `users.manage_roles`, `users.invite`, `users.remove`
-  - `billing.manage`, `billing.plan_override`
-  - `admin.rate_limits`, `admin.tenant_diagnostics`
-- Map roles → sets of permissions.
-- Backend checks: **always** use something like `require_permission("budget.approve")` (decorator or middleware). Never trust frontend-only checks.
-
-### 2. Backend enforcement first
-
-- Add decorators/middleware: e.g. `@require_permission("budget.approve")`.
-- Every admin endpoint must verify the caller's role/permissions on the server.
-
-### 3. Admin surface inside existing app
-
-- **`/admin`** section rendered only for allowed roles (frontend route guard).
-- Start with **3 pages**:
-  1. **AI Budget Approvals** — approve/revoke monthly soft-stop overrides.
-  2. **Tenant Usage / Health** — usage and health per tenant.
-  3. **Role Management** — assign/revoke roles (owner/admin/member/support).
-
-### 4. Audit trail
-
-- Log for every admin action:
-  - **Actor** (user id, role)
-  - **Action** (e.g. `budget.approve`, `role.assign`)
-  - **Target** (tenant id, user id)
-  - **Before/after** (e.g. previous vs new role, or previous vs new override)
-  - **Timestamp**, **IP** (and optionally user agent)
-- Store in DB or logging pipeline; queryable for compliance and support.
-
-### 5. Safety controls
-
-- **Step-up / re-auth** for sensitive actions: role changes, approvals, billing, destructive actions.
-- Consider: require password or MFA again before executing.
+| Role | Scope |
+|------|--------|
+| **owner** | Billing, team/roles, plan overrides within **their** tenant |
+| **admin** | Operational controls within tenant. No ownership transfer. |
+| **member** | Normal product use |
+| **support** (optional) | Read-only diagnostics + limited assist |
 
 ---
 
-## Immediate Need: AI Budget Approvals
+## Roadmap (security-first)
 
-- **One admin endpoint:** approve/revoke monthly soft-stop override (per tenant or globally, as needed).
-- **One simple UI:** `/admin/budgets` — list pending approvals, approve/revoke.
-- Gives operational control without new infrastructure.
+| Phase | Deliverable | Gate |
+|-------|-------------|------|
+| **1** | `/admin` shell, tenant directory, infra summary, audit read, impersonation scaffolding | Done (foundation) |
+| **1.5** | MFA/step-up, session controls, CSRF stance, rate limits, lockdown, denied audit, priv-esc tests | **Required before Phase 2** |
+| **2** | Ops: job cancel/retry, suspend, OAuth disconnect | Phase 1.5 complete |
+| **3** | Billing overrides / AI budget approvals UI | Phase 1.5 + billing step-up |
+| **4** | Deep infra views | Rate limits + read capabilities |
+| **5** | Continuous assurance (SAST, deps, secret scan, alerts) | CI green |
+
+**Hard rule:** No `platform.ops.write`, billing override, account suspension, OAuth force-disconnect,
+role mutation, or bulk export until [ADMIN_PORTAL_SECURITY.md](./ADMIN_PORTAL_SECURITY.md) §8 is green
+**and** the failed-sync retry pattern has been exercised in staging under multi-worker + Redis + MFA.
+
+### Sync retry reference pattern (`platform.ops.retry_sync`)
+
+- Step-up is **required but not consumed** — multiple retries allowed within TTL; each audited.
+- Idempotency keys are bound to operator + tenant + job + action + payload hash (`IDEMPOTENCY_CONFLICT` on reuse with different dimensions).
+- Claim uses conditional `UPDATE ... WHERE status IN ('failed','retrying')` with exactly-one-row verification.
+- Server-side eligibility (OAuth present, tenant active, Gmail job, not permanently failed, not superseded by a newer completed sync).
+- Replacement job uses a stable id for queue dedup; enqueue ambiguity after DB insert does **not** roll the original claim back to `failed`.
+
+---
+
+## What Phase 1 already provides
+
+- Capability decorator: `require_platform_capability`
+- APIs under `/api/admin/platform/*`
+- Impersonation JWT with immutable `actor_user_id`
+- Basic audit table + UI
+- Frontend `/admin` + impersonation banner
+
+---
+
+## Phase 1.5 focus (current)
+
+See security standard §6–§8. Implementation modules:
+
+- `core/admin_security.py` — step-up, lockdown, sensitive-action registry
+- Hardened `core/admin_audit.py` — outcome, capability, correlation_id
+- `tests/test_admin_platform_security.py` — acceptance tests
 
 ---
 
@@ -83,16 +102,32 @@ Only consider a **separate** admin app when you need:
 - Separate deployment or security boundaries
 - Large internal ops workflows that don't fit the main app
 
-Until then, a separate portal is extra overhead with little ROI.
+Until then, a separate portal is extra overhead with little ROI — **provided** Phase 1.5
+controls are enforced in-app.
 
 ---
 
-## Implementation Checklist (When You Start)
+## Implementation Checklist
 
-- [ ] Define capability strings and role → permissions mapping (config or DB).
-- [ ] Add backend `require_permission(capability)` (or equivalent) and use on all admin routes.
-- [ ] Add `/admin` route(s) in the existing app; guard with role/permission check (and still enforce on API).
-- [ ] Implement audit logging (actor, action, target, before/after, timestamp, IP).
-- [ ] Build first admin endpoint: approve/revoke budget soft-stop override.
-- [ ] Build first admin page: `/admin/budgets` for pending approvals.
-- [ ] Add step-up auth for sensitive admin actions (role changes, approvals, billing).
+### Foundation (Phase 1)
+
+- [x] Platform capability strings + `require_platform_capability`
+- [x] `/admin` routes with frontend guard + API enforcement
+- [x] Audit logging (actor, action, target, timestamp, IP)
+- [x] Impersonation scaffolding + banner
+
+### Security gate (Phase 1.5) — blocking
+
+- [ ] Step-up + MFA for §4 sensitive actions
+- [ ] Nested impersonation blocked; kill switch; short TTL; no refresh
+- [ ] Admin lockdown + impersonation shutdown
+- [ ] Rate limits (impersonate, search, step-up)
+- [ ] Denied-action audit + correlation id
+- [ ] Privilege-escalation / tenant-boundary acceptance tests green
+- [ ] `ADMIN_DESTRUCTIVE_ENABLED` remains off
+
+### After gate (Phase 2+)
+
+- [ ] Ops write endpoints (jobs, suspend, OAuth disconnect)
+- [ ] Billing approvals UI (`/admin/budgets`)
+- [ ] Continuous monitoring alerts
