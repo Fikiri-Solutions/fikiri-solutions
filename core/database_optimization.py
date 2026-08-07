@@ -2615,6 +2615,11 @@ class DatabaseOptimizer:
         )
         return any(marker in msg for marker in retry_markers)
 
+    def _is_retryable_sqlite_lock_error(self, error: Exception) -> bool:
+        """Detect SQLite busy/locked errors worth a short retry (pytest-xdist contention)."""
+        msg = str(error).lower()
+        return "locked" in msg or "busy" in msg
+
     def execute_query(self, query: str, params: Tuple = None, fetch: bool = True, 
                      user_id: int = None, endpoint: str = None, _retry_depth: int = 0) -> Any:
         """Execute a query with performance monitoring and JSON validation"""
@@ -2717,6 +2722,20 @@ class DatabaseOptimizer:
                     user_id=user_id,
                     endpoint=endpoint,
                     _retry_depth=1,
+                )
+            if (
+                self.db_type != "postgresql"
+                and _retry_depth < 3
+                and self._is_retryable_sqlite_lock_error(e)
+            ):
+                time.sleep(0.05 * (2 ** _retry_depth))
+                return self.execute_query(
+                    query,
+                    params=params,
+                    fetch=fetch,
+                    user_id=user_id,
+                    endpoint=endpoint,
+                    _retry_depth=_retry_depth + 1,
                 )
             logger.error(f"Query execution error: {e}")
             raise

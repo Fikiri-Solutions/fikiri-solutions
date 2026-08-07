@@ -102,3 +102,67 @@ class TestDatabaseOptimizationHelpers:
         cols = db_optimizer.list_table_columns("users")
         assert isinstance(cols, list)
         assert "email" in cols
+
+    def test_is_retryable_sqlite_lock_error(self):
+        assert db_optimizer._is_retryable_sqlite_lock_error(
+            sqlite3.OperationalError("database is locked")
+        )
+        assert db_optimizer._is_retryable_sqlite_lock_error(
+            sqlite3.OperationalError("database is busy")
+        )
+        assert not db_optimizer._is_retryable_sqlite_lock_error(
+            sqlite3.OperationalError("no such table: foo")
+        )
+
+    def test_execute_query_retries_sqlite_lock(self, monkeypatch):
+        calls = {"n": 0}
+
+        class _Conn:
+            def cursor(self):
+                return self
+
+            def execute(self, *a, **k):
+                calls["n"] += 1
+                if calls["n"] < 3:
+                    raise sqlite3.OperationalError("database is locked")
+                return None
+
+            @property
+            def rowcount(self):
+                return 1
+
+            def fetchall(self):
+                return []
+
+            def commit(self):
+                return None
+
+            def close(self):
+                return None
+
+        class _Ctx:
+            def __enter__(self):
+                return _Conn()
+
+            def __exit__(self, *a):
+                return False
+
+        monkeypatch.setattr(db_optimizer, "db_type", "sqlite")
+        monkeypatch.setattr(db_optimizer, "get_connection", lambda *a, **k: _Ctx())
+        monkeypatch.setattr(db_optimizer, "_ready", False)
+        result = db_optimizer.execute_query("DELETE FROM admin_audit_log", fetch=False)
+        assert calls["n"] == 3
+        assert result == 1
+
+
+def test_clear_admin_audit_for_tests_soft_fails_on_persistent_lock(monkeypatch):
+    from core import admin_audit
+
+    monkeypatch.setattr(admin_audit, "ensure_admin_audit_table", lambda: None)
+
+    def _always_locked(*a, **k):
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(admin_audit.db_optimizer, "execute_query", _always_locked)
+    admin_audit.clear_admin_audit_for_tests()  # must not raise
+    assert admin_audit._TABLE_READY is False

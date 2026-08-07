@@ -73,7 +73,7 @@ def ensure_operator_user_rows(user_ids: Iterable[int] = (1,)) -> None:
 
 def prepare_admin_test_db(
     monkeypatch,
-    user_ids: Iterable[int] = (1, 9),
+    user_ids: Iterable[int] = (1, 9, 42, 55, 77, 99),
     *,
     usable: bool = True,
 ) -> None:

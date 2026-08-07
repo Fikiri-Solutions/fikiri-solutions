@@ -308,8 +308,30 @@ def list_admin_audit(
 
 
 def clear_admin_audit_for_tests() -> None:
+    """Clear audit rows for test isolation.
+
+    Soft-retries SQLite lock contention under pytest-xdist and never raises —
+    fixture teardown must not turn a passed test into an ERROR.
+    """
+    import time
+
     ensure_admin_audit_table()
-    db_optimizer.execute_query("DELETE FROM admin_audit_log", fetch=False)
+    last_err: Optional[Exception] = None
+    for attempt in range(5):
+        try:
+            db_optimizer.execute_query("DELETE FROM admin_audit_log", fetch=False)
+            last_err = None
+            break
+        except Exception as exc:
+            last_err = exc
+            msg = str(exc).lower()
+            if "locked" in msg or "busy" in msg:
+                time.sleep(0.05 * (attempt + 1))
+                continue
+            logger.warning("clear_admin_audit_for_tests failed: %s", exc)
+            break
+    if last_err is not None:
+        logger.warning("clear_admin_audit_for_tests gave up after retries: %s", last_err)
     # Allow ensure to re-run column checks in subsequent tests if needed.
     global _TABLE_READY
     _TABLE_READY = False
