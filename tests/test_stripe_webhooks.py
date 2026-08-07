@@ -209,6 +209,52 @@ class TestStripeWebhookHandler(unittest.TestCase):
         mock_complete.assert_called_once_with("evt_test_1", "completed", {"status": "success"})
 
     @patch("core.stripe_webhooks.stripe")
+    def test_process_verified_event_stripe_v15_object_without_dict_get(self, mock_stripe):
+        """Stripe SDK v15+ StripeObject is not a dict; .get raises AttributeError('get')."""
+        from core.stripe_webhooks import StripeWebhookHandler, _stripe_get
+
+        class StripeV15LikeEvent:
+            """Mimics Stripe SDK v15 StripeObject: bracket access only, no dict.get."""
+
+            def __init__(self, data):
+                self._data = data
+
+            def __getitem__(self, key):
+                return self._data[key]
+
+            def __contains__(self, key):
+                return key in self._data
+
+            def __getattr__(self, key):
+                # StripeObject raises AttributeError(*KeyError(key).args) → message "get"
+                if key in self._data:
+                    return self._data[key]
+                raise AttributeError(key)
+
+        event = StripeV15LikeEvent(
+            {
+                "id": "evt_v15",
+                "type": "invoice.payment_succeeded",
+                "data": {"object": {}},
+            }
+        )
+        with self.assertRaises(AttributeError) as raised:
+            event.get("id")
+        self.assertEqual(str(raised.exception), "get")
+        self.assertEqual(_stripe_get(event, "id"), "evt_v15")
+
+        handler = StripeWebhookHandler()
+        with patch.object(handler, "_claim_stripe_webhook_event", return_value="claimed") as mock_claim, \
+            patch.object(handler, "handle_event", return_value={"status": "success"}) as mock_handle, \
+            patch.object(handler, "_complete_stripe_webhook_event") as mock_complete:
+            result = handler.process_verified_event(event)
+
+        self.assertEqual(result.get("status"), "success")
+        mock_claim.assert_called_once_with("evt_v15", "invoice.payment_succeeded")
+        mock_handle.assert_called_once_with(event)
+        mock_complete.assert_called_once()
+
+    @patch("core.stripe_webhooks.stripe")
     def test_process_verified_event_duplicate_skips_side_effects(self, mock_stripe):
         from core.stripe_webhooks import StripeWebhookHandler
 

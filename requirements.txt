@@ -18,7 +18,7 @@ requests>=2.31.0
 twilio>=9.0.0
 
 # Billing
-stripe>=11.0.0
+stripe>=11.0.0,<16
 
 # JWT for Apple iCloud Integration
 PyJWT>=2.9.0

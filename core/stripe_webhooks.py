@@ -6,7 +6,7 @@ Handles Stripe webhook events for subscription management
 import os
 import json
 import logging
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 from datetime import datetime
 
 # Optional Stripe integration
@@ -21,6 +21,23 @@ from core.email_branding import wrap_html_email_body
 
 logger = logging.getLogger(__name__)
 
+
+def _stripe_get(obj: Any, key: str, default: Any = None) -> Any:
+    """Read a field from a StripeObject or mapping.
+
+    Stripe Python SDK v15+ no longer subclasses dict, so ``obj.get(key)`` raises
+    ``AttributeError('get')`` and breaks webhook handling.
+    """
+    if obj is None:
+        return default
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    try:
+        return obj[key]
+    except (KeyError, TypeError, StopIteration):
+        return default
+
+
 class StripeWebhookHandler:
     """Handles Stripe webhook events"""
     
@@ -34,7 +51,9 @@ class StripeWebhookHandler:
             return ''
         try:
             customer = stripe.Customer.retrieve(customer_id)
-            return (customer.email or '') if hasattr(customer, 'email') else (customer.get('email') or '')
+            if hasattr(customer, 'email') and customer.email:
+                return customer.email or ''
+            return _stripe_get(customer, 'email') or ''
         except Exception as e:
             logger.warning(f"Could not get customer email for {customer_id}: {e}")
             return ''
@@ -142,11 +161,11 @@ class StripeWebhookHandler:
         if not event:
             return {'status': 'error', 'message': 'No event data'}
 
-        event_id = event.get('id')
+        event_id = _stripe_get(event, 'id')
         if not event_id:
             return {'status': 'error', 'message': 'Missing event id'}
 
-        event_type = event.get('type') or ''
+        event_type = _stripe_get(event, 'type') or ''
         claim = self._claim_stripe_webhook_event(event_id, event_type)
         if claim == 'duplicate':
             logger.info("Stripe webhook duplicate ignored: %s", event_id)
@@ -580,7 +599,7 @@ class StripeWebhookHandler:
         """Handle checkout session expiration"""
         try:
             session_id = session['id']
-            customer_id = session.get('customer')
+            customer_id = _stripe_get(session, 'customer')
             
             logger.info(f"Checkout expired: Session {session_id}")
             
@@ -602,8 +621,8 @@ class StripeWebhookHandler:
         """Handle asynchronous checkout payment success (common with ACH)."""
         try:
             session_id = session['id']
-            customer_id = session.get('customer')
-            subscription_id = session.get('subscription')
+            customer_id = _stripe_get(session, 'customer')
+            subscription_id = _stripe_get(session, 'subscription')
             logger.info(f"Checkout async payment succeeded: Session {session_id} - Customer {customer_id}")
             if subscription_id and customer_id:
                 self._update_user_subscription(subscription_id, customer_id, 'active')
@@ -623,8 +642,8 @@ class StripeWebhookHandler:
         """Handle asynchronous checkout payment failure (common with ACH)."""
         try:
             session_id = session['id']
-            customer_id = session.get('customer')
-            subscription_id = session.get('subscription')
+            customer_id = _stripe_get(session, 'customer')
+            subscription_id = _stripe_get(session, 'subscription')
             logger.warning(f"Checkout async payment failed: Session {session_id} - Customer {customer_id}")
             if subscription_id and customer_id:
                 self._update_user_subscription(subscription_id, customer_id, 'past_due')
@@ -644,8 +663,8 @@ class StripeWebhookHandler:
         """Handle successful setup intent (card or bank account added)."""
         try:
             setup_intent_id = setup_intent['id']
-            customer_id = setup_intent.get('customer')
-            payment_method = setup_intent.get('payment_method')
+            customer_id = _stripe_get(setup_intent, 'customer')
+            payment_method = _stripe_get(setup_intent, 'payment_method')
             logger.info(f"Setup intent succeeded: {setup_intent_id} for customer {customer_id}")
             return {
                 'status': 'success',
@@ -662,9 +681,9 @@ class StripeWebhookHandler:
         """Handle failed setup intent (card or bank account setup failed)."""
         try:
             setup_intent_id = setup_intent['id']
-            customer_id = setup_intent.get('customer')
-            last_setup_error = setup_intent.get('last_setup_error', {})
-            error_message = last_setup_error.get('message', 'Setup failed')
+            customer_id = _stripe_get(setup_intent, 'customer')
+            last_setup_error = _stripe_get(setup_intent, 'last_setup_error') or {}
+            error_message = _stripe_get(last_setup_error, 'message', 'Setup failed')
             logger.warning(f"Setup intent failed: {setup_intent_id} for customer {customer_id} - {error_message}")
             return {
                 'status': 'success',
@@ -681,12 +700,12 @@ class StripeWebhookHandler:
         """Handle successful payment intent (card verification)"""
         try:
             payment_intent_id = payment_intent['id']
-            customer_id = payment_intent.get('customer')
+            customer_id = _stripe_get(payment_intent, 'customer')
             amount = payment_intent['amount']
-            metadata = payment_intent.get('metadata', {})
+            metadata = _stripe_get(payment_intent, 'metadata') or {}
             
             # Check if this is a verification charge ($1 or less)
-            is_verification = metadata.get('verification', 'false') == 'true' or amount <= 100
+            is_verification = _stripe_get(metadata, 'verification', 'false') == 'true' or amount <= 100
             
             if is_verification:
                 logger.info(f"Card verification succeeded: Payment Intent {payment_intent_id} - Amount: ${amount/100}")
@@ -721,9 +740,9 @@ class StripeWebhookHandler:
         """Handle failed payment intent (card verification failed)"""
         try:
             payment_intent_id = payment_intent['id']
-            customer_id = payment_intent.get('customer')
-            last_payment_error = payment_intent.get('last_payment_error', {})
-            error_message = last_payment_error.get('message', 'Payment failed')
+            customer_id = _stripe_get(payment_intent, 'customer')
+            last_payment_error = _stripe_get(payment_intent, 'last_payment_error') or {}
+            error_message = _stripe_get(last_payment_error, 'message', 'Payment failed')
             
             logger.warning(f"Card verification failed: Payment Intent {payment_intent_id} - {error_message}")
             
@@ -746,11 +765,11 @@ class StripeWebhookHandler:
         """Handle successful charge (including verification charges)"""
         try:
             charge_id = charge['id']
-            customer_id = charge.get('customer')
+            customer_id = _stripe_get(charge, 'customer')
             amount = charge['amount']
-            metadata = charge.get('metadata', {})
+            metadata = _stripe_get(charge, 'metadata') or {}
             
-            is_verification = metadata.get('verification', 'false') == 'true' or amount <= 100
+            is_verification = _stripe_get(metadata, 'verification', 'false') == 'true' or amount <= 100
             
             if is_verification:
                 logger.info(f"Verification charge succeeded: Charge {charge_id} - Amount: ${amount/100}")
@@ -772,11 +791,11 @@ class StripeWebhookHandler:
         """Handle refunded charge (verification refund)"""
         try:
             charge_id = charge['id']
-            customer_id = charge.get('customer')
-            amount_refunded = charge.get('amount_refunded', 0)
-            metadata = charge.get('metadata', {})
+            customer_id = _stripe_get(charge, 'customer')
+            amount_refunded = _stripe_get(charge, 'amount_refunded', 0)
+            metadata = _stripe_get(charge, 'metadata') or {}
             
-            if metadata.get('reason') == 'card_verification':
+            if _stripe_get(metadata, 'reason') == 'card_verification':
                 logger.info(f"Verification charge refunded: Charge {charge_id} - Amount: ${amount_refunded/100}")
             
             return {
@@ -833,8 +852,7 @@ class StripeWebhookHandler:
                 product_id = subscription.items.data[0].price.product
                 try:
                     product = stripe.Product.retrieve(product_id)
-                    tier = product.metadata.get('tier', 'starter')
-                    
+                    tier = _stripe_get(product.metadata, 'tier', 'starter')                    
                     # Get billing period from price
                     price = subscription.items.data[0].price
                     if price.recurring:

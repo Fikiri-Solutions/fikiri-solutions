@@ -1130,7 +1130,7 @@ def handle_stripe_webhook():
         return jsonify(result)
         
     except Exception as e:
-        logger.error(f"Failed to handle webhook: {e}")
+        logger.error(f"Failed to handle webhook: {type(e).__name__}: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
