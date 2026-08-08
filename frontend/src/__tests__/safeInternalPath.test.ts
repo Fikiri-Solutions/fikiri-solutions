@@ -11,8 +11,10 @@ describe('safeInternalPath', () => {
   it('rejects open redirects and auth loops', () => {
     expect(safeInternalPath('https://evil.example')).toBeNull()
     expect(safeInternalPath('//evil.example')).toBeNull()
+    expect(safeInternalPath('/\\evil.example')).toBeNull()
     expect(safeInternalPath('/login')).toBeNull()
     expect(safeInternalPath('/signup')).toBeNull()
+    expect(safeInternalPath('/login?next=/dashboard')).toBeNull()
     expect(safeInternalPath(null)).toBeNull()
     expect(safeInternalPath('')).toBeNull()
   })
