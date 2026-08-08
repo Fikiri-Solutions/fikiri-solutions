@@ -1,49 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom'
-import { Suspense, useMemo, lazy } from 'react'
+import { Suspense, useMemo, lazy, type ComponentType } from 'react'
 import { HelmetProvider } from 'react-helmet-async'
-import { Dashboard } from './pages/Dashboard'
-import { Login } from './pages/Login'
-import { Signup } from './pages/Signup'
-import { ForgotPassword } from './pages/ForgotPassword'
-import { ResetPassword } from './pages/ResetPassword'
-import { VerifyEmail } from './pages/VerifyEmail'
-import { TermsOfService } from './pages/TermsOfService'
-import { PrivacyPolicy } from './pages/PrivacyPolicy'
-import SmsOptIn from './pages/SmsOptIn'
-import { Onboarding } from './pages/Onboarding'
-import { Services } from './pages/Services'
-import { CRM } from './pages/CRM'
-import { AIAssistant } from './pages/AIAssistant'
-import { Automations } from './pages/Automations'
-import { AutomationSetupCaptureLeadsEmail } from './pages/AutomationSetupCaptureLeadsEmail'
-import { CorrelationDebugPage } from './pages/CorrelationDebugPage'
-import { ChatbotBuilder } from './pages/ChatbotBuilder'
-import { DemoGatedFeature } from './components/DemoGatedFeature'
-import { ContentMigration } from './pages/ContentMigration'
-import { GmailConnect } from './pages/GmailConnect'
-import { OutlookConnect } from './pages/OutlookConnect'
-import { Integrations } from './pages/Integrations'
-import { InboxPage } from './pages/InboxPage'
-import { GmailStatusCheck } from './pages/GmailStatusCheck'
-import { NotFoundPage, ErrorPage } from './pages/ErrorPages'
-import { ServicesLanding } from './pages/ServicesLanding'
-import { AIAssistantLanding } from './pages/AIAssistantLanding'
-import { LandscapingLanding } from './pages/LandscapingLanding'
-import { RestaurantLanding } from './pages/RestaurantLanding'
-import { MedicalLanding } from './pages/MedicalLanding'
-import { Layout } from './components/Layout'
-import { UsageAnalytics } from './pages/UsageAnalytics'
-import { About } from './pages/About'
-import { Contact } from './pages/Contact'
-import { Intake } from './pages/Intake'
-import { InternalContact } from './pages/InternalContact'
-import { PrivacySettings } from './components/PrivacySettings'
-import LandingPage from './pages/LandingPage'
-import InstallPage from './pages/Install'
-import RadiantLandingPage from './pages/RadiantLandingPage'
-import PricingPage from './pages/PricingPage'
-import FaqPage from './pages/FaqPage'
-import { BillingPage } from './pages/BillingPage'
 import { QueryProvider } from './providers/QueryProvider'
 import { ToastProvider } from './components/Toast'
 import { ThemeProvider } from './contexts/ThemeContext'
@@ -52,19 +9,93 @@ import { ActivityProvider } from './contexts/ActivityContext'
 import { AuthProvider } from './contexts/AuthContext'
 import { ScrollToTop } from './components/ScrollToTop'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { PageLoader } from './components/PageLoader'
+import { RouteLoadingFallback } from './components/RouteLoadingFallback'
 import { ProtectedRoute, AuthRoute, OnboardingRoute } from './components/RouteGuard'
 import { AdminRoute } from './components/AdminRoute'
-import { AdminLayout } from './pages/admin/AdminLayout'
-import { AdminDashboard } from './pages/admin/AdminDashboard'
-import { TenantDirectory } from './pages/admin/TenantDirectory'
-import { TenantDetail } from './pages/admin/TenantDetail'
-import { AdminAuditLog } from './pages/admin/AdminAuditLog'
-import { AdminMfaSecurity } from './pages/admin/AdminMfaSecurity'
 import { LandingThemeGuard } from './components/LandingThemeGuard'
+import { ForgotPassword } from './pages/ForgotPassword'
+import { ResetPassword } from './pages/ResetPassword'
 import { getFeatureConfig } from './config'
 import { useWarmRoutes } from './hooks/useWarmRoutes'
 import { AccessibilityProvider } from './components/AccessibilityProvider'
+
+// ---------------------------------------------------------------------------
+// Route-level code splitting: keep the shell (providers/guards) eager;
+// load page modules only when their routes are visited.
+// Named exports are remapped to default for React.lazy.
+// ---------------------------------------------------------------------------
+
+const named = <T extends Record<string, unknown>, K extends keyof T>(
+  loader: () => Promise<T>,
+  exportName: K,
+) =>
+  lazy(async () => {
+    const module = await loader()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- lazy remaps named page exports; props vary by route
+    return { default: module[exportName] as ComponentType<any> }
+  })
+
+// Public marketing
+const RadiantLandingPage = lazy(() => import('./pages/RadiantLandingPage'))
+const LandingPage = lazy(() => import('./pages/LandingPage'))
+const PricingPage = lazy(() => import('./pages/PricingPage'))
+const FaqPage = lazy(() => import('./pages/FaqPage'))
+const InstallPage = lazy(() => import('./pages/Install'))
+const SmsOptIn = lazy(() => import('./pages/SmsOptIn'))
+const About = named(() => import('./pages/About'), 'About')
+const Contact = named(() => import('./pages/Contact'), 'Contact')
+const Intake = named(() => import('./pages/Intake'), 'Intake')
+const ServicesLanding = named(() => import('./pages/ServicesLanding'), 'ServicesLanding')
+const AIAssistantLanding = named(() => import('./pages/AIAssistantLanding'), 'AIAssistantLanding')
+const LandscapingLanding = named(() => import('./pages/LandscapingLanding'), 'LandscapingLanding')
+const RestaurantLanding = named(() => import('./pages/RestaurantLanding'), 'RestaurantLanding')
+const MedicalLanding = named(() => import('./pages/MedicalLanding'), 'MedicalLanding')
+const TermsOfService = named(() => import('./pages/TermsOfService'), 'TermsOfService')
+const PrivacyPolicy = named(() => import('./pages/PrivacyPolicy'), 'PrivacyPolicy')
+const NotFoundPage = named(() => import('./pages/ErrorPages'), 'NotFoundPage')
+const ErrorPage = named(() => import('./pages/ErrorPages'), 'ErrorPage')
+
+// Auth
+const Login = named(() => import('./pages/Login'), 'Login')
+const Signup = named(() => import('./pages/Signup'), 'Signup')
+// ForgotPassword / ResetPassword stay eager: pre-commit secret scanner false-positives on those names in lazy import lines.
+const VerifyEmail = named(() => import('./pages/VerifyEmail'), 'VerifyEmail')
+
+// Onboarding + app shell
+const Onboarding = named(() => import('./pages/Onboarding'), 'Onboarding')
+const Layout = named(() => import('./components/Layout'), 'Layout')
+const DemoGatedFeature = named(() => import('./components/DemoGatedFeature'), 'DemoGatedFeature')
+
+// Dashboard / app routes (chart-heavy Dashboard stays behind this boundary)
+const Dashboard = named(() => import('./pages/Dashboard'), 'Dashboard')
+const Services = named(() => import('./pages/Services'), 'Services')
+const CRM = named(() => import('./pages/CRM'), 'CRM')
+const AIAssistant = named(() => import('./pages/AIAssistant'), 'AIAssistant')
+const Automations = named(() => import('./pages/Automations'), 'Automations')
+const AutomationSetupCaptureLeadsEmail = named(
+  () => import('./pages/AutomationSetupCaptureLeadsEmail'),
+  'AutomationSetupCaptureLeadsEmail',
+)
+const CorrelationDebugPage = named(() => import('./pages/CorrelationDebugPage'), 'CorrelationDebugPage')
+const ChatbotBuilder = named(() => import('./pages/ChatbotBuilder'), 'ChatbotBuilder')
+const ContentMigration = named(() => import('./pages/ContentMigration'), 'ContentMigration')
+const GmailConnect = named(() => import('./pages/GmailConnect'), 'GmailConnect')
+const OutlookConnect = named(() => import('./pages/OutlookConnect'), 'OutlookConnect')
+const InboxPage = named(() => import('./pages/InboxPage'), 'InboxPage')
+const GmailStatusCheck = named(() => import('./pages/GmailStatusCheck'), 'GmailStatusCheck')
+const UsageAnalytics = named(() => import('./pages/UsageAnalytics'), 'UsageAnalytics')
+const BillingPage = named(() => import('./pages/BillingPage'), 'BillingPage')
+const InternalContact = named(() => import('./pages/InternalContact'), 'InternalContact')
+const PrivacySettings = named(() => import('./components/PrivacySettings'), 'PrivacySettings')
+
+// Admin
+const AdminLayout = named(() => import('./pages/admin/AdminLayout'), 'AdminLayout')
+const AdminDashboard = named(() => import('./pages/admin/AdminDashboard'), 'AdminDashboard')
+const TenantDirectory = named(() => import('./pages/admin/TenantDirectory'), 'TenantDirectory')
+const TenantDetail = named(() => import('./pages/admin/TenantDetail'), 'TenantDetail')
+const AdminAuditLog = named(() => import('./pages/admin/AdminAuditLog'), 'AdminAuditLog')
+const AdminMfaSecurity = named(() => import('./pages/admin/AdminMfaSecurity'), 'AdminMfaSecurity')
+const AdminSiteChat = named(() => import('./pages/admin/AdminSiteChat'), 'AdminSiteChat')
 
 const Analytics = lazy(async () => {
   const module = await import('@vercel/analytics/react')
@@ -101,7 +132,7 @@ function LegacyIntegrationsIndexRedirect() {
 
 function App() {
   const features = getFeatureConfig()
-  useWarmRoutes() // Warm up routes after first paint
+  useWarmRoutes() // Warm dashboard chunk after first paint (authenticated only)
   const showObservability = useMemo(() => {
     if (import.meta.env.PROD) {
       return true
@@ -128,7 +159,7 @@ function App() {
                     <ToastProvider>
                       <ScrollToTop />
                       <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
-                        <Suspense fallback={<PageLoader />}>
+                        <Suspense fallback={<RouteLoadingFallback />}>
                           <Routes>
                           {/* Public routes - no authentication required */}
                           <Route path="/" element={<RadiantLandingPage />} />
@@ -335,6 +366,7 @@ function App() {
                             <Route path="tenants/:tenantId" element={<TenantDetail />} />
                             <Route path="audit" element={<AdminAuditLog />} />
                             <Route path="security" element={<AdminMfaSecurity />} />
+                            <Route path="site-chat" element={<AdminSiteChat />} />
                           </Route>
                           
                           {/* 404 route */}
