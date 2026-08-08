@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react'
 import { FikiriLogo } from '../components/FikiriLogo'
 import { RadiantLayout } from '../components/radiant'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { apiClient } from '../services/apiClient'
 import { AUTOCOMPLETE } from '../constants/autocomplete'
@@ -18,6 +18,7 @@ export const ResetPassword: React.FC = () => {
   const [searchParams] = useSearchParams()
   const location = useLocation()
   const navigate = useNavigate()
+  const reduceMotion = useReducedMotion()
 
   const hashParams = new URLSearchParams(location.hash.replace(/^#/, ''))
   const token = searchParams.get('token') || hashParams.get('token') || hashParams.get('reset_token')
@@ -70,11 +71,12 @@ export const ResetPassword: React.FC = () => {
 
   if (success) {
     return (
-      <RadiantLayout>
+      <RadiantLayout showFooterCta={false}>
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-fikiri-900 to-fikiri-800 flex items-center justify-center p-4">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={reduceMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.45, ease: 'easeOut' }}
           className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 w-full max-w-md border border-white/20"
         >
           <div className="text-center">
@@ -102,11 +104,12 @@ export const ResetPassword: React.FC = () => {
 
   if (!token) {
     return (
-      <RadiantLayout>
+      <RadiantLayout showFooterCta={false}>
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-fikiri-900 to-fikiri-800 flex items-center justify-center p-4">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={reduceMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.45, ease: 'easeOut' }}
           className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 w-full max-w-md border border-white/20"
         >
           <div className="text-center">
@@ -133,11 +136,12 @@ export const ResetPassword: React.FC = () => {
   }
 
   return (
-    <RadiantLayout>
+    <RadiantLayout showFooterCta={false}>
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-fikiri-900 to-fikiri-800 flex items-center justify-center p-4">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={reduceMotion ? false : { opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.45, ease: 'easeOut' }}
         className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 w-full max-w-md border border-white/20"
       >
         <div className="text-center mb-8">

@@ -7,7 +7,10 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Plus Jakarta Sans Variable', 'system-ui', 'sans-serif'],
+        // Brand face site-wide (login “Fikiri Solutions” treatment) — buttons, body, headings
+        sans: ['"Source Serif 4"', 'Georgia', 'Times New Roman', 'serif'],
+        serif: ['"Source Serif 4"', 'Georgia', 'Times New Roman', 'serif'],
+        display: ['"Source Serif 4"', 'Georgia', 'Times New Roman', 'serif'],
       },
       transitionProperty: {
         'colors': 'background-color, border-color, color, fill, stroke',

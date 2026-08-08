@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useTransition } from 'react'
-import { Link } from 'react-router-dom'
 import { Mail, Lock, ArrowRight, Zap, Shield, Rocket, Github, Chrome, UserPlus, Eye, EyeOff, Building2 } from 'lucide-react'
 import { useUserActivityTracking } from '../contexts/ActivityContext'
 import { useAuth } from '../contexts/AuthContext'
-import { FikiriLogo } from '../components/FikiriLogo'
 import { RadiantLayout } from '../components/radiant'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { apiClient } from '../services/apiClient'
 import { loadGmailLookbackId } from '../utils/gmailLookbackStorage'
@@ -42,12 +40,12 @@ export const Login: React.FC = () => {
   const [emailError, setEmailError] = useState('')
   const [passwordError, setPasswordError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const [isMicrosoftLoading, setIsMicrosoftLoading] = useState(false)
   const [isPending, startTransition] = useTransition()
   const { trackLogin } = useUserActivityTracking()
   const { login: contextLogin, getRedirectPath, user } = useAuth()
   const navigate = useNavigate()
+  const reduceMotion = useReducedMotion()
   const [searchParams] = useSearchParams()
 
   // When "Remember me" is checked and we have saved credentials, keep form in sync (e.g. after navigation)
@@ -64,15 +62,6 @@ export const Login: React.FC = () => {
       console.error('Error loading saved credentials:', err)
     }
   }, [rememberMe])
-
-  // Track mouse position for interactive background
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY })
-    }
-    window.addEventListener('mousemove', handleMouseMove)
-    return () => window.removeEventListener('mousemove', handleMouseMove)
-  }, [])
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -306,176 +295,41 @@ export const Login: React.FC = () => {
   }
 
   return (
-    <RadiantLayout>
-    <div id="main-content" className="min-h-screen relative overflow-hidden fikiri-gradient-animated">
-      {/* Enhanced Animated Background Elements */}
-      <div className="absolute inset-0">
-        {/* Floating orbs with brand colors */}
-        <motion.div 
-          className="absolute w-72 h-72 bg-brand-accent/20 rounded-full blur-3xl"
-          animate={{
-            x: mousePosition.x * 0.1,
-            y: mousePosition.y * 0.1,
-            scale: [1, 1.1, 1],
-          }}
-          transition={{
-            duration: 4,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-        <motion.div 
-          className="absolute w-96 h-96 bg-brand-secondary/20 rounded-full blur-3xl"
-          animate={{
-            x: mousePosition.x * 0.05,
-            y: mousePosition.y * 0.05,
-            scale: [1.1, 1, 1.1],
-          }}
-          transition={{
-            duration: 6,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-        <motion.div 
-          className="absolute w-64 h-64 bg-brand-primary/20 rounded-full blur-3xl"
-          animate={{
-            x: mousePosition.x * 0.08,
-            y: mousePosition.y * 0.1,
-            scale: [1, 1.2, 1],
-          }}
-          transition={{
-            duration: 5,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-        
-        {/* Geometric shapes */}
-        <motion.div
-          className="absolute top-20 left-20 w-32 h-32 border-2 border-white/10 rounded-lg"
-          animate={{
-            rotate: [0, 90, 180, 270, 360],
-            scale: [1, 1.1, 1],
-          }}
-          transition={{
-            duration: 8,
-            repeat: Infinity,
-            ease: "linear"
-          }}
-        />
-        <motion.div
-          className="absolute bottom-32 right-32 w-24 h-24 bg-brand-accent/10 rounded-full"
-          animate={{
-            y: [-20, 20, -20],
-            x: [-10, 10, -10],
-          }}
-          transition={{
-            duration: 7,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-        <motion.div
-          className="absolute top-1/2 right-20 w-16 h-16 border-2 border-brand-secondary/20 rounded-full"
-          animate={{
-            rotate: [0, 180, 360],
-            scale: [1, 1.2, 1],
-          }}
-          transition={{
-            duration: 6,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-        
-        {/* Grid pattern */}
-        <div className="absolute inset-0 opacity-20" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-        }} />
-        
-        {/* Floating particles */}
-        {[...Array(30)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-2 h-2 bg-white/30 rounded-full"
-            animate={{
-              y: [-20, 20, -20],
-              x: [-10, 10, -10],
-              opacity: [0.3, 0.8, 0.3],
-            }}
-            transition={{
-              duration: 3 + Math.random() * 2,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: Math.random() * 2,
-            }}
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-            }}
-          />
-        ))}
+    <RadiantLayout showFooterCta={false} backdropIntensity="subtle">
+    <div id="main-content" className="relative overflow-x-clip">
+      {/* Static ambient wash — calm for auth focus */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden>
+        <div className="absolute -left-16 top-10 h-56 w-56 rounded-full bg-brand-accent/12 blur-3xl sm:h-72 sm:w-72" />
+        <div className="absolute -right-20 top-40 h-64 w-64 rounded-full bg-brand-secondary/12 blur-3xl sm:h-96 sm:w-96" />
+        <div className="absolute bottom-20 left-1/3 h-48 w-48 rounded-full bg-brand-primary/12 blur-3xl sm:h-64 sm:w-64" />
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full">
-          {/* Logo and Branding */}
-          <motion.div 
-            className="text-center mb-8"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <div className="flex items-center justify-center mb-6">
-              <Link 
-                to={user ? "/dashboard" : "/"}
-                className="cursor-pointer hover:opacity-80 transition-opacity"
-                aria-label={user ? "Fikiri Solutions - Go to dashboard" : "Fikiri Solutions - Return to homepage"}
-              >
-                <FikiriLogo size="xl" variant="full" className="mx-auto" />
-              </Link>
-            </div>
-            <motion.h1 
-              className="text-5xl font-bold text-gray-900 mb-2 font-serif tracking-tight drop-shadow-sm"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-            >
-              Fikiri Solutions
-            </motion.h1>
-            <motion.p 
-              className="text-xl text-gray-800 mb-1 font-medium"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-            >
-              AI-Powered Business Automation
-            </motion.p>
-            <motion.p 
-              className="text-sm text-gray-600 font-light"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-            >
-              Transform your business with intelligent automation
-            </motion.p>
-          </motion.div>
+      <div className="relative z-10 flex items-start justify-center px-4 pb-10 pt-4 sm:items-center sm:px-6 sm:pb-16 sm:pt-8 lg:px-8">
+        <motion.div
+          className="max-w-md w-full min-w-0"
+          initial={reduceMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.45, ease: 'easeOut' }}
+        >
+          {/* Branding — nav already has logo; keep compact page title */}
+          <div className="mb-5 text-center sm:mb-6">
+            <h1 className="mb-1 text-3xl font-bold font-serif tracking-tight text-white drop-shadow-sm sm:text-4xl">
+              Welcome back
+            </h1>
+            <p className="text-base text-white/85 sm:text-lg">
+              Sign in to continue
+            </p>
+          </div>
 
           {/* Login Form - solid card for contrast on gradient */}
-          <motion.div 
-            className="bg-white rounded-3xl p-8 shadow-2xl border border-gray-200/80"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.5 }}
-          >
+          <div className="bg-white rounded-3xl p-5 shadow-2xl border border-white/40 ring-1 ring-black/5 sm:p-8">
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 text-center mb-2 font-serif">
-                Welcome Back
+              <h2 className="text-xl font-bold text-stone-900 text-center mb-2 font-serif sm:text-2xl">
+                Sign in
               </h2>
-              <p className="text-gray-600 text-center text-sm font-light">
-                Sign in to continue your automation journey
+              <p className="text-stone-600 text-center text-sm">
+                Use your Fikiri account email and password
               </p>
             </div>
             
@@ -496,12 +350,12 @@ export const Login: React.FC = () => {
               
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="email" className="block text-sm font-medium text-stone-800 mb-2">
                     Email Address
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <Mail className="h-5 w-5 text-gray-500" />
+                      <Mail className="h-5 w-5 text-stone-500" />
                     </div>
                     <input
                       id="email"
@@ -509,24 +363,24 @@ export const Login: React.FC = () => {
                       type="email"
                       autoComplete={AUTOCOMPLETE.login.identifier}
                       required
-                      className={`w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-all duration-200 ${emailError ? 'border-red-500 focus:ring-red-500' : ''}`}
+                      className={`w-full pl-12 pr-4 py-3 bg-stone-50 border border-stone-300 rounded-xl text-stone-900 placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-all duration-200 ${emailError ? 'border-red-500 focus:ring-red-500' : ''}`}
                       placeholder="Enter your email"
                       value={email}
                       onChange={handleEmailChange}
                     />
                   </div>
                   {emailError && (
-                    <p className="mt-2 text-sm text-red-600">{emailError}</p>
+                    <p className="mt-2 text-sm font-medium text-red-700">{emailError}</p>
                   )}
                 </div>
                 
                 <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="password" className="block text-sm font-medium text-stone-800 mb-2">
                     Password
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <Lock className="h-5 w-5 text-gray-500" />
+                      <Lock className="h-5 w-5 text-stone-500" />
                     </div>
                     <input
                       id="password"
@@ -534,7 +388,7 @@ export const Login: React.FC = () => {
                       type={showPassword ? "text" : "password"}
                       autoComplete={AUTOCOMPLETE.login.password}
                       required
-                      className={`w-full pl-12 pr-12 py-3 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-all duration-200 ${passwordError ? 'border-red-500 focus:ring-red-500' : ''}`}
+                      className={`w-full pl-12 pr-12 py-3 bg-stone-50 border border-stone-300 rounded-xl text-stone-900 placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-all duration-200 ${passwordError ? 'border-red-500 focus:ring-red-500' : ''}`}
                       placeholder="Enter your password"
                       value={password}
                       onChange={handlePasswordChange}
@@ -546,14 +400,14 @@ export const Login: React.FC = () => {
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                       {showPassword ? (
-                        <EyeOff className="h-5 w-5 text-gray-500 hover:text-gray-700" />
+                        <EyeOff className="h-5 w-5 text-stone-500 hover:text-stone-800" />
                       ) : (
-                        <Eye className="h-5 w-5 text-gray-500 hover:text-gray-700" />
+                        <Eye className="h-5 w-5 text-stone-500 hover:text-stone-800" />
                       )}
                     </button>
                   </div>
                   {passwordError && (
-                    <p className="mt-2 text-sm text-red-600">{passwordError}</p>
+                    <p className="mt-2 text-sm font-medium text-red-700">{passwordError}</p>
                   )}
                 </div>
               </div>
@@ -567,10 +421,10 @@ export const Login: React.FC = () => {
                     autoComplete={AUTOCOMPLETE.off}
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="h-4 w-4 text-brand-primary focus:ring-brand-primary border-gray-300 rounded"
+                    className="h-4 w-4 text-brand-primary focus:ring-brand-primary border-stone-300 rounded"
                     aria-describedby="remember-me-label"
                   />
-                  <label id="remember-me-label" htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
+                  <label id="remember-me-label" htmlFor="remember-me" className="ml-2 block text-sm text-stone-800">
                     Remember me
                   </label>
                 </div>
@@ -579,7 +433,7 @@ export const Login: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => navigate('/forgot-password')}
-                    className="font-medium text-brand-primary hover:text-fikiri-400 transition-colors"
+                    className="font-semibold text-orange-800 hover:text-orange-700 transition-colors"
                   >
                     Forgot password?
                   </button>
@@ -612,7 +466,7 @@ export const Login: React.FC = () => {
                   <div className="w-full border-t border-gray-200" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                  <span className="px-2 bg-white text-stone-600">Or continue with</span>
                 </div>
               </div>
 
@@ -620,7 +474,7 @@ export const Login: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleGmailLogin}
-                  className="w-full min-h-[44px] touch-manipulation inline-flex items-center justify-center gap-2 py-3 px-3 sm:px-4 border border-gray-300 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary transition-colors duration-200"
+                  className="w-full min-h-[44px] touch-manipulation inline-flex items-center justify-center gap-2 py-3 px-3 sm:px-4 border border-stone-300 rounded-xl shadow-sm bg-white text-sm font-medium text-stone-800 hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary transition-colors duration-200"
                 >
                   <Chrome className="h-5 w-5 shrink-0" aria-hidden />
                   <span className="truncate">Gmail</span>
@@ -630,7 +484,7 @@ export const Login: React.FC = () => {
                   type="button"
                   onClick={handleMicrosoftLogin}
                   disabled={isMicrosoftLoading}
-                  className="w-full min-h-[44px] touch-manipulation inline-flex items-center justify-center gap-2 py-3 px-3 sm:px-4 border border-gray-300 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full min-h-[44px] touch-manipulation inline-flex items-center justify-center gap-2 py-3 px-3 sm:px-4 border border-stone-300 rounded-xl shadow-sm bg-white text-sm font-medium text-stone-800 hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Building2 className="h-5 w-5 shrink-0" aria-hidden />
                   <span className="truncate">{isMicrosoftLoading ? 'Connecting...' : 'Microsoft'}</span>
@@ -640,7 +494,7 @@ export const Login: React.FC = () => {
                   type="button"
                   disabled
                   title="Coming soon"
-                  className="w-full min-h-[44px] touch-manipulation inline-flex items-center justify-center gap-2 py-3 px-3 sm:px-4 border border-gray-200 rounded-xl shadow-sm bg-gray-50 text-sm font-medium text-gray-400 cursor-not-allowed"
+                  className="w-full min-h-[44px] touch-manipulation inline-flex items-center justify-center gap-2 py-3 px-3 sm:px-4 border border-stone-200 rounded-xl shadow-sm bg-stone-100 text-sm font-medium text-stone-500 cursor-not-allowed"
                 >
                   <Github className="h-5 w-5 shrink-0" aria-hidden />
                   <span className="truncate">GitHub (soon)</span>
@@ -653,7 +507,7 @@ export const Login: React.FC = () => {
               <button
                 type="button"
                 onClick={() => window.location.href = '/signup'}
-                className="w-full min-h-[44px] touch-manipulation inline-flex justify-center items-center gap-2 py-3 px-4 border border-gray-300 rounded-xl shadow-sm bg-gray-50 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary transition-colors duration-200"
+                className="w-full min-h-[44px] touch-manipulation inline-flex justify-center items-center gap-2 py-3 px-4 border border-stone-300 rounded-xl shadow-sm bg-stone-50 text-sm font-medium text-stone-800 hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary transition-colors duration-200"
               >
                 <UserPlus className="h-5 w-5 shrink-0" aria-hidden />
                 <span>Create New Account</span>
@@ -662,25 +516,25 @@ export const Login: React.FC = () => {
 
             {/* Features Preview */}
             <div className="mt-8 pt-6 border-t border-gray-200">
-              <p className="text-xs text-gray-500 text-center mb-4">Powered by AI</p>
+              <p className="text-xs text-stone-600 text-center mb-4">Powered by AI</p>
               <div className="flex justify-center space-x-6">
-                <div className="flex items-center space-x-2 text-gray-600">
+                <div className="flex items-center space-x-2 text-stone-700">
                   <Shield className="h-4 w-4 text-brand-primary" />
-                  <span className="text-xs">Secure</span>
+                  <span className="text-xs font-medium">Secure</span>
                 </div>
-                <div className="flex items-center space-x-2 text-gray-600">
+                <div className="flex items-center space-x-2 text-stone-700">
                   <Rocket className="h-4 w-4 text-brand-primary" />
-                  <span className="text-xs">Fast</span>
+                  <span className="text-xs font-medium">Fast</span>
                 </div>
-                <div className="flex items-center space-x-2 text-gray-600">
+                <div className="flex items-center space-x-2 text-stone-700">
                   <Zap className="h-4 w-4 text-brand-primary" />
-                  <span className="text-xs">Smart</span>
+                  <span className="text-xs font-medium">Smart</span>
                 </div>
               </div>
             </div>
-          </motion.div>
+          </div>
 
-        </div>
+        </motion.div>
       </div>
     </div>
     </RadiantLayout>
