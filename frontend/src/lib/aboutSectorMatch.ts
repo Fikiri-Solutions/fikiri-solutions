@@ -1,9 +1,7 @@
 /**
- * Lightweight sector → feature fit matcher for the public About page.
- * Keyword/substring scoring only (no backend, no AI) — recommendations come from
- * fixed templates per sector, never generated prose (no hallucinated “fits”).
- * Cast wide via many sector rows + keywords; stay honest via weak-word filters,
- * score thresholds, and ambiguity detection when two verticals tie.
+ * Sector Fit Explorer matcher for the public homepage.
+ * Deterministic, client-side, keyword/template based — no LLM in the primary path.
+ * Pipeline: normalize → viability gate → typed keyword scoring → confidence/ambiguity → presentation.
  */
 
 export type FeatureFitId = 'email_automation' | 'crm_management' | 'ai_assistant'
@@ -14,23 +12,191 @@ const FEATURE_LABELS: Record<FeatureFitId, string> = {
   ai_assistant: 'AI Assistant',
 }
 
+export type KeywordMatchType = 'exact' | 'token' | 'phrase' | 'prefix'
+
+export type SectorKeyword = {
+  value: string
+  type: KeywordMatchType
+  weight: number
+  conceptId: string
+}
+
 type SectorTemplate = {
   id: string
   displayName: string
+  /** Raw catalog strings; compiled to typed keywords at module init */
   keywords: string[]
-  /** One short paragraph: real workflow pain, not marketing fluff */
   summary: string
   fits: Record<FeatureFitId, string>
 }
 
 type SectorScoring = SectorTemplate & {
-  /** Top-level bucket (Automotive, Food & beverage, B2B services, …) */
   category: string
-  /** Pre-normalized keyword phrases (see normalizeQuery) */
-  normalizedPhrases: string[]
+  positiveKeywords: SectorKeyword[]
 }
 
-/** Single words too vague to match alone — avoids “service company” → random vertical */
+export type SectorInputStatus =
+  | 'empty'
+  | 'too_short'
+  | 'low_information'
+  | 'nonsensical'
+  | 'viable'
+  | 'unsupported'
+  | 'ambiguous'
+  | 'matched'
+
+export type SectorInputReasonCode =
+  | 'EMPTY'
+  | 'NO_MEANINGFUL_CHARACTERS'
+  | 'TOO_SHORT'
+  | 'ONLY_NUMBERS'
+  | 'MOSTLY_SYMBOLS'
+  | 'REPEATED_CHARACTER_SEQUENCE'
+  | 'KEYBOARD_MASH'
+  | 'INSUFFICIENT_INFORMATION'
+  | 'UNSUPPORTED_LANGUAGE'
+  | 'NO_SUPPORTED_SECTOR'
+  | 'AMBIGUOUS_SECTORS'
+  | 'VALID_MATCH'
+
+export type SectorFitPresentationStatus =
+  | 'idle'
+  | 'invalid'
+  | 'needs_detail'
+  | 'unsupported'
+  | 'ambiguous'
+  | 'matched'
+
+export type FeatureFit = {
+  id: FeatureFitId
+  title: string
+  fit: string
+}
+
+export type SectorFitPresentation = {
+  status: SectorFitPresentationStatus
+  reasonCode: SectorInputReasonCode | null
+  headline: string
+  matchStrength: 'high' | 'medium' | 'broad' | null
+  category: string | null
+  sectorId: string | null
+  needsMoreDetail: boolean
+  ambiguousAlternates: ReadonlyArray<{ id: string; displayName: string }> | null
+  summary: string
+  featuresOrdered: ReadonlyArray<FeatureFit>
+}
+
+export type SectorInputAnalysis = {
+  rawLength: number
+  normalizedInput: string
+  matchingInput: string
+  status: SectorInputStatus
+  reasonCode: SectorInputReasonCode | null
+  presentation: SectorFitPresentation
+}
+
+/** Input limits (homepage safety) */
+export const MAX_RAW_INPUT_CHARS = 500
+export const MAX_MATCHING_INPUT_CHARS = 300
+export const MIN_MEANINGFUL_CHARS = 2
+export const MIN_MEANINGFUL_LETTERS = 2
+export const MAX_TOKEN_COUNT = 60
+
+/** Minimum primary description length before follow-up (legacy; prefer status-based UI) */
+export const MIN_PRIMARY_CHARS_FOR_FOLLOW_UP = 6
+
+const APPROVED_SHORT_TERMS = new Set([
+  'ai',
+  'it',
+  'gym',
+  'cpa',
+  'msp',
+  'hvac',
+  'saas',
+  'crm',
+  'ngo',
+  'cpg',
+  'pos',
+  'bpo',
+  'oem',
+  '3pl',
+  'hoa',
+  'spa',
+  'pub',
+  'inn',
+  'mow',
+  'ppc',
+  'vet',
+  'k9',
+  '3d',
+  'mua',
+  'dj',
+])
+
+/** Intentional stem/prefix keywords from the catalog (token-boundary prefix, min 4 chars). */
+const INTENTIONAL_PREFIXES = new Set([
+  'landscap',
+  'horticult',
+  'orthodont',
+  'endodont',
+  'periodont',
+  'veterinar',
+  'chiropract',
+  'dermatolog',
+  'ophthalmolog',
+  'optometr',
+  'plumb',
+  'bookkeep',
+  'actuar',
+  'fundraisin',
+  'fabricat',
+  'recruit',
+  'agronom',
+  'subcontract',
+  'electric',
+  'manufactur',
+])
+
+const BUSINESS_CONTEXT_TERMS = new Set([
+  'sell',
+  'selling',
+  'provide',
+  'providing',
+  'repair',
+  'install',
+  'manage',
+  'deliver',
+  'manufacture',
+  'consult',
+  'train',
+  'teach',
+  // Keep these generic — do NOT include sector labels like restaurant/clinic/software
+  // (those are real catalog keywords and must remain matchable as one-worders).
+  'shop',
+  'store',
+  'agency',
+  'firm',
+  'contractor',
+  'company',
+  'business',
+  'service',
+  'services',
+  'customers',
+  'clients',
+  'appointments',
+  'products',
+  'help',
+  'helping',
+  'need',
+  'needs',
+  'automation',
+  'crm',
+  'local',
+  'small',
+  'online',
+  'team',
+])
+
 const WEAK_SINGLE_WORDS = new Set([
   'service',
   'services',
@@ -50,13 +216,31 @@ const WEAK_SINGLE_WORDS = new Set([
   'management',
   'operations',
   'professional',
+  'people',
+  'customers',
+  'automation',
+  'need',
+  'needs',
+  'want',
+  'small',
 ])
 
-/** If the top two sectors score within this margin, ask for detail instead of guessing */
-const AMBIGUITY_SCORE_MARGIN = 3
+const KEYBOARD_MASH_PATTERNS = [
+  /qwerty/iu,
+  /asdfgh/iu,
+  /zxcvbn/iu,
+  /qazwsx/iu,
+  /poiuyt/iu,
+  /asdfasdf/iu,
+  /hjkl/iu,
+]
 
-const FALLBACK_SUMMARY =
-  'Most teams we work with live in email for leads, scheduling, quotes, vendors, or renewals. Name your sector (even loosely)—we map it to how inbox automation, CRM structure, and assistant-style help usually land first.'
+const SAME_CHARACTER_RE = /^(.)\1{5,}$/u
+const REPEATED_BLOCK_RE = /^(.{1,3})\1{4,}$/u
+
+const AMBIGUITY_SCORE_MARGIN = 3
+const MIN_SCORE_HIGH = 10
+const MIN_SCORE_MEDIUM = 6
 
 const FALLBACK_FITS: Record<FeatureFitId, string> = {
   email_automation:
@@ -67,25 +251,334 @@ const FALLBACK_FITS: Record<FeatureFitId, string> = {
     'Turn long threads into short internal briefs and suggested next steps—your team sends the final message.',
 }
 
+const FEATURE_ORDER: FeatureFitId[] = ['email_automation', 'crm_management', 'ai_assistant']
+
 function stripCombiningMarks(value: string): string {
   try {
     return value.replace(/\p{M}+/gu, '')
   } catch {
-    // Older browsers without Unicode property escapes still get NFKD decomposition.
     return value
   }
 }
 
-function normalizeQuery(raw: string): string {
-  return stripCombiningMarks(raw.normalize('NFKD'))
-    .toLowerCase()
-    .replace(/[&]+/g, ' and ')
-    .replace(/[^a-z0-9\s-+]+/gi, ' ')
-    .replace(/\s+/g, ' ')
+/** Display-safe normalized input: preserves readable Unicode letters. */
+export function normalizeForValidation(input: string): string {
+  let value = input
+  try {
+    value = value.normalize('NFKC')
+  } catch {
+    // ignore
+  }
+  try {
+    value = value.replace(/\p{C}+/gu, ' ')
+  } catch {
+    value = value.replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2060\uFEFF]/g, ' ')
+  }
+  return value.replace(/\s+/gu, ' ').trim()
+}
+
+/** English matching form for the current keyword catalog. */
+export function normalizeForMatching(input: string): string {
+  let value = normalizeForValidation(input)
+  try {
+    value = value.normalize('NFKD')
+  } catch {
+    // ignore
+  }
+  value = stripCombiningMarks(value)
+  try {
+    value = value.toLocaleLowerCase('en-US')
+  } catch {
+    value = value.toLowerCase()
+  }
+  return value
+    .replace(/&/gu, ' and ')
+    .replace(/[’']/gu, '')
+    .replace(/[‐-‒–—―]/gu, '-')
+    .replace(/[^\p{L}\p{N}\s+/-]+/gu, ' ')
+    .replace(/\s+/gu, ' ')
     .trim()
 }
 
-/** Source-of-truth sector rows; summaries tuned to typical SMB operational patterns in each vertical */
+/** @deprecated Prefer normalizeForMatching — kept for existing call sites/tests */
+export function normalizeQuery(raw: string): string {
+  return normalizeForMatching(raw)
+}
+
+export function combineSectorQueries(primary: string, additional: string): string {
+  const parts = [primary.trim(), additional.trim()].filter((p) => p.length > 0)
+  return parts.join(' ')
+}
+
+function countByClass(normalized: string): {
+  letterCount: number
+  numberCount: number
+  symbolCount: number
+  whitespaceCount: number
+  meaningfulCount: number
+} {
+  let letterCount = 0
+  let numberCount = 0
+  let symbolCount = 0
+  let whitespaceCount = 0
+  for (const char of normalized) {
+    if (/\s/u.test(char)) {
+      whitespaceCount += 1
+    } else if (/\p{L}/u.test(char)) {
+      letterCount += 1
+    } else if (/\p{N}/u.test(char)) {
+      numberCount += 1
+    } else {
+      symbolCount += 1
+    }
+  }
+  return {
+    letterCount,
+    numberCount,
+    symbolCount,
+    whitespaceCount,
+    meaningfulCount: letterCount + numberCount,
+  }
+}
+
+function tokenizeMatching(matchingInput: string): string[] {
+  if (!matchingInput) return []
+  return matchingInput
+    .split(/[\s/+-]+/u)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0)
+    .slice(0, MAX_TOKEN_COUNT)
+}
+
+function compactedNoSpace(matchingInput: string): string {
+  return matchingInput.replace(/\s+/gu, '')
+}
+
+function vowelRatio(token: string): number {
+  const letters = [...token].filter((c) => /\p{L}/u.test(c))
+  if (letters.length === 0) return 0
+  const vowels = letters.filter((c) => /[aeiouy]/i.test(c)).length
+  return vowels / letters.length
+}
+
+function isApprovedShortAlias(matchingInput: string, tokens: string[]): boolean {
+  if (APPROVED_SHORT_TERMS.has(matchingInput)) return true
+  if (tokens.length === 1 && APPROVED_SHORT_TERMS.has(tokens[0])) return true
+  return false
+}
+
+function hasNonLatinLetters(normalizedValidation: string): boolean {
+  // Letters that survive matching-normalization as non [a-z] after accent stripping
+  // indicate non-Latin scripts (Cyrillic, CJK, Arabic, etc.).
+  try {
+    const letters = normalizedValidation.match(/\p{L}/gu) ?? []
+    return letters.some((ch) => !/[a-zA-Z]/.test(ch))
+  } catch {
+    return /[^\u0000-\u007Fa-zA-Z0-9\s]/.test(normalizedValidation)
+  }
+}
+
+function looksLikeKeyboardMash(matchingInput: string, tokens: string[]): boolean {
+  const compact = compactedNoSpace(matchingInput)
+  if (compact.length < 6) return false
+
+  // Non-Latin script input is never "keyboard mash" in the QWERTY sense
+  const latinOnly = /^[a-z0-9]+$/i.test(compact)
+  if (!latinOnly && !/[a-z]/i.test(compact)) return false
+
+  const hasMashPattern = KEYBOARD_MASH_PATTERNS.some((re) => re.test(compact))
+  if (hasMashPattern) return true
+
+  const lowVowels = vowelRatio(compact) < 0.18 && compact.length >= 7
+  const repeatedAdjacent = /(.)\1{3,}/u.test(compact)
+  const repeatedBlock = /([a-z]{2,3})\1{2,}/iu.test(compact)
+
+  // Require a strong noise signal — do not flag ordinary long English words like "automation"
+  if (tokens.length === 1 && lowVowels && (repeatedAdjacent || repeatedBlock || compact.length >= 8)) {
+    return true
+  }
+  if (tokens.length === 1 && repeatedBlock && compact.length >= 10) return true
+  if (tokens.length === 1 && repeatedAdjacent && lowVowels) return true
+
+  return false
+}
+
+function looksLikeRepeatedNoise(matchingInput: string): boolean {
+  const compact = compactedNoSpace(matchingInput)
+  if (compact.length < 6) return false
+  if (SAME_CHARACTER_RE.test(compact)) return true
+  if (REPEATED_BLOCK_RE.test(compact)) return true
+  return false
+}
+
+type ViabilityResult = {
+  status: SectorInputStatus
+  reasonCode: SectorInputReasonCode
+} | null
+
+function assessViability(
+  rawInput: string,
+  normalizedInput: string,
+  matchingInput: string
+): ViabilityResult {
+  if (!normalizedInput) {
+    return { status: 'empty', reasonCode: 'EMPTY' }
+  }
+
+  const counts = countByClass(normalizedInput)
+  if (counts.meaningfulCount === 0) {
+    return { status: 'nonsensical', reasonCode: 'NO_MEANINGFUL_CHARACTERS' }
+  }
+
+  const tokens = tokenizeMatching(matchingInput)
+  const matchingCounts = countByClass(matchingInput)
+
+  // Numbers only (matching form has no letters)
+  if (matchingCounts.letterCount === 0 && matchingCounts.numberCount > 0) {
+    return { status: 'nonsensical', reasonCode: 'ONLY_NUMBERS' }
+  }
+
+  if (
+    matchingCounts.letterCount === 0 &&
+    matchingCounts.numberCount === 0 &&
+    (matchingCounts.symbolCount > 0 || counts.symbolCount > 0)
+  ) {
+    return { status: 'nonsensical', reasonCode: 'MOSTLY_SYMBOLS' }
+  }
+
+  // Mostly symbols: symbols dominate and almost no letters
+  if (
+    matchingCounts.letterCount > 0 &&
+    counts.symbolCount >= matchingCounts.letterCount * 2 &&
+    matchingCounts.letterCount < MIN_MEANINGFUL_LETTERS
+  ) {
+    return { status: 'nonsensical', reasonCode: 'MOSTLY_SYMBOLS' }
+  }
+
+  if (looksLikeRepeatedNoise(matchingInput)) {
+    return { status: 'nonsensical', reasonCode: 'REPEATED_CHARACTER_SEQUENCE' }
+  }
+
+  if (looksLikeKeyboardMash(matchingInput, tokens)) {
+    return { status: 'nonsensical', reasonCode: 'KEYBOARD_MASH' }
+  }
+
+  // Too short / too little — unless approved alias
+  if (!isApprovedShortAlias(matchingInput, tokens)) {
+    if (matchingCounts.meaningfulCount < MIN_MEANINGFUL_CHARS || matchingCounts.letterCount < MIN_MEANINGFUL_LETTERS) {
+      return { status: 'too_short', reasonCode: 'TOO_SHORT' }
+    }
+    if (matchingInput.length < 2) {
+      return { status: 'too_short', reasonCode: 'TOO_SHORT' }
+    }
+  }
+
+  // Substantial non-Latin letters with little Latin → unsupported language for this catalog
+  const latinLetterCount = (matchingInput.match(/[a-z]/gi) || []).length
+  if (hasNonLatinLetters(normalizedInput) && latinLetterCount < 3 && matchingCounts.letterCount >= 4) {
+    return { status: 'low_information', reasonCode: 'UNSUPPORTED_LANGUAGE' }
+  }
+
+  // Insufficient business information (vague but not nonsense)
+  if (isInsufficientBusinessDescription(matchingInput, tokens)) {
+    return { status: 'low_information', reasonCode: 'INSUFFICIENT_INFORMATION' }
+  }
+
+  return null
+}
+
+function isInsufficientBusinessDescription(matchingInput: string, tokens: string[]): boolean {
+  if (isApprovedShortAlias(matchingInput, tokens)) return false
+  // Single weak generic token
+  if (tokens.length === 1 && WEAK_SINGLE_WORDS.has(tokens[0])) return true
+  // Only weak/business-context generics, no distinctive sector token yet —
+  // defer to scoring; only flag clearly vague phrases here
+  const distinctive = tokens.filter(
+    (t) =>
+      !WEAK_SINGLE_WORDS.has(t) &&
+      !BUSINESS_CONTEXT_TERMS.has(t) &&
+      t.length >= 3
+  )
+  const vaguePhrases = [
+    'my company',
+    'our company',
+    'we help people',
+    'we help customers',
+    'need crm',
+    'need help',
+    'want automation',
+    'small business',
+    'small local business',
+    'local business',
+    'help local businesses',
+    'we help local businesses grow',
+    'automation',
+    'i want automation',
+    'my company needs help',
+  ]
+  if (vaguePhrases.includes(matchingInput)) return true
+
+  // Very short vague: only weak + context terms
+  if (tokens.length <= 4 && distinctive.length === 0 && tokens.every((t) => WEAK_SINGLE_WORDS.has(t) || BUSINESS_CONTEXT_TERMS.has(t))) {
+    return true
+  }
+  return false
+}
+
+function conceptIdFor(value: string): string {
+  const base = value.replace(/\s+/g, '_').slice(0, 32)
+  // Collapse common morphological variants into one concept when possible
+  for (const prefix of INTENTIONAL_PREFIXES) {
+    if (value === prefix || value.startsWith(prefix)) return prefix
+  }
+  if (value.endsWith('ing') && value.length > 5) return value.slice(0, -3)
+  if (value.endsWith('ers') && value.length > 5) return value.slice(0, -1)
+  if (value.endsWith('er') && value.length > 4) return value.slice(0, -2)
+  if (value.endsWith('s') && !value.endsWith('ss') && value.length > 4) return value.slice(0, -1)
+  return base
+}
+
+function compileKeyword(raw: string): SectorKeyword | null {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  const value = normalizeForMatching(trimmed)
+  if (value.length < 2) return null
+
+  const conceptId = conceptIdFor(value)
+
+  if (value.includes(' ')) {
+    // Phrase: if any token is an intentional prefix stem, still phrase type;
+    // matching logic allows prefix on intentional last tokens.
+    return { value, type: 'phrase', weight: 10, conceptId }
+  }
+
+  if (INTENTIONAL_PREFIXES.has(value)) {
+    return { value, type: 'prefix', weight: 6, conceptId }
+  }
+
+  if (APPROVED_SHORT_TERMS.has(value) || value.length <= 3) {
+    return { value, type: 'token', weight: 10, conceptId }
+  }
+
+  // Whole-input exact aliases get boosted at score time when q === value
+  return { value, type: 'token', weight: 8, conceptId }
+}
+
+function compileKeywords(rawKeywords: string[]): SectorKeyword[] {
+  const out: SectorKeyword[] = []
+  const seen = new Set<string>()
+  for (const raw of rawKeywords) {
+    const kw = compileKeyword(raw)
+    if (!kw) continue
+    const key = `${kw.type}:${kw.value}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(kw)
+  }
+  return out
+}
+
+
 const SECTOR_SOURCE: SectorTemplate[] = [
   {
     id: 'landscaping-field',
@@ -112,6 +605,11 @@ const SECTOR_SOURCE: SectorTemplate[] = [
       'fence install',
       'deck build',
       'pressure wash',
+      'pressure washing',
+      'fence company',
+      'fence contractor',
+      'deck builder',
+      'deck building',
       'commercial grounds',
     ],
     summary:
@@ -150,7 +648,10 @@ const SECTOR_SOURCE: SectorTemplate[] = [
       'brewery',
       'distillery',
       'bakery',
+      'barista',
       'catering',
+      'caterer',
+      'catering company',
       'ghost kitchen',
       'cloud kitchen',
       'food hall',
@@ -199,8 +700,11 @@ const SECTOR_SOURCE: SectorTemplate[] = [
       'endodont',
       'periodont',
       'veterinar',
+      'vet',
       'vet clinic',
       'animal hospital',
+      'doula',
+      'midwife',
       'chiropract',
       'podiatrist',
       'dermatolog',
@@ -210,6 +714,9 @@ const SECTOR_SOURCE: SectorTemplate[] = [
       'medspa',
       'plastic surgery',
       'pharmacy',
+      'pharmacist',
+      'therapist',
+      'therapy practice',
       'physical therap',
       'occupational therap',
       'mental health practice',
@@ -220,6 +727,13 @@ const SECTOR_SOURCE: SectorTemplate[] = [
       'healthcare provider',
       'clinical staff',
       'appointment schedul',
+      'dog groomer',
+      'pet groomer',
+      'pet grooming',
+      'dog walker',
+      'pet sitter',
+      'pet sitting',
+      'mobile pet',
     ],
     summary:
       'Scheduling changes, refill requests, lab coordination, payer questions, recall campaigns, no-shows—front desk workflows still depend on orderly email triage.',
@@ -240,7 +754,12 @@ const SECTOR_SOURCE: SectorTemplate[] = [
       'electrical',
       'electrician',
       'plumb',
+      'plumber',
+      'plumbing',
       'hvac',
+      'ac tech',
+      'ac repair',
+      'air conditioning',
       'roofer',
       'roofing',
       'siding',
@@ -263,6 +782,21 @@ const SECTOR_SOURCE: SectorTemplate[] = [
       'solar install',
       'battery storage',
       'generator install',
+      'carpenter',
+      'carpentry',
+      'welder',
+      'welding',
+      'tiler',
+      'tile setter',
+      'drywall',
+      'drywaller',
+      'mason',
+      'bricklayer',
+      'glazier',
+      'insulation contractor',
+      'septic',
+      'well pump',
+      'appliance repair',
     ],
     summary:
       'Emergency tickets, quoting, permitting questions, subcontractor chatter, warranties, and inspections mean one delayed reply can cascade into rework or churn.',
@@ -302,6 +836,9 @@ const SECTOR_SOURCE: SectorTemplate[] = [
       'mechanical engineer consulting',
       'surveying',
       'actuar',
+      'notary',
+      'notary public',
+      'paralegal',
     ],
     summary:
       'Engagement letters, document requests, client status pings, auditor mail, counterparties—patterns repeat matter by matter.',
@@ -325,6 +862,10 @@ const SECTOR_SOURCE: SectorTemplate[] = [
       'branding agency',
       'design studio',
       'web agency',
+      'web designer',
+      'web developer',
+      'graphic designer',
+      'graphic design',
       'seo agency',
       'ppc ',
       'media buying',
@@ -364,6 +905,7 @@ const SECTOR_SOURCE: SectorTemplate[] = [
       'sponsorship',
       'podcast host',
       'podcaster',
+      'podcast',
       'streamer',
       'twitch',
       'newsletter',
@@ -422,6 +964,7 @@ const SECTOR_SOURCE: SectorTemplate[] = [
       'real estate brokerage',
       'leasing agent',
       'property manager',
+      'property management',
       'asset manager',
       'landlord ',
       'hoa ',
@@ -451,6 +994,9 @@ const SECTOR_SOURCE: SectorTemplate[] = [
       'fitness center',
       'crossfit ',
       'yoga studio',
+      'yoga',
+      'yoga instructor',
+      'pilates',
       'pilates studio',
       'spin studio',
       'personal train',
@@ -462,18 +1008,69 @@ const SECTOR_SOURCE: SectorTemplate[] = [
       'athletic coach',
       'gym',
       'salon ',
+      'hair salon',
+      'barber',
       'barbershop',
+      'hairstylist',
+      'hair stylist',
+      'colorist',
+      'balayage',
+      'blow dry',
+      'blowdry',
+      'blowout',
       ' nail salon',
+      'nails',
+      'nail tech',
+      'nail technician',
+      'manicurist',
+      'manicure',
+      'pedicurist',
+      'pedicure',
       'spa ',
       'day spa',
+      'massage',
+      'massage therapist',
       'massage therapy',
       'med spa',
       'aesthetics',
+      'esthetician',
+      'aesthetician',
+      'cosmetologist',
+      'cosmetology',
+      'facialist',
       'waxing ',
+      'lash',
       'lashes',
+      'lash tech',
+      'lash artist',
+      'lash technician',
+      'eyelash',
+      'eyelash tech',
+      'eyelash extensions',
+      'brow tech',
+      'brow artist',
+      'makeup',
+      'makeup artist',
+      'make up artist',
+      'bridal makeup',
+      'mua',
       'grooming',
       'boutique spa',
       'tanning ',
+      'spray tan',
+      'facial',
+      'facials',
+      'microblading',
+      'microblade',
+      'permanent makeup',
+      'threader',
+      'threading',
+      'brow threading',
+      'tattoo',
+      'tattoo artist',
+      'tattoo shop',
+      'piercer',
+      'body piercing',
     ],
     summary:
       'Packages, cancellations, memberships, refill retail, Groupon fallout—confirmation discipline is half the retention story.',
@@ -497,6 +1094,14 @@ const SECTOR_SOURCE: SectorTemplate[] = [
       'private school',
       'charter school',
       'tutoring',
+      'tutor',
+      'private tutor',
+      'nanny',
+      'nannying',
+      'piano teacher',
+      'music teacher',
+      'voice coach',
+      'voice teacher',
       'learning center',
       'test prep',
       'drivers ed',
@@ -553,13 +1158,20 @@ const SECTOR_SOURCE: SectorTemplate[] = [
       'marine service',
       'car dealership',
       'auto dealership',
+      'dealership',
       'used car',
       'auto sales',
       'parts department',
       'automotive detailing',
       'detail shop',
+      'detailer',
+      'car detailing',
+      'auto detailing',
+      'mobile detailing',
       'tow company',
+      'tow truck',
       'towing',
+      'roadside assistance',
     ],
     summary:
       'Estimates awaiting approval, OEM bulletins, fleet managers, towing partners, comeback complaints—everything chases bays and advisors.',
@@ -578,6 +1190,8 @@ const SECTOR_SOURCE: SectorTemplate[] = [
     keywords: [
       'insurance agency',
       'insurance broker',
+      'insurance agent',
+      'insurance',
       'producer license',
       'claims adjust',
       'independent broker',
@@ -633,6 +1247,8 @@ const SECTOR_SOURCE: SectorTemplate[] = [
       'logistics',
       'freight broker',
       'trucking ',
+      'truck driver',
+      'truck driving',
       '3pl ',
       'fulfillment center',
       'warehouse ops',
@@ -658,6 +1274,8 @@ const SECTOR_SOURCE: SectorTemplate[] = [
     displayName: 'Manufacturing & industrial',
     keywords: [
       'manufacturer',
+      'manufacturing',
+      'cnc',
       'machine shop ',
       'fabricat',
       'metal fab',
@@ -688,9 +1306,15 @@ const SECTOR_SOURCE: SectorTemplate[] = [
     keywords: [
       'managed service',
       'managed it',
+      'managed services',
       'msp ',
       'mssp ',
+      'it company',
+      'it support',
       'it support company',
+      'tech support',
+      'help desk',
+      'helpdesk',
       'helpdesk outsource',
       'office 365 migra',
       'network operations',
@@ -740,6 +1364,7 @@ const SECTOR_SOURCE: SectorTemplate[] = [
     displayName: 'Software & SaaS teams',
     keywords: [
       'saas ',
+      'software',
       'b2b software',
       'software startup',
       'software company',
@@ -790,6 +1415,7 @@ const SECTOR_SOURCE: SectorTemplate[] = [
     displayName: 'Events, venues & experiences',
     keywords: [
       'event planner',
+      'event organizer',
       'event venue ',
       'wedding venue',
       'conference center ',
@@ -800,6 +1426,12 @@ const SECTOR_SOURCE: SectorTemplate[] = [
       'expo ',
       'wedding planner',
       'florist ',
+      'photographer',
+      'photography',
+      'wedding photographer',
+      'dj',
+      'wedding dj',
+      'mobile dj',
     ],
     summary:
       'Timelines slip when vendor threads splinter—inboxes become the unofficial Gantt.',
@@ -817,14 +1449,33 @@ const SECTOR_SOURCE: SectorTemplate[] = [
     displayName: 'Cleaning & janitorial',
     keywords: [
       'janitorial',
+      'janitor',
       'commercial clean',
       'office clean',
       'housekeep serv',
+      'housekeeper',
+      'house cleaning',
+      'home cleaning',
+      'residential cleaning',
+      'cleaner',
+      'cleaning company',
+      'maid',
       'maid service ',
+      'carpet cleaning',
+      'carpet cleaner',
+      'window washing',
+      'window cleaning',
+      'gutter cleaning',
+      'gutter cleaner',
+      'chimney sweep',
+      'chimney cleaning',
       'post construction clean',
       'window clean commercial',
       'disinfection serv',
       'facility service contract',
+      'home organizer',
+      'professional organizer',
+      'home organization',
     ],
     summary:
       'Scope creep, SLA credits, nightly crew turnover, recurring inspections—all negotiated over email snapshots.',
@@ -938,6 +1589,12 @@ const SECTOR_SOURCE: SectorTemplate[] = [
       'sales consulting',
       'revenue operations',
       'revops',
+      'virtual assistant',
+      'virtual assistants',
+      'va services',
+      'executive assistant services',
+      'business coach',
+      'business coaching',
     ],
     summary:
       'Proposals, SOW changes, stakeholder approvals, and delivery status all ride email—client work breaks when threads are the system of record.',
@@ -1010,159 +1667,451 @@ const SECTOR_CATEGORIES: Record<string, string> = {
   agriculture: 'Agriculture',
 }
 
+
 const SCORING_SECTORS: SectorScoring[] = SECTOR_SOURCE.map((s) => ({
   ...s,
   category: SECTOR_CATEGORIES[s.id] ?? 'General business',
-  normalizedPhrases: s.keywords.map((k) => normalizeQuery(k)).filter((p) => p.length >= 2),
+  positiveKeywords: compileKeywords(s.keywords),
 }))
 
-export function scoreSectorMatch(normalizedQuery: string, sector: SectorScoring): number {
-  if (!normalizedQuery) return 0
+function phraseTokensHit(phrase: string, tokenSet: Set<string>, tokens: string[]): boolean {
+  const pTokens = phrase.split(/\s+/).filter(Boolean)
+  if (pTokens.length === 0) return false
+  return pTokens.every((pt) => {
+    if (tokenSet.has(pt)) return true
+    if (INTENTIONAL_PREFIXES.has(pt)) {
+      return tokens.some((t) => t.startsWith(pt) && pt.length >= 4)
+    }
+    // Allow one connector flexibility: already normalized "and" etc.
+    return false
+  })
+}
+
+function orderedPhraseLooseHit(phrase: string, matchingInput: string): boolean {
+  // Phrase with optional "and" / hyphen connectors already normalized
+  const compactPhrase = phrase.replace(/\band\b/g, ' ').replace(/\s+/g, ' ').trim()
+  const compactQuery = matchingInput.replace(/\band\b/g, ' ').replace(/\s+/g, ' ').trim()
+  if (compactQuery.includes(compactPhrase)) return true
+  const pTokens = compactPhrase.split(' ').filter(Boolean)
+  const qTokens = compactQuery.split(' ').filter(Boolean)
+  if (pTokens.length < 2) return false
+  let qi = 0
+  for (const pt of pTokens) {
+    let found = false
+    while (qi < qTokens.length) {
+      const qt = qTokens[qi]
+      qi += 1
+      if (qt === pt || (INTENTIONAL_PREFIXES.has(pt) && pt.length >= 4 && qt.startsWith(pt))) {
+        found = true
+        break
+      }
+    }
+    if (!found) return false
+  }
+  return true
+}
+
+type ConceptHit = { conceptId: string; weight: number; kind: KeywordMatchType }
+
+export function scoreSectorMatch(matchingInput: string, sector: SectorScoring): {
+  score: number
+  conceptCount: number
+  strongestWeight: number
+  strongestKind: KeywordMatchType | null
+} {
+  if (!matchingInput) {
+    return { score: 0, conceptCount: 0, strongestWeight: 0, strongestKind: null }
+  }
+
+  const tokens = tokenizeMatching(matchingInput)
+  const tokenSet = new Set(tokens)
+  const bestByConcept = new Map<string, ConceptHit>()
+
+  const consider = (hit: ConceptHit) => {
+    const prev = bestByConcept.get(hit.conceptId)
+    if (!prev || hit.weight > prev.weight) {
+      bestByConcept.set(hit.conceptId, hit)
+    }
+  }
+
+  for (const kw of sector.positiveKeywords) {
+    if (WEAK_SINGLE_WORDS.has(kw.value) && kw.type !== 'phrase') {
+      // Weak singles never create sector evidence alone / at all as tokens
+      continue
+    }
+
+    if (matchingInput === kw.value) {
+      // Bare intentional stems are not whole-input aliases — keep prefix weight
+      if (kw.type === 'prefix') {
+        consider({ conceptId: kw.conceptId, weight: kw.weight, kind: 'prefix' })
+      } else {
+        consider({ conceptId: kw.conceptId, weight: Math.max(kw.weight, 12), kind: 'exact' })
+      }
+      continue
+    }
+
+    if (kw.type === 'phrase') {
+      if (matchingInput.includes(kw.value) || phraseTokensHit(kw.value, tokenSet, tokens)) {
+        consider({ conceptId: kw.conceptId, weight: kw.weight, kind: 'phrase' })
+      } else if (orderedPhraseLooseHit(kw.value, matchingInput)) {
+        consider({ conceptId: kw.conceptId, weight: Math.min(kw.weight, 8), kind: 'phrase' })
+      }
+      continue
+    }
+
+    if (kw.type === 'prefix') {
+      if (kw.value.length < 4) continue
+      const matchedToken = tokens.find((t) => t.startsWith(kw.value))
+      if (matchedToken) {
+        // Morphological extension (landscap → landscaping) is strong; bare stem alone stays weaker
+        const extended = matchedToken.length > kw.value.length
+        const weight = extended ? Math.max(kw.weight, 10) : kw.weight
+        const kind: KeywordMatchType = extended ? 'token' : 'prefix'
+        consider({ conceptId: kw.conceptId, weight, kind })
+      }
+      continue
+    }
+
+    // token / exact-as-token
+    if (tokenSet.has(kw.value)) {
+      const weight = APPROVED_SHORT_TERMS.has(kw.value) ? Math.max(kw.weight, 10) : kw.weight
+      consider({ conceptId: kw.conceptId, weight, kind: 'token' })
+    }
+  }
+
   let score = 0
-  const q = normalizedQuery
-  const words = q.split(/\s+/).filter((w) => w.length >= 2)
-
-  for (const p of sector.normalizedPhrases) {
-    if (p.length < 2) continue
-    const isSingleWord = !p.includes(' ')
-    if (isSingleWord && WEAK_SINGLE_WORDS.has(p)) continue
-
-    // Whole-query equals a keyword ("hvac", "trainer", "gym") — strong single-word sector signal
-    if (q === p) {
-      score += 10
-      continue
+  let strongestWeight = 0
+  let strongestKind: KeywordMatchType | null = null
+  for (const hit of bestByConcept.values()) {
+    score += hit.weight
+    if (hit.weight > strongestWeight) {
+      strongestWeight = hit.weight
+      strongestKind = hit.kind
     }
-    if (q.includes(p)) {
-      if (isSingleWord && WEAK_SINGLE_WORDS.has(p)) continue
-      score += Math.min(12, Math.max(3, Math.round(p.length * 1.5)))
-      continue
-    }
-    const pTokens = p.split(/\s+/).filter(Boolean)
-    const allTokensHit = pTokens.every((tok) =>
-      words.some((w) => w === tok || (tok.length >= 4 && (w.includes(tok) || tok.includes(w))))
-    )
-    if (pTokens.length > 1 && allTokensHit) {
-      score += 5
-      continue
-    }
-    if (isSingleWord && WEAK_SINGLE_WORDS.has(p)) continue
-
-    const wordHit =
-      words.some((w) => w === p) ||
-      words.some((w) => w.length >= 4 && (w.startsWith(p) || (p.length >= 4 && w.includes(p))))
-    if (wordHit) score += 3
   }
-  return score
-}
 
-function rankSectorMatches(normalized: string): Array<{ sector: SectorScoring; score: number }> {
-  return SCORING_SECTORS.map((sector) => ({
-    sector,
-    score: scoreSectorMatch(normalized, sector),
-  }))
-    .filter((row) => row.score > 0)
-    .sort((a, b) => b.score - a.score)
-}
-
-export type SectorFitPresentation = {
-  headline: string
-  matchStrength: 'high' | 'medium' | 'broad'
-  /** Top-level bucket when confidently matched */
-  category: string | null
-  /** True when we have input but could not map to a sector template confidently */
-  needsMoreDetail: boolean
-  /** Set when two sectors score similarly — we ask for detail instead of guessing */
-  ambiguousAlternates: ReadonlyArray<string> | null
-  summary: string
-  featuresOrdered: ReadonlyArray<{
-    id: FeatureFitId
-    title: string
-    fit: string
-  }>
-}
-
-/** Minimum primary description length before we ask for follow-up context */
-export const MIN_PRIMARY_CHARS_FOR_FOLLOW_UP = 6
-
-export function combineSectorQueries(primary: string, additional: string): string {
-  const parts = [primary.trim(), additional.trim()].filter((p) => p.length > 0)
-  return parts.join(' ')
-}
-
-const FEATURE_ORDER: FeatureFitId[] = ['email_automation', 'crm_management', 'ai_assistant']
-
-/** Slightly tighter than early versions: broader index ⇒ more accidental hits without intent */
-const MIN_SCORE_HIGH = 10
-const MIN_SCORE_MEDIUM = 6
-
-function fallbackPresentation(
-  queryRaw: string,
-  normalized: string,
-  opts?: { ambiguousAlternates?: string[]; summary?: string }
-): SectorFitPresentation {
-  const headline = normalized ? `What could help • “${truncateDisplay(queryRaw.trim(), 48)}”` : 'Tell us what you do'
-  const summary =
-    opts?.summary ??
-    (normalized
-      ? 'Add your industry or how leads reach you in the box below—we’ll map Email Automation, CRM, and AI Assistant to workflows that fit.'
-      : FALLBACK_SUMMARY)
   return {
-    headline,
-    matchStrength: 'broad',
-    category: null,
-    needsMoreDetail: Boolean(normalized),
-    ambiguousAlternates: opts?.ambiguousAlternates ?? null,
-    summary,
-    featuresOrdered: FEATURE_ORDER.map((id) => ({
-      id,
-      title: FEATURE_LABELS[id],
-      fit: FALLBACK_FITS[id],
-    })),
+    score,
+    conceptCount: bestByConcept.size,
+    strongestWeight,
+    strongestKind,
   }
 }
 
-export function getSectorFitPresentation(queryRaw: string): SectorFitPresentation {
-  const normalized = normalizeQuery(queryRaw)
-  const ranked = rankSectorMatches(normalized)
-  const best = ranked[0] ?? null
-  const second = ranked[1] ?? null
+type RankedSector = {
+  sector: SectorScoring
+  score: number
+  conceptCount: number
+  strongestWeight: number
+  strongestKind: KeywordMatchType | null
+}
 
-  if (!normalized || !best || best.score < MIN_SCORE_MEDIUM) {
-    return fallbackPresentation(queryRaw, normalized)
+function rankSectorMatches(matchingInput: string): RankedSector[] {
+  return SCORING_SECTORS.map((sector) => {
+    const result = scoreSectorMatch(matchingInput, sector)
+    return { sector, ...result }
+  })
+    .filter((row) => row.score > 0)
+    .sort((a, b) => b.score - a.score || b.conceptCount - a.conceptCount)
+}
+
+function featuresFromFits(fits: Record<FeatureFitId, string>): FeatureFit[] {
+  return FEATURE_ORDER.map((id) => ({
+    id,
+    title: FEATURE_LABELS[id],
+    fit: fits[id],
+  }))
+}
+
+function idlePresentation(): SectorFitPresentation {
+  return {
+    status: 'idle',
+    reasonCode: 'EMPTY',
+    headline: 'Tell us what your business does',
+    matchStrength: null,
+    category: null,
+    sectorId: null,
+    needsMoreDetail: false,
+    ambiguousAlternates: null,
+    summary:
+      'Enter a business type or briefly explain what you sell, provide, repair, manage, or organize.',
+    featuresOrdered: featuresFromFits(FALLBACK_FITS),
   }
+}
 
-  const isAmbiguous =
-    second !== null &&
-    second.score >= MIN_SCORE_MEDIUM &&
-    best.score - second.score < AMBIGUITY_SCORE_MARGIN
-
-  if (isAmbiguous) {
-    const a = best.sector.displayName
-    const b = second.sector.displayName
-    return fallbackPresentation(queryRaw, normalized, {
-      ambiguousAlternates: [a, b],
-      summary: `That could fit ${a} or ${b}. Add one concrete detail—what you sell, who buys it, and how inquiries arrive—so we map the right playbook instead of guessing.`,
-    })
+function invalidPresentation(reasonCode: SectorInputReasonCode): SectorFitPresentation {
+  return {
+    status: 'invalid',
+    reasonCode,
+    headline: 'We need a clearer business description',
+    matchStrength: null,
+    category: null,
+    sectorId: null,
+    needsMoreDetail: false,
+    ambiguousAlternates: null,
+    summary: 'Please enter a real business type or a short description of what the business does.',
+    featuresOrdered: featuresFromFits(FALLBACK_FITS),
   }
+}
 
-  const strength = best.score >= MIN_SCORE_HIGH ? 'high' : 'medium'
+function needsDetailPresentation(
+  reasonCode: SectorInputReasonCode,
+  summary?: string
+): SectorFitPresentation {
+  const unsupportedLanguage = reasonCode === 'UNSUPPORTED_LANGUAGE'
+  return {
+    status: 'needs_detail',
+    reasonCode,
+    headline: 'Tell us a little more',
+    matchStrength: null,
+    category: null,
+    sectorId: null,
+    needsMoreDetail: true,
+    ambiguousAlternates: null,
+    summary:
+      summary ??
+      (unsupportedLanguage
+        ? 'We could not confidently interpret that description yet. Please describe what the business sells or does in English, such as “commercial cleaning company” or “online clothing store.”'
+        : 'What does the business sell or provide, and who does it serve?'),
+    featuresOrdered: featuresFromFits(FALLBACK_FITS),
+  }
+}
+
+function unsupportedPresentation(): SectorFitPresentation {
+  return {
+    status: 'unsupported',
+    reasonCode: 'NO_SUPPORTED_SECTOR',
+    headline: 'We do not have a specific sector match yet',
+    matchStrength: null,
+    category: null,
+    sectorId: null,
+    needsMoreDetail: true,
+    ambiguousAlternates: null,
+    summary:
+      'Your business may still benefit from automation. Tell us how you currently handle inquiries, leads, follow-ups, scheduling, or repetitive administrative work.',
+    featuresOrdered: featuresFromFits(FALLBACK_FITS),
+  }
+}
+
+function ambiguousPresentation(alternates: RankedSector[]): SectorFitPresentation {
+  const top = alternates.slice(0, 3)
+  const names = top.map((r) => r.sector.displayName)
+  const nameList =
+    names.length === 2
+      ? `${names[0]} or ${names[1]}`
+      : names.length > 2
+        ? `${names.slice(0, -1).join(', ')}, or ${names[names.length - 1]}`
+        : names[0] ?? 'more than one sector'
+  return {
+    status: 'ambiguous',
+    reasonCode: 'AMBIGUOUS_SECTORS',
+    headline: 'We found a few possible matches',
+    matchStrength: null,
+    category: null,
+    sectorId: null,
+    needsMoreDetail: true,
+    ambiguousAlternates: top.map((r) => ({
+      id: r.sector.id,
+      displayName: r.sector.displayName,
+    })),
+    summary: `This could fit ${nameList}. Tell us whether you primarily serve customers, distribute products, organize events, or something else so we map the right playbook.`,
+    featuresOrdered: featuresFromFits(FALLBACK_FITS),
+  }
+}
+
+function matchedPresentation(best: RankedSector, strength: 'high' | 'medium'): SectorFitPresentation {
   const category = best.sector.category
   return {
+    status: 'matched',
+    reasonCode: 'VALID_MATCH',
     headline: `Matched fit • ${category} — ${best.sector.displayName}`,
     matchStrength: strength,
     category,
+    sectorId: best.sector.id,
     needsMoreDetail: false,
     ambiguousAlternates: null,
     summary: best.sector.summary,
-    featuresOrdered: FEATURE_ORDER.map((id) => ({
-      id,
-      title: FEATURE_LABELS[id],
-      fit: best.sector.fits[id],
-    })),
+    featuresOrdered: featuresFromFits(best.sector.fits),
   }
 }
 
-function truncateDisplay(s: string, maxLen: number): string {
-  if (s.length <= maxLen) return s
-  return `${s.slice(0, Math.max(0, maxLen - 1)).trim()}…`
+/**
+ * Central processing entry: normalize → viability → match → presentation.
+ */
+export function analyzeSectorInput(rawInput: string): SectorInputAnalysis {
+  const cappedRaw = rawInput.slice(0, MAX_RAW_INPUT_CHARS)
+  const rawLength = cappedRaw.length
+  const normalizedInput = normalizeForValidation(cappedRaw)
+  let matchingInput = normalizeForMatching(cappedRaw)
+  if (matchingInput.length > MAX_MATCHING_INPUT_CHARS) {
+    matchingInput = matchingInput.slice(0, MAX_MATCHING_INPUT_CHARS).trim()
+  }
+
+  const viability = assessViability(cappedRaw, normalizedInput, matchingInput)
+  if (viability) {
+    let presentation: SectorFitPresentation
+    if (viability.status === 'empty') {
+      presentation = idlePresentation()
+    } else if (
+      viability.status === 'nonsensical' ||
+      viability.status === 'too_short' ||
+      viability.reasonCode === 'NO_MEANINGFUL_CHARACTERS' ||
+      viability.reasonCode === 'ONLY_NUMBERS' ||
+      viability.reasonCode === 'MOSTLY_SYMBOLS' ||
+      viability.reasonCode === 'REPEATED_CHARACTER_SEQUENCE' ||
+      viability.reasonCode === 'KEYBOARD_MASH' ||
+      viability.reasonCode === 'TOO_SHORT'
+    ) {
+      presentation = invalidPresentation(viability.reasonCode)
+    } else {
+      presentation = needsDetailPresentation(viability.reasonCode)
+    }
+    return {
+      rawLength,
+      normalizedInput,
+      matchingInput,
+      status: viability.status === 'empty' ? 'empty' : viability.status,
+      reasonCode: viability.reasonCode,
+      presentation,
+    }
+  }
+
+  const ranked = rankSectorMatches(matchingInput)
+  const best = ranked[0] ?? null
+
+  if (!best || best.score < MIN_SCORE_MEDIUM) {
+    // Viable language but no sector evidence → unsupported (or still needs detail if very generic)
+    const tokens = tokenizeMatching(matchingInput)
+    const hasDistinctive = tokens.some(
+      (t) => !WEAK_SINGLE_WORDS.has(t) && !BUSINESS_CONTEXT_TERMS.has(t) && t.length >= 4
+    )
+    if (!hasDistinctive) {
+      const presentation = needsDetailPresentation('INSUFFICIENT_INFORMATION')
+      return {
+        rawLength,
+        normalizedInput,
+        matchingInput,
+        status: 'low_information',
+        reasonCode: 'INSUFFICIENT_INFORMATION',
+        presentation,
+      }
+    }
+    const presentation = unsupportedPresentation()
+    return {
+      rawLength,
+      normalizedInput,
+      matchingInput,
+      status: 'unsupported',
+      reasonCode: 'NO_SUPPORTED_SECTOR',
+      presentation,
+    }
+  }
+
+  // Ambiguity: all peers within margin that clear medium threshold
+  const ambiguousPeers = ranked.filter(
+    (row) =>
+      row.score >= MIN_SCORE_MEDIUM &&
+      best.score - row.score < AMBIGUITY_SCORE_MARGIN
+  )
+
+  if (ambiguousPeers.length >= 2) {
+    const presentation = ambiguousPresentation(ambiguousPeers)
+    return {
+      rawLength,
+      normalizedInput,
+      matchingInput,
+      status: 'ambiguous',
+      reasonCode: 'AMBIGUOUS_SECTORS',
+      presentation,
+    }
+  }
+
+  // Confidence
+  const weakOnly =
+    best.conceptCount === 1 &&
+    best.strongestKind === 'prefix' &&
+    best.score < MIN_SCORE_HIGH
+
+  if (weakOnly) {
+    const presentation = needsDetailPresentation(
+      'INSUFFICIENT_INFORMATION',
+      'We picked up a partial signal—add one concrete detail (what you sell, who you serve, or how leads arrive) so we can map the right playbook.'
+    )
+    return {
+      rawLength,
+      normalizedInput,
+      matchingInput,
+      status: 'low_information',
+      reasonCode: 'INSUFFICIENT_INFORMATION',
+      presentation,
+    }
+  }
+
+  const hasStrongSignal =
+    best.strongestKind === 'exact' ||
+    best.strongestKind === 'phrase' ||
+    best.strongestKind === 'token' ||
+    (best.strongestKind === 'prefix' && best.conceptCount >= 2)
+
+  const strength: 'high' | 'medium' =
+    best.score >= MIN_SCORE_HIGH && hasStrongSignal && best.strongestKind !== 'prefix'
+      ? 'high'
+      : 'medium'
+
+  // Require high to lead runner-up safely (already non-ambiguous)
+  const presentation = matchedPresentation(best, strength)
+  return {
+    rawLength,
+    normalizedInput,
+    matchingInput,
+    status: 'matched',
+    reasonCode: 'VALID_MATCH',
+    presentation,
+  }
 }
+
+/**
+ * Compatibility wrapper — prefer analyzeSectorInput for new code.
+ * Maps analysis presentation into the historical SectorFitPresentation shape used by the UI.
+ */
+export function getSectorFitPresentation(queryRaw: string): SectorFitPresentation {
+  return analyzeSectorInput(queryRaw).presentation
+}
+
+/** Test helper: score a sector by id against a normalized/matching query string */
+export function scoreSectorMatchById(
+  matchingInput: string,
+  sectorId: string
+): number {
+  const sector = SCORING_SECTORS.find((s) => s.id === sectorId)
+  if (!sector) return 0
+  return scoreSectorMatch(matchingInput, sector).score
+}
+
+/** Read-only catalog snapshot for integrity / regression gates (compiled keywords). */
+export type SectorCatalogEntry = {
+  id: string
+  displayName: string
+  category: string
+  summary: string
+  fits: Record<FeatureFitId, string>
+  keywords: ReadonlyArray<SectorKeyword>
+}
+
+export function listSectorCatalog(): ReadonlyArray<SectorCatalogEntry> {
+  return SCORING_SECTORS.map((s) => ({
+    id: s.id,
+    displayName: s.displayName,
+    category: s.category,
+    summary: s.summary,
+    fits: { ...s.fits },
+    keywords: s.positiveKeywords.map((k) => ({ ...k })),
+  }))
+}
+
+export const FEATURE_FIT_IDS: ReadonlyArray<FeatureFitId> = [
+  'email_automation',
+  'crm_management',
+  'ai_assistant',
+]
+
