@@ -12,6 +12,7 @@ import {
   MarketingBackdrop,
   Reveal,
 } from '@/components/radiant'
+import { FikiriHeroVisual, FikiriHeroBrandBlock, FikiriHeroSectorSettle } from '@/components/radiant/FikiriHeroVisual'
 import { MarketingChatWidget } from '../components/MarketingChatWidget'
 import { SectorFitSection } from '../components/SectorFitExplorer'
 import { publicMedia } from '@/lib/publicMedia'
@@ -19,25 +20,24 @@ import { trackSectorExplorerCta } from '../lib/sectorFitAnalytics'
 
 function Hero() {
   const sectorHeadingId = useId()
-  const reduceMotion = useReducedMotion()
 
   return (
-    <div className="relative isolate">
+    <FikiriHeroVisual>
       <Container className="relative">
         <Navbar tone="onDark" variant="marketing" />
-        <motion.div
-          className="px-2 pb-12 pt-4 sm:pb-16 sm:pt-6 md:pb-20"
-          initial={reduceMotion ? false : { opacity: 0, y: 28, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
-        >
+
+        {/*
+          Reserve vertical space so the absolute tree reads as the hero field,
+          then brand + Sector Fit continue in the same continuous section.
+        */}
+        <div className="flex min-h-[min(52vw,300px)] flex-col justify-end pb-2 pt-10 sm:min-h-[min(46vw,380px)] sm:pt-12 md:min-h-[min(42vw,440px)] md:pb-4 lg:min-h-[min(40vw,480px)]">
+          <FikiriHeroBrandBlock />
+        </div>
+
+        <FikiriHeroSectorSettle className="px-2 pb-12 pt-6 sm:pb-16 sm:pt-8 md:pb-20">
           <SectorFitSection headingId={sectorHeadingId} tone="onDark" />
-          <motion.div
-            className="mt-6 flex flex-col items-stretch justify-center gap-3 sm:mt-8 sm:flex-row sm:items-center sm:gap-4"
-            initial={reduceMotion ? false : { opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.65, delay: 0.18, ease: [0.22, 1, 0.36, 1] }}
-          >
+
+          <div className="mt-6 flex flex-col items-stretch justify-center gap-3 sm:mt-8 sm:flex-row sm:items-center sm:gap-4">
             <Button
               to="/signup"
               className="w-full sm:w-auto"
@@ -53,7 +53,7 @@ function Hero() {
             >
               Start a workflow conversation
             </Button>
-          </motion.div>
+          </div>
           <p className="mt-4 text-center text-sm text-white/75">
             Prefer pricing first?{' '}
             <a
@@ -64,9 +64,9 @@ function Hero() {
               See plans
             </a>
           </p>
-        </motion.div>
+        </FikiriHeroSectorSettle>
       </Container>
-    </div>
+    </FikiriHeroVisual>
   )
 }
 

@@ -13,6 +13,16 @@ export const publicMedia = {
     serviceAi: inImages('about-service-ai.png'),
   },
   landing: {
+    /** Approved production hero plates — compositing only; do not recreate. */
+    hero: {
+      desktop: publicAsset('brand/hero/fikiri-hero-desktop.png'),
+      mobile: publicAsset('brand/hero/fikiri-hero-mobile.png'),
+      /**
+       * Baked black RGB plate (no alpha). Do not overlay until a transparent export exists.
+       * Path kept for when asset cleanup lands.
+       */
+      tripleF: publicAsset('brand/hero/fikiri-triple-f.png'),
+    },
     bento: {
       email: inImages('email.png'),
       /** Person + tablet (lifestyle) — not the in-app UI snapshot; that’s `tab.crm` below Features. */

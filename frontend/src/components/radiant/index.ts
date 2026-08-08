@@ -13,3 +13,10 @@ export { RadiantLayout } from './RadiantLayout'
 export { ClientPartnerships } from './ClientPartnerships'
 export { Reveal, MarketingReveal } from './Reveal'
 export type { RevealDirection } from './Reveal'
+export {
+  FikiriHeroVisual,
+  FikiriHeroBrandBlock,
+  FikiriHeroSectorSettle,
+  HERO_SEEN_SESSION_KEY,
+  useHeroEntrance,
+} from './FikiriHeroVisual'
