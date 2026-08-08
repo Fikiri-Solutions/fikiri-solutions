@@ -313,3 +313,59 @@ export interface ImpersonationContext {
   actor_email?: string | null
   actor_name?: string | null
 }
+
+/** Landing-page (site) chatbot transcript — staff review via /api/admin/site-chat */
+export interface SiteChatSessionSummary {
+  session_id: string
+  source_page?: string | null
+  first_seen_at?: string | null
+  last_seen_at?: string | null
+  turn_count?: number
+  last_mode?: string | null
+  latest_lead_tier?: string | null
+  latest_lead_score?: number | null
+  latest_lead_synopsis?: string | null
+  latest_handoff_path?: string | null
+}
+
+export interface SiteChatMessage {
+  role: string
+  content: string
+  mode?: string | null
+  grounded?: boolean | null
+  confidence?: number | null
+  lead_assessment?: {
+    tier?: string
+    score?: number
+    synopsis?: string
+  } | null
+  intake?: Record<string, unknown> | null
+  handoff?: Record<string, unknown> | null
+  created_at?: string | null
+}
+
+export interface SiteChatSessionDetail {
+  session: SiteChatSessionSummary & {
+    hashed_ip?: string | null
+    hashed_user_agent?: string | null
+    created_at?: string | null
+    updated_at?: string | null
+  }
+  messages: SiteChatMessage[]
+}
+
+export interface SiteChatSessionsList {
+  sessions: SiteChatSessionSummary[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export interface SiteChatTranscriptExport {
+  format: 'text' | 'json'
+  session_id: string
+  content?: string
+  session?: SiteChatSessionSummary
+  messages?: SiteChatMessage[]
+  [key: string]: unknown
+}

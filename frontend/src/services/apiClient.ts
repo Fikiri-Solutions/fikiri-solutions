@@ -2396,6 +2396,36 @@ class ApiClient {
     const response = await this.client.post('/analytics/events', payload)
     return response.data?.data ?? response.data
   }
+
+  async listSiteChatSessions(params?: {
+    limit?: number
+    offset?: number
+    tier?: string
+    mode?: string
+  }): Promise<import('../types/admin').SiteChatSessionsList> {
+    const response = await this.client.get('/admin/site-chat/sessions', { params })
+    return response.data?.data ?? response.data
+  }
+
+  async getSiteChatSession(
+    sessionId: string
+  ): Promise<import('../types/admin').SiteChatSessionDetail> {
+    const response = await this.client.get(
+      `/admin/site-chat/sessions/${encodeURIComponent(sessionId)}`
+    )
+    return response.data?.data ?? response.data
+  }
+
+  async exportSiteChatSession(
+    sessionId: string,
+    format: 'text' | 'json' = 'text'
+  ): Promise<import('../types/admin').SiteChatTranscriptExport> {
+    const response = await this.client.get(
+      `/admin/site-chat/sessions/${encodeURIComponent(sessionId)}/export`,
+      { params: { format } }
+    )
+    return response.data?.data ?? response.data
+  }
 }
 
 // Export singleton instance

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Building2, ClipboardList, KeyRound } from 'lucide-react'
+import { Building2, ClipboardList, KeyRound, MessageSquare } from 'lucide-react'
 import { apiClient } from '../../services/apiClient'
 import type { PlatformAdminStatus } from '../../types/admin'
 import { AdminPanel, MetricTile, StatusBadge, type StatusTone } from './adminUi'
@@ -11,6 +11,12 @@ const destinations = [
     title: 'Tenant Directory',
     description: 'Browse client accounts and open a tenant dossier.',
     icon: Building2,
+  },
+  {
+    to: '/admin/site-chat',
+    title: 'Site Chat Logs',
+    description: 'Review and download landing-page chatbot transcripts.',
+    icon: MessageSquare,
   },
   {
     to: '/admin/security',

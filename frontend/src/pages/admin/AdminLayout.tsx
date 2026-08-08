@@ -1,10 +1,11 @@
 import { useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Building2, ClipboardList, LayoutDashboard, Shield, KeyRound } from 'lucide-react'
+import { Building2, ClipboardList, LayoutDashboard, MessageSquare, Shield, KeyRound } from 'lucide-react'
 
 const navItems = [
   { to: '/admin', label: 'Overview', icon: LayoutDashboard, end: true },
   { to: '/admin/tenants', label: 'Tenants', icon: Building2 },
+  { to: '/admin/site-chat', label: 'Site Chat', icon: MessageSquare },
   { to: '/admin/security', label: 'MFA Security', icon: KeyRound },
   { to: '/admin/audit', label: 'Audit Log', icon: ClipboardList },
 ]
