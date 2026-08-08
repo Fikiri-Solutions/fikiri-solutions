@@ -33,12 +33,21 @@ export default defineConfig({
     {
       name: 'e2e',
       dependencies: ['setup'],
+      testIgnore: /e2e\.(sector-fit-explorer|public-responsive|auth-continuity)\.spec\.ts/,
       use: { 
         storageState: 'playwright/.auth/state.json',
         ...devices['Desktop Chrome'],
       },
     },
-    
+
+    // Public marketing smokes (no auth setup)
+    {
+      name: 'public-e2e',
+      testMatch: /e2e\.(sector-fit-explorer|public-responsive|auth-continuity)\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+    },    
     // Admin tests
     {
       name: 'admin-e2e',
