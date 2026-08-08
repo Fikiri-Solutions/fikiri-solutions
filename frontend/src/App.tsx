@@ -31,7 +31,6 @@ const named = <T extends Record<string, unknown>, K extends keyof T>(
 ) =>
   lazy(async () => {
     const module = await loader()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- lazy remaps named page exports; props vary by route
     return { default: module[exportName] as ComponentType<any> }
   })
 
