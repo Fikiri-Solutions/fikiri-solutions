@@ -4,7 +4,7 @@ export function CRMIcon({ className = "w-full h-full" }: { className?: string })
   return (
     <svg
       viewBox="0 0 200 160"
-      className={className}
+      className={`fikiri-visual ${className}`}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
@@ -65,7 +65,7 @@ export function CRMIcon({ className = "w-full h-full" }: { className?: string })
         fontWeight="bold"
         fill="url(#textGradient)"
         textAnchor="middle"
-        fontFamily="system-ui, sans-serif"
+        fontFamily="'Source Serif 4', Georgia, 'Times New Roman', serif"
         style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}
       >
         CRM
@@ -78,7 +78,7 @@ export function CRMIcon({ className = "w-full h-full" }: { className?: string })
         fontWeight="bold"
         fill="url(#textHighlight)"
         textAnchor="middle"
-        fontFamily="system-ui, sans-serif"
+        fontFamily="'Source Serif 4', Georgia, 'Times New Roman', serif"
         opacity="0.3"
       >
         CRM

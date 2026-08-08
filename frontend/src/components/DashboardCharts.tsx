@@ -1,5 +1,6 @@
 import React from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts'
+import { chartTickStyle, BRAND_FONT_FAMILY } from '../lib/brandTypography'
 
 interface ChartData {
   name: string
@@ -36,11 +37,11 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, pieData 
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis 
               dataKey="name" 
-              tick={{ fontSize: 12 }}
+              tick={chartTickStyle()}
               tickLine={{ stroke: '#e5e7eb' }}
             />
             <YAxis 
-              tick={{ fontSize: 12 }}
+              tick={chartTickStyle()}
               tickLine={{ stroke: '#e5e7eb' }}
             />
             <Tooltip 
@@ -48,7 +49,8 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, pieData 
                 backgroundColor: 'white',
                 border: '1px solid #e5e7eb',
                 borderRadius: '8px',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                fontFamily: BRAND_FONT_FAMILY,
               }}
             />
             <Line 
@@ -93,11 +95,11 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, pieData 
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis 
               dataKey="name" 
-              tick={{ fontSize: 12 }}
+              tick={chartTickStyle()}
               tickLine={{ stroke: '#e5e7eb' }}
             />
             <YAxis 
-              tick={{ fontSize: 12 }}
+              tick={chartTickStyle()}
               tickLine={{ stroke: '#e5e7eb' }}
             />
             <Tooltip 
@@ -105,7 +107,8 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, pieData 
                 backgroundColor: 'white',
                 border: '1px solid #e5e7eb',
                 borderRadius: '8px',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                fontFamily: BRAND_FONT_FAMILY,
               }}
             />
             <Bar 
@@ -156,7 +159,8 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({ data, pieData 
                   backgroundColor: 'white',
                   border: '1px solid #e5e7eb',
                   borderRadius: '8px',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                fontFamily: BRAND_FONT_FAMILY,
                 }}
               />
             </PieChart>

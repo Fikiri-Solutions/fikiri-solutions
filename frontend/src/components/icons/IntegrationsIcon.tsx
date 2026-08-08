@@ -4,7 +4,7 @@ export function IntegrationsIcon({ className = "w-full h-full" }: { className?: 
   return (
     <svg
       viewBox="0 0 200 200"
-      className={className}
+      className={`fikiri-visual ${className}`}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
@@ -52,7 +52,7 @@ export function IntegrationsIcon({ className = "w-full h-full" }: { className?: 
         <ellipse cx="0" cy="22" rx="18" ry="3" fill="#1a1a1a" opacity="0.15" />
         <circle cx="0" cy="0" r="20" fill="white" stroke="#737373" strokeWidth="1.5" />
         <circle cx="0" cy="0" r="20" fill="url(#iconHighlight)" opacity="0.2" />
-        <text x="0" y="8" fontSize="26" fontWeight="bold" fill="url(#mailGradient)" textAnchor="middle" fontFamily="system-ui, sans-serif">M</text>
+        <text x="0" y="8" fontSize="26" fontWeight="bold" fill="url(#mailGradient)" textAnchor="middle" fontFamily="'Source Serif 4', Georgia, 'Times New Roman', serif">M</text>
         {/* Connecting line */}
         <path
           d="M20 0 Q75 25, 65 65"
@@ -107,7 +107,7 @@ export function IntegrationsIcon({ className = "w-full h-full" }: { className?: 
         <circle cx="0" cy="0" r="20" fill="url(#iconHighlight)" opacity="0.2" />
         <rect x="-8" y="-6" width="16" height="12" rx="2" fill="url(#calendarGradient2)" />
         <rect x="-8" y="-6" width="16" height="3" fill="#B33B1E" />
-        <text x="0" y="6" fontSize="13" fontWeight="bold" fill="white" textAnchor="middle" fontFamily="system-ui, sans-serif">31</text>
+        <text x="0" y="6" fontSize="13" fontWeight="bold" fill="white" textAnchor="middle" fontFamily="'Source Serif 4', Georgia, 'Times New Roman', serif">31</text>
         <path d="M6 8 L8 10 L6 10 Z" fill="#E7641C" />
         {/* Connecting line */}
         <path

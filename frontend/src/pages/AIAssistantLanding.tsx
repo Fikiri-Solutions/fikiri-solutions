@@ -55,7 +55,7 @@ export const AIAssistantLanding: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-100">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-100 font-serif">
       <div className="container mx-auto px-4 py-16">
         {/* Hero Section */}
         <div className="text-center mb-16">

@@ -547,6 +547,13 @@ def _session_detail_row(row: Any) -> Dict[str, Any]:
 def _parse_json_field(raw: Any) -> Any:
     if raw is None or raw == "":
         return None
+    if isinstance(raw, (dict, list)):
+        return raw
+    if isinstance(raw, (bytes, bytearray)):
+        try:
+            raw = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            return None
     try:
         return json.loads(raw)
     except (TypeError, json.JSONDecodeError):

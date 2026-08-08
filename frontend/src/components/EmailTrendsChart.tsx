@@ -1,5 +1,6 @@
 import React from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { chartTickStyle } from '../lib/brandTypography'
 
 interface ChartData {
   name: string
@@ -22,16 +23,16 @@ export const EmailTrendsChart: React.FC<EmailTrendsChartProps> = ({ data }) => {
   }
   
   return (
-    <ResponsiveContainer width="100%" height="100%" minHeight={256}>
+    <ResponsiveContainer width="100%" height="100%" minHeight={256} className="fikiri-chart">
       <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" opacity={0.3} />
         <XAxis 
           dataKey="name" 
-          tick={{ fontSize: 12, fill: '#6B7280' }}
+          tick={chartTickStyle()}
           tickLine={{ stroke: '#E5E7EB' }}
         />
         <YAxis 
-          tick={{ fontSize: 12, fill: '#6B7280' }}
+          tick={chartTickStyle()}
           tickLine={{ stroke: '#E5E7EB' }}
         />
         <Tooltip 
@@ -39,7 +40,8 @@ export const EmailTrendsChart: React.FC<EmailTrendsChartProps> = ({ data }) => {
             backgroundColor: 'white',
             border: '1px solid #e5e7eb',
             borderRadius: '8px',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+            fontFamily: '"Source Serif 4", Georgia, "Times New Roman", serif',
           }}
         />
         <Line 

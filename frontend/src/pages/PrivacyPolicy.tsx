@@ -27,7 +27,7 @@ const PrivacyPolicy: React.FC = () => {
         <meta name="description" content="Privacy Policy for Fikiri Solutions AI-powered Gmail automation platform" />
       </Helmet>
       
-      <div className="min-h-screen bg-gray-900 text-white">
+      <div className="min-h-screen bg-gray-900 font-serif text-white">
         <div className="container mx-auto px-4 py-8 max-w-4xl">
           {/* Navigation Buttons */}
           <div className="mb-6 flex flex-wrap items-center gap-4">

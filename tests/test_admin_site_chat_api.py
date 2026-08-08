@@ -61,6 +61,7 @@ def test_unauthenticated_admin_transcript_request_rejected(client):
 
 def test_non_admin_admin_transcript_request_rejected(client, monkeypatch):
     monkeypatch.setenv("FIKIRI_SITE_BOT_PERSIST_TRANSCRIPTS", "1")
+    monkeypatch.setattr("routes.admin_site_chat_api.get_actor_user_id", lambda: None)
     monkeypatch.setattr("routes.admin_site_chat_api.get_current_user_id", lambda: 42)
     monkeypatch.setattr("routes.admin_site_chat_api._is_admin_user", lambda _uid: False)
     monkeypatch.setattr("routes.admin_site_chat_api._get_user_role", lambda _uid: "member")
@@ -73,6 +74,7 @@ def test_non_admin_admin_transcript_request_rejected(client, monkeypatch):
 
 def test_admin_can_list_transcript_sessions(client, monkeypatch):
     monkeypatch.setenv("FIKIRI_SITE_BOT_PERSIST_TRANSCRIPTS", "1")
+    monkeypatch.setattr("routes.admin_site_chat_api.get_actor_user_id", lambda: None)
     monkeypatch.setattr("routes.admin_site_chat_api.get_current_user_id", lambda: 1)
     monkeypatch.setattr("routes.admin_site_chat_api._is_admin_user", lambda _uid: True)
     _seed_transcript()
@@ -89,6 +91,7 @@ def test_admin_can_list_transcript_sessions(client, monkeypatch):
 
 def test_admin_can_read_one_transcript_and_audit(client, monkeypatch):
     monkeypatch.setenv("FIKIRI_SITE_BOT_PERSIST_TRANSCRIPTS", "1")
+    monkeypatch.setattr("routes.admin_site_chat_api.get_actor_user_id", lambda: None)
     monkeypatch.setattr("routes.admin_site_chat_api.get_current_user_id", lambda: 7)
     monkeypatch.setattr("routes.admin_site_chat_api._is_admin_user", lambda _uid: True)
     _seed_transcript("site_read_one")
@@ -114,6 +117,7 @@ def test_admin_can_read_one_transcript_and_audit(client, monkeypatch):
 
 def test_admin_can_export_copy_friendly_transcript(client, monkeypatch):
     monkeypatch.setenv("FIKIRI_SITE_BOT_PERSIST_TRANSCRIPTS", "1")
+    monkeypatch.setattr("routes.admin_site_chat_api.get_actor_user_id", lambda: None)
     monkeypatch.setattr("routes.admin_site_chat_api.get_current_user_id", lambda: 9)
     monkeypatch.setattr("routes.admin_site_chat_api._is_admin_user", lambda _uid: True)
     _seed_transcript("site_export_one")
@@ -139,6 +143,7 @@ def test_admin_can_export_copy_friendly_transcript(client, monkeypatch):
 
 def test_owner_role_can_read_transcripts(client, monkeypatch):
     monkeypatch.setenv("FIKIRI_SITE_BOT_PERSIST_TRANSCRIPTS", "1")
+    monkeypatch.setattr("routes.admin_site_chat_api.get_actor_user_id", lambda: None)
     monkeypatch.setattr("routes.admin_site_chat_api.get_current_user_id", lambda: 3)
     monkeypatch.setattr("routes.admin_site_chat_api._is_admin_user", lambda _uid: False)
     monkeypatch.setattr("routes.admin_site_chat_api._get_user_role", lambda _uid: "owner")
@@ -146,6 +151,21 @@ def test_owner_role_can_read_transcripts(client, monkeypatch):
 
     response = client.get("/api/admin/site-chat/sessions/site_owner_read")
     assert response.status_code == 200
+
+
+def test_platform_actor_can_read_while_impersonating_tenant(client, monkeypatch):
+    """Staff identity (actor) must authorize, not the impersonated tenant."""
+    monkeypatch.setenv("FIKIRI_SITE_BOT_PERSIST_TRANSCRIPTS", "1")
+    monkeypatch.setattr("routes.admin_site_chat_api.get_actor_user_id", lambda: 1)
+    monkeypatch.setattr("routes.admin_site_chat_api.get_current_user_id", lambda: 99)
+    monkeypatch.setattr("routes.admin_site_chat_api._is_admin_user", lambda uid: int(uid) == 1)
+    monkeypatch.setattr("routes.admin_site_chat_api._get_user_role", lambda uid: "member" if int(uid) == 99 else "admin")
+    _seed_transcript("site_impersonation_read")
+
+    response = client.get("/api/admin/site-chat/sessions/site_impersonation_read")
+    assert response.status_code == 200
+    body = json.loads(response.data)
+    assert body["data"]["session"]["session_id"] == "site_impersonation_read"
 
 
 def _seed_miss_transcript(session_id: str = "site_miss_demo"):
@@ -189,6 +209,7 @@ def _seed_miss_transcript(session_id: str = "site_miss_demo"):
 
 def test_admin_can_list_misses(client, monkeypatch):
     monkeypatch.setenv("FIKIRI_SITE_BOT_PERSIST_TRANSCRIPTS", "1")
+    monkeypatch.setattr("routes.admin_site_chat_api.get_actor_user_id", lambda: None)
     monkeypatch.setattr("routes.admin_site_chat_api.get_current_user_id", lambda: 11)
     monkeypatch.setattr("routes.admin_site_chat_api._is_admin_user", lambda _uid: True)
     _seed_miss_transcript()
@@ -205,6 +226,7 @@ def test_admin_can_list_misses(client, monkeypatch):
 
 def test_admin_can_export_miss_cursor_patch(client, monkeypatch):
     monkeypatch.setenv("FIKIRI_SITE_BOT_PERSIST_TRANSCRIPTS", "1")
+    monkeypatch.setattr("routes.admin_site_chat_api.get_actor_user_id", lambda: None)
     monkeypatch.setattr("routes.admin_site_chat_api.get_current_user_id", lambda: 12)
     monkeypatch.setattr("routes.admin_site_chat_api._is_admin_user", lambda _uid: True)
     _seed_miss_transcript("site_miss_export")

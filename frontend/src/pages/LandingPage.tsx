@@ -10,7 +10,6 @@ import {
   BarChart3, 
   CheckCircle, 
   Play,
-  Star,
   Menu,
   X
 } from 'lucide-react'
@@ -20,6 +19,7 @@ import DemoVideoModal from '@/components/DemoVideoModal'
 import LogoTicker from '@/components/LogoTicker'
 import { useAuth } from '@/contexts/AuthContext'
 import { MarketingChatWidget } from '../components/MarketingChatWidget'
+import { clientPartnerships } from '@/lib/clientPartnerships'
 
 const LandingPage: React.FC = () => {
   // State for mobile menu and demo video
@@ -76,27 +76,6 @@ const LandingPage: React.FC = () => {
       step: "03",
       title: "Scale Your Business",
       description: "Watch your efficiency soar as AI handles routine tasks"
-    }
-  ]
-
-  const testimonials = [
-    {
-      name: "Sarah Johnson",
-      company: "Johnson Landscaping",
-      quote: "Fikiri's AI assistant has transformed how we handle customer inquiries. Response time dropped from hours to minutes.",
-      rating: 5
-    },
-    {
-      name: "Mike Chen",
-      company: "Chen's Restaurant Group", 
-      quote: "The automation features saved us 20 hours per week. Our team can now focus on what matters most.",
-      rating: 5
-    },
-    {
-      name: "Dr. Emily Rodriguez",
-      company: "Rodriguez Medical Practice",
-      quote: "Patient communication has never been smoother. Fikiri handles appointment reminders and follow-ups reliably for our current workflow.",
-      rating: 5
     }
   ]
 
@@ -158,7 +137,7 @@ const LandingPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-orange-900/30 to-red-900/30 text-white overflow-hidden relative" style={{
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-orange-900/30 to-red-900/30 text-white overflow-hidden relative font-serif" style={{
       background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 20%, #FF6B35 40%, #D2691E 60%, #8B0000 80%, #991b1b 100%)'
     }}>
       {/* Header Navigation */}
@@ -182,7 +161,7 @@ const LandingPage: React.FC = () => {
           <nav className="hidden md:flex items-center space-x-8">
             <a href="#features" className="text-white hover:text-orange-200 transition-colors">Features</a>
             <a href="#how-it-works" className="text-white hover:text-orange-200 transition-colors">How it works</a>
-            <a href="#testimonials" className="text-white hover:text-orange-200 transition-colors">Testimonials</a>
+            <a href="#client-partnerships" className="text-white hover:text-orange-200 transition-colors">Client Partnerships</a>
             <button 
               onClick={handlePricing}
               className="text-white hover:text-orange-200 transition-colors"
@@ -247,11 +226,11 @@ const LandingPage: React.FC = () => {
                   How it works
                 </a>
                 <a 
-                  href="#testimonials" 
+                  href="#client-partnerships" 
                   className="block text-white hover:text-orange-200 transition-colors py-2"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  Testimonials
+                  Client Partnerships
                 </a>
                 <button 
                   onClick={() => {
@@ -447,8 +426,8 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Social Proof Section */}
-      <section ref={testimonialsRef} id="testimonials" className="relative z-10 py-20 px-4 sm:px-6 lg:px-8">
+      {/* Client Partnerships */}
+      <section ref={testimonialsRef} id="client-partnerships" className="relative z-10 py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -456,36 +435,82 @@ const LandingPage: React.FC = () => {
             transition={{ duration: 0.8 }}
             className="text-center mb-16"
           >
+            <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-orange-300">
+              Client Partnerships
+            </p>
             <h2 className="text-3xl sm:text-4xl font-bold mb-4 bg-gradient-to-r from-orange-400 via-orange-500 to-blue-500 bg-clip-text text-transparent">
-              Trusted by growing service businesses
+              Real client work across different industries.
             </h2>
-            <p className="text-xl text-white max-w-2xl mx-auto">
-              From solo practices to multi‑location teams, Fikiri helps owners reclaim hours every week without hiring more staff.
+            <p className="text-xl text-white max-w-3xl mx-auto">
+              Fikiri starts with consulting and workflow discovery. From there, we help businesses
+              plan, build, and support practical systems around their real operations — from
+              automation and CRM to product workflows, cloud support, and custom tools.
             </p>
           </motion.div>
 
-          {/* Testimonials */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-            {testimonials.map((testimonial, index) => (
-              <motion.div
-                key={index}
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-16">
+            {clientPartnerships.map((client, index) => (
+              <motion.article
+                key={client.name}
                 initial={{ opacity: 0, y: 30 }}
                 animate={testimonialsInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
                 transition={{ duration: 0.8, delay: index * 0.1 }}
-                className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700"
+                className="flex flex-col rounded-xl border border-gray-700 bg-gray-800/50 p-6 backdrop-blur-sm"
               >
-                <div className="flex mb-4">
-                  {[...Array(testimonial.rating)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                  ))}
-                </div>
-                <p className="text-white mb-4 italic">"{testimonial.quote}"</p>
-                <div>
-                  <p className="font-semibold text-white">{testimonial.name}</p>
-                  <p className="text-orange-200 text-sm">{testimonial.company}</p>
-                </div>
-              </motion.div>
+                {client.logoSrc ? (
+                  <div
+                    className={
+                      client.darkLogoPlate
+                        ? 'mb-4 flex h-24 items-center justify-center overflow-hidden rounded-lg bg-black p-3 ring-1 ring-white/10 sm:h-28'
+                        : 'mb-4 flex h-24 items-center justify-center overflow-hidden rounded-lg bg-white p-3 ring-1 ring-white/20 sm:h-28'
+                    }
+                  >
+                    <img
+                      src={client.logoSrc}
+                      alt={client.logoAlt}
+                      className="h-full w-full object-contain"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className="mb-4 flex h-24 items-center justify-center rounded-lg bg-orange-500/15 ring-1 ring-orange-400/30 sm:h-28"
+                    role="img"
+                    aria-label={client.logoAlt}
+                  >
+                    <span className="text-2xl font-semibold tracking-widest text-orange-300">
+                      {client.fallbackMark}
+                    </span>
+                  </div>
+                )}
+                <h3 className="text-lg font-semibold text-white">{client.name}</h3>
+                <p className="mt-1 text-sm font-medium text-orange-300">{client.category}</p>
+                <p className="mt-3 flex-1 text-sm leading-relaxed text-white/80">{client.summary}</p>
+                <a
+                  href={client.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 inline-flex min-h-[44px] items-center text-sm font-medium text-orange-300 hover:text-orange-200"
+                >
+                  Visit site
+                  <span className="sr-only"> ({client.name})</span>
+                  <span aria-hidden className="ml-1">→</span>
+                </a>
+              </motion.article>
             ))}
+          </div>
+
+          <div className="mb-16 flex flex-col items-center gap-4 text-center">
+            <p className="max-w-2xl text-lg text-white">
+              Have a workflow, customer follow-up, or software problem you are trying to solve?
+            </p>
+            <Link
+              to="/intake"
+              className="inline-flex min-h-[44px] items-center rounded-lg bg-gradient-to-r from-orange-600 to-red-600 px-6 py-3 font-semibold text-white transition-all hover:from-orange-700 hover:to-red-700"
+            >
+              Start a workflow conversation
+            </Link>
           </div>
 
           {/* Tech Stack Logos */}

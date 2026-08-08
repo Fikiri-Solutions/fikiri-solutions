@@ -12,6 +12,7 @@ import {
   Calendar, Filter, Download, Maximize2, RefreshCw, Eye, EyeOff, Activity
 } from 'lucide-react'
 import { cn } from "../lib/utils"
+import { chartTickStyle, BRAND_FONT_FAMILY } from "../lib/brandTypography"
 
 interface ChartData {
   name: string
@@ -390,17 +391,17 @@ export const EnhancedDashboardCharts: React.FC<DashboardChartsProps> = ({
                       <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" opacity={0.3} />
                       <XAxis 
                         dataKey="name" 
-                        tick={{ fontSize: 12, fill: '#6B7280' }}
+                        tick={chartTickStyle()}
                         tickLine={{ stroke: '#E5E7EB' }}
                         axisLine={{ stroke: '#E5E7EB' }}
                       />
                       <YAxis 
-                        tick={{ fontSize: 12, fill: '#6B7280' }}
+                        tick={chartTickStyle()}
                         tickLine={{ stroke: '#E5E7EB' }}
                         axisLine={{ stroke: '#E5E7EB' }}
                       />
                       <Tooltip content={<CustomTooltip />} />
-                      {showLegend && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+                      {showLegend && <Legend wrapperStyle={{ paddingTop: '20px', fontFamily: BRAND_FONT_FAMILY }} />}
                       <Line 
                         type="monotone" 
                         dataKey="emails" 
@@ -435,17 +436,17 @@ export const EnhancedDashboardCharts: React.FC<DashboardChartsProps> = ({
                       <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" opacity={0.3} />
                       <XAxis 
                         dataKey="name" 
-                        tick={{ fontSize: 12, fill: '#6B7280' }}
+                        tick={chartTickStyle()}
                         tickLine={{ stroke: '#E5E7EB' }}
                         axisLine={{ stroke: '#E5E7EB' }}
                       />
                       <YAxis 
-                        tick={{ fontSize: 12, fill: '#6B7280' }}
+                        tick={chartTickStyle()}
                         tickLine={{ stroke: '#E5E7EB' }}
                         axisLine={{ stroke: '#E5E7EB' }}
                       />
                       <Tooltip content={<CustomTooltip />} />
-                      {showLegend && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+                      {showLegend && <Legend wrapperStyle={{ paddingTop: '20px', fontFamily: BRAND_FONT_FAMILY }} />}
                       <Bar 
                         dataKey="emails" 
                         fill="url(#emailGradient)"
@@ -484,17 +485,17 @@ export const EnhancedDashboardCharts: React.FC<DashboardChartsProps> = ({
                       <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" opacity={0.3} />
                       <XAxis 
                         dataKey="name" 
-                        tick={{ fontSize: 12, fill: '#6B7280' }}
+                        tick={chartTickStyle()}
                         tickLine={{ stroke: '#E5E7EB' }}
                         axisLine={{ stroke: '#E5E7EB' }}
                       />
                       <YAxis 
-                        tick={{ fontSize: 12, fill: '#6B7280' }}
+                        tick={chartTickStyle()}
                         tickLine={{ stroke: '#E5E7EB' }}
                         axisLine={{ stroke: '#E5E7EB' }}
                       />
                       <Tooltip content={<CustomTooltip />} />
-                      {showLegend && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
+                      {showLegend && <Legend wrapperStyle={{ paddingTop: '20px', fontFamily: BRAND_FONT_FAMILY }} />}
                       <Area 
                         type="monotone" 
                         dataKey="emails" 

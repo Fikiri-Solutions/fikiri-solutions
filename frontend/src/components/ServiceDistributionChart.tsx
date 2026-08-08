@@ -1,5 +1,6 @@
 import React from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { BRAND_FONT_FAMILY } from '../lib/brandTypography'
 
 interface PieData {
   name: string
@@ -24,7 +25,7 @@ export const ServiceDistributionChart: React.FC<ServiceDistributionChartProps> =
   }
 
   return (
-    <ResponsiveContainer width="100%" height="100%" minHeight={256}>
+    <ResponsiveContainer width="100%" height="100%" minHeight={256} className="fikiri-chart">
       <PieChart>
         <Pie
           data={data}
@@ -48,10 +49,11 @@ export const ServiceDistributionChart: React.FC<ServiceDistributionChartProps> =
             backgroundColor: 'white',
             border: '1px solid #e5e7eb',
             borderRadius: '8px',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+            fontFamily: BRAND_FONT_FAMILY,
           }}
         />
-        <Legend />
+        <Legend wrapperStyle={{ fontFamily: BRAND_FONT_FAMILY }} />
       </PieChart>
     </ResponsiveContainer>
   )

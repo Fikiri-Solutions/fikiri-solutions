@@ -178,6 +178,15 @@ def test_metadata_snapshots_serialize_safely(monkeypatch):
     json.dumps(assistant)
 
 
+def test_parse_json_field_accepts_already_parsed_objects():
+    from company_chatbot.transcript_store import _parse_json_field
+
+    assert _parse_json_field({"tier": "warm"}) == {"tier": "warm"}
+    assert _parse_json_field([1, 2]) == [1, 2]
+    assert _parse_json_field('{"tier":"hot"}') == {"tier": "hot"}
+    assert _parse_json_field(None) is None
+
+
 def test_retention_config_default_is_90_days():
     assert config.transcript_retention_days() == 90
 

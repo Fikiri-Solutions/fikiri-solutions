@@ -61,7 +61,7 @@ export function BentoCard({
         </Subheading>
         <p
           className={clsx(
-            'mt-1 text-2xl font-medium tracking-tight',
+            'mt-1 font-serif text-2xl font-medium tracking-tight',
             dark ? 'text-white' : 'text-foreground'
           )}
         >

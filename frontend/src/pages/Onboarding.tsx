@@ -300,11 +300,11 @@ export const Onboarding: React.FC = () => {
   };
 
         return (
-    <div className="min-h-screen bg-gradient-to-br from-brand-background via-brand-tan/20 to-brand-background flex items-center justify-center px-4 py-12">
-      <div className="max-w-2xl w-full">
+    <div className="min-h-dvh bg-gradient-to-br from-brand-background via-brand-tan/20 to-brand-background flex items-start justify-center px-4 py-8 sm:items-center sm:py-12">
+      <div className="max-w-2xl w-full min-w-0 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         <EmailVerificationBanner user={user} />
         {/* Progress indicator */}
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
             <span className="font-medium">Step {step} of 4</span>
             <span className="font-medium">{Math.round((step / 4) * 100)}% Complete</span>
@@ -317,7 +317,7 @@ export const Onboarding: React.FC = () => {
               </div>
             </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 md:p-10">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-5 sm:p-8 md:p-10">
           {/* Step 1: Welcome & Company Info */}
         {step === 1 && (
             <div className="space-y-6">
@@ -325,10 +325,10 @@ export const Onboarding: React.FC = () => {
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-brand-primary to-brand-secondary rounded-full mb-4">
                   <Sparkles className="h-8 w-8 text-white" />
                 </div>
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 sm:text-3xl">
                   Welcome to Fikiri Solutions
                 </h2>
-                <p className="text-lg text-gray-600 dark:text-gray-300">
+                <p className="text-base text-gray-600 dark:text-gray-300 sm:text-lg">
                   Let's set up your account in just a few steps
                 </p>
           </div>

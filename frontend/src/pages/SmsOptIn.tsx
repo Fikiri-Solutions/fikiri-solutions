@@ -24,7 +24,7 @@ const SmsOptIn: React.FC = () => {
           <meta name="description" content="Consent to receive SMS text messages from Fikiri Solutions LLC. Opt-in language and proof of consent for toll-free verification." />
         </Helmet>
 
-        <div className="min-h-screen bg-gray-900 text-white">
+        <div className="min-h-screen bg-gray-900 font-serif text-white">
           <div className="container mx-auto px-4 py-8 max-w-4xl">
             <div className="mb-6 flex items-center gap-4">
               <button

@@ -12,6 +12,7 @@ import {
   Maximize2, Minimize2, RotateCcw
 } from 'lucide-react'
 import { cn } from "@/lib/utils"
+import { chartTickStyle } from "@/lib/brandTypography"
 
 export type ChartDatum = Record<string, string | number>
 
@@ -84,12 +85,12 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" opacity={0.3} />
               <XAxis 
                 dataKey="name" 
-                tick={{ fontSize: compact ? 10 : 12, fill: '#6B7280' }}
+                tick={chartTickStyle({ fontSize: compact ? 10 : 12 })}
                 tickLine={{ stroke: '#E5E7EB' }}
                 axisLine={{ stroke: '#E5E7EB' }}
               />
               <YAxis 
-                tick={{ fontSize: compact ? 10 : 12, fill: '#6B7280' }}
+                tick={chartTickStyle({ fontSize: compact ? 10 : 12 })}
                 tickLine={{ stroke: '#E5E7EB' }}
                 axisLine={{ stroke: '#E5E7EB' }}
               />
@@ -113,12 +114,12 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" opacity={0.3} />
               <XAxis 
                 dataKey="name" 
-                tick={{ fontSize: compact ? 10 : 12, fill: '#6B7280' }}
+                tick={chartTickStyle({ fontSize: compact ? 10 : 12 })}
                 tickLine={{ stroke: '#E5E7EB' }}
                 axisLine={{ stroke: '#E5E7EB' }}
               />
               <YAxis 
-                tick={{ fontSize: compact ? 10 : 12, fill: '#6B7280' }}
+                tick={chartTickStyle({ fontSize: compact ? 10 : 12 })}
                 tickLine={{ stroke: '#E5E7EB' }}
                 axisLine={{ stroke: '#E5E7EB' }}
               />
@@ -145,12 +146,12 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" opacity={0.3} />
               <XAxis 
                 dataKey="name" 
-                tick={{ fontSize: compact ? 10 : 12, fill: '#6B7280' }}
+                tick={chartTickStyle({ fontSize: compact ? 10 : 12 })}
                 tickLine={{ stroke: '#E5E7EB' }}
                 axisLine={{ stroke: '#E5E7EB' }}
               />
               <YAxis 
-                tick={{ fontSize: compact ? 10 : 12, fill: '#6B7280' }}
+                tick={chartTickStyle({ fontSize: compact ? 10 : 12 })}
                 tickLine={{ stroke: '#E5E7EB' }}
                 axisLine={{ stroke: '#E5E7EB' }}
               />

@@ -51,11 +51,17 @@ function CallToAction() {
 }
 
 function SitemapHeading({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-sm font-medium text-white/80">{children}</h3>
+  return (
+    <h3 className="font-serif text-base font-semibold tracking-tight text-orange-300 sm:text-lg">
+      <span className="relative inline-block pb-2 after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-7 after:rounded-full after:bg-gradient-to-r after:from-orange-400 after:to-amber-500/40">
+        {children}
+      </span>
+    </h3>
+  )
 }
 
 function SitemapLinks({ children }: { children: React.ReactNode }) {
-  return <ul className="mt-4 space-y-3 text-sm">{children}</ul>
+  return <ul className="mt-5 space-y-1 text-sm sm:mt-6">{children}</ul>
 }
 
 function SitemapLink(props: React.ComponentPropsWithoutRef<typeof RadiantLink>) {
@@ -63,7 +69,7 @@ function SitemapLink(props: React.ComponentPropsWithoutRef<typeof RadiantLink>) 
     <li>
       <RadiantLink
         {...props}
-        className="inline-flex min-h-[44px] items-center font-medium text-white/65 transition-colors hover:text-white touch-manipulation"
+        className="inline-flex min-h-[44px] items-center font-normal text-white/60 transition-colors hover:text-white touch-manipulation"
       />
     </li>
   )
@@ -95,7 +101,7 @@ function Sitemap() {
       </div>
       <div>
         <SitemapHeading>Follow us</SitemapHeading>
-        <ul className="mt-4 flex flex-col gap-y-2 text-sm">
+        <ul className="mt-5 flex flex-col gap-y-1 text-sm sm:mt-6">
           {SOCIAL_LINKS.map(({ label, href, aria }) => (
             <li key={label}>
               <a
@@ -103,7 +109,7 @@ function Sitemap() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={aria}
-                className="inline-flex min-h-[44px] items-center gap-1.5 font-medium text-white/65 transition-colors hover:text-white touch-manipulation"
+                className="inline-flex min-h-[44px] items-center gap-1.5 font-normal text-white/60 transition-colors hover:text-white touch-manipulation"
               >
                 <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
                 {label}
@@ -128,8 +134,13 @@ export function Footer({ showCta = true }: { showCta?: boolean }) {
 
         <div className="grid grid-cols-2 gap-y-10 gap-x-8 lg:grid-cols-6">
           <div className="col-span-2 flex items-start">
-            <RadiantLink to="/" title="Home" className="inline-flex">
-              <FikiriLogo size="md" variant="white" className="h-10 w-auto sm:h-12" />
+            <RadiantLink
+              to="/"
+              title="Home"
+              aria-label="Fikiri Solutions — Home"
+              className="inline-flex items-center"
+            >
+              <FikiriLogo size="xl" variant="white" className="!h-16 w-auto sm:!h-20 md:!h-24" />
             </RadiantLink>
           </div>
           <div className="col-span-2 grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-4 lg:col-span-4 lg:pt-1">

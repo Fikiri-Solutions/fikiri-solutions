@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, memo } from 'react';
 import { Skeleton } from './Skeleton';
+import { BRAND_FONT_FAMILY, chartTickStyle } from '../lib/brandTypography';
 
 // Lazy load chart components
 const LazyRecharts = lazy(() => import('recharts').then(module => ({
@@ -77,7 +78,7 @@ export const OptimizedLineChart: React.FC<{
   const processedData = React.useMemo(() => processChartData(data, dataKey), [data, dataKey]);
 
   return (
-    <div className={`w-full ${className}`} style={{ height: `${height}px` }}>
+    <div className={`fikiri-chart w-full ${className}`} style={{ height: `${height}px` }}>
       <Suspense fallback={<Skeleton className="w-full h-full" />}>
         <LazyRecharts width="100%" height={height}>
           <LazyLineChart data={processedData}>
@@ -85,13 +86,13 @@ export const OptimizedLineChart: React.FC<{
             <LazyXAxis 
               dataKey="name" 
               stroke="#666"
-              fontSize={12}
+              tick={chartTickStyle()}
               tickLine={false}
               axisLine={false}
             />
             <LazyYAxis 
               stroke="#666"
-              fontSize={12}
+              tick={chartTickStyle()}
               tickLine={false}
               axisLine={false}
             />
@@ -100,7 +101,8 @@ export const OptimizedLineChart: React.FC<{
                 backgroundColor: 'white',
                 border: '1px solid #e5e7eb',
                 borderRadius: '8px',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                fontFamily: BRAND_FONT_FAMILY,
               }}
             />
             <LazyLine 
@@ -129,7 +131,7 @@ export const OptimizedBarChart: React.FC<{
   const processedData = React.useMemo(() => processChartData(data, dataKey), [data, dataKey]);
 
   return (
-    <div className={`w-full ${className}`} style={{ height: `${height}px` }}>
+    <div className={`fikiri-chart w-full ${className}`} style={{ height: `${height}px` }}>
       <Suspense fallback={<Skeleton className="w-full h-full" />}>
         <LazyRecharts width="100%" height={height}>
           <LazyBarChart data={processedData}>
@@ -137,13 +139,13 @@ export const OptimizedBarChart: React.FC<{
             <LazyXAxis 
               dataKey="name" 
               stroke="#666"
-              fontSize={12}
+              tick={chartTickStyle()}
               tickLine={false}
               axisLine={false}
             />
             <LazyYAxis 
               stroke="#666"
-              fontSize={12}
+              tick={chartTickStyle()}
               tickLine={false}
               axisLine={false}
             />
@@ -152,7 +154,8 @@ export const OptimizedBarChart: React.FC<{
                 backgroundColor: 'white',
                 border: '1px solid #e5e7eb',
                 borderRadius: '8px',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                fontFamily: BRAND_FONT_FAMILY,
               }}
             />
             <LazyBar dataKey={dataKey} fill={color} radius={[4, 4, 0, 0]} />
@@ -182,7 +185,7 @@ export const OptimizedPieChart: React.FC<{
   const processedData = React.useMemo(() => processChartData(data, dataKey), [data, dataKey]);
 
   return (
-    <div className={`w-full ${className}`} style={{ height: `${height}px` }}>
+    <div className={`fikiri-chart w-full ${className}`} style={{ height: `${height}px` }}>
       <Suspense fallback={<Skeleton className="w-full h-full" />}>
         <LazyRecharts width="100%" height={height}>
           <LazyPieChart>
@@ -200,8 +203,12 @@ export const OptimizedPieChart: React.FC<{
                 <LazyCell key={`cell-${index}`} fill={colors[index % colors.length]} />
               ))}
             </LazyPie>
-            <LazyTooltip />
-            <LazyLegend />
+            <LazyTooltip
+              contentStyle={{ fontFamily: BRAND_FONT_FAMILY }}
+            />
+            <LazyLegend
+              wrapperStyle={{ fontFamily: BRAND_FONT_FAMILY }}
+            />
           </LazyPieChart>
         </LazyRecharts>
       </Suspense>

@@ -20,7 +20,7 @@ from company_chatbot.miss_review import (
 )
 from core.api_validation import create_error_response, create_success_response, handle_api_errors
 from core.billing_api import _get_user_role, _is_admin_user
-from core.secure_sessions import get_current_user_id
+from core.secure_sessions import get_actor_user_id, get_current_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,8 @@ def _can_read_site_chat_transcripts(user_id) -> bool:
 
 
 def _require_transcript_reader():
-    user_id = get_current_user_id()
+    # Prefer actor so platform ops can read while impersonating a tenant.
+    user_id = get_actor_user_id() or get_current_user_id()
     if not user_id:
         return None, create_error_response("Authentication required", 401, "AUTHENTICATION_REQUIRED")
     if not _can_read_site_chat_transcripts(user_id):

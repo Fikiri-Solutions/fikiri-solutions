@@ -38,7 +38,7 @@ export const VerticalLanding: React.FC<VerticalLandingProps> = ({
   ctaLink
 }) => {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+    <div className="min-h-screen bg-gray-50 font-serif dark:bg-gray-900 transition-colors duration-300">
       {/* Hero Section */}
       <div className="bg-gradient-to-br from-blue-600 to-purple-700 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
