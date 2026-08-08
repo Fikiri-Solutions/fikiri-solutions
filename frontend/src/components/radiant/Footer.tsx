@@ -69,7 +69,7 @@ function SitemapLink(props: React.ComponentPropsWithoutRef<typeof RadiantLink>) 
     <li>
       <RadiantLink
         {...props}
-        className="inline-flex min-h-[44px] items-center font-normal text-white/60 transition-colors hover:text-white touch-manipulation"
+        className="inline-flex min-h-[44px] items-center font-normal !text-white/70 transition-colors hover:!text-white touch-manipulation"
       />
     </li>
   )
@@ -109,7 +109,7 @@ function Sitemap() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={aria}
-                className="inline-flex min-h-[44px] items-center gap-1.5 font-normal text-white/60 transition-colors hover:text-white touch-manipulation"
+                className="inline-flex min-h-[44px] items-center gap-1.5 font-normal !text-white/70 transition-colors hover:!text-white touch-manipulation"
               >
                 <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
                 {label}

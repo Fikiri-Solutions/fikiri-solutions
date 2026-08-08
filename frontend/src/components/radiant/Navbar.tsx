@@ -1,7 +1,6 @@
 import { useLocation } from 'react-router-dom'
 import { Disclosure, DisclosureButton, DisclosurePanel } from '@headlessui/react'
 import { Bars2Icon } from '@heroicons/react/24/solid'
-import { motion } from 'framer-motion'
 import { clsx } from 'clsx'
 import { RadiantLink } from './RadiantLink'
 import { FikiriLogo } from '@/components/FikiriLogo'
@@ -12,18 +11,27 @@ function buildNavLinks(
   isAuthenticated: boolean,
   onboardingCompleted: boolean | undefined
 ): { to: string; label: string }[] {
-  const authLink =
-    !isAuthenticated
-      ? { to: '/login', label: 'Login' }
-      : onboardingCompleted
-        ? { to: '/dashboard', label: 'Dashboard' }
-        : { to: '/onboarding', label: 'Continue setup' }
+  if (!isAuthenticated) {
+    return [
+      { to: '/pricing', label: 'Pricing' },
+      { to: '/about', label: 'About' },
+      { to: '/login', label: 'Login' },
+      { to: '/signup', label: 'Sign up' },
+    ]
+  }
   return [
     { to: '/pricing', label: 'Pricing' },
     { to: '/about', label: 'About' },
-    authLink,
+    onboardingCompleted
+      ? { to: '/dashboard', label: 'Dashboard' }
+      : { to: '/onboarding', label: 'Continue setup' },
   ]
 }
+
+const onDarkLinkClass =
+  'flex min-h-[44px] items-center rounded-lg px-4 py-3 text-base font-medium !text-white hover:bg-white/15 touch-manipulation'
+const onLightLinkClass =
+  'flex min-h-[44px] items-center rounded-lg px-4 py-3 text-base font-medium !text-foreground hover:bg-black/5 touch-manipulation'
 
 function DesktopNav({
   links,
@@ -36,14 +44,7 @@ function DesktopNav({
     <nav className="relative hidden lg:flex">
       {links.map(({ to, label }) => (
         <PlusGridItem key={to} className="relative flex">
-          <RadiantLink
-            to={to}
-            className={
-              onDark
-                ? 'flex min-h-[44px] items-center rounded-lg px-4 py-3 text-base font-medium text-white hover:bg-white/15 touch-manipulation'
-                : 'flex min-h-[44px] items-center rounded-lg px-4 py-3 text-base font-medium text-foreground hover:bg-black/5 touch-manipulation'
-            }
-          >
+          <RadiantLink to={to} className={onDark ? onDarkLinkClass : onLightLinkClass}>
             {label}
           </RadiantLink>
         </PlusGridItem>
@@ -57,8 +58,8 @@ function MobileNavButton({ onDark }: { onDark?: boolean }) {
     <DisclosureButton
       className={
         onDark
-          ? 'flex size-12 items-center justify-center self-center rounded-lg text-white hover:bg-white/10 lg:hidden'
-          : 'flex size-12 items-center justify-center self-center rounded-lg text-foreground hover:bg-black/5 lg:hidden'
+          ? 'flex size-12 items-center justify-center self-center rounded-lg !text-white hover:bg-white/10 lg:hidden'
+          : 'flex size-12 items-center justify-center self-center rounded-lg !text-foreground hover:bg-black/5 lg:hidden'
       }
       aria-label="Open main menu"
     >
@@ -80,33 +81,27 @@ function MobileNav({
     <DisclosurePanel
       className={clsx(
         'lg:hidden',
-        marketing && onDark && 'rounded-b-xl bg-black/70 backdrop-blur-md',
-        marketing && !onDark && 'rounded-b-xl bg-background/70 backdrop-blur-md'
+        marketing && onDark && 'rounded-b-xl bg-black/85 px-2 backdrop-blur-md ring-1 ring-white/10',
+        marketing && !onDark && 'rounded-b-xl bg-background/90 px-2 backdrop-blur-md ring-1 ring-black/10'
       )}
     >
-      <div className="flex flex-col gap-6 py-4">
-        {links.map(({ to, label }, linkIndex) => (
-          <motion.div
+      {/*
+        Avoid rotateX / 3D menu reveals — on iOS Chrome and in-app browsers they
+        often stick at near-zero opacity and look like missing/dark links.
+      */}
+      <div className="flex flex-col gap-1 py-3">
+        {links.map(({ to, label }) => (
+          <RadiantLink
             key={to}
-            initial={{ opacity: 0, rotateX: -90 }}
-            animate={{ opacity: 1, rotateX: 0 }}
-            transition={{
-              duration: 0.15,
-              ease: 'easeInOut',
-              rotateX: { duration: 0.3, delay: linkIndex * 0.1 },
-            }}
+            to={to}
+            className={
+              onDark
+                ? 'flex min-h-[44px] items-center px-3 py-3 text-base font-medium !text-white touch-manipulation'
+                : 'flex min-h-[44px] items-center px-3 py-3 text-base font-medium !text-foreground touch-manipulation'
+            }
           >
-            <RadiantLink
-              to={to}
-              className={
-                onDark
-                  ? 'flex min-h-[44px] items-center py-3 text-base font-medium text-white'
-                  : 'flex min-h-[44px] items-center py-3 text-base font-medium text-foreground'
-              }
-            >
-              {label}
-            </RadiantLink>
-          </motion.div>
+            {label}
+          </RadiantLink>
         ))}
       </div>
     </DisclosurePanel>

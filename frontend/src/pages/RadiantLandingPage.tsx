@@ -30,7 +30,7 @@ function Hero() {
           Reserve vertical space so the absolute tree reads as the hero field,
           then brand + Sector Fit continue in the same continuous section.
         */}
-        <div className="flex min-h-[min(52vw,300px)] flex-col justify-end pb-2 pt-10 sm:min-h-[min(46vw,380px)] sm:pt-12 md:min-h-[min(42vw,440px)] md:pb-4 lg:min-h-[min(40vw,480px)]">
+        <div className="flex min-h-[min(42vw,220px)] flex-col justify-end pb-2 pt-6 sm:min-h-[min(46vw,380px)] sm:pt-12 md:min-h-[min(42vw,440px)] md:pb-4 lg:min-h-[min(40vw,480px)]">
           <FikiriHeroBrandBlock />
         </div>
 

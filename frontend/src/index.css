@@ -219,8 +219,9 @@ html {
     max-width: 100%;
   }
 
-  /* Default link styling - Fikiri brand colors as subtle accents */
-  a {
+  /* Default link styling - Fikiri brand colors as subtle accents.
+     Do not fight explicit utility colors on marketing shells (e.g. nav !text-white). */
+  a:not([class*='text-']) {
     @apply text-brand-primary dark:text-brand-secondary hover:text-brand-secondary dark:hover:text-brand-accent;
     transition: color 0.3s ease;
   }

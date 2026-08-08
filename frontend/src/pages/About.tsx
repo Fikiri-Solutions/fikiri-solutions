@@ -239,6 +239,11 @@ function ProcessTimeline() {
 
 function WorkflowNodes({ steps }: { steps: readonly string[] }) {
   const reduceMotion = useReducedMotion()
+  // Avoid opacity:0 whileInView chips on mobile — same iOS stuck-invisible failure mode as nav.
+  const skipHide =
+    reduceMotion ||
+    (typeof window !== 'undefined' &&
+      window.matchMedia?.('(max-width: 639px)')?.matches === true)
 
   return (
     <ol className="mt-3.5 flex flex-col gap-1 sm:mt-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-1.5 sm:gap-y-2">
@@ -246,10 +251,10 @@ function WorkflowNodes({ steps }: { steps: readonly string[] }) {
         <li key={`${label}-${index}`} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-1.5">
           <motion.span
             className="inline-flex w-fit max-w-full rounded-md border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-xs leading-snug text-white/85 sm:text-[0.8rem]"
-            initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+            initial={skipHide ? false : { opacity: 0, y: 8 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.4 }}
-            transition={{ duration: 0.35, delay: reduceMotion ? 0 : index * 0.06, ease: EASE }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.35, delay: skipHide ? 0 : index * 0.06, ease: EASE }}
           >
             {label}
           </motion.span>

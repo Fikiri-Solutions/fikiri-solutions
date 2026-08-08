@@ -13,7 +13,7 @@ type RevealProps = {
   /**
    * Reveal direction. Defaults to upward lift.
    * Legacy `distance` still applies to up/down/left/right travel.
-   * On narrow viewports, left/right become `up` to avoid side overflow.
+   * On narrow viewports reveals are skipped (see component body).
    */
   direction?: RevealDirection
   /** Travel distance in px for directional reveals (default 32) */
@@ -27,8 +27,18 @@ type RevealProps = {
 const EASE = [0.22, 1, 0.36, 1] as const
 const MOBILE_MQ = '(max-width: 639px)'
 
+function readNarrowViewport(): boolean {
+  if (typeof window === 'undefined' || !window.matchMedia) return false
+  try {
+    return window.matchMedia(MOBILE_MQ).matches
+  } catch {
+    return false
+  }
+}
+
 function useIsNarrowViewport() {
-  const [narrow, setNarrow] = useState(false)
+  // Sync on first paint so mobile never flashes opacity:0 then "never reveals".
+  const [narrow, setNarrow] = useState(readNarrowViewport)
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return
     const mq = window.matchMedia(MOBILE_MQ)
@@ -58,6 +68,8 @@ function initialFor(direction: RevealDirection, distance: number) {
 
 /**
  * Scroll-triggered marketing reveal. Respects prefers-reduced-motion.
+ * On narrow phones, skip hide-until-in-view — IntersectionObserver + opacity:0
+ * is a common “missing content” failure on iOS Chrome / in-app browsers.
  * Prefer this (or MarketingReveal) over one-off motion wrappers on public pages.
  */
 export function Reveal({
@@ -72,23 +84,18 @@ export function Reveal({
   const reduceMotion = useReducedMotion()
   const narrow = useIsNarrowViewport()
 
-  if (reduceMotion) {
+  // Visibility first on phones and reduced-motion — desktop keeps the reveal.
+  if (reduceMotion || narrow) {
     return <div className={className}>{children}</div>
   }
-
-  const resolvedDirection: RevealDirection =
-    narrow && (direction === 'left' || direction === 'right') ? 'up' : direction
-  const resolvedDistance = narrow ? Math.min(distance, 20) : distance
-  const resolvedDelay = narrow ? delay * 0.6 : delay
-  const resolvedAmount = narrow ? Math.min(amount, 0.15) : amount
 
   return (
     <motion.div
       className={clsx(className)}
-      initial={initialFor(resolvedDirection, resolvedDistance)}
+      initial={initialFor(direction, distance)}
       whileInView={{ opacity: 1, x: 0, y: 0, scale: 1 }}
-      viewport={{ once, amount: resolvedAmount, margin: '0px 0px -6% 0px' }}
-      transition={{ duration: narrow ? 0.45 : 0.6, ease: EASE, delay: resolvedDelay }}
+      viewport={{ once, amount, margin: '0px 0px -6% 0px' }}
+      transition={{ duration: 0.6, ease: EASE, delay }}
     >
       {children}
     </motion.div>

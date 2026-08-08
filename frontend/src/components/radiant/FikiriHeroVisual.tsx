@@ -49,6 +49,16 @@ function prefersReducedMotionSync(): boolean {
   }
 }
 
+/** Narrow phones: skip long staged delays so the first viewport is not an empty charcoal gap. */
+function isNarrowViewportSync(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.matchMedia('(max-width: 767px)').matches
+  } catch {
+    return false
+  }
+}
+
 function markHeroSeen() {
   try {
     sessionStorage.setItem(HERO_SEEN_SESSION_KEY, '1')
@@ -71,12 +81,16 @@ export function FikiriHeroVisual({ className, children }: FikiriHeroVisualProps)
   const reduceMotion = useReducedMotion()
   const [seenThisSession] = useState(readHeroSeen)
   const [prefersReduced] = useState(prefersReducedMotionSync)
-  const instant = Boolean(reduceMotion) || prefersReduced || seenThisSession
+  const [narrowViewport] = useState(isNarrowViewportSync)
+  // Mobile: enter immediately — long staged delays leave a blank first paint that looks "broken".
+  const instant =
+    Boolean(reduceMotion) || prefersReduced || seenThisSession || narrowViewport
   const [entered, setEntered] = useState(instant)
 
   useEffect(() => {
     if (instant) {
       setEntered(true)
+      if (narrowViewport && !seenThisSession) markHeroSeen()
       return
     }
 
@@ -94,12 +108,13 @@ export function FikiriHeroVisual({ className, children }: FikiriHeroVisualProps)
         markHeroSeen()
         observer.disconnect()
       },
-      { threshold: 0.2 }
+      // Low threshold so tall hero sections still trigger on short mobile viewports.
+      { threshold: 0.05 }
     )
 
     observer.observe(node)
     return () => observer.disconnect()
-  }, [instant])
+  }, [instant, narrowViewport, seenThisSession])
 
   const treeTransition = instant
     ? { duration: 0.2, ease: EASE }

@@ -197,7 +197,7 @@ const Signup: React.FC = () => {
           className="max-w-md w-full min-w-0"
           initial={reduceMotion ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.45, ease: 'easeOut' }}
+          transition={{ duration: reduceMotion ? 0 : 0.45, ease: 'easeOut' }}
         >
           {/* Branding — nav already has logo */}
           <div className="mb-5 text-center sm:mb-6">
