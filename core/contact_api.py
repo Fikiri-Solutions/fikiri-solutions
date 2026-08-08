@@ -48,7 +48,8 @@ def _send_contact_email(to_email: str, subject: str, body_utf8: str) -> bool:
     try:
         if os.getenv("SENDGRID_API_KEY"):
             return _send_via_sendgrid(to_email, subject, body_utf8)
-        if os.getenv("SMTP_SERVER"):
+        # SMTP_HOST is accepted as an alias for SMTP_SERVER (common in prod env files).
+        if os.getenv("SMTP_SERVER") or os.getenv("SMTP_HOST"):
             return _send_via_smtp(to_email, subject, body_utf8)
         logger.info(
             "Contact form: no mail provider configured, would send to %s", to_email
@@ -88,7 +89,7 @@ def _send_via_smtp(to_email: str, subject: str, body: str) -> bool:
         msg["Subject"] = subject
         msg["From"] = CONTACT_FROM_EMAIL
         msg["To"] = to_email
-        smtp_server = os.getenv("SMTP_SERVER")
+        smtp_server = os.getenv("SMTP_SERVER") or os.getenv("SMTP_HOST")
         smtp_port = int(os.getenv("SMTP_PORT", "587"))
         smtp_user = os.getenv("SMTP_USERNAME")
         smtp_pass = os.getenv("SMTP_PASSWORD")
@@ -184,8 +185,28 @@ def submit_contact():
 
     sent = _send_contact_email(CONTACT_TO_EMAIL, email_subject, body)
 
-    # Persist customer submission so it isn't lost if email sending is temporarily failing.
+    from core.lead_form_notifications import send_lead_slack_notification
+
+    slack_sent = send_lead_slack_notification(
+        title=f"New contact form: {name}",
+        text=message[:1500],
+        fields=[
+            {"title": "Email", "value": email, "short": True},
+            {"title": "Phone", "value": phone or "—", "short": True},
+            {"title": "Company", "value": company or "—", "short": True},
+            {"title": "Subject", "value": subject or "—", "short": False},
+            {"title": "To", "value": CONTACT_TO_EMAIL, "short": True},
+            {
+                "title": "Email delivery",
+                "value": "sent" if sent else "FAILED",
+                "short": True,
+            },
+        ],
+    )
+
+    # Persist customer submission so it isn't lost if email/Slack sending is temporarily failing.
     # Best-effort only: contact should still return its normal response even if DB insert fails.
+    persisted = False
     try:
         payload = {
             "name": name,
@@ -194,6 +215,7 @@ def submit_contact():
             "company": company or None,
             "subject": subject or None,
             "message": message,
+            "slack_sent": slack_sent,
         }
         payload_json = json.dumps(payload, ensure_ascii=False)
         db_optimizer.execute_query(
@@ -218,18 +240,30 @@ def submit_contact():
                 CONTACT_TO_EMAIL,
                 CONTACT_FROM_EMAIL,
                 payload_json,
-                0,
-                "sent" if sent else "failed",
-                None if sent else "email_send_failed",
+                False,
+                "sent" if (sent or slack_sent) else "failed",
+                None
+                if (sent and slack_sent)
+                else (
+                    "email_send_failed"
+                    if not sent and not slack_sent
+                    else (
+                        "email_send_failed;slack_ok"
+                        if not sent
+                        else "slack_send_failed;email_ok"
+                    )
+                ),
                 request.remote_addr,
                 request.headers.get("User-Agent"),
             ),
             fetch=False,
         )
+        persisted = True
     except Exception as e:
         logger.error("Failed to persist contact submission: %s", e)
 
-    if not sent:
+    # Never drop a lead: succeed if email, Slack, or durable DB backup worked.
+    if not sent and not slack_sent and not persisted:
         return (
             jsonify(
                 {
@@ -238,6 +272,13 @@ def submit_contact():
                 }
             ),
             503,
+        )
+    if not sent:
+        logger.warning(
+            "Contact form: email failed but lead retained (slack=%s persisted=%s) email=%s",
+            slack_sent,
+            persisted,
+            email,
         )
     return (
         jsonify(
@@ -304,7 +345,12 @@ def submit_consultation_intake():
         user_agent=request.headers.get("User-Agent"),
     )
 
-    if not outcome.crm_ok and not outcome.email_sent:
+    if (
+        not outcome.crm_ok
+        and not outcome.email_sent
+        and not outcome.slack_sent
+        and not outcome.persisted
+    ):
         return (
             jsonify(
                 {
@@ -315,9 +361,21 @@ def submit_consultation_intake():
             503,
         )
 
-    if outcome.email_failed_after_crm:
+    if outcome.email_failed_after_crm or not outcome.email_sent:
         logger.warning(
-            "Consultation intake: CRM saved but notification email failed for correlation_id=%s",
+            "Consultation intake: notification email failed "
+            "(crm=%s slack=%s persisted=%s) correlation_id=%s",
+            outcome.crm_ok,
+            outcome.slack_sent,
+            outcome.persisted,
+            correlation_id,
+        )
+    if not outcome.slack_sent:
+        logger.warning(
+            "Consultation intake: Slack notification failed "
+            "(crm=%s email=%s) correlation_id=%s",
+            outcome.crm_ok,
+            outcome.email_sent,
             correlation_id,
         )
 

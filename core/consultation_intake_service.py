@@ -7,19 +7,20 @@ How this fits in the architecture
    automations, and dashboard UI read from here.
 
 2. **POST /api/intake** (browser, no API key) — This module. Writes to CRM when
-   `FIKIRI_INTAKE_LEAD_OWNER_USER_ID` is set; sends notification email; on CRM or total failure
-   paths, append-only backup in `customer_contact_submissions` (`form_type=consultation_intake`).
-   Does **not** write to `customer_form_intake_submissions` (that table is reserved for
+   `FIKIRI_INTAKE_LEAD_OWNER_USER_ID` is set; sends notification email + Slack;
+   always appends a backup row in `customer_contact_submissions`
+   (`form_type=consultation_intake`). Does **not** write to
+   `customer_form_intake_submissions` (that table is reserved for
    **authenticated** `/api/webhooks/forms/submit` flows in `core/webhook_api.py`).
 
-3. **POST /api/contact** — Short unstructured message; email + `customer_contact_submissions` only;
-   no CRM row (different product intent).
+3. **POST /api/contact** — Short unstructured message; email + Slack +
+   `customer_contact_submissions`; no CRM row (different product intent).
 
 Failure isolation
 -----------------
 - CRM `create_lead` / `update_lead` exceptions are caught; the request can still succeed via email
-  + backup row so ops is not blind.
-- Email failure **after** CRM success does not fail the HTTP response (lead is already stored).
+  + Slack + backup row so ops is not blind.
+- Email or Slack failure after CRM success does not fail the HTTP response (lead is already stored).
 - Rate limiting and honeypot remain in the Flask route (HTTP concerns).
 """
 
@@ -202,7 +203,7 @@ def _persist_intake_contact_fallback(
     contact_from_email: str,
     request_ip: Optional[str],
     user_agent: Optional[str],
-) -> None:
+) -> bool:
     try:
         payload_json = json.dumps(payload_obj, ensure_ascii=False)
         db_optimizer.execute_query(
@@ -227,7 +228,7 @@ def _persist_intake_contact_fallback(
                 contact_to_email,
                 contact_from_email,
                 payload_json,
-                0,
+                False,
                 "sent" if sent else "failed",
                 None if sent else "email_send_failed",
                 request_ip,
@@ -235,8 +236,10 @@ def _persist_intake_contact_fallback(
             ),
             fetch=False,
         )
+        return True
     except Exception as e:
         logger.error("Failed to persist consultation intake submission: %s", e)
+        return False
 
 
 def _crm_create_or_merge_lead(
@@ -310,7 +313,9 @@ class PublicIntakeProcessResult:
 
     crm_ok: bool
     email_sent: bool
+    slack_sent: bool
     email_failed_after_crm: bool
+    persisted: bool
 
 
 def process_public_intake(
@@ -329,6 +334,8 @@ def process_public_intake(
     ``send_notification_email`` is a callable ``(to_email: str, subject: str, html_body: str) -> bool``
     injected from ``contact_api`` so mail transport stays in one place.
     """
+    from core.lead_form_notifications import send_lead_slack_notification
+
     # Normalize email for CRM uniqueness (case-insensitive pipeline key for intake).
     p = dict(p)
     p["email_norm"] = p.get("email", "").strip().lower()
@@ -364,26 +371,48 @@ def process_public_intake(
     except Exception:
         logger.exception("Intake notification email send raised")
 
+    slack_sent = send_lead_slack_notification(
+        title=f"Consultation intake: {p['business_name']}",
+        text=plain_notes[:2500],
+        fields=[
+            {"title": "Contact", "value": p["contact_name"], "short": True},
+            {"title": "Email", "value": p["email"], "short": True},
+            {"title": "Phone", "value": p.get("phone") or "—", "short": True},
+            {"title": "Industry", "value": p.get("industry") or "—", "short": True},
+            {"title": "CRM", "value": "saved" if crm_ok else "not saved", "short": True},
+            {
+                "title": "Email delivery",
+                "value": "sent" if sent else "FAILED",
+                "short": True,
+            },
+            {"title": "Correlation", "value": correlation_id, "short": False},
+        ],
+    )
+
     payload_obj = {
         **{k: v for k, v in p.items() if k not in ("leave_blank", "email_norm")},
         "correlation_id": correlation_id,
+        "crm_ok": crm_ok,
+        "slack_sent": slack_sent,
     }
 
-    if not crm_ok:
-        _persist_intake_contact_fallback(
-            p=p,
-            plain_notes=plain_notes,
-            payload_obj=payload_obj,
-            email_subject=email_subject,
-            sent=sent,
-            contact_to_email=contact_to_email,
-            contact_from_email=contact_from_email,
-            request_ip=request_ip,
-            user_agent=user_agent,
-        )
+    # Always append a durable backup row so ops never depends on CRM or mail alone.
+    persisted = _persist_intake_contact_fallback(
+        p=p,
+        plain_notes=plain_notes,
+        payload_obj=payload_obj,
+        email_subject=email_subject,
+        sent=bool(sent or slack_sent),
+        contact_to_email=contact_to_email,
+        contact_from_email=contact_from_email,
+        request_ip=request_ip,
+        user_agent=user_agent,
+    )
 
     return PublicIntakeProcessResult(
         crm_ok=crm_ok,
         email_sent=sent,
+        slack_sent=slack_sent,
         email_failed_after_crm=bool(crm_ok and not sent),
+        persisted=persisted,
     )

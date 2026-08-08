@@ -24,8 +24,9 @@ class TestContactApi(unittest.TestCase):
     @patch("core.contact_api.CONTACT_FROM_EMAIL", "noreply@test.com")
     @patch("core.contact_api.CONTACT_TO_EMAIL", "info@test.com")
     @patch("core.contact_api.db_optimizer")
+    @patch("core.lead_form_notifications.send_lead_slack_notification", return_value=True)
     @patch("core.contact_api._send_contact_email")
-    def test_submit_contact_success_persists(self, mock_send, mock_db, *_):
+    def test_submit_contact_success_persists(self, mock_send, mock_slack, mock_db, *_):
         mock_send.return_value = True
         mock_db.execute_query.return_value = None
 
@@ -48,17 +49,22 @@ class TestContactApi(unittest.TestCase):
         self.assertTrue(mock_db.execute_query.called)
         _q, params = mock_db.execute_query.call_args[0]
         self.assertIn("jane@example.com", params)
+        mock_slack.assert_called_once()
+        self.assertIn("Jane Smith", mock_slack.call_args.kwargs["title"])
 
     @patch("core.contact_api.CONTACT_FROM_EMAIL", "noreply@test.com")
     @patch("core.contact_api.CONTACT_TO_EMAIL", "info@test.com")
     @patch("core.contact_api.db_optimizer")
+    @patch("core.lead_form_notifications.send_lead_slack_notification", return_value=False)
     @patch("core.contact_api._send_contact_email")
-    def test_submit_contact_failure_persists_with_failed_status(
+    def test_submit_contact_email_failure_still_succeeds_when_persisted(
         self,
         mock_send,
+        mock_slack,
         mock_db,
         *_,
     ):
+        """Email+Slack can fail; durable DB backup must still keep the lead."""
         mock_send.return_value = False
         mock_db.execute_query.return_value = None
 
@@ -69,22 +75,48 @@ class TestContactApi(unittest.TestCase):
         }
 
         response = self.client.post("/api/contact", json=payload)
-        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.status_code, 200)
 
         data = json.loads(response.data)
-        self.assertFalse(data.get("success"))
+        self.assertTrue(data.get("success"))
 
         self.assertTrue(mock_db.execute_query.called)
         _q, params = mock_db.execute_query.call_args[0]
         self.assertIn("failed", params)
+        mock_slack.assert_called_once()
+
+    @patch("core.contact_api.CONTACT_FROM_EMAIL", "noreply@test.com")
+    @patch("core.contact_api.CONTACT_TO_EMAIL", "info@test.com")
+    @patch("core.contact_api.db_optimizer")
+    @patch("core.lead_form_notifications.send_lead_slack_notification", return_value=False)
+    @patch("core.contact_api._send_contact_email", return_value=False)
+    def test_submit_contact_total_failure_returns_503(
+        self, mock_send, mock_slack, mock_db, *_
+    ):
+        mock_db.execute_query.side_effect = RuntimeError("db down")
+
+        payload = {
+            "name": "Jane Smith",
+            "email": "jane@example.com",
+            "message": "Hi there",
+        }
+
+        response = self.client.post("/api/contact", json=payload)
+        self.assertEqual(response.status_code, 503)
+        data = json.loads(response.data)
+        self.assertFalse(data.get("success"))
 
     @patch.dict(os.environ, {"FIKIRI_INTAKE_LEAD_OWNER_USER_ID": "1"}, clear=False)
     @patch("core.contact_api.CONTACT_FROM_EMAIL", "noreply@test.com")
     @patch("core.contact_api.CONTACT_TO_EMAIL", "info@test.com")
     @patch("core.contact_api.check_public_intake_rate_limit")
+    @patch("core.lead_form_notifications.send_lead_slack_notification", return_value=True)
     @patch("core.contact_api._send_contact_email")
+    @patch("core.consultation_intake_service.db_optimizer")
     @patch("crm.service.enhanced_crm_service")
-    def test_submit_intake_creates_lead(self, mock_crm, mock_send, mock_rl, *_):
+    def test_submit_intake_creates_lead(
+        self, mock_crm, mock_intake_db, mock_send, mock_slack, mock_rl, *_
+    ):
         from core.rate_limiter import RateLimitResult
 
         mock_rl.return_value = RateLimitResult(
@@ -92,6 +124,7 @@ class TestContactApi(unittest.TestCase):
         )
         mock_send.return_value = True
         mock_crm.create_lead.return_value = {"success": True, "data": {"lead_id": 99}}
+        mock_intake_db.execute_query.return_value = None
 
         payload = {
             "business_name": "Acme Co",
@@ -109,10 +142,15 @@ class TestContactApi(unittest.TestCase):
         self.assertEqual(args[0], 1)
         self.assertEqual(args[1]["email"], "jane@acme.com")
         self.assertIn("Acme", args[1].get("company", ""))
+        mock_slack.assert_called_once()
+        self.assertIn("Acme Co", mock_slack.call_args.kwargs["title"])
+        # Durable backup always written (even when CRM succeeds).
+        self.assertTrue(mock_intake_db.execute_query.called)
 
     @patch("core.contact_api.check_public_intake_rate_limit")
+    @patch("core.lead_form_notifications.send_lead_slack_notification")
     @patch("core.contact_api._send_contact_email")
-    def test_intake_honeypot_succeeds_without_crm(self, mock_send, mock_rl, *_):
+    def test_intake_honeypot_succeeds_without_crm(self, mock_send, mock_slack, mock_rl, *_):
         from core.rate_limiter import RateLimitResult
 
         mock_rl.return_value = RateLimitResult(
@@ -127,11 +165,13 @@ class TestContactApi(unittest.TestCase):
         response = self.client.post("/api/intake", json=payload)
         self.assertEqual(response.status_code, 200)
         mock_send.assert_not_called()
+        mock_slack.assert_not_called()
 
     @patch("core.contact_api.db_optimizer")
+    @patch("core.lead_form_notifications.send_lead_slack_notification")
     @patch("core.contact_api._send_contact_email")
     def test_submit_contact_honeypot_returns_success_without_sending(
-        self, mock_send, mock_db
+        self, mock_send, mock_slack, mock_db
     ):
         payload = {
             "name": "Spam Bot",
@@ -145,13 +185,17 @@ class TestContactApi(unittest.TestCase):
         data = json.loads(response.data)
         self.assertTrue(data.get("success"))
         mock_send.assert_not_called()
+        mock_slack.assert_not_called()
         mock_db.execute_query.assert_not_called()
 
     @patch("core.contact_api.CONTACT_FROM_EMAIL", "noreply@test.com")
     @patch("core.contact_api.CONTACT_TO_EMAIL", "info@test.com")
     @patch("core.contact_api.db_optimizer")
+    @patch("core.lead_form_notifications.send_lead_slack_notification", return_value=True)
     @patch("core.contact_api._send_contact_email")
-    def test_submit_contact_escapes_html_in_email_body(self, mock_send, mock_db, *_):
+    def test_submit_contact_escapes_html_in_email_body(
+        self, mock_send, mock_slack, mock_db, *_
+    ):
         mock_send.return_value = True
         mock_db.execute_query.return_value = None
 
@@ -167,6 +211,35 @@ class TestContactApi(unittest.TestCase):
         self.assertIn("&lt;b&gt;Jane&lt;/b&gt;", sent_body)
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", sent_body)
         self.assertNotIn("<script>alert(1)</script>", sent_body)
+
+    @patch.dict(os.environ, {"FIKIRI_INTAKE_LEAD_OWNER_USER_ID": ""}, clear=False)
+    @patch("core.contact_api.CONTACT_FROM_EMAIL", "noreply@test.com")
+    @patch("core.contact_api.CONTACT_TO_EMAIL", "info@test.com")
+    @patch("core.contact_api.check_public_intake_rate_limit")
+    @patch("core.lead_form_notifications.send_lead_slack_notification", return_value=True)
+    @patch("core.contact_api._send_contact_email", return_value=False)
+    @patch("core.consultation_intake_service.db_optimizer")
+    def test_intake_succeeds_via_slack_and_backup_when_email_fails(
+        self, mock_intake_db, mock_send, mock_slack, mock_rl, *_
+    ):
+        from core.rate_limiter import RateLimitResult
+
+        mock_rl.return_value = RateLimitResult(
+            allowed=True, remaining=9, reset_time=0, retry_after=0, limit=10
+        )
+        mock_intake_db.execute_query.return_value = None
+
+        payload = {
+            "business_name": "Solo Shop",
+            "contact_name": "Pat",
+            "email": "pat@solo.test",
+        }
+        response = self.client.post("/api/intake", json=payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(json.loads(response.data).get("success"))
+        mock_slack.assert_called_once()
+        mock_send.assert_called_once()
+        self.assertTrue(mock_intake_db.execute_query.called)
 
 
 if __name__ == "__main__":

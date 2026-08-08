@@ -36,19 +36,27 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 })
 
-// Mock IntersectionObserver
-global.IntersectionObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}))
+// Mock IntersectionObserver (must be constructable — Framer Motion uses `new`)
+class MockIntersectionObserver implements IntersectionObserver {
+  readonly root: Element | Document | null = null
+  readonly rootMargin = ''
+  readonly thresholds: ReadonlyArray<number> = []
+  observe = vi.fn()
+  unobserve = vi.fn()
+  disconnect = vi.fn()
+  takeRecords = vi.fn(() => [] as IntersectionObserverEntry[])
+  constructor(_callback?: IntersectionObserverCallback, _options?: IntersectionObserverInit) {}
+}
+global.IntersectionObserver = MockIntersectionObserver as unknown as typeof IntersectionObserver
 
-// Mock ResizeObserver
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}))
+// Mock ResizeObserver (must be constructable)
+class MockResizeObserver implements ResizeObserver {
+  observe = vi.fn()
+  unobserve = vi.fn()
+  disconnect = vi.fn()
+  constructor(_callback?: ResizeObserverCallback) {}
+}
+global.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver
 
 // Mock scrollTo
 global.scrollTo = vi.fn().mockImplementation((options?: ScrollToOptions | number, y?: number) => {
