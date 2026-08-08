@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { RadiantLayout, Container, Gradient, AnimatedBackground } from '../components/radiant'
+import { RadiantLayout, Container } from '../components/radiant'
 import { Button } from '../components/radiant/Button'
 import { apiClient } from '../services/apiClient'
 import { MarketingChatWidget } from '../components/MarketingChatWidget'
@@ -63,40 +63,36 @@ export const Contact: React.FC = () => {
 
   return (
     <RadiantLayout>
-      <div className="min-h-screen bg-background text-foreground relative">
-        <div className="absolute inset-0 fikiri-gradient-animated">
-          <AnimatedBackground />
-        </div>
-        <section className="relative py-12 sm:py-16 z-10">
-          <Gradient className="absolute inset-x-2 top-0 bottom-0 rounded-3xl ring-1 ring-black/5 ring-inset opacity-20" />
+      <div className="relative min-h-dvh pb-[env(safe-area-inset-bottom)]">
+        <section className="relative py-10 sm:py-16 z-10">
           <Container className="relative">
-            <div className="max-w-xl mx-auto">
-              <h1 className="text-4xl font-bold text-foreground mb-2 sm:text-5xl">
+            <div className="max-w-xl mx-auto min-w-0">
+              <h1 className="font-serif text-3xl font-bold text-white mb-2 sm:text-5xl">
                 Contact us
               </h1>
-              <p className="text-lg text-muted-foreground mb-2">
+              <p className="font-serif text-lg text-white/70 mb-2">
                 Questions, feedback, or a demo? We’ll get back to you soon.
               </p>
-              <p className="text-sm text-muted-foreground mb-8">
+              <p className="font-serif text-sm text-white/55 mb-8">
                 Booking a consultation? Complete the{' '}
-                <Link to="/intake" className="text-brand-primary font-medium hover:underline">
+                <Link to="/intake" className="text-orange-300 font-medium hover:underline">
                   consultation intake
                 </Link>{' '}
                 first (about 10–15 minutes) so we can focus the session on your workflow.
               </p>
 
               {success && (
-                <div className="mb-6 p-4 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-800">
+                <div className="mb-6 p-4 rounded-lg bg-green-100 text-green-800 border border-green-200">
                   Thank you. We will get back to you soon.
                 </div>
               )}
               {error && (
-                <div className="mb-6 p-4 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800">
+                <div className="mb-6 p-4 rounded-lg bg-red-100 text-red-800 border border-red-200">
                   {error}
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-5" autoComplete="on">
+              <form onSubmit={handleSubmit} className="space-y-5 rounded-2xl bg-white/[0.95] p-6 font-serif shadow-lg shadow-orange-950/20 ring-1 ring-white/25 backdrop-blur-sm sm:p-8" autoComplete="on">
                 <div className="hidden" aria-hidden="true">
                   <label htmlFor="contact-leave-blank">Leave this field blank</label>
                   <input
@@ -110,7 +106,7 @@ export const Contact: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label htmlFor="contact-name" className="block text-sm font-medium text-foreground mb-1">
+                  <label htmlFor="contact-name" className="mb-1 block font-serif text-sm font-medium text-stone-800">
                     Name <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -122,13 +118,13 @@ export const Contact: React.FC = () => {
                     maxLength={LIMITS.name}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                    className="w-full min-h-[44px] rounded-lg border border-stone-200 bg-white px-3 py-2.5 font-serif text-stone-900 placeholder:text-stone-400 focus:border-transparent focus:ring-2 focus:ring-brand-primary touch-manipulation"
                     placeholder="Your name"
                   />
-                  <p className="mt-1 text-xs text-muted-foreground">{name.length}/{LIMITS.name}</p>
+                  <p className="mt-1 text-xs text-stone-500">{name.length}/{LIMITS.name}</p>
                 </div>
                 <div>
-                  <label htmlFor="contact-email" className="block text-sm font-medium text-foreground mb-1">
+                  <label htmlFor="contact-email" className="mb-1 block font-serif text-sm font-medium text-stone-800">
                     Email <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -140,12 +136,12 @@ export const Contact: React.FC = () => {
                     maxLength={LIMITS.email}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                    className="w-full min-h-[44px] rounded-lg border border-stone-200 bg-white px-3 py-2.5 font-serif text-stone-900 placeholder:text-stone-400 focus:border-transparent focus:ring-2 focus:ring-brand-primary touch-manipulation"
                     placeholder="you@example.com"
                   />
                 </div>
                 <div>
-                  <label htmlFor="contact-phone" className="block text-sm font-medium text-foreground mb-1">
+                  <label htmlFor="contact-phone" className="mb-1 block font-serif text-sm font-medium text-stone-800">
                     Phone
                   </label>
                   <input
@@ -156,12 +152,12 @@ export const Contact: React.FC = () => {
                     maxLength={LIMITS.phone}
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                    className="w-full min-h-[44px] rounded-lg border border-stone-200 bg-white px-3 py-2.5 font-serif text-stone-900 placeholder:text-stone-400 focus:border-transparent focus:ring-2 focus:ring-brand-primary touch-manipulation"
                     placeholder="+1 (555) 000-0000"
                   />
                 </div>
                 <div>
-                  <label htmlFor="contact-company" className="block text-sm font-medium text-foreground mb-1">
+                  <label htmlFor="contact-company" className="mb-1 block font-serif text-sm font-medium text-stone-800">
                     Company
                   </label>
                   <input
@@ -172,12 +168,12 @@ export const Contact: React.FC = () => {
                     maxLength={LIMITS.company}
                     value={company}
                     onChange={(e) => setCompany(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                    className="w-full min-h-[44px] rounded-lg border border-stone-200 bg-white px-3 py-2.5 font-serif text-stone-900 placeholder:text-stone-400 focus:border-transparent focus:ring-2 focus:ring-brand-primary touch-manipulation"
                     placeholder="Your company"
                   />
                 </div>
                 <div>
-                  <label htmlFor="contact-subject" className="block text-sm font-medium text-foreground mb-1">
+                  <label htmlFor="contact-subject" className="mb-1 block font-serif text-sm font-medium text-stone-800">
                     Subject
                   </label>
                   <input
@@ -188,12 +184,12 @@ export const Contact: React.FC = () => {
                     maxLength={LIMITS.subject}
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                    className="w-full min-h-[44px] rounded-lg border border-stone-200 bg-white px-3 py-2.5 font-serif text-stone-900 placeholder:text-stone-400 focus:border-transparent focus:ring-2 focus:ring-brand-primary touch-manipulation"
                     placeholder="Brief subject"
                   />
                 </div>
                 <div>
-                  <label htmlFor="contact-message" className="block text-sm font-medium text-foreground mb-1">
+                  <label htmlFor="contact-message" className="mb-1 block font-serif text-sm font-medium text-stone-800">
                     Message <span className="text-red-500">*</span>
                   </label>
                   <textarea
@@ -205,10 +201,10 @@ export const Contact: React.FC = () => {
                     maxLength={LIMITS.message}
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-brand-primary focus:border-transparent resize-y"
+                    className="w-full resize-y rounded-lg border border-stone-200 bg-white px-3 py-2 font-serif text-stone-900 placeholder:text-stone-400 focus:border-transparent focus:ring-2 focus:ring-brand-primary"
                     placeholder="Your question or request..."
                   />
-                  <p className="mt-1 text-xs text-muted-foreground">{message.length}/{LIMITS.message} characters</p>
+                  <p className="mt-1 font-serif text-xs text-stone-500">{message.length}/{LIMITS.message} characters</p>
                 </div>
                 <Button type="submit" disabled={loading} className="w-full sm:w-auto">
                   {loading ? 'Sending…' : 'Send message'}

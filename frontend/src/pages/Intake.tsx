@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { RadiantLayout, Container, Gradient, AnimatedBackground } from '../components/radiant'
+import { RadiantLayout, Container } from '../components/radiant'
 import { Button } from '../components/radiant/Button'
 import { apiClient } from '../services/apiClient'
 import { MarketingChatWidget } from '../components/MarketingChatWidget'
@@ -81,8 +81,8 @@ const WEEKLY_VOLUME = [
 ]
 
 const inputCls =
-  'w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-brand-primary focus:border-transparent'
-const labelCls = 'block text-sm font-medium text-foreground mb-1'
+  'w-full px-3 py-2 rounded-lg border border-stone-200 bg-white font-serif text-stone-900 placeholder:text-stone-400 focus:ring-2 focus:ring-brand-primary focus:border-transparent'
+const labelCls = 'block text-sm font-serif font-medium text-stone-800 mb-1'
 
 export const Intake: React.FC = () => {
   const [loading, setLoading] = useState(false)
@@ -200,24 +200,20 @@ export const Intake: React.FC = () => {
 
   return (
     <RadiantLayout>
-      <div className="min-h-screen bg-background text-foreground relative">
-        <div className="absolute inset-0 fikiri-gradient-animated">
-          <AnimatedBackground />
-        </div>
-        <section className="relative py-16 sm:py-20 z-10">
-          <Gradient className="absolute inset-x-2 top-0 bottom-0 rounded-3xl ring-1 ring-black/5 ring-inset opacity-20" />
+      <div className="relative min-h-dvh pb-[env(safe-area-inset-bottom)]">
+        <section className="relative py-10 sm:py-16 z-10">
           <Container className="relative">
-            <div className="max-w-2xl mx-auto">
-              <h1 className="text-4xl font-bold text-foreground mb-2 sm:text-5xl">
+            <div className="max-w-2xl mx-auto min-w-0">
+              <h1 className="font-serif text-3xl font-bold text-white mb-2 sm:text-5xl">
                 Consultation intake
               </h1>
-              <p className="text-lg text-muted-foreground mb-2">
+              <p className="font-serif text-lg text-white/70 mb-2">
                 Share context before we talk—about 10–15 minutes. We&apos;ll still walk through your real workflow
                 live on the call; this just saves setup time.
               </p>
-              <p className="text-sm text-muted-foreground mb-8">
+              <p className="font-serif text-sm text-white/55 mb-8">
                 Prefer email only?{' '}
-                <Link to="/contact" className="text-brand-primary hover:underline">
+                <Link to="/contact" className="text-orange-300 hover:underline">
                   Contact us here
                 </Link>
                 .
@@ -234,7 +230,7 @@ export const Intake: React.FC = () => {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-8" autoComplete="on">
+              <form onSubmit={handleSubmit} className="space-y-8 rounded-2xl bg-white/[0.95] p-5 font-serif shadow-lg shadow-orange-950/20 ring-1 ring-white/25 backdrop-blur-sm sm:p-8" autoComplete="on">
                 <input
                   id="intake-honeypot"
                   type="text"
@@ -248,7 +244,7 @@ export const Intake: React.FC = () => {
                 />
 
                 <section className="space-y-4">
-                  <h2 className="text-lg font-semibold text-foreground border-b border-border pb-2">
+                  <h2 className="text-lg font-serif font-semibold text-stone-900 border-b border-stone-200 pb-2">
                     Business & contact
                   </h2>
                   <div>
@@ -383,7 +379,7 @@ export const Intake: React.FC = () => {
                 </section>
 
                 <section className="space-y-4">
-                  <h2 className="text-lg font-semibold text-foreground border-b border-border pb-2">
+                  <h2 className="text-lg font-serif font-semibold text-stone-900 border-b border-stone-200 pb-2">
                     Business profile
                   </h2>
                   <div>
@@ -460,7 +456,7 @@ export const Intake: React.FC = () => {
                 </section>
 
                 <section className="space-y-4">
-                  <h2 className="text-lg font-semibold text-foreground border-b border-border pb-2">
+                  <h2 className="text-lg font-serif font-semibold text-stone-900 border-b border-stone-200 pb-2">
                     Workflow focus (Input → Decision → Execution → Follow-Up → Money)
                   </h2>
                   <div>

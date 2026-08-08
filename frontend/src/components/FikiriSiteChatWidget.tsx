@@ -181,7 +181,7 @@ export const FikiriSiteChatWidget: React.FC = () => {
     <div className="fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-3 pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)]">
       {open && (
         <div
-          className="flex w-[min(100vw-2rem,26rem)] flex-col overflow-hidden rounded-2xl border border-neutral-200/80 bg-white text-neutral-900 shadow-[0_20px_60px_-12px_rgba(179,59,30,0.35)]"
+          className="flex max-h-[min(70dvh,32rem)] w-[min(100vw-2rem,26rem)] flex-col overflow-hidden rounded-2xl border border-neutral-200/80 bg-white text-neutral-900 shadow-[0_20px_60px_-12px_rgba(179,59,30,0.35)]"
           role="dialog"
           aria-label="Fikiri assistant chat"
           aria-modal="false"
@@ -224,7 +224,7 @@ export const FikiriSiteChatWidget: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="rounded-lg p-1.5 text-white/90 transition hover:bg-white/15"
+                  className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-white/90 transition hover:bg-white/15 touch-manipulation"
                   aria-label="Close chat"
                 >
                   <X className="h-5 w-5" />
@@ -257,7 +257,7 @@ export const FikiriSiteChatWidget: React.FC = () => {
             </div>
           )}
 
-          <div className="max-h-[min(50vh,28rem)] space-y-3 overflow-y-auto bg-[#FAFAFA] px-3 py-4 sm:px-4">
+          <div className="max-h-[min(40dvh,22rem)] space-y-3 overflow-y-auto bg-[#FAFAFA] px-3 py-4 sm:max-h-[min(50vh,28rem)] sm:px-4">
             {lines.map((line) => (
               <div
                 key={line.id}

@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { useInView } from 'react-intersection-observer';
-import { RadiantLayout, Gradient, Container, AnimatedBackground } from '../components/radiant';
+import { RadiantLayout, Gradient, Container, Reveal } from '../components/radiant';
 import { MarketingChatWidget } from '../components/MarketingChatWidget';
 import { TableScroll } from '../components/TableScroll';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,7 +8,6 @@ import { apiClient } from '../services/apiClient';
 import { useToast } from '../components/Toast';
 import { 
   Check, 
-  ArrowRight, 
   Star,
   Loader2,
   CreditCard
@@ -120,11 +117,6 @@ const PricingPage: React.FC = () => {
     }
   }, [searchParams, addToast, navigate, isAuthenticated, hasAutoCheckedOut, handleCheckout]);
   
-  // Animation states
-  const { ref: heroRef, inView: heroInView } = useInView({ triggerOnce: true });
-  const { ref: pricingRef, inView: pricingInView } = useInView({ triggerOnce: true });
-  const { ref: featuresRef, inView: featuresInView } = useInView({ triggerOnce: true });
-
   const pricingTiers: PricingTier[] = [
     {
       name: 'Starter',
@@ -233,69 +225,57 @@ const PricingPage: React.FC = () => {
 
   return (
     <RadiantLayout>
-      <div className="min-h-screen bg-background text-foreground overflow-hidden relative">
-        <div className="absolute inset-0 fikiri-gradient-animated pointer-events-none">
-          <AnimatedBackground />
-        </div>
+      <div className="relative min-h-dvh overflow-hidden pb-[env(safe-area-inset-bottom)]">
         <div className="relative z-10">
       {/* Hero Section */}
-      <section ref={heroRef} className="relative py-12 sm:py-20 z-10">
+      <section className="relative z-10 py-8 sm:py-12">
         <Container>
           <div className="max-w-4xl mx-auto text-center">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={heroInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
-              transition={{ duration: 0.8 }}
-            >
-              <h1 className="text-3xl sm:text-6xl font-bold mb-6 text-foreground">
+            <Reveal direction="up">
+              <h1 className="text-3xl font-bold mb-4 text-white sm:text-4xl md:text-5xl lg:text-6xl">
                 Plans for businesses of any size
               </h1>
-              <p className="text-lg sm:text-xl text-muted-foreground mb-4">
+              <p className="text-base sm:text-xl text-white/85 mb-3">
                 Get all the Fikiri Solutions features — pay for what you use
               </p>
-              <p className="text-sm text-muted-foreground mb-4">
+              <p className="text-sm text-white/75 mb-4 leading-relaxed">
                 Verified now: core CRM, lead capture, and core automation actions. Optional integrations: Gmail, Outlook, Twilio, Slack, Stripe.
                 Some advanced automation actions are marked partial or coming soon.
               </p>
-              <p className="text-sm text-muted-foreground mb-8 px-2 sm:px-0">
+              <p className="text-sm text-white/75 mb-8 px-1 sm:px-0">
                 {purchaseType === 'trial' ? (
-                  <span className="inline-flex items-center gap-2">
-                    <CreditCard className="w-4 h-4" />
-                    Card required for free trial verification. No charge during your 7-day trial.
+                  <span className="inline-flex max-w-full flex-wrap items-center justify-center gap-2 text-center">
+                    <CreditCard className="h-4 w-4 shrink-0" aria-hidden />
+                    <span>Card required for free trial verification. No charge during your 7-day trial.</span>
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-2">
-                    <CreditCard className="w-4 h-4" />
-                    Start using all features immediately. Charged today.
+                  <span className="inline-flex max-w-full flex-wrap items-center justify-center gap-2 text-center">
+                    <CreditCard className="h-4 w-4 shrink-0" aria-hidden />
+                    <span>Start using all features immediately. Charged today.</span>
                   </span>
                 )}
               </p>
-            </motion.div>
+            </Reveal>
 
             {/* Billing Toggle */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={heroInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="flex flex-col items-center justify-center mb-8 gap-4"
-            >
-              <div className="bg-card/90 backdrop-blur-sm rounded-lg p-1 border border-border shadow-sm flex flex-col sm:flex-row w-full sm:w-auto">
+            <Reveal direction="up" delay={0.12} className="flex flex-col items-center justify-center mb-8 gap-4">
+              <div className="bg-white/90 backdrop-blur-sm rounded-lg p-1 border border-white/20 shadow-sm flex flex-col sm:flex-row w-full sm:w-auto">
                 <button
                   onClick={() => setBillingPeriod('monthly')}
-                  className={`px-4 sm:px-6 py-2 rounded-md font-medium transition-all duration-300 ${
+                  className={`min-h-[44px] px-4 sm:px-6 py-2.5 rounded-md font-medium touch-manipulation transition-all duration-300 ${
                     billingPeriod === 'monthly'
                       ? 'bg-brand-primary text-white'
-                      : 'text-foreground hover:bg-muted'
+                      : 'text-stone-800 hover:bg-stone-100'
                   }`}
                 >
                   Monthly
                 </button>
                 <button
                   onClick={() => setBillingPeriod('yearly')}
-                  className={`px-4 sm:px-6 py-2 rounded-md font-medium transition-all duration-300 ${
+                  className={`min-h-[44px] px-4 sm:px-6 py-2.5 rounded-md font-medium touch-manipulation transition-all duration-300 ${
                     billingPeriod === 'yearly'
                       ? 'bg-brand-primary text-white'
-                      : 'text-foreground hover:bg-muted'
+                      : 'text-stone-800 hover:bg-stone-100'
                   }`}
                 >
                   <span>Yearly</span>
@@ -303,13 +283,13 @@ const PricingPage: React.FC = () => {
                 </button>
               </div>
 
-              <div className="bg-card/90 backdrop-blur-sm rounded-lg p-1 border border-border shadow-sm flex flex-col sm:flex-row w-full sm:w-auto">
+              <div className="bg-white/90 backdrop-blur-sm rounded-lg p-1 border border-white/20 shadow-sm flex flex-col sm:flex-row w-full sm:w-auto">
                 <button
                   onClick={() => setPurchaseType('trial')}
-                  className={`px-4 sm:px-6 py-2 rounded-md font-medium transition-all duration-300 ${
+                  className={`min-h-[44px] px-4 sm:px-6 py-2.5 rounded-md font-medium touch-manipulation transition-all duration-300 ${
                     purchaseType === 'trial'
                       ? 'bg-brand-primary text-white'
-                      : 'text-foreground hover:bg-muted'
+                      : 'text-stone-800 hover:bg-stone-100'
                   }`}
                 >
                   <span>Free Trial</span>
@@ -317,40 +297,39 @@ const PricingPage: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setPurchaseType('immediate')}
-                  className={`px-4 sm:px-6 py-2 rounded-md font-medium transition-all duration-300 ${
+                  className={`min-h-[44px] px-4 sm:px-6 py-2.5 rounded-md font-medium touch-manipulation transition-all duration-300 ${
                     purchaseType === 'immediate'
                       ? 'bg-brand-primary text-white'
-                      : 'text-foreground hover:bg-muted'
+                      : 'text-stone-800 hover:bg-stone-100'
                   }`}
                 >
                   Start Now
                 </button>
               </div>
-            </motion.div>
+            </Reveal>
           </div>
         </Container>
       </section>
 
       {/* Pricing Cards - Radiant-style gradient behind */}
-      <section ref={pricingRef} className="relative py-14 sm:py-20 z-10 overflow-x-hidden">
+      <section className="relative py-14 sm:py-20 z-10 overflow-x-hidden">
         <Gradient className="absolute inset-x-2 top-24 bottom-0 rounded-3xl ring-1 ring-black/5 ring-inset opacity-30" />
         <Container className="relative">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4 md:gap-8">
             {pricingTiers.map((tier, index) => (
-              <motion.div
+              <Reveal
                 key={tier.name}
-                initial={{ opacity: 0, y: 30 }}
-                animate={pricingInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
-                transition={{ duration: 0.8, delay: index * 0.1 }}
-                className={`relative min-w-0 bg-card/90 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-border shadow-lg ring-1 ring-black/5 transition-all duration-300 hover:shadow-xl ${
+                direction="up"
+                delay={index * 0.1}
+                className={`relative min-w-0 bg-white/[0.95] backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-white/30 shadow-lg shadow-orange-950/25 ring-1 ring-white/15 transition-all duration-300 hover:shadow-xl ${
                   tier.highlighted
-                    ? 'ring-2 ring-brand-primary/30'
-                    : 'hover:border-brand-primary/30'
+                    ? 'ring-2 ring-brand-primary/50'
+                    : 'hover:border-brand-primary/40'
                 }`}
               >
                 {tier.popular && (
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <div className="bg-brand-primary text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 shadow-md">
+                    <div className="bg-brand-primary text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 shadow-md">
                       <Star className="w-4 h-4" />
                       Most Popular
                     </div>
@@ -358,19 +337,19 @@ const PricingPage: React.FC = () => {
                 )}
 
                 <div className="text-center mb-8">
-                  <h3 className="text-2xl font-bold text-foreground mb-2">{tier.name}</h3>
+                  <h3 className="text-2xl font-bold text-stone-900 mb-2">{tier.name}</h3>
                   <div className="flex items-center justify-center mb-4">
-                    <span className="text-4xl font-bold text-foreground">${tier.price}</span>
-                    <span className="text-muted-foreground ml-2">{tier.period}</span>
+                    <span className="text-4xl font-bold text-stone-900">${tier.price}</span>
+                    <span className="text-stone-600 ml-2 font-medium">{tier.period}</span>
                   </div>
-                  <p className="text-muted-foreground text-sm">{tier.description}</p>
+                  <p className="text-stone-700 text-sm leading-relaxed">{tier.description}</p>
                 </div>
 
                 <ul className="space-y-3 mb-8 min-w-0">
                   {tier.features.map((feature, featureIndex) => (
-                    <li key={featureIndex} className="flex items-center text-foreground min-w-0">
-                      <Check className="w-5 h-5 text-green-600 mr-3 flex-shrink-0" />
-                      <span className="text-sm text-foreground break-words">{feature}</span>
+                    <li key={featureIndex} className="flex items-center text-stone-800 min-w-0">
+                      <Check className="w-5 h-5 text-green-700 mr-3 flex-shrink-0" aria-hidden />
+                      <span className="text-sm text-stone-800 break-words">{feature}</span>
                     </li>
                   ))}
                 </ul>
@@ -404,7 +383,7 @@ const PricingPage: React.FC = () => {
                     await handleCheckout(tier.name.toLowerCase());
                   }}
                   disabled={loadingTier === tier.name}
-                  className={`w-full py-3 px-6 rounded-lg font-semibold transition-all duration-300 sm:transform sm:hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${tier.buttonStyle}`}
+                  className={`w-full min-h-[44px] touch-manipulation py-3 px-6 rounded-lg font-semibold transition-all duration-300 sm:transform sm:hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${tier.buttonStyle}`}
                 >
                   {loadingTier === tier.name ? (
                     <>
@@ -418,99 +397,94 @@ const PricingPage: React.FC = () => {
                     </>
                   )}
                 </button>
-              </motion.div>
+              </Reveal>
             ))}
           </div>
         </Container>
       </section>
 
       {/* Consultation & Implementation Services */}
-      <section className="relative py-14 sm:py-20 z-10">
+      <section className="relative py-14 sm:py-20 z-10 overflow-x-hidden">
         <Container>
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={featuresInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
-            transition={{ duration: 0.8 }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-foreground">
+          <Reveal direction="up" className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-white">
               Consultation & Implementation
             </h2>
-            <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+            <p className="text-lg text-white/80 max-w-3xl mx-auto">
               Subscription gives you platform access. Consultation covers hands-on setup so your CRM, inbox, and
               automation work reliably for your team.
             </p>
-          </motion.div>
+          </Reveal>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-card/90 backdrop-blur-sm rounded-2xl p-6 border border-border shadow-sm">
-              <h3 className="text-xl font-semibold text-foreground mb-3">Workflow Diagnostic</h3>
-              <p className="text-muted-foreground text-sm mb-4">
+            <Reveal direction="left" delay={0.08} className="bg-white/[0.95] backdrop-blur-sm rounded-2xl p-6 border border-white/30 shadow-sm shadow-orange-950/15">
+              <h3 className="text-xl font-semibold text-stone-900 mb-3">Workflow Diagnostic</h3>
+              <p className="text-stone-700 text-sm mb-4">
                 We review one part of your business from start to finish and show where time is being lost.
               </p>
-              <ul className="space-y-2 text-sm text-foreground">
+              <ul className="space-y-2 text-sm text-stone-800">
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-green-600" />
+                  <Check className="w-4 h-4 text-green-700" aria-hidden />
                   Simple map of how work happens now vs. how it should work
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-green-600" />
+                  <Check className="w-4 h-4 text-green-700" aria-hidden />
                   Clear checklist of what can be automated now (and what should wait)
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-green-600" />
+                  <Check className="w-4 h-4 text-green-700" aria-hidden />
                   Realistic estimate of time and cost savings
                 </li>
               </ul>
-            </div>
+            </Reveal>
 
-            <div className="bg-card/90 backdrop-blur-sm rounded-2xl p-6 border border-border shadow-sm">
-              <h3 className="text-xl font-semibold text-foreground mb-3">Foundations Sprint</h3>
-              <p className="text-muted-foreground text-sm mb-4">
+            <Reveal direction="up" delay={0.16} className="bg-white/[0.95] backdrop-blur-sm rounded-2xl p-6 border border-white/30 shadow-sm shadow-orange-950/15">
+              <h3 className="text-xl font-semibold text-stone-900 mb-3">Foundations Sprint</h3>
+              <p className="text-stone-700 text-sm mb-4">
                 We clean up your CRM and inbox so automation works reliably.
               </p>
-              <ul className="space-y-2 text-sm text-foreground">
+              <ul className="space-y-2 text-sm text-stone-800">
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-green-600" />
+                  <Check className="w-4 h-4 text-green-700" aria-hidden />
                   Clear rules for who owns each lead and next step
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-green-600" />
+                  <Check className="w-4 h-4 text-green-700" aria-hidden />
                   Better email routing and response templates
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-green-600" />
+                  <Check className="w-4 h-4 text-green-700" aria-hidden />
                   3-5 simple numbers to track progress
                 </li>
               </ul>
-            </div>
+            </Reveal>
 
-            <div className="bg-card/90 backdrop-blur-sm rounded-2xl p-6 border border-border shadow-sm">
-              <h3 className="text-xl font-semibold text-foreground mb-3">Automation Build Sprint</h3>
-              <p className="text-muted-foreground text-sm mb-4">
+            <Reveal direction="right" delay={0.24} className="bg-white/[0.95] backdrop-blur-sm rounded-2xl p-6 border border-white/30 shadow-sm shadow-orange-950/15">
+              <h3 className="text-xl font-semibold text-stone-900 mb-3">Automation Build Sprint</h3>
+              <p className="text-stone-700 text-sm mb-4">
                 We build one automation from start to finish, train your team, and support rollout.
               </p>
-              <ul className="space-y-2 text-sm text-foreground">
+              <ul className="space-y-2 text-sm text-stone-800">
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-green-600" />
+                  <Check className="w-4 h-4 text-green-700" aria-hidden />
                   End-to-end automation delivery
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-green-600" />
+                  <Check className="w-4 h-4 text-green-700" aria-hidden />
                   Live testing with your real scenarios
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-green-600" />
+                  <Check className="w-4 h-4 text-green-700" aria-hidden />
                   30 days of in-scope fixes after launch
                 </li>
               </ul>
-            </div>
+            </Reveal>
           </div>
 
-          <div className="mt-8 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <Reveal direction="up" delay={0.1} className="mt-8 bg-orange-50 border border-orange-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-orange-900 dark:text-orange-200">Not sure where to start?</p>
-              <p className="text-sm text-orange-800 dark:text-orange-300">
+              <p className="text-sm font-semibold text-orange-950">Not sure where to start?</p>
+              <p className="text-sm text-orange-900">
                 Book a consultation and we will tell you if a diagnostic is the right next step.
               </p>
             </div>
@@ -520,71 +494,66 @@ const PricingPage: React.FC = () => {
             >
               Book Consultation
             </button>
-          </div>
+          </Reveal>
         </Container>
       </section>
 
       {/* Feature Comparison */}
-      <section ref={featuresRef} className="relative py-14 sm:py-20 z-10">
+      <section className="relative py-14 sm:py-20 z-10">
         <Container>
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={featuresInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
-            transition={{ duration: 0.8 }}
-            className="text-center mb-8 sm:mb-16"
-          >
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-foreground">
+          <Reveal direction="up" className="text-center mb-8 sm:mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-white">
               Compare Plans
             </h2>
-            <p className="text-sm text-muted-foreground sm:hidden">
+            <p className="text-sm text-white/75 sm:hidden">
               Swipe horizontally to compare all plans
             </p>
-          </motion.div>
+          </Reveal>
 
-          <div className="bg-card/90 backdrop-blur-sm rounded-2xl border border-border shadow-sm overflow-hidden">
+          <Reveal direction="up" delay={0.1} className="bg-white/[0.95] backdrop-blur-sm rounded-2xl border border-white/30 shadow-sm shadow-orange-950/15 overflow-hidden">
             <TableScroll size="wide" label="Compare plans table">
               <table className="w-full table-fixed sm:table-auto">
                 <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left p-4 sm:p-6 text-foreground font-semibold whitespace-nowrap w-[38%] sm:w-auto">Features</th>
-                    <th className="text-center p-4 sm:p-6 text-foreground font-semibold whitespace-nowrap">Starter</th>
-                    <th className="text-center p-4 sm:p-6 text-foreground font-semibold whitespace-nowrap">Growth</th>
-                    <th className="text-center p-4 sm:p-6 text-foreground font-semibold whitespace-nowrap">Business</th>
-                    <th className="text-center p-4 sm:p-6 text-foreground font-semibold whitespace-nowrap">Enterprise</th>
+                  <tr className="border-b border-stone-200">
+                    <th className="text-left p-4 sm:p-6 text-stone-900 font-semibold whitespace-nowrap w-[38%] sm:w-auto">Features</th>
+                    <th className="text-center p-4 sm:p-6 text-stone-900 font-semibold whitespace-nowrap">Starter</th>
+                    <th className="text-center p-4 sm:p-6 text-stone-900 font-semibold whitespace-nowrap">Growth</th>
+                    <th className="text-center p-4 sm:p-6 text-stone-900 font-semibold whitespace-nowrap">Business</th>
+                    <th className="text-center p-4 sm:p-6 text-stone-900 font-semibold whitespace-nowrap">Enterprise</th>
                   </tr>
                 </thead>
                 <tbody>
                   {comparisonFeatures.map((category) => (
                     <React.Fragment key={category.category}>
-                      <tr className="border-b border-border">
-                        <td colSpan={5} className="p-4 text-brand-primary font-semibold text-sm uppercase tracking-wider">
+                      <tr className="border-b border-stone-200">
+                        <td colSpan={5} className="p-4 text-orange-800 font-semibold text-sm uppercase tracking-wider">
                           {category.category}
                         </td>
                       </tr>
                       {category.features.map((feature, featureIndex) => (
-                        <tr key={featureIndex} className="border-b border-border/50">
-                          <td className="table-scroll-cell-wrap p-4 text-foreground min-w-[8rem]">{feature.name}</td>
-                          <td className="p-4 text-center text-foreground">
+                        <tr key={featureIndex} className="border-b border-stone-100">
+                          <td className="table-scroll-cell-wrap p-4 text-stone-800 min-w-[8rem]">{feature.name}</td>
+                          <td className="p-4 text-center text-stone-700">
                             {typeof feature.starter === 'boolean' 
-                              ? (feature.starter ? <Check className="w-5 h-5 text-green-600 mx-auto" /> : '—')
+                              ? (feature.starter ? <Check className="w-5 h-5 text-green-700 mx-auto" aria-label="Included" /> : <span className="text-stone-400" aria-label="Not included">—</span>)
                               : feature.starter
                             }
                           </td>
-                          <td className="p-4 text-center text-foreground">
+                          <td className="p-4 text-center text-stone-700">
                             {typeof feature.growth === 'boolean' 
-                              ? (feature.growth ? <Check className="w-5 h-5 text-green-600 mx-auto" /> : '—')
+                              ? (feature.growth ? <Check className="w-5 h-5 text-green-700 mx-auto" aria-label="Included" /> : <span className="text-stone-400" aria-label="Not included">—</span>)
                               : feature.growth
                             }
                           </td>
-                          <td className="p-4 text-center text-foreground">
+                          <td className="p-4 text-center text-stone-700">
                             {typeof feature.business === 'boolean' 
-                              ? (feature.business ? <Check className="w-5 h-5 text-green-600 mx-auto" /> : '—')
+                              ? (feature.business ? <Check className="w-5 h-5 text-green-700 mx-auto" aria-label="Included" /> : <span className="text-stone-400" aria-label="Not included">—</span>)
                               : feature.business
                             }
                           </td>
-                          <td className="p-4 text-center text-foreground">
+                          <td className="p-4 text-center text-stone-700">
                             {typeof feature.enterprise === 'boolean' 
-                              ? (feature.enterprise ? <Check className="w-5 h-5 text-green-600 mx-auto" /> : '—')
+                              ? (feature.enterprise ? <Check className="w-5 h-5 text-green-700 mx-auto" aria-label="Included" /> : <span className="text-stone-400" aria-label="Not included">—</span>)
                               : feature.enterprise
                             }
                           </td>
@@ -595,49 +564,21 @@ const PricingPage: React.FC = () => {
                 </tbody>
               </table>
             </TableScroll>
-          </div>
+          </Reveal>
         </Container>
       </section>
 
-      <section className="relative py-10 z-10 border-t border-border/60">
+      <section className="relative py-10 z-10 border-t border-white/10">
         <Container>
-          <p className="text-center text-muted-foreground text-sm sm:text-base">
+          <Reveal direction="up">
+          <p className="text-center text-white/80 text-sm sm:text-base">
             Questions about plans or trials?{' '}
-            <Link to="/faq" className="font-medium text-brand-primary hover:text-brand-secondary underline-offset-4 hover:underline">
+            <Link to="/faq" className="font-medium text-orange-300 hover:text-orange-200 underline-offset-4 hover:underline">
               Read the FAQ
             </Link>
             .
           </p>
-        </Container>
-      </section>
-
-      {/* CTA Section - Radiant-style gradient strip */}
-      <section className="relative py-14 sm:py-20 z-10">
-        <Gradient className="absolute inset-0 opacity-20" />
-        <Container className="relative">
-          <div className="max-w-4xl mx-auto text-center">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-6 text-foreground">
-              Ready to start automating?
-            </h2>
-            <p className="text-xl text-muted-foreground mb-8">
-              Get started with a 7-day free trial. No credit card required.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button
-                onClick={() => navigate('/signup')}
-                className="px-8 py-4 bg-brand-primary hover:bg-fikiri-400 text-white font-semibold rounded-full transition-all duration-300 flex items-center justify-center gap-2 shadow-md"
-              >
-                Start Free Trial
-                <ArrowRight className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => navigate('/signup')}
-                className="px-8 py-4 border border-border text-foreground font-semibold rounded-full hover:bg-muted transition-all duration-300"
-              >
-                Schedule Demo
-              </button>
-            </div>
-          </div>
+          </Reveal>
         </Container>
       </section>
         </div>

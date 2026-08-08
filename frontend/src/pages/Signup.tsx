@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   Mail, 
@@ -15,7 +15,6 @@ import {
   CheckCircle,
   AlertCircle
 } from 'lucide-react';
-import { FikiriLogo } from '../components/FikiriLogo';
 import { RadiantLayout } from '../components/radiant';
 import { useAuth } from '../contexts/AuthContext';
 import { useUserActivityTracking } from '../contexts/ActivityContext';
@@ -23,6 +22,7 @@ import { SMS_CONSENT } from '../constants/smsConsent';
 import { AUTOCOMPLETE } from '../constants/autocomplete';
 
 const Signup: React.FC = () => {
+  const reduceMotion = useReducedMotion();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -40,9 +40,8 @@ const Signup: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   
-  const { signup, user } = useAuth();
+  const { signup } = useAuth();
   const { trackSignup } = useUserActivityTracking();
   const navigate = useNavigate();
 
@@ -64,13 +63,6 @@ const Signup: React.FC = () => {
       }
     }
   }, []);
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    setMousePosition({
-      x: (e.clientX / window.innerWidth) * 100,
-      y: (e.clientY / window.innerHeight) * 100,
-    });
-  };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -187,179 +179,43 @@ const Signup: React.FC = () => {
   };
 
   return (
-    <RadiantLayout>
+    <RadiantLayout showFooterCta={false} backdropIntensity="subtle">
     <div 
       id="main-content"
-      className="min-h-screen bg-brand-tan dark:bg-gray-900 relative overflow-hidden"
-      onMouseMove={handleMouseMove}
+      className="relative overflow-x-clip"
     >
-      {/* Animated Background */}
-      <div className="absolute inset-0">
-        {/* Floating orbs with brand colors */}
-        <motion.div 
-          className="absolute w-72 h-72 bg-brand-accent/20 rounded-full blur-3xl"
-          animate={{
-            x: mousePosition.x * 0.1,
-            y: mousePosition.y * 0.1,
-            scale: [1, 1.1, 1],
-          }}
-          transition={{
-            duration: 4,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-        <motion.div 
-          className="absolute w-96 h-96 bg-brand-secondary/20 rounded-full blur-3xl"
-          animate={{
-            x: mousePosition.x * 0.05,
-            y: mousePosition.y * 0.05,
-            scale: [1.1, 1, 1.1],
-          }}
-          transition={{
-            duration: 6,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-        <motion.div 
-          className="absolute w-64 h-64 bg-brand-primary/20 rounded-full blur-3xl"
-          animate={{
-            x: mousePosition.x * 0.08,
-            y: mousePosition.y * 0.1,
-            scale: [1, 1.2, 1],
-          }}
-          transition={{
-            duration: 5,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-        
-        {/* Geometric shapes */}
-        <motion.div
-          className="absolute top-20 left-20 w-32 h-32 border-2 border-white/10 rounded-lg"
-          animate={{
-            rotate: [0, 90, 180, 270, 360],
-            scale: [1, 1.1, 1],
-          }}
-          transition={{
-            duration: 8,
-            repeat: Infinity,
-            ease: "linear"
-          }}
-        />
-        <motion.div
-          className="absolute bottom-32 right-32 w-24 h-24 bg-brand-accent/10 rounded-full"
-          animate={{
-            y: [-20, 20, -20],
-            x: [-10, 10, -10],
-          }}
-          transition={{
-            duration: 7,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-        <motion.div
-          className="absolute top-1/2 right-20 w-16 h-16 border-2 border-brand-secondary/20 rounded-full"
-          animate={{
-            rotate: [0, 180, 360],
-            scale: [1, 1.2, 1],
-          }}
-          transition={{
-            duration: 6,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-        
-        {/* Grid pattern */}
-        <div className="absolute inset-0 opacity-20" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-        }} />
-        
-        {/* Floating particles */}
-        {[...Array(30)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-2 h-2 bg-white/30 rounded-full"
-            animate={{
-              y: [-20, 20, -20],
-              x: [-10, 10, -10],
-              opacity: [0.3, 0.8, 0.3],
-            }}
-            transition={{
-              duration: 3 + Math.random() * 2,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: Math.random() * 2,
-            }}
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-            }}
-          />
-        ))}
+      {/* Static ambient wash — calm for auth focus */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden>
+        <div className="absolute -left-16 top-10 h-56 w-56 rounded-full bg-brand-accent/12 blur-3xl sm:h-72 sm:w-72" />
+        <div className="absolute -right-20 top-40 h-64 w-64 rounded-full bg-brand-secondary/12 blur-3xl sm:h-96 sm:w-96" />
+        <div className="absolute bottom-20 left-1/3 h-48 w-48 rounded-full bg-brand-primary/12 blur-3xl sm:h-64 sm:w-64" />
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full">
-          {/* Logo and Branding */}
-          <motion.div 
-            className="text-center mb-8"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <div className="flex items-center justify-center mb-6">
-              <Link 
-                to={user ? "/dashboard" : "/"}
-                className="cursor-pointer hover:opacity-80 transition-opacity"
-                aria-label={user ? "Fikiri Solutions - Go to dashboard" : "Fikiri Solutions - Return to homepage"}
-              >
-                <FikiriLogo size="xl" variant="full" textColor="white" className="mx-auto" />
-              </Link>
-            </div>
-            <motion.h1 
-              className="text-3xl sm:text-5xl font-bold text-white mb-2 font-serif tracking-tight"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-            >
+      <div className="relative z-10 flex items-start justify-center px-4 pb-10 pt-4 sm:items-center sm:px-6 sm:pb-16 sm:pt-8 lg:px-8">
+        <motion.div
+          className="max-w-md w-full min-w-0"
+          initial={reduceMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.45, ease: 'easeOut' }}
+        >
+          {/* Branding — nav already has logo */}
+          <div className="mb-5 text-center sm:mb-6">
+            <h1 className="mb-1 text-3xl font-bold text-white font-serif tracking-tight sm:text-4xl">
               Join Fikiri
-            </motion.h1>
-            <motion.p 
-              className="text-xl text-white/90 mb-1 font-medium"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-            >
-              Start Your Automation Journey
-            </motion.p>
-            <motion.p 
-              className="text-sm text-white/70 font-light"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-            >
-              Transform your business with intelligent automation
-            </motion.p>
-          </motion.div>
+            </h1>
+            <p className="text-base text-white/85 sm:text-lg">
+              Create your account
+            </p>
+          </div>
 
-          {/* Signup Form */}
-          <motion.div 
-            className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.5 }}
-          >
+          {/* Signup Form — dark panel for contrast on marketing wash */}
+          <div className="rounded-3xl border border-white/20 bg-black/45 p-5 shadow-2xl backdrop-blur-sm sm:p-8 sm:backdrop-blur-md">
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-white text-center mb-2 font-serif">
+              <h2 className="text-xl font-bold text-white text-center mb-2 font-serif sm:text-2xl">
                 Create Your Account
               </h2>
-              <p className="text-white text-center text-sm font-light opacity-80">
+              <p className="text-white/80 text-center text-sm">
                 Get started with Fikiri Solutions today
               </p>
             </div>
@@ -377,7 +233,7 @@ const Signup: React.FC = () => {
               {/* Name Fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-200 mb-2">
+                  <label htmlFor="firstName" className="block text-sm font-medium text-white/90 mb-2">
                     First Name
                   </label>
                   <div className="relative">
@@ -402,7 +258,7 @@ const Signup: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label htmlFor="lastName" className="block text-sm font-medium text-gray-200 mb-2">
+                  <label htmlFor="lastName" className="block text-sm font-medium text-white/90 mb-2">
                     Last Name
                   </label>
                   <div className="relative">
@@ -429,7 +285,7 @@ const Signup: React.FC = () => {
               
               {/* Email Field */}
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-200 mb-2">
+                <label htmlFor="email" className="block text-sm font-medium text-white/90 mb-2">
                   Email Address
                 </label>
                 <div className="relative">
@@ -455,7 +311,7 @@ const Signup: React.FC = () => {
               
               {/* Company Field */}
               <div>
-                <label htmlFor="company" className="block text-sm font-medium text-gray-200 mb-2">
+                <label htmlFor="company" className="block text-sm font-medium text-white/90 mb-2">
                   Company Name
                 </label>
                 <div className="relative">
@@ -485,8 +341,8 @@ const Signup: React.FC = () => {
                 <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
                   {SMS_CONSENT.upfrontDisclosure}
                 </p>
-                <label htmlFor="phone" className="block text-sm font-medium text-gray-200 mb-2">
-                  Mobile number <span className="text-gray-500 font-normal">(optional)</span>
+                <label htmlFor="phone" className="block text-sm font-medium text-white/90 mb-2">
+                  Mobile number <span className="text-white/55 font-normal">(optional)</span>
                 </label>
                 <div className="relative">
                   <input
@@ -521,7 +377,7 @@ const Signup: React.FC = () => {
               {/* Password Fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-200 mb-2">
+                  <label htmlFor="password" className="block text-sm font-medium text-white/90 mb-2">
                     Password
                   </label>
                   <div className="relative">
@@ -558,7 +414,7 @@ const Signup: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-200 mb-2">
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-white/90 mb-2">
                     Confirm Password
                   </label>
                   <div className="relative">
@@ -712,15 +568,10 @@ const Signup: React.FC = () => {
                 </Link>
               </p>
             </div>
-          </motion.div>
+          </div>
 
           {/* Features Preview */}
-          <motion.div 
-            className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.8 }}
-          >
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="text-center">
               <div className="w-12 h-12 bg-brand-accent/20 rounded-xl flex items-center justify-center mx-auto mb-2">
                 <CheckCircle className="h-6 w-6 text-brand-accent" />
@@ -739,8 +590,8 @@ const Signup: React.FC = () => {
               </div>
               <p className="text-xs text-gray-300">Quick Start</p>
             </div>
-          </motion.div>
-        </div>
+          </div>
+        </motion.div>
       </div>
     </div>
     </RadiantLayout>

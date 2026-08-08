@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useId, useState } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { useReducedMotion } from 'framer-motion'
 import { Container } from './Container'
 import { Button } from './Button'
 import { Heading, Subheading } from './Text'
@@ -8,7 +7,8 @@ import { Reveal } from './Reveal'
 import { clientPartnerships, type ClientPartnership } from '@/lib/clientPartnerships'
 import { cn } from '@/lib/utils'
 
-const AUTOPLAY_MS = 6000
+/** Seconds for one full loop of the duplicated track (RTL conveyor). */
+const LOOP_SECONDS = 28
 
 function ClientLogoFallback({
   logoAlt,
@@ -19,11 +19,11 @@ function ClientLogoFallback({
 }) {
   return (
     <div
-      className="flex h-24 w-full items-center justify-center rounded-xl bg-gradient-to-br from-orange-500/15 via-amber-500/10 to-transparent ring-1 ring-orange-500/20 sm:h-28"
+      className="flex h-16 w-full items-center justify-center rounded-lg bg-gradient-to-br from-orange-500/15 via-amber-500/10 to-transparent ring-1 ring-orange-500/20"
       role="img"
       aria-label={logoAlt}
     >
-      <span className="font-mono text-2xl font-semibold tracking-widest text-orange-700">
+      <span className="text-lg font-semibold tracking-widest text-orange-700">
         {fallbackMark}
       </span>
     </div>
@@ -51,8 +51,8 @@ function ClientLogo({
     <div
       className={
         darkLogoPlate
-          ? 'flex h-24 w-full items-center justify-center overflow-hidden rounded-xl bg-black p-3 ring-1 ring-white/10 sm:h-28 sm:p-4'
-          : 'flex h-24 w-full items-center justify-center overflow-hidden rounded-xl bg-white p-3 ring-1 ring-black/10 sm:h-28 sm:p-4'
+          ? 'flex h-16 w-full items-center justify-center overflow-hidden rounded-lg bg-black p-2.5 ring-1 ring-white/10'
+          : 'flex h-16 w-full items-center justify-center overflow-hidden rounded-lg bg-white p-2.5 ring-1 ring-black/10'
       }
     >
       <img
@@ -69,16 +69,16 @@ function ClientLogo({
 
 function PartnershipCard({
   client,
-  reduceMotion,
+  className,
 }: {
   client: ClientPartnership
-  reduceMotion: boolean | null
+  className?: string
 }) {
   return (
     <article
       className={cn(
-        'group flex h-full min-h-[22rem] flex-col rounded-2xl bg-white/[0.95] p-6 shadow-md shadow-orange-950/20 ring-1 ring-white/30 backdrop-blur-sm transition-shadow duration-300',
-        !reduceMotion && 'hover:shadow-lg hover:shadow-brand-primary/25 hover:ring-brand-primary/40'
+        'flex w-[min(15.5rem,calc(100vw-2.5rem))] shrink-0 flex-col rounded-xl bg-white/[0.95] p-4 shadow-md shadow-orange-950/15 ring-1 ring-white/25 backdrop-blur-sm sm:w-[17rem]',
+        className
       )}
     >
       <ClientLogo
@@ -87,18 +87,18 @@ function PartnershipCard({
         fallbackMark={client.fallbackMark}
         darkLogoPlate={client.darkLogoPlate}
       />
-      <h3 className="mt-5 text-lg font-semibold tracking-tight text-stone-900">{client.name}</h3>
-      <p className="mt-1 text-sm font-medium text-orange-700">{client.category}</p>
-      <p className="mt-3 flex-1 text-sm leading-relaxed text-stone-600">{client.summary}</p>
+      <h3 className="mt-3 text-base font-semibold tracking-tight text-stone-900">{client.name}</h3>
+      <p className="mt-0.5 text-xs font-medium text-orange-700">{client.category}</p>
+      <p className="mt-2 line-clamp-3 flex-1 text-xs leading-relaxed text-stone-600">{client.summary}</p>
       <a
         href={client.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="mt-5 inline-flex min-h-[44px] items-center text-sm font-medium text-brand-primary transition-colors group-hover:text-fikiri-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/80 focus-visible:ring-offset-2"
+        className="mt-3 inline-flex min-h-[44px] items-center text-sm font-medium text-brand-primary transition-colors hover:text-fikiri-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/80 focus-visible:ring-offset-2 touch-manipulation"
       >
         Visit site
         <span className="sr-only"> ({client.name})</span>
-        <span aria-hidden className="ml-1 transition-transform duration-200 group-hover:translate-x-0.5">
+        <span aria-hidden className="ml-1">
           →
         </span>
       </a>
@@ -106,94 +106,86 @@ function PartnershipCard({
   )
 }
 
-function usePerView(): number {
-  const [perView, setPerView] = useState(1)
-
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)')
-    const update = () => setPerView(mq.matches ? 2 : 1)
-    update()
-    mq.addEventListener('change', update)
-    return () => mq.removeEventListener('change', update)
-  }, [])
-
-  return perView
-}
-
 export function ClientPartnerships() {
   const reduceMotion = useReducedMotion()
-  const perView = usePerView()
   const statusId = useId()
-  const total = clientPartnerships.length
-  const pageCount = Math.max(1, Math.ceil(total / perView))
-
-  const [page, setPage] = useState(0)
+  const trackRef = useRef<HTMLDivElement>(null)
+  const stickyPausedRef = useRef(false)
   const [paused, setPaused] = useState(false)
-  const [direction, setDirection] = useState(1)
+
+  const setStickyPaused = (next: boolean) => {
+    stickyPausedRef.current = next
+    setPaused(next)
+  }
+
+  const setTransientPaused = (next: boolean) => {
+    if (stickyPausedRef.current) return
+    setPaused(next)
+  }
 
   useEffect(() => {
-    setPage((current) => Math.min(current, pageCount - 1))
-  }, [pageCount])
-
-  const goTo = useCallback(
-    (nextPage: number, dir: number) => {
-      setDirection(dir)
-      setPage(((nextPage % pageCount) + pageCount) % pageCount)
-    },
-    [pageCount]
-  )
-
-  const goNext = useCallback(() => {
-    goTo(page + 1, 1)
-  }, [goTo, page])
-
-  const goPrev = useCallback(() => {
-    goTo(page - 1, -1)
-  }, [goTo, page])
-
-  useEffect(() => {
-    if (reduceMotion || paused || pageCount <= 1) return
-    const id = window.setInterval(() => {
-      setDirection(1)
-      setPage((current) => (current + 1) % pageCount)
-    }, AUTOPLAY_MS)
-    return () => window.clearInterval(id)
-  }, [reduceMotion, paused, pageCount, page])
-
-  const visibleClients = clientPartnerships.slice(page * perView, page * perView + perView)
-  const slideLabel = `Showing partnerships ${page * perView + 1} to ${Math.min(
-    page * perView + visibleClients.length,
-    total
-  )} of ${total}`
+    const track = trackRef.current
+    if (!track || reduceMotion) return
+    track.style.animationPlayState = paused ? 'paused' : 'running'
+  }, [paused, reduceMotion])
 
   return (
     <section
-      className="relative overflow-hidden py-14 sm:py-16 lg:py-20"
+      className="relative overflow-hidden py-12 sm:py-14 lg:py-16"
       id="client-partnerships"
       aria-labelledby="client-partnerships-heading"
     >
+      <style>{`
+        @keyframes fikiri-partnerships-rtl {
+          from { transform: translate3d(0, 0, 0); }
+          to { transform: translate3d(-50%, 0, 0); }
+        }
+        .fikiri-partnerships-track {
+          width: max-content;
+          animation: fikiri-partnerships-rtl ${LOOP_SECONDS}s linear infinite;
+          will-change: transform;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .fikiri-partnerships-track {
+            animation: none !important;
+            transform: none !important;
+          }
+        }
+      `}</style>
+
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand-primary/40 to-transparent"
         aria-hidden
       />
 
       <Container className="relative">
-        <Reveal>
+        <Reveal direction="up">
           <Subheading dark>Client Partnerships</Subheading>
-          <Heading as="h2" dark id="client-partnerships-heading" className="mt-2 max-w-3xl">
+          <Heading as="h2" dark id="client-partnerships-heading" className="mt-2 max-w-3xl text-3xl sm:text-4xl md:text-5xl">
             Real client work across different industries.
           </Heading>
-          <p className="mt-3 max-w-3xl text-base leading-relaxed text-white/80 sm:mt-4 sm:text-lg">
+          <p className="mt-3 max-w-3xl text-sm leading-relaxed text-white/80 sm:mt-4 sm:text-base">
             Fikiri starts with consulting and workflow discovery. From there, we help businesses
             plan, build, and support practical systems around their real operations — from
             automation and CRM to product workflows, cloud support, and custom tools.
           </p>
         </Reveal>
+      </Container>
 
+      <div className="relative mt-8 sm:mt-10">
         <div
-          className="relative mt-8 sm:mt-10"
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
+          className="relative touch-pan-y"
+          onMouseEnter={() => setTransientPaused(true)}
+          onMouseLeave={() => setTransientPaused(false)}
+          onPointerDown={() => setTransientPaused(true)}
+          onPointerUp={() => setTransientPaused(false)}
+          onPointerCancel={() => setTransientPaused(false)}
+          onFocusCapture={() => setTransientPaused(true)}
+          onBlurCapture={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+              setTransientPaused(false)
+            }
+          }}
         >
           <div
             className="overflow-hidden"
@@ -203,82 +195,65 @@ export function ClientPartnerships() {
             aria-describedby={statusId}
           >
             <p id={statusId} className="sr-only" aria-live="polite">
-              {slideLabel}
+              Client partnerships scroll continuously from right to left. Pause by hovering, touching,
+              or focusing the cards, or use the pause control. Use the list below for direct links.
             </p>
 
-            <AnimatePresence mode="wait" custom={direction} initial={false}>
-              <motion.div
-                key={`${page}-${perView}`}
-                custom={direction}
-                initial={
-                  reduceMotion
-                    ? false
-                    : { opacity: 0, x: direction > 0 ? 36 : -36 }
-                }
-                animate={{ opacity: 1, x: 0 }}
-                exit={reduceMotion ? undefined : { opacity: 0, x: direction > 0 ? -36 : 36 }}
-                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-                className={cn(
-                  'grid gap-5',
-                  perView === 2 ? 'md:grid-cols-2' : 'grid-cols-1'
-                )}
+            {reduceMotion ? (
+              <Container>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  {clientPartnerships.map((client) => (
+                    <PartnershipCard key={client.name} client={client} className="w-full max-w-full" />
+                  ))}
+                </div>
+              </Container>
+            ) : (
+              <div
+                ref={trackRef}
+                className="fikiri-partnerships-track flex gap-4 px-4 sm:gap-5 sm:px-6"
               >
-                {visibleClients.map((client) => (
-                  <PartnershipCard key={client.name} client={client} reduceMotion={reduceMotion} />
+                {clientPartnerships.map((client) => (
+                  <PartnershipCard key={`a-${client.name}`} client={client} />
                 ))}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-
-          <div className="mt-6 flex items-center justify-between gap-3 sm:mt-8">
-            <button
-              type="button"
-              onClick={goPrev}
-              aria-label="Previous client partnership"
-              className="inline-flex size-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1c1510]"
-            >
-              <ChevronLeft className="h-5 w-5" aria-hidden />
-            </button>
-
-            <div className="flex flex-1 flex-col items-center gap-2">
-              <div className="flex items-center gap-2" role="tablist" aria-label="Partnership slides">
-                {Array.from({ length: pageCount }, (_, index) => {
-                  const selected = index === page
-                  return (
-                    <button
-                      key={index}
-                      type="button"
-                      role="tab"
-                      aria-selected={selected}
-                      aria-label={`Go to partnership slide ${index + 1} of ${pageCount}`}
-                      onClick={() => goTo(index, index > page ? 1 : -1)}
-                      className={cn(
-                        'h-2.5 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1c1510]',
-                        selected
-                          ? 'w-7 bg-orange-400 shadow-[0_0_12px_rgba(251,146,60,0.55)]'
-                          : 'w-2.5 bg-white/35 hover:bg-white/55'
-                      )}
-                    />
-                  )
-                })}
+                <div className="flex gap-4 sm:gap-5" aria-hidden>
+                  {clientPartnerships.map((client) => (
+                    <PartnershipCard key={`b-${client.name}`} client={client} />
+                  ))}
+                </div>
               </div>
-              <p className="text-xs font-medium text-white/70" aria-hidden>
-                {page + 1} of {pageCount}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={goNext}
-              aria-label="Next client partnership"
-              className="inline-flex size-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1c1510]"
-            >
-              <ChevronRight className="h-5 w-5" aria-hidden />
-            </button>
+            )}
           </div>
+
+          {/* Edge fades so the belt feels integrated with the wash */}
+          {!reduceMotion && (
+            <>
+              <div
+                className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-[#1c1510] to-transparent sm:w-16"
+                aria-hidden
+              />
+              <div
+                className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[#1c1510] to-transparent sm:w-16"
+                aria-hidden
+              />
+            </>
+          )}
         </div>
 
-        {/* Always expose all partnership names/links for assistive discovery */}
+        {!reduceMotion && (
+          <div className="mt-4 flex justify-center sm:mt-5">
+            <button
+              type="button"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full border border-white/20 bg-black/40 px-4 text-sm font-medium text-white backdrop-blur-sm touch-manipulation hover:bg-black/55"
+              aria-pressed={paused}
+              onClick={() => setStickyPaused(!stickyPausedRef.current)}
+            >
+              {paused ? 'Resume' : 'Pause'} carousel
+            </button>
+          </div>
+        )}
+      </div>
+
+      <Container className="relative">
         <ul className="sr-only">
           {clientPartnerships.map((client) => (
             <li key={`sr-${client.name}`}>
@@ -289,7 +264,7 @@ export function ClientPartnerships() {
           ))}
         </ul>
 
-        <Reveal delay={0.12} className="mt-10 sm:mt-12">
+        <Reveal direction="scale" delay={0.08} className="mt-8 sm:mt-10">
           <div className="flex flex-col items-start gap-3 sm:items-center sm:text-center">
             <p className="max-w-2xl text-base font-medium text-white sm:text-lg">
               Have a workflow, customer follow-up, or software problem you are trying to solve?
