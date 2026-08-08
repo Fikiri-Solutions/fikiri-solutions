@@ -1,5 +1,4 @@
-import React from 'react'
-import { FikiriSiteChatWidget } from './FikiriSiteChatWidget'
+import React, { Suspense, lazy } from 'react'
 
 /** Marketing-site chat only — not the tenant embed product (`PublicChatbotWidget`). */
 export function isSiteChatWidgetEnabled(): boolean {
@@ -8,7 +7,18 @@ export function isSiteChatWidgetEnabled(): boolean {
   return true
 }
 
+const FikiriSiteChatWidget = lazy(() =>
+  import('./FikiriSiteChatWidget').then((module) => ({
+    default: module.FikiriSiteChatWidget,
+  }))
+)
+
+/** Deferred so marketing cold loads do not pay for chat UI until after first paint. */
 export const MarketingChatWidget: React.FC = () => {
   if (!isSiteChatWidgetEnabled()) return null
-  return <FikiriSiteChatWidget />
+  return (
+    <Suspense fallback={null}>
+      <FikiriSiteChatWidget />
+    </Suspense>
+  )
 }

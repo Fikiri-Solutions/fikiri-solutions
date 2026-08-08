@@ -21,7 +21,7 @@ export const publicMedia = {
     },
     tab: {
       dashboard: inImages('preview-tab-dashboard.png'),
-      inbox: inImages('preview-tab-inbox.png'),
+      inbox: inImages('preview-tab-inbox.webp'),
       /** In-app UI snapshot for the tab strip + large preview (below Features). */
       crm: inImages('preview-tab-crm.png'),
       automations: inImages('preview-tab-automations.png'),

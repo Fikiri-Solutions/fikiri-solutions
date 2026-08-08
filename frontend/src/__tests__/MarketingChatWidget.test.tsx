@@ -7,11 +7,11 @@ vi.mock('../components/FikiriSiteChatWidget', () => ({
 }))
 
 describe('MarketingChatWidget', () => {
-  it('renders site widget when enabled', () => {
+  it('renders site widget when enabled', async () => {
     vi.stubEnv('VITE_SITE_CHAT_WIDGET_ENABLED', 'true')
     expect(isSiteChatWidgetEnabled()).toBe(true)
     render(<MarketingChatWidget />)
-    expect(screen.getByTestId('site-chat-widget')).toBeInTheDocument()
+    expect(await screen.findByTestId('site-chat-widget')).toBeInTheDocument()
     vi.unstubAllEnvs()
   })
 
