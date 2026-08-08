@@ -44,7 +44,9 @@ const FEATURE_ICONS: Record<FeatureFitId, LucideIcon> = {
   ai_assistant: Sparkles,
 }
 
-function strengthLabel(strength: 'high' | 'medium' | null | undefined): string | null {
+function strengthLabel(
+  strength: 'high' | 'medium' | 'broad' | null | undefined
+): string | null {
   if (strength === 'high') return 'Strong match'
   if (strength === 'medium') return 'Possible match'
   return null

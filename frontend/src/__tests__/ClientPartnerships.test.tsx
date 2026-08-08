@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
-import { act, render, screen, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen } from '@testing-library/react'
 import { ClientPartnerships } from '../components/radiant/ClientPartnerships'
 import { clientPartnerships } from '../lib/clientPartnerships'
 
@@ -13,11 +12,11 @@ vi.mock('framer-motion', async () => {
   }
 })
 
-function mockMatchMedia(matchesDesktop: boolean) {
+function mockMatchMedia() {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     value: vi.fn().mockImplementation((query: string) => ({
-      matches: Boolean(matchesDesktop && query.includes('min-width: 768px')),
+      matches: false,
       media: query,
       onchange: null,
       addListener: vi.fn(),
@@ -39,11 +38,10 @@ function renderSection() {
 
 describe('ClientPartnerships', () => {
   beforeEach(() => {
-    mockMatchMedia(false)
+    mockMatchMedia()
   })
 
   afterEach(() => {
-    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
@@ -62,6 +60,7 @@ describe('ClientPartnerships', () => {
     expect(screen.queryByText(/sarah m\./i)).not.toBeInTheDocument()
     expect(screen.queryByText(/james k\./i)).not.toBeInTheDocument()
     expect(screen.queryByText(/priya l\./i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/7-day free trial/i)).not.toBeInTheDocument()
   })
 
   it('exposes all four real clients with visit links and intake CTA', () => {
@@ -79,51 +78,28 @@ describe('ClientPartnerships', () => {
     )
   })
 
-  it('renders carousel controls and advances slides with next/previous', async () => {
-    const user = userEvent.setup()
+  it('renders an RTL conveyor carousel region', () => {
     renderSection()
 
     const region = screen.getByRole('region', { name: /client partnership cards/i })
-    const next = screen.getByRole('button', { name: /next client partnership/i })
-    const prev = screen.getByRole('button', { name: /previous client partnership/i })
+    expect(region).toBeInTheDocument()
+    expect(region).toHaveAttribute('aria-roledescription', 'carousel')
 
-    expect(within(region).getByRole('heading', { name: clientPartnerships[0].name })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: clientPartnerships[1].name })).not.toBeInTheDocument()
-
-    await user.click(next)
-    expect(await within(region).findByRole('heading', { name: clientPartnerships[1].name })).toBeInTheDocument()
-
-    await user.click(prev)
-    expect(await within(region).findByRole('heading', { name: clientPartnerships[0].name })).toBeInTheDocument()
+    // Visible track duplicates cards for seamless looping
+    expect(screen.getAllByRole('heading', { name: clientPartnerships[0].name }).length).toBeGreaterThanOrEqual(1)
+    expect(document.querySelector('.fikiri-partnerships-track')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /pause carousel/i })).toBeInTheDocument()
   })
 
-  it('autoplays to the next partnership when motion is allowed', async () => {
-    const setIntervalSpy = vi.spyOn(window, 'setInterval')
-    renderSection()
-
-    const region = screen.getByRole('region', { name: /client partnership cards/i })
-    expect(within(region).getByRole('heading', { name: clientPartnerships[0].name })).toBeInTheDocument()
-
-    const autoplayCall = setIntervalSpy.mock.calls.find((call) => call[1] === 6000)
-    expect(autoplayCall).toBeTruthy()
-
-    act(() => {
-      ;(autoplayCall![0] as TimerHandler as () => void)()
-    })
-
-    expect(
-      await within(region).findByRole('heading', { name: clientPartnerships[1].name })
-    ).toBeInTheDocument()
-  })
-
-  it('renders local logo images for the visible partnership slide', () => {
+  it('renders local logo images for partnership cards', () => {
     renderSection()
 
     const first = clientPartnerships[0]
     expect(first.logoSrc).toBeTruthy()
     expect(first.logoSrc).not.toMatch(/^https?:\/\//)
-    const logo = screen.getByRole('img', { name: first.logoAlt })
-    expect(logo).toHaveAttribute('src', first.logoSrc)
+    const logos = screen.getAllByRole('img', { name: first.logoAlt })
+    expect(logos.length).toBeGreaterThan(0)
+    expect(logos[0]).toHaveAttribute('src', first.logoSrc)
   })
 })
 

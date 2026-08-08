@@ -4,7 +4,9 @@ import { AdminReauthModal } from '../components/AdminReauthModal'
 
 describe('AdminReauthModal', () => {
   it('does not persist password to storage and clears inputs after confirm', async () => {
-    const onConfirm = vi.fn(async () => undefined)
+    const onConfirm = vi.fn(
+      async (_password: string, _mfaCode?: string, _recoveryCode?: string) => undefined
+    )
     const setItem = vi.spyOn(Storage.prototype, 'setItem')
 
     render(

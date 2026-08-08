@@ -40,9 +40,7 @@ function runReleaseGateCase(testCase: SectorReleaseGateCase) {
     testCase.status === 'ambiguous'
   ) {
     // Non-matched statuses must not claim a confident authored sector fit list as personalized
-    if (testCase.status !== 'matched') {
-      expect(presentation.sectorId).toBeNull()
-    }
+    expect(presentation.sectorId).toBeNull()
   }
 }
 
