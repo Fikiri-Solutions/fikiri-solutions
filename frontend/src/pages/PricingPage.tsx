@@ -225,7 +225,7 @@ const PricingPage: React.FC = () => {
 
   return (
     <RadiantLayout>
-      <div className="relative min-h-dvh overflow-hidden pb-[env(safe-area-inset-bottom)]">
+      <div className="relative min-h-dvh overflow-x-clip pb-[max(7rem,calc(env(safe-area-inset-bottom)+5.5rem))] sm:pb-[env(safe-area-inset-bottom)]">
         <div className="relative z-10">
       {/* Hero Section */}
       <section className="relative z-10 py-8 sm:py-12">

@@ -287,7 +287,7 @@ export const About: React.FC = () => {
 
   return (
     <RadiantLayout>
-      <div className="relative min-h-dvh overflow-x-hidden pb-[env(safe-area-inset-bottom)]">
+      <div className="relative min-h-dvh overflow-x-hidden pb-[max(7rem,calc(env(safe-area-inset-bottom)+5.5rem))] sm:pb-[env(safe-area-inset-bottom)]">
         {/* 1. Why Fikiri hero */}
         <section
           className="relative z-10 overflow-hidden pb-10 pt-10 sm:pb-14 sm:pt-14 md:pb-16 md:pt-16"

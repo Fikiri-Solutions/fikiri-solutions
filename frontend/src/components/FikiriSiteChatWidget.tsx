@@ -178,7 +178,7 @@ export const FikiriSiteChatWidget: React.FC = () => {
   const handoffCta = handoffLabel(lastReply?.handoff.handoff_type)
 
   return (
-    <div className="fixed bottom-20 right-4 z-[60] flex flex-col items-end gap-3 pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)] sm:bottom-4">
+    <div className="fixed bottom-[max(5.5rem,calc(env(safe-area-inset-bottom)+4.5rem))] right-3 z-[60] flex flex-col items-end gap-3 sm:bottom-4 sm:right-4 sm:pb-0">
       {open && (
         <div
           className="flex max-h-[min(70dvh,32rem)] w-[min(100vw-2rem,26rem)] flex-col overflow-hidden rounded-2xl border border-neutral-200/80 bg-white text-neutral-900 shadow-[0_20px_60px_-12px_rgba(179,59,30,0.35)]"
@@ -409,7 +409,7 @@ export const FikiriSiteChatWidget: React.FC = () => {
         type="button"
         onClick={togglePanel}
         className={cn(
-          'group relative inline-flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg transition',
+          'group relative inline-flex h-12 w-12 items-center justify-center rounded-full text-white shadow-lg transition sm:h-14 sm:w-14',
           'bg-gradient-to-br from-[#992D1E] to-[#B33B1E] hover:from-[#B33B1E] hover:to-[#C55A0F]',
           'ring-4 ring-white/90',
           open && 'scale-95 opacity-90'
@@ -418,13 +418,13 @@ export const FikiriSiteChatWidget: React.FC = () => {
         aria-expanded={open}
       >
         {open ? (
-          <X className="h-6 w-6" aria-hidden />
+          <X className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden />
         ) : (
           <>
-            <FikiriLogo variant="white" size="xs" className="!h-8 w-8" />
-            <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5">
+            <FikiriLogo variant="white" size="xs" className="!h-7 w-7 sm:!h-8 sm:w-8" />
+            <span className="absolute -right-0.5 -top-0.5 flex h-3 w-3 sm:h-3.5 sm:w-3.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-fikiri-100 opacity-60" />
-              <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-fikiri-100 ring-2 ring-white" />
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-fikiri-100 ring-2 ring-white sm:h-3.5 sm:w-3.5" />
             </span>
           </>
         )}

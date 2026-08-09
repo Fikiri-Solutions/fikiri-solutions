@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { RadiantLayout, Container } from '../components/radiant'
 import { Button } from '../components/radiant/Button'
 import { apiClient } from '../services/apiClient'
-import { MarketingChatWidget } from '../components/MarketingChatWidget'
+
 import { AUTOCOMPLETE } from '../constants/autocomplete'
 
 const LIMITS = { name: 200, email: 254, phone: 50, company: 200, subject: 200, message: 3000 }
@@ -214,7 +214,6 @@ export const Contact: React.FC = () => {
           </Container>
         </section>
       </div>
-      <MarketingChatWidget />
     </RadiantLayout>
   )
 }

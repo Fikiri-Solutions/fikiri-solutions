@@ -35,7 +35,7 @@ export const PRICING_FAQ_ITEMS = [
 const FaqPage: React.FC = () => {
   return (
     <RadiantLayout>
-      <div className="relative min-h-screen overflow-hidden">
+      <div className="relative min-h-dvh overflow-x-clip pb-[max(7rem,calc(env(safe-area-inset-bottom)+5.5rem))] sm:pb-[env(safe-area-inset-bottom)]">
         <div className="relative z-10">
           <section className="relative py-16 sm:py-20 z-10">
             <Container>

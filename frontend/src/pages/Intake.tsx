@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { RadiantLayout, Container } from '../components/radiant'
 import { Button } from '../components/radiant/Button'
 import { apiClient } from '../services/apiClient'
-import { MarketingChatWidget } from '../components/MarketingChatWidget'
 import { AUTOCOMPLETE } from '../constants/autocomplete'
 
 /** Mirrors backend core/contact_api INTAKE_LIMITS */
@@ -596,7 +595,6 @@ export const Intake: React.FC = () => {
           </Container>
         </section>
       </div>
-      <MarketingChatWidget />
     </RadiantLayout>
   )
 }
