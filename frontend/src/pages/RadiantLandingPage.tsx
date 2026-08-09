@@ -23,14 +23,18 @@ function Hero() {
 
   return (
     <FikiriHeroVisual>
-      <Container className="relative">
-        <Navbar tone="onDark" variant="marketing" />
+      {/*
+        Overlay nav floats on the hero field (tree continues behind).
+        Content keeps its own top padding so type/CTAs clear the controls.
+      */}
+      <Navbar tone="onDark" variant="marketing" overlay />
 
+      <Container className="relative pt-[4.75rem] sm:pt-24 md:pt-28">
         {/*
           Reserve vertical space so the absolute tree reads as the hero field,
           then brand + CTAs + Sector Fit continue in the same continuous section.
         */}
-        <div className="flex min-h-[min(48vw,260px)] flex-col justify-end pb-1 pt-4 sm:min-h-[min(46vw,380px)] sm:pb-2 sm:pt-12 md:min-h-[min(42vw,440px)] md:pb-4 lg:min-h-[min(40vw,480px)]">
+        <div className="flex min-h-[min(48vw,260px)] flex-col justify-end pb-1 pt-2 sm:min-h-[min(46vw,380px)] sm:pb-2 sm:pt-4 md:min-h-[min(42vw,440px)] md:pb-4 lg:min-h-[min(40vw,480px)]">
           <FikiriHeroBrandBlock />
         </div>
 
