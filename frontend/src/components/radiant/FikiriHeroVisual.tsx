@@ -132,13 +132,13 @@ export function FikiriHeroVisual({ className, children }: FikiriHeroVisualProps)
       >
         <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
           {/* Outer keeps absolute placement; inner motion only opacity/scale/y */}
-          <div className="absolute left-1/2 top-0 h-[min(68vw,560px)] w-auto max-w-none -translate-x-1/2 sm:h-[min(58vw,620px)] md:h-[min(52vw,680px)] lg:h-[min(48vw,720px)]">
+          <div className="absolute left-1/2 top-0 h-[min(78vw,420px)] w-auto max-w-none -translate-x-1/2 sm:h-[min(58vw,620px)] md:h-[min(52vw,680px)] lg:h-[min(48vw,720px)]">
             <motion.div
               className="h-full w-auto origin-center"
               initial={false}
               animate={
                 entered
-                  ? { opacity: 0.92, scale: 1, y: 0 }
+                  ? { opacity: 1, scale: 1, y: 0 }
                   : { opacity: 0, scale: 0.985, y: 8 }
               }
               transition={treeTransition}
@@ -152,25 +152,36 @@ export function FikiriHeroVisual({ className, children }: FikiriHeroVisualProps)
                   height={576}
                   decoding="async"
                   className="h-full w-auto max-w-none object-contain object-top"
-                  style={{
-                    WebkitMaskImage: [
-                      'radial-gradient(ellipse 72% 68% at 50% 32%, #000 28%, rgba(0,0,0,0.92) 48%, rgba(0,0,0,0.55) 68%, transparent 86%)',
-                      'linear-gradient(to bottom, #000 0%, #000 48%, rgba(0,0,0,0.55) 72%, transparent 100%)',
-                    ].join(', '),
-                    maskImage: [
-                      'radial-gradient(ellipse 72% 68% at 50% 32%, #000 28%, rgba(0,0,0,0.92) 48%, rgba(0,0,0,0.55) 68%, transparent 86%)',
-                      'linear-gradient(to bottom, #000 0%, #000 48%, rgba(0,0,0,0.55) 72%, transparent 100%)',
-                    ].join(', '),
-                    WebkitMaskComposite: 'source-in',
-                    maskComposite: 'intersect',
-                  }}
+                  style={
+                    narrowViewport
+                      ? {
+                          // Soft bottom fade only — heavy dual masks made the baobab a ghost on phones.
+                          WebkitMaskImage:
+                            'linear-gradient(to bottom, #000 0%, #000 58%, rgba(0,0,0,0.75) 78%, transparent 100%)',
+                          maskImage:
+                            'linear-gradient(to bottom, #000 0%, #000 58%, rgba(0,0,0,0.75) 78%, transparent 100%)',
+                        }
+                      : {
+                          WebkitMaskImage: [
+                            'radial-gradient(ellipse 72% 68% at 50% 32%, #000 28%, rgba(0,0,0,0.92) 48%, rgba(0,0,0,0.55) 68%, transparent 86%)',
+                            'linear-gradient(to bottom, #000 0%, #000 48%, rgba(0,0,0,0.55) 72%, transparent 100%)',
+                          ].join(', '),
+                          maskImage: [
+                            'radial-gradient(ellipse 72% 68% at 50% 32%, #000 28%, rgba(0,0,0,0.92) 48%, rgba(0,0,0,0.55) 68%, transparent 86%)',
+                            'linear-gradient(to bottom, #000 0%, #000 48%, rgba(0,0,0,0.55) 72%, transparent 100%)',
+                          ].join(', '),
+                          WebkitMaskComposite: 'source-in',
+                          maskComposite: 'intersect',
+                        }
+                  }
                 />
               </picture>
             </motion.div>
           </div>
 
+          {/* Desktop: stronger edge wash. Mobile: lighter so canopy lights + sunset read. */}
           <div
-            className="absolute inset-0"
+            className="absolute inset-0 hidden sm:block"
             style={{
               background: `
                 linear-gradient(to right, ${PAGE_BG} 0%, transparent 16%, transparent 84%, ${PAGE_BG} 100%),
@@ -179,9 +190,19 @@ export function FikiriHeroVisual({ className, children }: FikiriHeroVisualProps)
               `,
             }}
           />
+          <div
+            className="absolute inset-0 sm:hidden"
+            style={{
+              background: `
+                linear-gradient(to right, ${PAGE_BG} 0%, transparent 8%, transparent 92%, ${PAGE_BG} 100%),
+                linear-gradient(to bottom, ${PAGE_BG}cc 0%, transparent 14%, transparent 55%, ${PAGE_BG} 96%),
+                radial-gradient(ellipse 110% 90% at 50% 28%, transparent 42%, ${PAGE_BG}99 100%)
+              `,
+            }}
+          />
 
           <div
-            className="absolute inset-x-0 bottom-0 h-[48%] sm:h-[42%]"
+            className="absolute inset-x-0 bottom-0 h-[28%] sm:h-[42%]"
             style={{
               background: `linear-gradient(to top, ${PAGE_BG} 0%, ${PAGE_BG} 18%, ${PAGE_BG}cc 45%, transparent 100%)`,
             }}

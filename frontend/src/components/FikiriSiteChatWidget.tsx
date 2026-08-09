@@ -178,7 +178,7 @@ export const FikiriSiteChatWidget: React.FC = () => {
   const handoffCta = handoffLabel(lastReply?.handoff.handoff_type)
 
   return (
-    <div className="fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-3 pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)]">
+    <div className="fixed bottom-20 right-4 z-[60] flex flex-col items-end gap-3 pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)] sm:bottom-4">
       {open && (
         <div
           className="flex max-h-[min(70dvh,32rem)] w-[min(100vw-2rem,26rem)] flex-col overflow-hidden rounded-2xl border border-neutral-200/80 bg-white text-neutral-900 shadow-[0_20px_60px_-12px_rgba(179,59,30,0.35)]"

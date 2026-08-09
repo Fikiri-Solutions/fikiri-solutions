@@ -28,42 +28,43 @@ function Hero() {
 
         {/*
           Reserve vertical space so the absolute tree reads as the hero field,
-          then brand + Sector Fit continue in the same continuous section.
+          then brand + CTAs + Sector Fit continue in the same continuous section.
         */}
-        <div className="flex min-h-[min(42vw,220px)] flex-col justify-end pb-2 pt-6 sm:min-h-[min(46vw,380px)] sm:pt-12 md:min-h-[min(42vw,440px)] md:pb-4 lg:min-h-[min(40vw,480px)]">
+        <div className="flex min-h-[min(48vw,260px)] flex-col justify-end pb-1 pt-4 sm:min-h-[min(46vw,380px)] sm:pb-2 sm:pt-12 md:min-h-[min(42vw,440px)] md:pb-4 lg:min-h-[min(40vw,480px)]">
           <FikiriHeroBrandBlock />
         </div>
 
-        <FikiriHeroSectorSettle className="px-2 pb-12 pt-6 sm:pb-16 sm:pt-8 md:pb-20">
-          <SectorFitSection headingId={sectorHeadingId} tone="onDark" />
+        {/* CTAs above Sector Fit so phones see a clear next step before the long form. */}
+        <div className="mt-5 flex flex-col items-stretch justify-center gap-3 px-2 sm:mt-8 sm:flex-row sm:items-center sm:gap-4 sm:px-0">
+          <Button
+            to="/signup"
+            className="w-full sm:w-auto"
+            onClick={() => trackSectorExplorerCta('signup')}
+          >
+            Get started
+          </Button>
+          <Button
+            variant="secondary"
+            to="/intake"
+            className="w-full border-white/20 bg-white/10 !text-white ring-white/20 hover:bg-white/15 sm:w-auto"
+            onClick={() => trackSectorExplorerCta('intake')}
+          >
+            Start a workflow conversation
+          </Button>
+        </div>
+        <p className="mt-3 px-2 text-center text-sm text-white/75 sm:mt-4">
+          Prefer pricing first?{' '}
+          <a
+            href="/pricing"
+            className="font-medium !text-orange-300 underline-offset-2 hover:!text-orange-200 hover:underline"
+            onClick={() => trackSectorExplorerCta('pricing')}
+          >
+            See plans
+          </a>
+        </p>
 
-          <div className="mt-6 flex flex-col items-stretch justify-center gap-3 sm:mt-8 sm:flex-row sm:items-center sm:gap-4">
-            <Button
-              to="/signup"
-              className="w-full sm:w-auto"
-              onClick={() => trackSectorExplorerCta('signup')}
-            >
-              Get started
-            </Button>
-            <Button
-              variant="secondary"
-              to="/intake"
-              className="w-full border-white/20 bg-white/10 text-white ring-white/20 hover:bg-white/15 sm:w-auto"
-              onClick={() => trackSectorExplorerCta('intake')}
-            >
-              Start a workflow conversation
-            </Button>
-          </div>
-          <p className="mt-4 text-center text-sm text-white/75">
-            Prefer pricing first?{' '}
-            <a
-              href="/pricing"
-              className="font-medium text-orange-300 underline-offset-2 hover:text-orange-200 hover:underline"
-              onClick={() => trackSectorExplorerCta('pricing')}
-            >
-              See plans
-            </a>
-          </p>
+        <FikiriHeroSectorSettle className="px-2 pb-12 pt-8 sm:pb-16 sm:pt-10 md:pb-20">
+          <SectorFitSection headingId={sectorHeadingId} tone="onDark" />
         </FikiriHeroSectorSettle>
       </Container>
     </FikiriHeroVisual>
