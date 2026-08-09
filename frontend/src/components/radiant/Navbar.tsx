@@ -143,7 +143,7 @@ export function Navbar({
       key={pathname}
       className={clsx(
         heroOverlay
-          ? 'absolute inset-x-0 top-0 z-50 bg-gradient-to-b from-[#140f0c]/90 via-[#140f0c]/50 to-transparent pt-[max(0.35rem,env(safe-area-inset-top))] sm:bg-transparent sm:from-transparent sm:via-transparent sm:pt-4'
+          ? 'absolute inset-x-0 top-0 z-50 bg-gradient-to-b from-[#140f0c]/55 via-[#140f0c]/20 to-transparent pt-[max(0.35rem,env(safe-area-inset-top))] sm:bg-transparent sm:from-transparent sm:via-transparent sm:pt-4'
           : clsx(
               'pt-3 sm:pt-4',
               isMarketing && onDark && 'bg-black/25 backdrop-blur-md',
