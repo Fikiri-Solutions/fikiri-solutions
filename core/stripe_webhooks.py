@@ -1,6 +1,10 @@
 """
 Fikiri Solutions - Stripe Webhook Handlers
-Handles Stripe webhook events for subscription management
+Handles Stripe webhook events for subscription management.
+
+Dashboard / founder-driven ops (manual invoices, one-off customers, product
+edits) are first-class: handlers must tolerate missing optional fields and
+must not assume every object is tied to a website subscription or app user.
 """
 
 import os
@@ -36,6 +40,44 @@ def _stripe_get(obj: Any, key: str, default: Any = None) -> Any:
         return obj[key]
     except (KeyError, TypeError, StopIteration):
         return default
+
+
+def _invoice_subscription_id(invoice: Any) -> Optional[str]:
+    """Resolve subscription id from legacy or Basil invoice payloads.
+
+    API ``2025-03-31.basil+`` removed top-level ``invoice.subscription`` in favor of
+    ``invoice.parent.subscription_details.subscription``. Manual/one-off invoices
+    have neither.
+    """
+    legacy = _stripe_get(invoice, "subscription")
+    if legacy:
+        return legacy if isinstance(legacy, str) else _stripe_get(legacy, "id")
+
+    parent = _stripe_get(invoice, "parent")
+    if not parent:
+        return None
+    details = _stripe_get(parent, "subscription_details")
+    if not details:
+        return None
+    subscription = _stripe_get(details, "subscription")
+    if not subscription:
+        return None
+    return subscription if isinstance(subscription, str) else _stripe_get(subscription, "id")
+
+
+def _ack(action: str, **fields: Any) -> Dict[str, Any]:
+    """Successful webhook ack (including intentional no-ops for manual/out-of-band events)."""
+    payload: Dict[str, Any] = {'status': 'success', 'action': action}
+    payload.update(fields)
+    return payload
+
+
+def _soft_error(action: str, error: Exception, **fields: Any) -> Dict[str, Any]:
+    """Log and ack with error details without raising (keeps Stripe delivery healthy)."""
+    logger.error("Error handling %s: %s", action, error)
+    payload: Dict[str, Any] = {'status': 'error', 'action': action, 'error': str(error)}
+    payload.update(fields)
+    return payload
 
 
 class StripeWebhookHandler:
@@ -259,9 +301,11 @@ class StripeWebhookHandler:
         """Route webhook events to appropriate handlers"""
         if not event:
             return {'status': 'error', 'message': 'No event data'}
-            
-        event_type = event['type']
-        
+
+        event_type = _stripe_get(event, 'type') or ''
+        data = _stripe_get(event, 'data') or {}
+        obj = _stripe_get(data, 'object')
+
         handlers = {
             'customer.subscription.created': self.handle_subscription_created,
             'customer.subscription.updated': self.handle_subscription_updated,
@@ -284,434 +328,382 @@ class StripeWebhookHandler:
             'charge.succeeded': self.handle_charge_succeeded,
             'charge.refunded': self.handle_charge_refunded,
         }
-        
+
         handler = handlers.get(event_type)
         if handler:
-            return handler(event['data']['object'])
-        else:
-            logger.warning(f"Unhandled event type: {event_type}")
-            return {'status': 'unhandled', 'event_type': event_type}
-    
-    def handle_subscription_created(self, subscription: Dict[str, Any]) -> Dict[str, Any]:
+            return handler(obj)
+        logger.info("Unhandled Stripe event type (acked): %s", event_type)
+        return {'status': 'unhandled', 'event_type': event_type}
+
+    def handle_subscription_created(self, subscription: Any) -> Dict[str, Any]:
         """Handle new subscription creation"""
         try:
-            subscription_id = subscription['id']
-            customer_id = subscription['customer']
-            status = subscription['status']
-            
+            subscription_id = _stripe_get(subscription, 'id')
+            customer_id = _stripe_get(subscription, 'customer')
+            status = _stripe_get(subscription, 'status') or 'incomplete'
+
+            if not subscription_id or not customer_id:
+                logger.info(
+                    "Skipping subscription.created side effects: missing id/customer "
+                    "(manual or incomplete Dashboard object)"
+                )
+                return _ack(
+                    'subscription_created_skipped',
+                    subscription_id=subscription_id,
+                    customer_id=customer_id,
+                    reason='missing_required_fields',
+                )
+
             logger.info(f"New subscription created: {subscription_id} for customer {customer_id}")
-            
-            # Update user subscription in database
             self._update_user_subscription(subscription_id, customer_id, status)
-            
-            # Send welcome email
             self._send_welcome_email(customer_id, subscription_id)
-            
-            # Track subscription creation
             self._track_subscription_event('created', subscription_id, customer_id)
-            
-            return {
-                'status': 'success',
-                'subscription_id': subscription_id,
-                'customer_id': customer_id,
-                'action': 'subscription_created'
-            }
-            
+            return _ack(
+                'subscription_created',
+                subscription_id=subscription_id,
+                customer_id=customer_id,
+            )
         except Exception as e:
-            logger.error(f"Error handling subscription created: {e}")
-            return {'status': 'error', 'error': str(e)}
-    
-    def handle_subscription_updated(self, subscription: Dict[str, Any]) -> Dict[str, Any]:
+            return _soft_error('subscription_created', e)
+
+    def handle_subscription_updated(self, subscription: Any) -> Dict[str, Any]:
         """Handle subscription updates"""
         try:
-            subscription_id = subscription['id']
-            customer_id = subscription['customer']
-            status = subscription['status']
-            
+            subscription_id = _stripe_get(subscription, 'id')
+            customer_id = _stripe_get(subscription, 'customer')
+            status = _stripe_get(subscription, 'status')
+
+            if not subscription_id or not customer_id:
+                logger.info("Skipping subscription.updated side effects: missing id/customer")
+                return _ack(
+                    'subscription_updated_skipped',
+                    subscription_id=subscription_id,
+                    customer_id=customer_id,
+                    reason='missing_required_fields',
+                )
+
             logger.info(f"Subscription updated: {subscription_id} - Status: {status}")
-            
-            # Update user subscription in database
-            self._update_user_subscription(subscription_id, customer_id, status)
-            
-            # Handle specific status changes
+            self._update_user_subscription(subscription_id, customer_id, status or 'incomplete')
+
             if status == 'active':
                 self._handle_subscription_activated(subscription_id, customer_id)
             elif status == 'past_due':
                 self._handle_subscription_past_due(subscription_id, customer_id)
             elif status == 'canceled':
                 self._handle_subscription_canceled(subscription_id, customer_id)
-            
-            # Track subscription update
+
             self._track_subscription_event('updated', subscription_id, customer_id)
-            
-            return {
-                'status': 'success',
-                'subscription_id': subscription_id,
-                'customer_id': customer_id,
-                'action': 'subscription_updated',
-                'new_status': status
-            }
-            
+            return _ack(
+                'subscription_updated',
+                subscription_id=subscription_id,
+                customer_id=customer_id,
+                new_status=status,
+            )
         except Exception as e:
-            logger.error(f"Error handling subscription updated: {e}")
-            return {'status': 'error', 'error': str(e)}
-    
-    def handle_subscription_deleted(self, subscription: Dict[str, Any]) -> Dict[str, Any]:
+            return _soft_error('subscription_updated', e)
+
+    def handle_subscription_deleted(self, subscription: Any) -> Dict[str, Any]:
         """Handle subscription deletion"""
         try:
-            subscription_id = subscription['id']
-            customer_id = subscription['customer']
-            
+            subscription_id = _stripe_get(subscription, 'id')
+            customer_id = _stripe_get(subscription, 'customer')
+
+            if not subscription_id or not customer_id:
+                logger.info("Skipping subscription.deleted side effects: missing id/customer")
+                return _ack(
+                    'subscription_deleted_skipped',
+                    subscription_id=subscription_id,
+                    customer_id=customer_id,
+                    reason='missing_required_fields',
+                )
+
             logger.info(f"Subscription deleted: {subscription_id}")
-            
-            # Update user subscription in database
             self._update_user_subscription(subscription_id, customer_id, 'canceled')
-            
-            # Send cancellation email
             self._send_cancellation_email(customer_id, subscription_id)
-            
-            # Track subscription deletion
             self._track_subscription_event('deleted', subscription_id, customer_id)
-            
-            return {
-                'status': 'success',
-                'subscription_id': subscription_id,
-                'customer_id': customer_id,
-                'action': 'subscription_deleted'
-            }
-            
+            return _ack(
+                'subscription_deleted',
+                subscription_id=subscription_id,
+                customer_id=customer_id,
+            )
         except Exception as e:
-            logger.error(f"Error handling subscription deleted: {e}")
-            return {'status': 'error', 'error': str(e)}
-    
-    def handle_trial_will_end(self, subscription: Dict[str, Any]) -> Dict[str, Any]:
+            return _soft_error('subscription_deleted', e)
+
+    def handle_trial_will_end(self, subscription: Any) -> Dict[str, Any]:
         """Handle trial ending notification"""
         try:
-            subscription_id = subscription['id']
-            customer_id = subscription['customer']
-            trial_end = subscription['trial_end']
-            
+            subscription_id = _stripe_get(subscription, 'id')
+            customer_id = _stripe_get(subscription, 'customer')
+            trial_end = _stripe_get(subscription, 'trial_end')
+
+            if not subscription_id or not customer_id:
+                logger.info("Skipping trial_will_end side effects: missing id/customer")
+                return _ack(
+                    'trial_ending_skipped',
+                    subscription_id=subscription_id,
+                    customer_id=customer_id,
+                    reason='missing_required_fields',
+                )
+
             logger.info(f"Trial ending soon for subscription: {subscription_id}")
-            
-            # Send trial ending email
             self._send_trial_ending_email(customer_id, subscription_id, trial_end)
-            
-            # Track trial ending event
             self._track_subscription_event('trial_ending', subscription_id, customer_id)
-            
-            return {
-                'status': 'success',
-                'subscription_id': subscription_id,
-                'customer_id': customer_id,
-                'action': 'trial_ending',
-                'trial_end': trial_end
-            }
-            
+            return _ack(
+                'trial_ending',
+                subscription_id=subscription_id,
+                customer_id=customer_id,
+                trial_end=trial_end,
+            )
         except Exception as e:
-            logger.error(f"Error handling trial will end: {e}")
-            return {'status': 'error', 'error': str(e)}
-    
-    def handle_payment_succeeded(self, invoice: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle successful payment"""
+            return _soft_error('trial_ending', e)
+
+    def handle_payment_succeeded(self, invoice: Any) -> Dict[str, Any]:
+        """Handle successful payment (subscription or manual/one-off invoice)."""
         try:
-            invoice_id = invoice['id']
-            customer_id = invoice['customer']
-            subscription_id = invoice['subscription']
-            amount_paid = invoice['amount_paid']
-            
-            logger.info(f"Payment succeeded: Invoice {invoice_id} - Amount: ${amount_paid/100}")
-            
-            # Update subscription status
-            if subscription_id:
+            invoice_id = _stripe_get(invoice, 'id')
+            customer_id = _stripe_get(invoice, 'customer')
+            subscription_id = _invoice_subscription_id(invoice)
+            amount_paid = _stripe_get(invoice, 'amount_paid') or 0
+
+            logger.info(
+                "Payment succeeded: Invoice %s - Amount: $%s (subscription=%s)",
+                invoice_id,
+                amount_paid / 100,
+                subscription_id or 'none',
+            )
+
+            if subscription_id and customer_id:
                 self._update_user_subscription(subscription_id, customer_id, 'active')
-            
-            # Send payment confirmation email
+
             self._send_payment_confirmation_email(customer_id, invoice_id, amount_paid)
-            
-            # Track successful payment
             self._track_payment_event('succeeded', invoice_id, customer_id, amount_paid)
-            
-            return {
-                'status': 'success',
-                'invoice_id': invoice_id,
-                'customer_id': customer_id,
-                'subscription_id': subscription_id,
-                'action': 'payment_succeeded',
-                'amount_paid': amount_paid
-            }
-            
+            return _ack(
+                'payment_succeeded',
+                invoice_id=invoice_id,
+                customer_id=customer_id,
+                subscription_id=subscription_id,
+                amount_paid=amount_paid,
+            )
         except Exception as e:
-            logger.error(f"Error handling payment succeeded: {e}")
-            return {'status': 'error', 'error': str(e)}
-    
-    def handle_payment_failed(self, invoice: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle failed payment"""
+            return _soft_error('payment_succeeded', e)
+
+    def handle_payment_failed(self, invoice: Any) -> Dict[str, Any]:
+        """Handle failed payment (subscription or manual/one-off invoice)."""
         try:
-            invoice_id = invoice['id']
-            customer_id = invoice['customer']
-            subscription_id = invoice['subscription']
-            amount_due = invoice['amount_due']
-            
-            logger.warning(f"Payment failed: Invoice {invoice_id} - Amount: ${amount_due/100}")
-            
-            # Update subscription status
-            if subscription_id:
+            invoice_id = _stripe_get(invoice, 'id')
+            customer_id = _stripe_get(invoice, 'customer')
+            subscription_id = _invoice_subscription_id(invoice)
+            amount_due = _stripe_get(invoice, 'amount_due') or 0
+
+            logger.warning(
+                "Payment failed: Invoice %s - Amount: $%s (subscription=%s)",
+                invoice_id,
+                amount_due / 100,
+                subscription_id or 'none',
+            )
+
+            if subscription_id and customer_id:
                 self._update_user_subscription(subscription_id, customer_id, 'past_due')
-            
-            # Send payment failure email
+
             self._send_payment_failure_email(customer_id, invoice_id, amount_due)
-            
-            # Track failed payment
             self._track_payment_event('failed', invoice_id, customer_id, amount_due)
-            
-            return {
-                'status': 'success',
-                'invoice_id': invoice_id,
-                'customer_id': customer_id,
-                'subscription_id': subscription_id,
-                'action': 'payment_failed',
-                'amount_due': amount_due
-            }
-            
+            return _ack(
+                'payment_failed',
+                invoice_id=invoice_id,
+                customer_id=customer_id,
+                subscription_id=subscription_id,
+                amount_due=amount_due,
+            )
         except Exception as e:
-            logger.error(f"Error handling payment failed: {e}")
-            return {'status': 'error', 'error': str(e)}
-    
-    def handle_invoice_created(self, invoice: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle invoice creation"""
+            return _soft_error('payment_failed', e)
+
+    def handle_invoice_created(self, invoice: Any) -> Dict[str, Any]:
+        """Handle invoice creation (Dashboard manual invoices included)."""
         try:
-            invoice_id = invoice['id']
-            customer_id = invoice['customer']
-            subscription_id = invoice['subscription']
-            amount_due = invoice['amount_due']
-            
-            logger.info(f"Invoice created: {invoice_id} - Amount: ${amount_due/100}")
-            
-            # Track invoice creation
+            invoice_id = _stripe_get(invoice, 'id')
+            customer_id = _stripe_get(invoice, 'customer')
+            subscription_id = _invoice_subscription_id(invoice)
+            amount_due = _stripe_get(invoice, 'amount_due') or 0
+
+            logger.info(
+                "Invoice created: %s - Amount: $%s (subscription=%s)",
+                invoice_id,
+                amount_due / 100,
+                subscription_id or 'none',
+            )
             self._track_invoice_event('created', invoice_id, customer_id, amount_due)
-            
-            return {
-                'status': 'success',
-                'invoice_id': invoice_id,
-                'customer_id': customer_id,
-                'subscription_id': subscription_id,
-                'action': 'invoice_created',
-                'amount_due': amount_due
-            }
-            
+            return _ack(
+                'invoice_created',
+                invoice_id=invoice_id,
+                customer_id=customer_id,
+                subscription_id=subscription_id,
+                amount_due=amount_due,
+            )
         except Exception as e:
-            logger.error(f"Error handling invoice created: {e}")
-            return {'status': 'error', 'error': str(e)}
-    
-    def handle_customer_created(self, customer: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle customer creation"""
+            return _soft_error('invoice_created', e)
+
+    def handle_customer_created(self, customer: Any) -> Dict[str, Any]:
+        """Handle customer creation (website signup or Dashboard-created)."""
         try:
-            customer_id = customer['id']
-            email = customer['email']
-            name = customer['name']
-            
+            customer_id = _stripe_get(customer, 'id')
+            email = _stripe_get(customer, 'email')
+            name = _stripe_get(customer, 'name')
             logger.info(f"New customer created: {customer_id} - {email}")
-            
-            # Track customer creation
             self._track_customer_event('created', customer_id, email)
-            
-            return {
-                'status': 'success',
-                'customer_id': customer_id,
-                'email': email,
-                'name': name,
-                'action': 'customer_created'
-            }
-            
+            return _ack(
+                'customer_created',
+                customer_id=customer_id,
+                email=email,
+                name=name,
+            )
         except Exception as e:
-            logger.error(f"Error handling customer created: {e}")
-            return {'status': 'error', 'error': str(e)}
-    
-    def handle_customer_updated(self, customer: Dict[str, Any]) -> Dict[str, Any]:
+            return _soft_error('customer_created', e)
+
+    def handle_customer_updated(self, customer: Any) -> Dict[str, Any]:
         """Handle customer updates"""
         try:
-            customer_id = customer['id']
-            email = customer['email']
-            
+            customer_id = _stripe_get(customer, 'id')
+            email = _stripe_get(customer, 'email')
             logger.info(f"Customer updated: {customer_id} - {email}")
-            
-            # Track customer update
             self._track_customer_event('updated', customer_id, email)
-            
-            return {
-                'status': 'success',
-                'customer_id': customer_id,
-                'email': email,
-                'action': 'customer_updated'
-            }
-            
+            return _ack(
+                'customer_updated',
+                customer_id=customer_id,
+                email=email,
+            )
         except Exception as e:
-            logger.error(f"Error handling customer updated: {e}")
-            return {'status': 'error', 'error': str(e)}
-    
-    def handle_payment_method_attached(self, payment_method: Dict[str, Any]) -> Dict[str, Any]:
+            return _soft_error('customer_updated', e)
+
+    def handle_payment_method_attached(self, payment_method: Any) -> Dict[str, Any]:
         """Handle payment method attachment"""
         try:
-            payment_method_id = payment_method['id']
-            customer_id = payment_method['customer']
-            
+            payment_method_id = _stripe_get(payment_method, 'id')
+            customer_id = _stripe_get(payment_method, 'customer')
             logger.info(f"Payment method attached: {payment_method_id} to customer {customer_id}")
-            
-            # Track payment method attachment
             self._track_payment_method_event('attached', payment_method_id, customer_id)
-            
-            return {
-                'status': 'success',
-                'payment_method_id': payment_method_id,
-                'customer_id': customer_id,
-                'action': 'payment_method_attached'
-            }
-            
+            return _ack(
+                'payment_method_attached',
+                payment_method_id=payment_method_id,
+                customer_id=customer_id,
+            )
         except Exception as e:
-            logger.error(f"Error handling payment method attached: {e}")
-            return {'status': 'error', 'error': str(e)}
-    
-    def handle_checkout_completed(self, session: Dict[str, Any]) -> Dict[str, Any]:
+            return _soft_error('payment_method_attached', e)
+
+    def handle_checkout_completed(self, session: Any) -> Dict[str, Any]:
         """Handle checkout session completion"""
         try:
-            session_id = session['id']
-            customer_id = session['customer']
-            subscription_id = session['subscription']
-            
+            session_id = _stripe_get(session, 'id')
+            customer_id = _stripe_get(session, 'customer')
+            subscription_id = _stripe_get(session, 'subscription')
             logger.info(f"Checkout completed: Session {session_id} - Customer {customer_id}")
-            
-            # Track checkout completion
             self._track_checkout_event('completed', session_id, customer_id, subscription_id)
-            
-            return {
-                'status': 'success',
-                'session_id': session_id,
-                'customer_id': customer_id,
-                'subscription_id': subscription_id,
-                'action': 'checkout_completed'
-            }
-            
+            return _ack(
+                'checkout_completed',
+                session_id=session_id,
+                customer_id=customer_id,
+                subscription_id=subscription_id,
+            )
         except Exception as e:
-            logger.error(f"Error handling checkout completed: {e}")
-            return {'status': 'error', 'error': str(e)}
-    
-    def handle_checkout_expired(self, session: Dict[str, Any]) -> Dict[str, Any]:
+            return _soft_error('checkout_completed', e)
+
+    def handle_checkout_expired(self, session: Any) -> Dict[str, Any]:
         """Handle checkout session expiration"""
         try:
-            session_id = session['id']
+            session_id = _stripe_get(session, 'id')
             customer_id = _stripe_get(session, 'customer')
-            
             logger.info(f"Checkout expired: Session {session_id}")
-            
-            # Track checkout expiration
             self._track_checkout_event('expired', session_id, customer_id)
-            
-            return {
-                'status': 'success',
-                'session_id': session_id,
-                'customer_id': customer_id,
-                'action': 'checkout_expired'
-            }
-            
+            return _ack(
+                'checkout_expired',
+                session_id=session_id,
+                customer_id=customer_id,
+            )
         except Exception as e:
-            logger.error(f"Error handling checkout expired: {e}")
-            return {'status': 'error', 'error': str(e)}
+            return _soft_error('checkout_expired', e)
 
-    def handle_checkout_async_payment_succeeded(self, session: Dict[str, Any]) -> Dict[str, Any]:
+    def handle_checkout_async_payment_succeeded(self, session: Any) -> Dict[str, Any]:
         """Handle asynchronous checkout payment success (common with ACH)."""
         try:
-            session_id = session['id']
+            session_id = _stripe_get(session, 'id')
             customer_id = _stripe_get(session, 'customer')
             subscription_id = _stripe_get(session, 'subscription')
             logger.info(f"Checkout async payment succeeded: Session {session_id} - Customer {customer_id}")
             if subscription_id and customer_id:
                 self._update_user_subscription(subscription_id, customer_id, 'active')
             self._track_checkout_event('async_payment_succeeded', session_id, customer_id, subscription_id)
-            return {
-                'status': 'success',
-                'session_id': session_id,
-                'customer_id': customer_id,
-                'subscription_id': subscription_id,
-                'action': 'checkout_async_payment_succeeded'
-            }
+            return _ack(
+                'checkout_async_payment_succeeded',
+                session_id=session_id,
+                customer_id=customer_id,
+                subscription_id=subscription_id,
+            )
         except Exception as e:
-            logger.error(f"Error handling checkout async payment succeeded: {e}")
-            return {'status': 'error', 'error': str(e)}
+            return _soft_error('checkout_async_payment_succeeded', e)
 
-    def handle_checkout_async_payment_failed(self, session: Dict[str, Any]) -> Dict[str, Any]:
+    def handle_checkout_async_payment_failed(self, session: Any) -> Dict[str, Any]:
         """Handle asynchronous checkout payment failure (common with ACH)."""
         try:
-            session_id = session['id']
+            session_id = _stripe_get(session, 'id')
             customer_id = _stripe_get(session, 'customer')
             subscription_id = _stripe_get(session, 'subscription')
             logger.warning(f"Checkout async payment failed: Session {session_id} - Customer {customer_id}")
             if subscription_id and customer_id:
                 self._update_user_subscription(subscription_id, customer_id, 'past_due')
             self._track_checkout_event('async_payment_failed', session_id, customer_id, subscription_id)
-            return {
-                'status': 'success',
-                'session_id': session_id,
-                'customer_id': customer_id,
-                'subscription_id': subscription_id,
-                'action': 'checkout_async_payment_failed'
-            }
+            return _ack(
+                'checkout_async_payment_failed',
+                session_id=session_id,
+                customer_id=customer_id,
+                subscription_id=subscription_id,
+            )
         except Exception as e:
-            logger.error(f"Error handling checkout async payment failed: {e}")
-            return {'status': 'error', 'error': str(e)}
+            return _soft_error('checkout_async_payment_failed', e)
 
-    def handle_setup_intent_succeeded(self, setup_intent: Dict[str, Any]) -> Dict[str, Any]:
+    def handle_setup_intent_succeeded(self, setup_intent: Any) -> Dict[str, Any]:
         """Handle successful setup intent (card or bank account added)."""
         try:
-            setup_intent_id = setup_intent['id']
+            setup_intent_id = _stripe_get(setup_intent, 'id')
             customer_id = _stripe_get(setup_intent, 'customer')
             payment_method = _stripe_get(setup_intent, 'payment_method')
             logger.info(f"Setup intent succeeded: {setup_intent_id} for customer {customer_id}")
-            return {
-                'status': 'success',
-                'setup_intent_id': setup_intent_id,
-                'customer_id': customer_id,
-                'payment_method_id': payment_method,
-                'action': 'setup_intent_succeeded'
-            }
+            return _ack(
+                'setup_intent_succeeded',
+                setup_intent_id=setup_intent_id,
+                customer_id=customer_id,
+                payment_method_id=payment_method,
+            )
         except Exception as e:
-            logger.error(f"Error handling setup intent succeeded: {e}")
-            return {'status': 'error', 'error': str(e)}
+            return _soft_error('setup_intent_succeeded', e)
 
-    def handle_setup_intent_failed(self, setup_intent: Dict[str, Any]) -> Dict[str, Any]:
+    def handle_setup_intent_failed(self, setup_intent: Any) -> Dict[str, Any]:
         """Handle failed setup intent (card or bank account setup failed)."""
         try:
-            setup_intent_id = setup_intent['id']
+            setup_intent_id = _stripe_get(setup_intent, 'id')
             customer_id = _stripe_get(setup_intent, 'customer')
             last_setup_error = _stripe_get(setup_intent, 'last_setup_error') or {}
             error_message = _stripe_get(last_setup_error, 'message', 'Setup failed')
             logger.warning(f"Setup intent failed: {setup_intent_id} for customer {customer_id} - {error_message}")
-            return {
-                'status': 'success',
-                'setup_intent_id': setup_intent_id,
-                'customer_id': customer_id,
-                'action': 'setup_intent_failed',
-                'error_message': error_message,
-            }
+            return _ack(
+                'setup_intent_failed',
+                setup_intent_id=setup_intent_id,
+                customer_id=customer_id,
+                error_message=error_message,
+            )
         except Exception as e:
-            logger.error(f"Error handling setup intent failed: {e}")
-            return {'status': 'error', 'error': str(e)}
-    
-    def handle_payment_intent_succeeded(self, payment_intent: Dict[str, Any]) -> Dict[str, Any]:
+            return _soft_error('setup_intent_failed', e)
+
+    def handle_payment_intent_succeeded(self, payment_intent: Any) -> Dict[str, Any]:
         """Handle successful payment intent (card verification)"""
         try:
-            payment_intent_id = payment_intent['id']
+            payment_intent_id = _stripe_get(payment_intent, 'id')
             customer_id = _stripe_get(payment_intent, 'customer')
-            amount = payment_intent['amount']
+            amount = _stripe_get(payment_intent, 'amount') or 0
             metadata = _stripe_get(payment_intent, 'metadata') or {}
-            
-            # Check if this is a verification charge ($1 or less)
             is_verification = _stripe_get(metadata, 'verification', 'false') == 'true' or amount <= 100
-            
+
             if is_verification:
                 logger.info(f"Card verification succeeded: Payment Intent {payment_intent_id} - Amount: ${amount/100}")
-                
-                # If it's a $1 verification charge, refund it immediately
-                if amount == 100 and STRIPE_AVAILABLE:
+                if amount == 100 and STRIPE_AVAILABLE and payment_intent_id:
                     try:
                         refund = stripe.Refund.create(
                             payment_intent=payment_intent_id,
@@ -722,94 +714,73 @@ class StripeWebhookHandler:
                         logger.info(f"Refunded $1 verification charge: Refund {refund.id}")
                     except Exception as e:
                         logger.error(f"Failed to refund verification charge: {e}")
-            
-            return {
-                'status': 'success',
-                'payment_intent_id': payment_intent_id,
-                'customer_id': customer_id,
-                'action': 'payment_intent_succeeded',
-                'is_verification': is_verification,
-                'amount': amount
-            }
-            
+
+            return _ack(
+                'payment_intent_succeeded',
+                payment_intent_id=payment_intent_id,
+                customer_id=customer_id,
+                is_verification=is_verification,
+                amount=amount,
+            )
         except Exception as e:
-            logger.error(f"Error handling payment intent succeeded: {e}")
-            return {'status': 'error', 'error': str(e)}
-    
-    def handle_payment_intent_failed(self, payment_intent: Dict[str, Any]) -> Dict[str, Any]:
+            return _soft_error('payment_intent_succeeded', e)
+
+    def handle_payment_intent_failed(self, payment_intent: Any) -> Dict[str, Any]:
         """Handle failed payment intent (card verification failed)"""
         try:
-            payment_intent_id = payment_intent['id']
+            payment_intent_id = _stripe_get(payment_intent, 'id')
             customer_id = _stripe_get(payment_intent, 'customer')
             last_payment_error = _stripe_get(payment_intent, 'last_payment_error') or {}
             error_message = _stripe_get(last_payment_error, 'message', 'Payment failed')
-            
             logger.warning(f"Card verification failed: Payment Intent {payment_intent_id} - {error_message}")
-            
-            # Track failed verification
             self._track_payment_event('verification_failed', payment_intent_id, customer_id, 0)
-            
-            return {
-                'status': 'success',
-                'payment_intent_id': payment_intent_id,
-                'customer_id': customer_id,
-                'action': 'payment_intent_failed',
-                'error_message': error_message
-            }
-            
+            return _ack(
+                'payment_intent_failed',
+                payment_intent_id=payment_intent_id,
+                customer_id=customer_id,
+                error_message=error_message,
+            )
         except Exception as e:
-            logger.error(f"Error handling payment intent failed: {e}")
-            return {'status': 'error', 'error': str(e)}
-    
-    def handle_charge_succeeded(self, charge: Dict[str, Any]) -> Dict[str, Any]:
+            return _soft_error('payment_intent_failed', e)
+
+    def handle_charge_succeeded(self, charge: Any) -> Dict[str, Any]:
         """Handle successful charge (including verification charges)"""
         try:
-            charge_id = charge['id']
+            charge_id = _stripe_get(charge, 'id')
             customer_id = _stripe_get(charge, 'customer')
-            amount = charge['amount']
+            amount = _stripe_get(charge, 'amount') or 0
             metadata = _stripe_get(charge, 'metadata') or {}
-            
             is_verification = _stripe_get(metadata, 'verification', 'false') == 'true' or amount <= 100
-            
             if is_verification:
                 logger.info(f"Verification charge succeeded: Charge {charge_id} - Amount: ${amount/100}")
-            
-            return {
-                'status': 'success',
-                'charge_id': charge_id,
-                'customer_id': customer_id,
-                'action': 'charge_succeeded',
-                'is_verification': is_verification,
-                'amount': amount
-            }
-            
+            return _ack(
+                'charge_succeeded',
+                charge_id=charge_id,
+                customer_id=customer_id,
+                is_verification=is_verification,
+                amount=amount,
+            )
         except Exception as e:
-            logger.error(f"Error handling charge succeeded: {e}")
-            return {'status': 'error', 'error': str(e)}
-    
-    def handle_charge_refunded(self, charge: Dict[str, Any]) -> Dict[str, Any]:
+            return _soft_error('charge_succeeded', e)
+
+    def handle_charge_refunded(self, charge: Any) -> Dict[str, Any]:
         """Handle refunded charge (verification refund)"""
         try:
-            charge_id = charge['id']
+            charge_id = _stripe_get(charge, 'id')
             customer_id = _stripe_get(charge, 'customer')
-            amount_refunded = _stripe_get(charge, 'amount_refunded', 0)
+            amount_refunded = _stripe_get(charge, 'amount_refunded', 0) or 0
             metadata = _stripe_get(charge, 'metadata') or {}
-            
             if _stripe_get(metadata, 'reason') == 'card_verification':
                 logger.info(f"Verification charge refunded: Charge {charge_id} - Amount: ${amount_refunded/100}")
-            
-            return {
-                'status': 'success',
-                'charge_id': charge_id,
-                'customer_id': customer_id,
-                'action': 'charge_refunded',
-                'amount_refunded': amount_refunded
-            }
-            
+            return _ack(
+                'charge_refunded',
+                charge_id=charge_id,
+                customer_id=customer_id,
+                amount_refunded=amount_refunded,
+            )
         except Exception as e:
-            logger.error(f"Error handling charge refunded: {e}")
-            return {'status': 'error', 'error': str(e)}
-    
+            return _soft_error('charge_refunded', e)
+
     # Private helper methods
     def _update_user_subscription(self, subscription_id: str, customer_id: str, status: str):
         """Update user subscription in database - persists webhook data"""
@@ -829,19 +800,27 @@ class StripeWebhookHandler:
             user_email = customer.email
             
             if not user_email:
-                logger.error(f"No email found for customer {customer_id}")
+                logger.info(
+                    "No email on Stripe customer %s — skipping SaaS subscription sync "
+                    "(common for Dashboard-only / manual customers)",
+                    customer_id,
+                )
                 return
             
             # Find user by email
             user_result = db.execute_query("SELECT id FROM users WHERE email = ?", (user_email,))
             if not user_result or len(user_result) == 0 or not user_result[0]:
-                logger.error(f"User not found for email: {user_email}")
+                logger.info(
+                    "No Fikiri app user for Stripe customer email %s — skipping SaaS sync "
+                    "(manual/Dashboard billing outside website subscriptions)",
+                    user_email,
+                )
                 return
             
             user_row = user_result[0]
             user_id = user_row[0] if isinstance(user_row, tuple) else user_row.get('id') if isinstance(user_row, dict) else None
             if not user_id:
-                logger.error(f"Invalid user data for email: {user_email}")
+                logger.info("Invalid user row for email %s — skipping SaaS sync", user_email)
                 return
             
             # Get tier from product metadata
@@ -885,8 +864,6 @@ class StripeWebhookHandler:
             
             logger.info(f"✅ Updated subscription {subscription_id} in database for user {user_id}")
             
-        except stripe.error.StripeError as e:
-            logger.error(f"Stripe API error updating subscription: {e}")
         except Exception as e:
             logger.error(f"Failed to update subscription in database: {e}")
             import traceback

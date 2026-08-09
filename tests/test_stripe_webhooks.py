@@ -4,6 +4,108 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 
+class TestInvoiceSubscriptionId(unittest.TestCase):
+    def test_legacy_top_level_subscription(self):
+        from core.stripe_webhooks import _invoice_subscription_id
+
+        self.assertEqual(
+            _invoice_subscription_id({"subscription": "sub_legacy"}),
+            "sub_legacy",
+        )
+
+    def test_basil_parent_subscription_details(self):
+        from core.stripe_webhooks import _invoice_subscription_id
+
+        invoice = {
+            "id": "in_basil",
+            "parent": {
+                "type": "subscription_details",
+                "subscription_details": {"subscription": "sub_basil"},
+            },
+        }
+        self.assertEqual(_invoice_subscription_id(invoice), "sub_basil")
+
+    def test_manual_invoice_without_subscription(self):
+        from core.stripe_webhooks import _invoice_subscription_id
+
+        # Live Aim High invoice.created payload shape: parent null, no subscription key
+        invoice = {
+            "id": "in_1U2IyLERdOuDQgq5gNcMymmP",
+            "customer": "cus_Uz2AtBI11oCPz6",
+            "amount_due": 0,
+            "parent": None,
+            "billing_reason": "manual",
+        }
+        self.assertIsNone(_invoice_subscription_id(invoice))
+
+
+class TestManualDashboardWebhookTolerance(unittest.TestCase):
+    """Founder/Dashboard ops outside website SaaS flow must still ack successfully."""
+
+    @patch("core.stripe_webhooks.stripe")
+    def test_payment_method_attached_without_customer(self, mock_stripe):
+        from core.stripe_webhooks import StripeWebhookHandler
+
+        handler = StripeWebhookHandler()
+        with patch.object(handler, "_track_payment_method_event"):
+            result = handler.handle_payment_method_attached({"id": "pm_1"})
+        self.assertEqual(result.get("status"), "success")
+        self.assertIsNone(result.get("customer_id"))
+
+    @patch("core.stripe_webhooks.stripe")
+    def test_charge_succeeded_minimal_payload(self, mock_stripe):
+        from core.stripe_webhooks import StripeWebhookHandler
+
+        handler = StripeWebhookHandler()
+        result = handler.handle_charge_succeeded({"id": "ch_1"})
+        self.assertEqual(result.get("status"), "success")
+        self.assertEqual(result.get("amount"), 0)
+
+    @patch("core.stripe_webhooks.stripe")
+    def test_subscription_created_missing_fields_skipped_not_error(self, mock_stripe):
+        from core.stripe_webhooks import StripeWebhookHandler
+
+        handler = StripeWebhookHandler()
+        with patch.object(handler, "_update_user_subscription") as mock_update:
+            result = handler.handle_subscription_created({})
+        self.assertEqual(result.get("status"), "success")
+        self.assertEqual(result.get("action"), "subscription_created_skipped")
+        mock_update.assert_not_called()
+
+    @patch("core.stripe_webhooks.stripe")
+    def test_checkout_completed_payment_mode_without_subscription(self, mock_stripe):
+        from core.stripe_webhooks import StripeWebhookHandler
+
+        handler = StripeWebhookHandler()
+        with patch.object(handler, "_track_checkout_event"):
+            result = handler.handle_checkout_completed(
+                {"id": "cs_1", "customer": "cus_1", "mode": "payment"}
+            )
+        self.assertEqual(result.get("status"), "success")
+        self.assertIsNone(result.get("subscription_id"))
+
+    @patch("core.stripe_webhooks.stripe")
+    def test_manual_payment_succeeded_does_not_touch_subscription(self, mock_stripe):
+        from core.stripe_webhooks import StripeWebhookHandler
+
+        handler = StripeWebhookHandler()
+        with patch.object(handler, "_update_user_subscription") as mock_update, \
+            patch.object(handler, "_send_payment_confirmation_email") as mock_email, \
+            patch.object(handler, "_track_payment_event"):
+            result = handler.handle_payment_succeeded(
+                {
+                    "id": "in_manual",
+                    "customer": "cus_manual",
+                    "amount_paid": 52470,
+                    "parent": None,
+                    "billing_reason": "manual",
+                }
+            )
+        self.assertEqual(result.get("status"), "success")
+        mock_update.assert_not_called()
+        mock_email.assert_called_once()
+
+
 class TestStripeWebhookHandler(unittest.TestCase):
     @patch("core.stripe_webhooks.stripe")
     def test_handle_event_routes_known_type(self, mock_stripe):
@@ -90,6 +192,53 @@ class TestStripeWebhookHandler(unittest.TestCase):
         self.assertEqual(result.get("status"), "success")
         mock_update.assert_called_once_with("sub_2", "cus_2", "past_due")
         mock_email.assert_called_once_with("cus_2", "in_2", 2000)
+        mock_track.assert_called_once()
+
+    @patch("core.stripe_webhooks.stripe")
+    def test_handle_invoice_created_basil_manual_no_subscription(self, mock_stripe):
+        """Regression: live invoice.created returned error \"'subscription'\" on Basil."""
+        from core.stripe_webhooks import StripeWebhookHandler
+
+        handler = StripeWebhookHandler()
+        with patch.object(handler, "_track_invoice_event") as mock_track:
+            invoice = {
+                "id": "in_1U2IyLERdOuDQgq5gNcMymmP",
+                "object": "invoice",
+                "customer": "cus_Uz2AtBI11oCPz6",
+                "amount_due": 0,
+                "parent": None,
+                "billing_reason": "manual",
+                "collection_method": "send_invoice",
+            }
+            result = handler.handle_invoice_created(invoice)
+
+        self.assertEqual(result.get("status"), "success")
+        self.assertEqual(result.get("action"), "invoice_created")
+        self.assertIsNone(result.get("subscription_id"))
+        mock_track.assert_called_once()
+
+    @patch("core.stripe_webhooks.stripe")
+    def test_handle_payment_succeeded_basil_parent_subscription(self, mock_stripe):
+        from core.stripe_webhooks import StripeWebhookHandler
+
+        handler = StripeWebhookHandler()
+        with patch.object(handler, "_update_user_subscription") as mock_update, \
+            patch.object(handler, "_send_payment_confirmation_email") as mock_email, \
+            patch.object(handler, "_track_payment_event") as mock_track:
+            invoice = {
+                "id": "in_basil",
+                "customer": "cus_1",
+                "amount_paid": 5000,
+                "parent": {
+                    "type": "subscription_details",
+                    "subscription_details": {"subscription": "sub_basil"},
+                },
+            }
+            result = handler.handle_payment_succeeded(invoice)
+
+        self.assertEqual(result.get("status"), "success")
+        mock_update.assert_called_once_with("sub_basil", "cus_1", "active")
+        mock_email.assert_called_once()
         mock_track.assert_called_once()
 
     @patch("core.stripe_webhooks.stripe")

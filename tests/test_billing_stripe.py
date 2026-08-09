@@ -232,6 +232,43 @@ class TestBillingAPI(unittest.TestCase):
         self.assertEqual(payload["audit"][0]["email"], "tester@example.com")
 
 
+class TestBillingWebhookHttpContract(unittest.TestCase):
+    """Webhook route: 400 only on verify failure; 200 after verified processing."""
+
+    def setUp(self):
+        from flask import Flask
+        from core.billing_api import billing_bp
+
+        self.app = Flask(__name__)
+        self.app.config["TESTING"] = True
+        self.app.register_blueprint(billing_bp)
+        self.client = self.app.test_client()
+
+    @patch("core.billing_api.webhook_handler")
+    def test_webhook_verify_failure_returns_400(self, mock_handler):
+        mock_handler.verify_webhook_signature.side_effect = ValueError("bad sig")
+        response = self.client.post(
+            "/api/billing/webhook",
+            data=b"{}",
+            headers={"Content-Type": "application/json", "Stripe-Signature": "t=1,v1=x"},
+        )
+        self.assertEqual(response.status_code, 400)
+        mock_handler.process_verified_event.assert_not_called()
+
+    @patch("core.billing_api.webhook_handler")
+    def test_webhook_processing_error_returns_200(self, mock_handler):
+        mock_handler.verify_webhook_signature.return_value = {"id": "evt_1", "type": "invoice.created"}
+        mock_handler.process_verified_event.side_effect = RuntimeError("boom")
+        response = self.client.post(
+            "/api/billing/webhook",
+            data=b"{}",
+            headers={"Content-Type": "application/json", "Stripe-Signature": "t=1,v1=x"},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertEqual(payload.get("status"), "error")
+
+
 class TestStripeWebhookHandler(unittest.TestCase):
     """Test stripe_webhooks module (handler) with mocked Stripe events."""
 

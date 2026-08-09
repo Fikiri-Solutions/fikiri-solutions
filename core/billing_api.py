@@ -1116,25 +1116,34 @@ def check_feature_access():
 
 @billing_bp.route('/webhook', methods=['POST'])
 def handle_stripe_webhook():
-    """Handle Stripe webhook events"""
+    """Handle Stripe webhook events.
+
+    Return 400 only for invalid payload/signature. After verification, always
+    acknowledge with 2xx so Stripe does not disable the endpoint when business
+    logic fails (handler errors are logged and recorded on the event row).
+    """
+    payload = request.get_data()
+    sig_header = request.headers.get('Stripe-Signature')
+
     try:
-        payload = request.get_data()
-        sig_header = request.headers.get('Stripe-Signature')
-        
-        # Verify webhook signature
         event = webhook_handler.verify_webhook_signature(payload, sig_header)
-        
-        # Handle the event (dedupe by Stripe event.id before side effects)
-        result = webhook_handler.process_verified_event(event)
-        
-        return jsonify(result)
-        
     except Exception as e:
-        logger.error(f"Failed to handle webhook: {type(e).__name__}: {e}")
+        logger.error(f"Stripe webhook verification failed: {type(e).__name__}: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
         }), 400
+
+    try:
+        result = webhook_handler.process_verified_event(event)
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"Stripe webhook processing failed: {type(e).__name__}: {e}")
+        return jsonify({
+            'success': False,
+            'status': 'error',
+            'error': str(e),
+        }), 200
 
 @billing_bp.route('/setup', methods=['POST'])
 @jwt_required()
