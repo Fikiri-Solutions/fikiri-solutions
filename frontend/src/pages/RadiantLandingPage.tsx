@@ -76,7 +76,7 @@ function Hero() {
 }
 
 /**
- * In-app screen snapshots: `public/images/preview-tab-*.png` (see `publicMedia.landing.tab`).
+ * In-app screen snapshots: `public/images/preview-tabs/*@2x.{webp,jpg}` (see `publicMedia.landing.tab`).
  * Renders in the **lower** product-preview block (under the Features bento), not in the bento images.
  */
 const previewTabs = [
@@ -86,20 +86,31 @@ const previewTabs = [
   { key: 'automations', label: 'Automations', image: publicMedia.landing.tab.automations },
 ] as const
 
-function PreviewTabImage({ src, alt }: { src: string; alt: string }) {
+type PreviewTabImageSrc = { webp: string; jpg: string }
+
+function PreviewTabImage({ src, alt }: { src: PreviewTabImageSrc; alt: string }) {
   const reduceMotion = useReducedMotion()
   return (
-    <motion.img
-      src={src}
-      alt={alt}
-      sizes="(max-width: 640px) 100vw, 56rem"
-      className="h-auto w-full max-h-[min(52vh,480px)] object-contain object-top"
-      loading="lazy"
-      decoding="async"
+    <motion.div
+      className="w-full"
       initial={reduceMotion ? false : { opacity: 0.35, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
-    />
+    >
+      <picture>
+        <source srcSet={src.webp} type="image/webp" />
+        <img
+          src={src.jpg}
+          alt={alt}
+          width={2560}
+          height={1458}
+          sizes="(max-width: 640px) 100vw, 56rem"
+          className="h-auto w-full object-contain object-top"
+          loading="lazy"
+          decoding="async"
+        />
+      </picture>
+    </motion.div>
   )
 }
 
@@ -137,13 +148,21 @@ function FeatureSection() {
 
         <Reveal direction="scale" delay={0.16} className="mt-5 sm:mt-6">
           <div className="flex justify-center px-1 sm:px-0">
-            <div className="relative w-full max-w-4xl overflow-hidden rounded-2xl bg-white/90 shadow-lg shadow-orange-950/30 ring-1 ring-white/20 transition-shadow duration-300 hover:shadow-xl hover:shadow-brand-primary/20">
-              <div className="relative flex w-full min-h-[240px] max-h-[min(52vh,480px)] items-start justify-center sm:min-h-[280px]">
+            {/* Product window chrome — keeps UI crisp without soft overlay wash */}
+            <div className="relative w-full max-w-4xl overflow-hidden rounded-2xl bg-[#f7f4f0] shadow-[0_24px_60px_-20px_rgba(20,15,12,0.65)] ring-1 ring-white/25">
+              <div
+                className="flex items-center gap-2 border-b border-black/5 bg-[#efeae4] px-3 py-2.5 sm:px-4"
+                aria-hidden
+              >
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e0684f]/90" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e0b24f]/90" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[#6fbe73]/90" />
+                <span className="ml-2 truncate rounded-md bg-white/70 px-2.5 py-0.5 text-[11px] font-medium tracking-wide text-[#5c534c] ring-1 ring-black/5 sm:text-xs">
+                  app.fikirisolutions.com · {current.label}
+                </span>
+              </div>
+              <div className="relative w-full bg-white">
                 <PreviewTabImage key={current.key} src={current.image} alt={`${current.label} preview`} />
-                <div
-                  className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#140f0c]/35"
-                  aria-hidden
-                />
               </div>
             </div>
           </div>

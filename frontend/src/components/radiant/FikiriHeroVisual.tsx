@@ -4,6 +4,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
@@ -72,12 +73,38 @@ type FikiriHeroVisualProps = {
   children?: ReactNode
 }
 
+function heroTreeMaskStyle(narrowViewport: boolean): CSSProperties {
+  if (narrowViewport) {
+    return {
+      // Soft bottom fade only — heavy dual masks made the baobab a ghost on phones.
+      WebkitMaskImage:
+        'linear-gradient(to bottom, #000 0%, #000 58%, rgba(0,0,0,0.75) 78%, transparent 100%)',
+      maskImage:
+        'linear-gradient(to bottom, #000 0%, #000 58%, rgba(0,0,0,0.75) 78%, transparent 100%)',
+    }
+  }
+
+  return {
+    WebkitMaskImage: [
+      'radial-gradient(ellipse 72% 68% at 50% 32%, #000 28%, rgba(0,0,0,0.92) 48%, rgba(0,0,0,0.55) 68%, transparent 86%)',
+      'linear-gradient(to bottom, #000 0%, #000 48%, rgba(0,0,0,0.55) 72%, transparent 100%)',
+    ].join(', '),
+    maskImage: [
+      'radial-gradient(ellipse 72% 68% at 50% 32%, #000 28%, rgba(0,0,0,0.92) 48%, rgba(0,0,0,0.55) 68%, transparent 86%)',
+      'linear-gradient(to bottom, #000 0%, #000 48%, rgba(0,0,0,0.55) 72%, transparent 100%)',
+    ].join(', '),
+    WebkitMaskComposite: 'source-in',
+    maskComposite: 'intersect',
+  }
+}
+
 /**
  * Continuous hero field + mount/in-view entrance motion.
- * Static composition is the approved resting state — motion only transitions into it.
+ * Static approved plates are the resting state; growth video is a one-shot entrance only.
  */
 export function FikiriHeroVisual({ className, children }: FikiriHeroVisualProps) {
   const sectionRef = useRef<HTMLElement | null>(null)
+  const growthVideoRef = useRef<HTMLVideoElement | null>(null)
   const reduceMotion = useReducedMotion()
   const [seenThisSession] = useState(readHeroSeen)
   const [prefersReduced] = useState(prefersReducedMotionSync)
@@ -86,6 +113,9 @@ export function FikiriHeroVisual({ className, children }: FikiriHeroVisualProps)
   const instant =
     Boolean(reduceMotion) || prefersReduced || seenThisSession || narrowViewport
   const [entered, setEntered] = useState(instant)
+  const allowGrowthVideo =
+    !Boolean(reduceMotion) && !prefersReduced && !seenThisSession
+  const [growthVisible, setGrowthVisible] = useState(allowGrowthVideo)
 
   useEffect(() => {
     if (instant) {
@@ -116,9 +146,47 @@ export function FikiriHeroVisual({ className, children }: FikiriHeroVisualProps)
     return () => observer.disconnect()
   }, [instant, narrowViewport, seenThisSession])
 
+  useEffect(() => {
+    if (!allowGrowthVideo || !growthVisible) return
+    const video = growthVideoRef.current
+    if (!video) return
+
+    const finishGrowth = () => setGrowthVisible(false)
+
+    const syncPlayback = () => {
+      if (!entered) return
+      if (document.visibilityState !== 'visible') {
+        video.pause()
+        return
+      }
+      try {
+        const playPromise = video.play()
+        if (playPromise) playPromise.catch(() => finishGrowth())
+      } catch {
+        finishGrowth()
+      }
+    }
+
+    const onEnded = () => finishGrowth()
+    const onError = () => finishGrowth()
+
+    video.addEventListener('ended', onEnded)
+    video.addEventListener('error', onError)
+    document.addEventListener('visibilitychange', syncPlayback)
+    syncPlayback()
+
+    return () => {
+      video.removeEventListener('ended', onEnded)
+      video.removeEventListener('error', onError)
+      document.removeEventListener('visibilitychange', syncPlayback)
+    }
+  }, [allowGrowthVideo, entered, growthVisible])
+
   const treeTransition = instant
     ? { duration: 0.2, ease: EASE }
     : { duration: 1.15, ease: EASE, delay: 0.3 }
+
+  const treeMaskStyle = heroTreeMaskStyle(narrowViewport)
 
   return (
     <HeroEntranceContext.Provider value={{ entered, instant }}>
@@ -128,13 +196,14 @@ export function FikiriHeroVisual({ className, children }: FikiriHeroVisualProps)
         aria-label="Fikiri Solutions brand hero"
         data-hero-entered={entered ? 'true' : 'false'}
         data-hero-instant={instant ? 'true' : 'false'}
+        data-hero-growth={growthVisible ? 'true' : 'false'}
         style={{ backgroundColor: PAGE_BG }}
       >
         <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
           {/* Outer keeps absolute placement; inner motion only opacity/scale/y */}
           <div className="absolute left-1/2 top-0 h-[min(78vw,420px)] w-auto max-w-none -translate-x-1/2 sm:h-[min(58vw,620px)] md:h-[min(52vw,680px)] lg:h-[min(48vw,720px)]">
             <motion.div
-              className="h-full w-auto origin-center"
+              className="relative h-full w-auto origin-center"
               initial={false}
               animate={
                 entered
@@ -143,7 +212,17 @@ export function FikiriHeroVisual({ className, children }: FikiriHeroVisualProps)
               }
               transition={treeTransition}
             >
-              <picture>
+              {/*
+                Approved resting plate — hidden while growth plays so the mature
+                canopy cannot silhouette through early seed frames. Shown immediately
+                when growth is skipped (reduced-motion / revisit).
+              */}
+              <picture
+                className={clsx(
+                  'block transition-opacity duration-700 ease-out',
+                  growthVisible ? 'opacity-0' : 'opacity-100'
+                )}
+              >
                 <source media="(max-width: 767px)" srcSet={publicMedia.landing.hero.mobile} />
                 <img
                   src={publicMedia.landing.hero.desktop}
@@ -151,31 +230,32 @@ export function FikiriHeroVisual({ className, children }: FikiriHeroVisualProps)
                   width={1024}
                   height={576}
                   decoding="async"
+                  fetchPriority={growthVisible ? 'low' : 'high'}
                   className="h-full w-auto max-w-none object-contain object-top"
-                  style={
-                    narrowViewport
-                      ? {
-                          // Soft bottom fade only — heavy dual masks made the baobab a ghost on phones.
-                          WebkitMaskImage:
-                            'linear-gradient(to bottom, #000 0%, #000 58%, rgba(0,0,0,0.75) 78%, transparent 100%)',
-                          maskImage:
-                            'linear-gradient(to bottom, #000 0%, #000 58%, rgba(0,0,0,0.75) 78%, transparent 100%)',
-                        }
-                      : {
-                          WebkitMaskImage: [
-                            'radial-gradient(ellipse 72% 68% at 50% 32%, #000 28%, rgba(0,0,0,0.92) 48%, rgba(0,0,0,0.55) 68%, transparent 86%)',
-                            'linear-gradient(to bottom, #000 0%, #000 48%, rgba(0,0,0,0.55) 72%, transparent 100%)',
-                          ].join(', '),
-                          maskImage: [
-                            'radial-gradient(ellipse 72% 68% at 50% 32%, #000 28%, rgba(0,0,0,0.92) 48%, rgba(0,0,0,0.55) 68%, transparent 86%)',
-                            'linear-gradient(to bottom, #000 0%, #000 48%, rgba(0,0,0,0.55) 72%, transparent 100%)',
-                          ].join(', '),
-                          WebkitMaskComposite: 'source-in',
-                          maskComposite: 'intersect',
-                        }
-                  }
+                  style={treeMaskStyle}
                 />
               </picture>
+
+              {/* Raw one-shot growth — no mature-tree poster; plate returns when this ends */}
+              {allowGrowthVideo && (
+                <video
+                  ref={growthVideoRef}
+                  className={clsx(
+                    'absolute left-0 top-0 h-full w-full max-w-none object-contain object-top transition-opacity duration-700 ease-out',
+                    growthVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                  )}
+                  style={treeMaskStyle}
+                  muted
+                  playsInline
+                  preload="auto"
+                  autoPlay={entered}
+                  disablePictureInPicture
+                  controls={false}
+                  aria-hidden
+                >
+                  <source src={publicMedia.landing.hero.growth} type="video/mp4" />
+                </video>
+              )}
             </motion.div>
           </div>
 

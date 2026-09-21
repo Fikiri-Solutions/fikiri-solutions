@@ -89,6 +89,17 @@ describe('Fikiri hero entrance motion', { timeout: 15_000 }, () => {
     sessionStorage.clear()
     setReducedMotion(false)
     installIntersectionObserverMock()
+    // jsdom has no media pipeline — stub so growth-video effects stay quiet in unit tests
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      writable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    })
+    Object.defineProperty(HTMLMediaElement.prototype, 'pause', {
+      configurable: true,
+      writable: true,
+      value: vi.fn(),
+    })
   })
 
   afterEach(() => {
