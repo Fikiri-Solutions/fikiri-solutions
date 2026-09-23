@@ -2,6 +2,7 @@ import React from 'react';
 import { Brain, MessageSquare, Zap, BarChart3, Clock, Shield } from 'lucide-react';
 import { FeatureStatus, getFeatureStatus } from '../components/FeatureStatus';
 import { MarketingChatWidget } from '../components/MarketingChatWidget';
+import { PageMeta } from '../components/PageMeta';
 
 export const AIAssistantLanding: React.FC = () => {
   const capabilities = [
@@ -56,6 +57,7 @@ export const AIAssistantLanding: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-100 font-serif">
+      <PageMeta route="/ai-landing" />
       <div className="container mx-auto px-4 py-16">
         {/* Hero Section */}
         <div className="text-center mb-16">

@@ -2,6 +2,7 @@ import React from 'react';
 import { CheckCircle, Star, Users, Zap, Shield, Clock } from 'lucide-react';
 import { FeatureStatus, getFeatureStatus } from '../components/FeatureStatus';
 import { MarketingChatWidget } from '../components/MarketingChatWidget';
+import { PageMeta } from '../components/PageMeta';
 
 export const ServicesLanding: React.FC = () => {
   const features = [
@@ -104,6 +105,7 @@ export const ServicesLanding: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 font-serif">
+      <PageMeta route="/services-landing" />
       {/* Hero Section */}
       <div className="container mx-auto px-4 py-16">
         <div className="text-center mb-16">

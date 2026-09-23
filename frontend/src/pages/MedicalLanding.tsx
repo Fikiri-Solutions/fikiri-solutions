@@ -1,10 +1,12 @@
 import React from 'react';
 import { VerticalLanding } from '../components/VerticalLanding';
 import { MarketingChatWidget } from '../components/MarketingChatWidget';
+import { PageMeta } from '../components/PageMeta';
 
 export const MedicalLanding: React.FC = () => {
   return (
     <>
+    <PageMeta route="/industries/medical" />
     <VerticalLanding
       industry="medical practice"
       title="HIPAA-Compliant Medical Practice Automation"

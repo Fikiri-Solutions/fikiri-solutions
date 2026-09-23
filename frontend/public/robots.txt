@@ -1,23 +1,33 @@
 User-agent: *
 Allow: /
 
-# Disallow admin and private routes
-Disallow: /admin/
+# App, auth, and internal surfaces (SPA still serves them; keep out of crawl focus)
+Disallow: /admin
 Disallow: /api/
-Disallow: /_next/
-Disallow: /static/
+Disallow: /dashboard
+Disallow: /home
+Disallow: /login
+Disallow: /signup
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /onboarding
+Disallow: /onboarding-flow
+Disallow: /inbox
+Disallow: /billing
+Disallow: /automations
+Disallow: /crm
+Disallow: /services
+Disallow: /ai
+Disallow: /assistant
+Disallow: /analytics
+Disallow: /industry
+Disallow: /import-center
+Disallow: /integrations
+Disallow: /privacy-settings
+Disallow: /gmail-status
+Disallow: /support/
+Disallow: /debug/
+Disallow: /landing-classic
 
-# Allow important pages
-Allow: /
-Allow: /services
-Allow: /ai
-Allow: /crm
-Allow: /privacy
-Allow: /industries/
-
-# Sitemap location
 Sitemap: https://fikirisolutions.com/sitemap.xml
-
-# Crawl delay (optional)
-Crawl-delay: 1
-

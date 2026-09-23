@@ -113,8 +113,13 @@ export function FikiriHeroVisual({ className, children }: FikiriHeroVisualProps)
   const instant =
     Boolean(reduceMotion) || prefersReduced || seenThisSession || narrowViewport
   const [entered, setEntered] = useState(instant)
+  // Narrow phones: never mount the ~3.4MB growth MP4 — static mobile plate is LCP.
+  // Desktop keeps the one-shot entrance; reduced-motion / revisit already skip video.
   const allowGrowthVideo =
-    !Boolean(reduceMotion) && !prefersReduced && !seenThisSession
+    !Boolean(reduceMotion) &&
+    !prefersReduced &&
+    !seenThisSession &&
+    !narrowViewport
   const [growthVisible, setGrowthVisible] = useState(allowGrowthVideo)
 
   useEffect(() => {
@@ -223,20 +228,26 @@ export function FikiriHeroVisual({ className, children }: FikiriHeroVisualProps)
                   growthVisible ? 'opacity-0' : 'opacity-100'
                 )}
               >
+                <source
+                  media="(max-width: 767px)"
+                  type="image/webp"
+                  srcSet={publicMedia.landing.hero.mobileWebp}
+                />
                 <source media="(max-width: 767px)" srcSet={publicMedia.landing.hero.mobile} />
                 <img
                   src={publicMedia.landing.hero.desktop}
                   alt=""
-                  width={1024}
-                  height={576}
-                  decoding="async"
+                  width={narrowViewport ? 819 : 1024}
+                  height={narrowViewport ? 1024 : 576}
+                  // Sync decode when this plate is the LCP candidate (no growth overlay).
+                  decoding={growthVisible ? 'async' : 'sync'}
                   fetchPriority={growthVisible ? 'low' : 'high'}
                   className="h-full w-auto max-w-none object-contain object-top"
                   style={treeMaskStyle}
                 />
               </picture>
 
-              {/* Raw one-shot growth — no mature-tree poster; plate returns when this ends */}
+              {/* Desktop-only one-shot growth — omitted on narrow viewports (LCP). */}
               {allowGrowthVideo && (
                 <video
                   ref={growthVideoRef}

@@ -2,6 +2,7 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import { RadiantLayout, Container } from '../components/radiant'
 import { MarketingChatWidget } from '../components/MarketingChatWidget'
+import { PageMeta } from '../components/PageMeta'
 import { ArrowRight } from 'lucide-react'
 
 /** Pricing & product FAQs (moved from /pricing). */
@@ -35,6 +36,7 @@ export const PRICING_FAQ_ITEMS = [
 const FaqPage: React.FC = () => {
   return (
     <RadiantLayout>
+      <PageMeta route="/faq" />
       <div className="relative min-h-dvh overflow-x-clip pb-[max(7rem,calc(env(safe-area-inset-bottom)+5.5rem))] sm:pb-[env(safe-area-inset-bottom)]">
         <div className="relative z-10">
           <section className="relative py-16 sm:py-20 z-10">

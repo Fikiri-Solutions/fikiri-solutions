@@ -13,6 +13,7 @@ import {
   Menu,
   X
 } from 'lucide-react'
+import { PageMeta } from '../components/PageMeta'
 import FikiriLogo from '@/components/FikiriLogo'
 import SimpleAnimatedBackground from '@/components/SimpleAnimatedBackground'
 import DemoVideoModal from '@/components/DemoVideoModal'
@@ -140,6 +141,7 @@ const LandingPage: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-orange-900/30 to-red-900/30 text-white overflow-hidden relative font-serif" style={{
       background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 20%, #FF6B35 40%, #D2691E 60%, #8B0000 80%, #991b1b 100%)'
     }}>
+      <PageMeta route="/landing-classic" />
       {/* Header Navigation */}
       <header className="relative z-20 w-full px-4 sm:px-6 lg:px-8 py-6">
         <div className="max-w-7xl mx-auto flex justify-between items-center">

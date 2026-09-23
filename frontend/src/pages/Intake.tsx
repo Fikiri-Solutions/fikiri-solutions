@@ -4,6 +4,7 @@ import { RadiantLayout, Container } from '../components/radiant'
 import { Button } from '../components/radiant/Button'
 import { apiClient } from '../services/apiClient'
 import { AUTOCOMPLETE } from '../constants/autocomplete'
+import { PageMeta } from '../components/PageMeta'
 
 /** Mirrors backend core/contact_api INTAKE_LIMITS */
 const LIMITS = {
@@ -199,6 +200,7 @@ export const Intake: React.FC = () => {
 
   return (
     <RadiantLayout>
+      <PageMeta route="/intake" />
       <div className="relative min-h-dvh pb-[env(safe-area-inset-bottom)]">
         <section className="relative py-10 sm:py-16 z-10">
           <Container className="relative">

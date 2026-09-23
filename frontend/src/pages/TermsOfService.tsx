@@ -1,10 +1,10 @@
 import React from 'react';
-import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Home, Shield } from 'lucide-react';
 import { RadiantLayout } from '../components/radiant';
 import { MarketingChatWidget } from '../components/MarketingChatWidget';
 import { useAuth } from '../contexts/AuthContext';
+import { PageMeta } from '../components/PageMeta';
 
 const TermsOfService: React.FC = () => {
   const navigate = useNavigate();
@@ -22,10 +22,7 @@ const TermsOfService: React.FC = () => {
   return (
     <RadiantLayout>
     <>
-      <Helmet>
-        <title>Terms of Service - Fikiri Solutions</title>
-        <meta name="description" content="Terms of Service for Fikiri Solutions AI-powered Gmail automation platform" />
-      </Helmet>
+      <PageMeta route="/terms" />
       
       <div className="min-h-screen bg-gray-900 font-serif text-white">
         <div className="container mx-auto px-4 py-8 max-w-4xl">

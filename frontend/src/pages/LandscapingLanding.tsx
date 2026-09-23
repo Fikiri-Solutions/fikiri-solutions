@@ -1,10 +1,12 @@
 import React from 'react';
 import { VerticalLanding } from '../components/VerticalLanding';
 import { MarketingChatWidget } from '../components/MarketingChatWidget';
+import { PageMeta } from '../components/PageMeta';
 
 export const LandscapingLanding: React.FC = () => {
   return (
     <>
+    <PageMeta route="/industries/landscaping" />
     <VerticalLanding
       industry="landscaping"
       title="Landscaping Business Automation"

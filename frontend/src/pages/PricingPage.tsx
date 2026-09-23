@@ -12,6 +12,7 @@ import {
   Loader2,
   CreditCard
 } from 'lucide-react';
+import { PageMeta } from '../components/PageMeta';
 
 interface PricingTier {
   name: string;
@@ -225,6 +226,7 @@ const PricingPage: React.FC = () => {
 
   return (
     <RadiantLayout>
+      <PageMeta route="/pricing" />
       <div className="relative min-h-dvh overflow-x-clip pb-[max(7rem,calc(env(safe-area-inset-bottom)+5.5rem))] sm:pb-[env(safe-area-inset-bottom)]">
         <div className="relative z-10">
       {/* Hero Section */}

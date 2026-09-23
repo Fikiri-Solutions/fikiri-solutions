@@ -2,9 +2,17 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.fikirisolutions.com" }],
+      "destination": "https://fikirisolutions.com/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
-      "source": "/((?!assets/|fonts/|icons/|img/|optimized/|manifest\\.json|manifest\\.webmanifest|sw\\.js|workbox-|registerSW\\.js|robots\\.txt|sitemap\\.xml|clear-cache\\.html|og-image\\.png|privacy\\.md|terms\\.md).*)",
+      "source": "/((?!assets/|fonts/|icons/|img/|images/|optimized/|media/|brand/|manifest\\.json|manifest\\.webmanifest|sw\\.js|workbox-|registerSW\\.js|robots\\.txt|sitemap\\.xml|clear-cache\\.html|og-image\\.png|privacy\\.md|terms\\.md|favicon\\.ico|pwa-).*)",
       "destination": "/index.html"
     }
   ],

@@ -17,8 +17,11 @@ export const publicMedia = {
     hero: {
       desktop: publicAsset('brand/hero/fikiri-hero-desktop.png'),
       mobile: publicAsset('brand/hero/fikiri-hero-mobile.png'),
+      /** Compressed mobile plate for LCP; pair with `mobile` as fallback. */
+      mobileWebp: publicAsset('brand/hero/fikiri-hero-mobile.webp'),
       /**
-       * One-shot seed→canopy entrance. Resting state remains the approved plates above.
+       * One-shot seed→canopy entrance (desktop / wide viewports only).
+       * Narrow phones use the static mobile plate instead to keep LCP under control.
        */
       growth: publicAsset('media/baobab-growth-hero.mp4'),
       /**

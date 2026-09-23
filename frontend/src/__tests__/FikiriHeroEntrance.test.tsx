@@ -56,11 +56,17 @@ function fireIntersect(isIntersecting = true) {
   })
 }
 
-function setReducedMotion(matches: boolean) {
+function setMatchMedia(options: { reducedMotion?: boolean; narrowViewport?: boolean }) {
+  const reducedMotion = Boolean(options.reducedMotion)
+  const narrowViewport = Boolean(options.narrowViewport)
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     value: vi.fn().mockImplementation((query: string) => ({
-      matches: query.includes('prefers-reduced-motion') ? matches : false,
+      matches: query.includes('prefers-reduced-motion')
+        ? reducedMotion
+        : query.includes('max-width: 767px')
+          ? narrowViewport
+          : false,
       media: query,
       onchange: null,
       addListener: vi.fn(),
@@ -70,6 +76,10 @@ function setReducedMotion(matches: boolean) {
       dispatchEvent: vi.fn(),
     })),
   })
+}
+
+function setReducedMotion(matches: boolean) {
+  setMatchMedia({ reducedMotion: matches, narrowViewport: false })
 }
 
 function renderHero() {
@@ -154,6 +164,26 @@ describe('Fikiri hero entrance motion', { timeout: 15_000 }, () => {
     })
     expect(observers).toHaveLength(0)
     expect(screen.getByText('FIKIRI')).toBeInTheDocument()
+  })
+
+  it('skips growth video on narrow viewports and uses the static plate for LCP', () => {
+    setMatchMedia({ reducedMotion: false, narrowViewport: true })
+    renderHero()
+    const hero = screen.getByRole('region', { name: /fikiri solutions brand hero/i })
+    expect(hero).toHaveAttribute('data-hero-instant', 'true')
+    expect(hero).toHaveAttribute('data-hero-entered', 'true')
+    expect(hero).toHaveAttribute('data-hero-growth', 'false')
+    expect(document.querySelector('video')).toBeNull()
+    expect(sessionStorage.getItem(HERO_SEEN_SESSION_KEY)).toBe('1')
+    expect(observers).toHaveLength(0)
+  })
+
+  it('mounts growth video on wide viewports for a first-visit entrance', () => {
+    setMatchMedia({ reducedMotion: false, narrowViewport: false })
+    renderHero()
+    const hero = screen.getByRole('region', { name: /fikiri solutions brand hero/i })
+    expect(hero).toHaveAttribute('data-hero-growth', 'true')
+    expect(document.querySelector('video')).not.toBeNull()
   })
 
   it('keeps Sector Fit interactive before and during the entrance sequence', async () => {

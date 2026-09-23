@@ -5,6 +5,7 @@ import { Button } from '../components/radiant/Button'
 import { apiClient } from '../services/apiClient'
 
 import { AUTOCOMPLETE } from '../constants/autocomplete'
+import { PageMeta } from '../components/PageMeta'
 
 const LIMITS = { name: 200, email: 254, phone: 50, company: 200, subject: 200, message: 3000 }
 
@@ -63,6 +64,7 @@ export const Contact: React.FC = () => {
 
   return (
     <RadiantLayout>
+      <PageMeta route="/contact" />
       <div className="relative min-h-dvh pb-[env(safe-area-inset-bottom)]">
         <section className="relative py-10 sm:py-16 z-10">
           <Container className="relative">
