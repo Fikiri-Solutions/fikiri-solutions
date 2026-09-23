@@ -18,6 +18,10 @@ export const publicMedia = {
       desktop: publicAsset('brand/hero/fikiri-hero-desktop.png'),
       mobile: publicAsset('brand/hero/fikiri-hero-mobile.png'),
       /**
+       * One-shot seed→canopy entrance. Resting state remains the approved plates above.
+       */
+      growth: publicAsset('media/baobab-growth-hero.mp4'),
+      /**
        * Baked black RGB plate (no alpha). Do not overlay until a transparent export exists.
        * Path kept for when asset cleanup lands.
        */
@@ -30,11 +34,23 @@ export const publicMedia = {
       automation: inImages('automation.png'),
     },
     tab: {
-      dashboard: inImages('preview-tab-dashboard.png'),
-      inbox: inImages('preview-tab-inbox.webp'),
-      /** In-app UI snapshot for the tab strip + large preview (below Features). */
-      crm: inImages('preview-tab-crm.png'),
-      automations: inImages('preview-tab-automations.png'),
+      /** Retina product previews (2× Lanczos export) — workspace strip below Features. */
+      dashboard: {
+        webp: inImages('preview-tabs/dashboard@2x.webp'),
+        jpg: inImages('preview-tabs/dashboard@2x.jpg'),
+      },
+      inbox: {
+        webp: inImages('preview-tabs/inbox@2x.webp'),
+        jpg: inImages('preview-tabs/inbox@2x.jpg'),
+      },
+      crm: {
+        webp: inImages('preview-tabs/crm@2x.webp'),
+        jpg: inImages('preview-tabs/crm@2x.jpg'),
+      },
+      automations: {
+        webp: inImages('preview-tabs/automations@2x.webp'),
+        jpg: inImages('preview-tabs/automations@2x.jpg'),
+      },
     },
   },
 } as const
