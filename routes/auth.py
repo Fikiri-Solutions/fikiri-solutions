@@ -31,6 +31,7 @@ from core.database_optimization import db_optimizer
 from core.enterprise_logging import log_security_event
 from services.business_operations import business_analytics
 from email_automation.jobs import email_job_manager
+from core.privacy_manager import privacy_manager
 
 logger = logging.getLogger(__name__)
 
@@ -281,22 +282,74 @@ def api_signup():
             phone_raw = data.get("phone")
             phone = (str(phone_raw).strip() if phone_raw is not None else "") or None
             sms_consent = bool(data.get("sms_consent"))
+            marketing_consent = bool(data.get("marketing_consent"))
+            privacy_consent = bool(data.get("privacy_consent"))
+            terms_accepted = bool(data.get("terms_accepted"))
+            consent_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            meta_updates = {}
             if phone is not None or "sms_consent" in data:
-                meta_updates = {
+                meta_updates.update({
                     "phone": phone,
                     "sms_consent": sms_consent,
-                    "sms_consent_at": (
-                        datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-                        if sms_consent
-                        else None
-                    ),
-                }
+                    "sms_consent_at": consent_at if sms_consent else None,
+                    "sms_consent_source": "signup" if sms_consent else None,
+                })
+            # Always record marketing flag state (default false) with source/timestamp.
+            meta_updates.update({
+                "marketing_consent": marketing_consent,
+                "marketing_consent_at": consent_at if marketing_consent else None,
+                "marketing_consent_source": "signup",
+                "privacy_consent": privacy_consent,
+                "terms_accepted": terms_accepted,
+                "terms_accepted_at": consent_at if terms_accepted else None,
+            })
+            if meta_updates:
                 user_auth_manager.update_user_profile(
                     user_data["id"],
                     metadata_updates=meta_updates,
                 )
         except Exception as e:
             logger.warning("Signup phone/sms_consent metadata update failed: %s", e)
+
+        # Audit consent rows (service/privacy/terms vs marketing kept as separate types).
+        try:
+            ip_address = request.remote_addr
+            user_agent = request.headers.get("User-Agent")
+            privacy_manager.record_privacy_consent(
+                user_data["id"],
+                "privacy_policy",
+                bool(data.get("privacy_consent")),
+                "Signup privacy policy acknowledgment",
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+            privacy_manager.record_privacy_consent(
+                user_data["id"],
+                "terms_of_service",
+                bool(data.get("terms_accepted")),
+                "Signup terms of service acknowledgment",
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+            privacy_manager.record_privacy_consent(
+                user_data["id"],
+                "marketing_email",
+                bool(data.get("marketing_consent")),
+                "Signup newsletter / marketing email opt-in (unchecked by default)",
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+            if "sms_consent" in data or data.get("phone"):
+                privacy_manager.record_privacy_consent(
+                    user_data["id"],
+                    "sms_alerts",
+                    bool(data.get("sms_consent")),
+                    "Signup SMS / text alerts opt-in (unchecked by default)",
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                )
+        except Exception as e:
+            logger.warning("Signup privacy consent recording failed: %s", e)
 
         _tok_t0 = time.monotonic()
         tokens = get_jwt_manager().generate_tokens(

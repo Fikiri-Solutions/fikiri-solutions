@@ -10,7 +10,7 @@ export const LandscapingLanding: React.FC = () => {
     <VerticalLanding
       industry="landscaping"
       title="Landscaping Business Automation"
-      subtitle="Never lose track of a client again. Automated scheduling, weather-based rescheduling, and project estimates that close more deals."
+      subtitle="Scheduling, weather-aware rescheduling, and estimate follow-up so you spend less time chasing clients."
       icon="🌱"
       painPoints={[
         "Missing appointments due to weather changes",
@@ -21,18 +21,18 @@ export const LandscapingLanding: React.FC = () => {
         "No system to track seasonal maintenance schedules"
       ]}
       solutions={[
-        "Weather-based automatic rescheduling keeps your calendar accurate",
-        "Client history tracking remembers preferences and past projects",
-        "AI-generated estimates that match your pricing and close deals",
-        "Automated reminders keep clients engaged and reduce no-shows",
-        "Smart scheduling prevents conflicts and optimizes your routes",
-        "Seasonal planning automation ensures recurring revenue"
+        "Weather-aware rescheduling workflows that keep clients informed",
+        "Client history tracking for preferences and past projects",
+        "Estimate and quote follow-up that stays organized",
+        "Automated reminders to reduce no-shows",
+        "Scheduling helpers that surface conflicts earlier",
+        "Seasonal planning reminders for recurring work"
       ]}
       workflows={[
-        "Client calls → AI captures details → Schedules estimate visit",
-        "Weather forecast changes → Automatic rescheduling → Client notification",
-        "Estimate visit → Photos uploaded → AI generates professional quote",
-        "Quote approved → Project scheduled → Materials ordered automatically",
+        "Client calls → Details captured → Estimate visit scheduled",
+        "Weather forecast changes → Rescheduling workflow → Client notification",
+        "Estimate visit → Photos uploaded → Quote prepared",
+        "Quote approved → Project scheduled → Materials checklist started",
         "Project completed → Follow-up scheduled → Next service planned",
         "Seasonal reminder → Client contacted → Service booked"
       ]}
@@ -41,29 +41,20 @@ export const LandscapingLanding: React.FC = () => {
         price: 99,
         features: [
           "Unlimited client management",
-          "Weather-based scheduling",
-          "AI-powered estimates",
+          "Weather-aware scheduling workflows",
+          "Estimate and quote follow-up",
           "Automated reminders",
-          "Route optimization",
-          "Seasonal planning"
+          "Route and day planning helpers",
+          "Seasonal planning reminders"
         ]
       }}
-      testimonials={[
-        {
-          name: "Mike Rodriguez",
-          business: "Rodriguez Landscaping",
-          quote: "Fikiri Solutions saved me 15 hours per week on scheduling and estimates. My revenue increased 40% in the first quarter."
-        },
-        {
-          name: "Sarah Chen",
-          business: "Green Thumb Landscaping",
-          quote: "The weather-based rescheduling feature is a game-changer. No more angry clients or wasted trips."
-        },
-        {
-          name: "David Thompson",
-          business: "Thompson Lawn Care",
-          quote: "The AI estimates are so accurate, my close rate went from 30% to 75%. It's like having a sales expert on my team."
-        }
+      engagementCategories={[
+        "Scheduling and weather-aware rescheduling",
+        "Estimate and quote follow-up",
+        "Client history and preference tracking",
+        "Seasonal maintenance reminders",
+        "Route and day planning helpers",
+        "Workflow consulting for field service operations"
       ]}
       ctaText="Start Your Free Trial"
       ctaLink="/signup?industry=landscaping"

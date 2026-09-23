@@ -187,7 +187,7 @@ const PricingPage: React.FC = () => {
         'Unlimited AI responses',
         'Custom AI training',
         'Dedicated support team',
-        'SLA guarantee',
+        'Documented support response targets',
         'Unlimited emails',
         'White-label platform',
         'Custom integrations',
@@ -217,7 +217,7 @@ const PricingPage: React.FC = () => {
         { name: 'Support', starter: 'Community', growth: 'Priority Email', business: 'Phone', enterprise: 'Dedicated team' },
         { name: 'Onboarding', starter: 'Self-service', growth: 'Guided', business: 'White-glove', enterprise: 'Custom' },
         { name: 'Training', starter: false, growth: false, business: true, enterprise: 'Custom' },
-        { name: 'SLA', starter: false, growth: false, business: false, enterprise: true },
+        { name: 'Documented support targets', starter: false, growth: false, business: false, enterprise: true },
         { name: 'Multi-user access', starter: false, growth: false, business: true, enterprise: true },
         { name: 'API access', starter: false, growth: false, business: true, enterprise: true }
       ]

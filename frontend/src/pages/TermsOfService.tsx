@@ -65,7 +65,7 @@ const TermsOfService: React.FC = () => {
               <section className="mb-8">
                 <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Agreement to Terms</h2>
                 <p className="text-gray-300 leading-relaxed">
-                  By accessing or using Fikiri Solutions ("Service") at 
+                  By accessing or using Fikiri Solutions LLC ("Service") at 
                   <a href="https://fikirisolutions.com" className="text-brand-primary hover:text-muted-foreground"> https://fikirisolutions.com</a>, 
                   you agree to be bound by these Terms of Service ("Terms"). If you disagree with any part of these terms, 
                   you may not access the Service.
@@ -221,7 +221,7 @@ const TermsOfService: React.FC = () => {
                 <div className="bg-gray-700 p-4 rounded-lg mt-4">
                   <p className="text-gray-300">
                     <strong>Email:</strong> info@fikirisolutions.com<br />
-                    <strong>Address:</strong> Fikiri Solutions, Legal Department<br />
+                    <strong>Address:</strong> Fikiri Solutions LLC, Legal Department<br />
                     <strong>Website:</strong> <a href="/contact" className="text-brand-primary hover:text-muted-foreground">https://fikirisolutions.com/contact</a>
                   </p>
                 </div>

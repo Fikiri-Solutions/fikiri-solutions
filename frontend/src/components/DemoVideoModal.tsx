@@ -12,7 +12,7 @@ interface DemoVideoModalProps {
 export const DemoVideoModal: React.FC<DemoVideoModalProps> = ({ 
   isOpen, 
   onClose, 
-  videoUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4' // Placeholder - replace with your Kling AI generated video
+  videoUrl = '',
 }) => {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
@@ -21,9 +21,11 @@ export const DemoVideoModal: React.FC<DemoVideoModalProps> = ({
   const [duration, setDuration] = useState(0)
   const [progress, setProgress] = useState(0)
   const videoRef = React.useRef<HTMLVideoElement>(null)
+  const hasLicensedVideo = Boolean(videoUrl?.trim())
 
   // Handle escape key
   useEffect(() => {
+    if (!hasLicensedVideo) return
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
         onClose()
@@ -39,7 +41,12 @@ export const DemoVideoModal: React.FC<DemoVideoModalProps> = ({
       document.removeEventListener('keydown', handleEscape)
       document.body.style.overflow = 'unset'
     }
-  }, [isOpen, onClose])
+  }, [isOpen, onClose, hasLicensedVideo])
+
+  // No licensed demo asset shipped — do not fall back to third-party sample video.
+  if (!hasLicensedVideo) {
+    return null
+  }
 
   // Video event handlers
   const handlePlayPause = () => {

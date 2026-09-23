@@ -589,6 +589,14 @@ export const Intake: React.FC = () => {
                   </div>
                 </section>
 
+                <p className="font-serif text-xs text-stone-500">
+                  By submitting, you agree we may use this information to evaluate and respond to your
+                  workflow conversation. See our{' '}
+                  <Link to="/privacy" className="text-orange-700 underline hover:text-orange-900">
+                    Privacy Policy
+                  </Link>
+                  . This is not a marketing signup.
+                </p>
                 <Button type="submit" disabled={loading} className="w-full sm:w-auto">
                   {loading ? 'Submitting…' : 'Submit intake'}
                 </Button>

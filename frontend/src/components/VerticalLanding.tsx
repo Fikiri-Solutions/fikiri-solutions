@@ -15,11 +15,14 @@ interface VerticalLandingProps {
     price: number;
     features: string[];
   };
+  /** Optional named quotes — only pass when source-verified (never placeholders). */
   testimonials?: Array<{
     name: string;
     business: string;
     quote: string;
   }>;
+  /** Factual engagement categories when quotes are not available. */
+  engagementCategories?: string[];
   ctaText: string;
   ctaLink: string;
 }
@@ -34,6 +37,7 @@ export const VerticalLanding: React.FC<VerticalLandingProps> = ({
   workflows,
   pricing,
   testimonials = [],
+  engagementCategories = [],
   ctaText,
   ctaLink
 }) => {
@@ -207,7 +211,7 @@ export const VerticalLanding: React.FC<VerticalLandingProps> = ({
         </div>
       </div>
 
-      {/* Testimonials Section */}
+      {/* Verified quotes only — empty when no source-backed testimonials */}
       {testimonials.length > 0 && (
         <div className="py-20 bg-white dark:bg-gray-800">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -236,6 +240,35 @@ export const VerticalLanding: React.FC<VerticalLandingProps> = ({
         </div>
       )}
 
+      {/* Factual engagement categories when quotes are not available */}
+      {testimonials.length === 0 && engagementCategories.length > 0 && (
+        <div className="py-20 bg-white dark:bg-gray-800">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                How we typically help {industry} teams
+              </h2>
+              <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                Engagement categories we support — not customer quotes or outcome guarantees.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {engagementCategories.map((category) => (
+                <div
+                  key={category}
+                  className="bg-gray-50 dark:bg-gray-900 p-6 rounded-lg border border-gray-100 dark:border-gray-700"
+                >
+                  <div className="flex items-start gap-3">
+                    <CheckCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-gray-800 dark:text-gray-200 font-medium">{category}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CTA Section */}
       <div className="py-20 bg-blue-600 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -243,7 +276,7 @@ export const VerticalLanding: React.FC<VerticalLandingProps> = ({
             Ready to Transform Your {industry} Business?
           </h2>
           <p className="text-xl mb-8 max-w-2xl mx-auto">
-            Join hundreds of {industry} businesses already using Fikiri Solutions to automate their operations and grow their revenue.
+            Automate scheduling, follow-up, and routine communication so your {industry} team can focus on higher-value work.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link

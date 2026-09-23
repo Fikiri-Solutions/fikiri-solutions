@@ -65,7 +65,7 @@ const PrivacyPolicy: React.FC = () => {
               <section className="mb-8">
                 <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Introduction</h2>
                 <p className="text-gray-300 leading-relaxed">
-                  Fikiri Solutions ("we," "our," or "us") is committed to protecting your privacy. 
+                  Fikiri Solutions LLC ("we," "our," or "us") is committed to protecting your privacy. 
                   This Privacy Policy explains how we collect, use, disclose, and safeguard your 
                   information when you use our AI-powered Gmail automation platform at 
                   <a href="https://fikirisolutions.com" className="text-brand-primary hover:text-muted-foreground"> https://fikirisolutions.com</a> (the "Service").
@@ -212,7 +212,7 @@ const PrivacyPolicy: React.FC = () => {
                 <div className="bg-gray-700 p-4 rounded-lg mt-4">
                   <p className="text-gray-300">
                     <strong>Email:</strong> info@fikirisolutions.com<br />
-                    <strong>Address:</strong> Fikiri Solutions, Privacy Department<br />
+                    <strong>Address:</strong> Fikiri Solutions LLC, Privacy Department<br />
                     <strong>Website:</strong> <a href="/contact" className="text-brand-primary hover:text-muted-foreground">https://fikirisolutions.com/contact</a>
                   </p>
                 </div>
