@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { HelmetProvider } from 'react-helmet-async'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import RadiantLandingPage from '../pages/RadiantLandingPage'
@@ -51,16 +52,18 @@ vi.mock('../components/radiant', async () => {
 
 function renderAt(path: string) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/" element={<RadiantLandingPage />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/signup" element={<div>Signup page</div>} />
-        <Route path="/pricing" element={<div>Pricing page</div>} />
-        <Route path="/intake" element={<div>Intake page</div>} />
-        <Route path="/contact" element={<div>Contact page</div>} />
-      </Routes>
-    </MemoryRouter>
+    <HelmetProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/" element={<RadiantLandingPage />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/signup" element={<div>Signup page</div>} />
+          <Route path="/pricing" element={<div>Pricing page</div>} />
+          <Route path="/intake" element={<div>Intake page</div>} />
+          <Route path="/contact" element={<div>Contact page</div>} />
+        </Routes>
+      </MemoryRouter>
+    </HelmetProvider>
   )
 }
 
