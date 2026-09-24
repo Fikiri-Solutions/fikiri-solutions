@@ -218,7 +218,7 @@ export const PrivacySettings: React.FC = () => {
         </div>
         <div className="flex shrink-0 items-center gap-2 self-start sm:self-center">
           <Shield className="h-6 w-6 shrink-0 text-brand-primary dark:text-brand-accent" aria-hidden />
-          <span className="text-sm font-medium text-brand-primary dark:text-brand-accent">GDPR Compliant</span>
+          <span className="text-sm font-medium text-brand-primary dark:text-brand-accent">Privacy controls</span>
         </div>
       </div>
 

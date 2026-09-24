@@ -251,6 +251,84 @@ class TestAuthRoutes(unittest.TestCase):
         self.assertEqual(meta.get('phone'), '+13525550100')
         self.assertIs(meta.get('sms_consent'), True)
         self.assertTrue(meta.get('sms_consent_at'))
+        self.assertEqual(meta.get('sms_consent_source'), 'signup')
+
+    @patch('routes.auth.privacy_manager')
+    @patch('routes.auth.email_job_manager')
+    @patch('routes.auth.business_analytics')
+    @patch('routes.auth.log_security_event')
+    @patch('routes.auth.secure_session_manager')
+    @patch('routes.auth.get_jwt_manager')
+    @patch('routes.auth.check_email_domain_has_mx_for_signup')
+    @patch('routes.auth.user_auth_manager')
+    def test_signup_persists_marketing_consent_separate_from_terms(
+        self,
+        mock_user_auth,
+        mock_check_email_domain_has_mx,
+        mock_get_jwt_mgr,
+        mock_session_mgr,
+        mock_log,
+        mock_analytics,
+        mock_email_jobs,
+        mock_privacy,
+    ):
+        mock_user_auth.create_user.return_value = {
+            'success': True,
+            'user': {
+                'id': 77,
+                'email': 'mkt@example.com',
+                'name': 'Mkt User',
+                'role': 'user',
+            },
+        }
+        mock_user_auth.update_user_profile.return_value = {'success': True}
+        mock_check_email_domain_has_mx.return_value = {
+            'domain': 'example.com',
+            'has_mx': True,
+            'mx_records': 1,
+            'reason': 'OK',
+        }
+        jwt_mgr = MagicMock()
+        jwt_mgr.generate_tokens.return_value = {
+            'access_token': 'access',
+            'refresh_token': 'refresh',
+            'expires_in': 1800,
+            'token_type': 'Bearer',
+        }
+        mock_get_jwt_mgr.return_value = jwt_mgr
+        mock_session_mgr.create_session.return_value = (
+            'session-id',
+            {'name': 'fikiri_session', 'value': 'session-id', 'httponly': True},
+        )
+        mock_privacy.record_privacy_consent.return_value = {'success': True}
+
+        response = self.client.post('/api/auth/signup', json={
+            'email': 'mkt@example.com',
+            'password': 'Password123!',
+            'name': 'Mkt User',
+            'terms_accepted': True,
+            'privacy_consent': True,
+            'marketing_consent': True,
+        })
+        self.assertEqual(response.status_code, 200)
+        meta = mock_user_auth.update_user_profile.call_args.kwargs.get('metadata_updates') or {}
+        self.assertIs(meta.get('marketing_consent'), True)
+        self.assertTrue(meta.get('marketing_consent_at'))
+        self.assertEqual(meta.get('marketing_consent_source'), 'signup')
+        self.assertIs(meta.get('terms_accepted'), True)
+        self.assertIs(meta.get('privacy_consent'), True)
+
+        consent_types = [
+            c.args[1] for c in mock_privacy.record_privacy_consent.call_args_list
+        ]
+        self.assertIn('marketing_email', consent_types)
+        self.assertIn('privacy_policy', consent_types)
+        self.assertIn('terms_of_service', consent_types)
+        marketing_call = next(
+            c for c in mock_privacy.record_privacy_consent.call_args_list
+            if c.args[1] == 'marketing_email'
+        )
+        self.assertIs(marketing_call.args[2], True)
 
     @patch('routes.auth.email_job_manager')
     @patch('routes.auth.business_analytics')

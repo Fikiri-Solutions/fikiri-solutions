@@ -2,6 +2,7 @@ import React from 'react';
 import { Brain, MessageSquare, Zap, BarChart3, Clock, Shield } from 'lucide-react';
 import { FeatureStatus, getFeatureStatus } from '../components/FeatureStatus';
 import { MarketingChatWidget } from '../components/MarketingChatWidget';
+import { PageMeta } from '../components/PageMeta';
 
 export const AIAssistantLanding: React.FC = () => {
   const capabilities = [
@@ -35,27 +36,28 @@ export const AIAssistantLanding: React.FC = () => {
     {
       industry: "E-commerce",
       scenario: "Product inquiries and order support",
-      result: "50% faster response times, 30% increase in conversions"
+      result: "Context-aware draft replies and organized inbox follow-up"
     },
     {
       industry: "Real Estate",
       scenario: "Property inquiries and appointment scheduling",
-      result: "Qualify leads automatically, 40% more appointments booked"
+      result: "Lead capture, qualification helpers, and scheduling follow-up"
     },
     {
       industry: "Healthcare",
       scenario: "Appointment scheduling and patient communication",
-      result: "Reduce admin workload by 60%, improve patient satisfaction"
+      result: "Privacy-aware reminder and intake communication workflows"
     },
     {
       industry: "Professional Services",
       scenario: "Client inquiries and project updates",
-      result: "Professional responses 24/7, never miss a business opportunity"
+      result: "Consistent responses and fewer missed inbound messages"
     }
   ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-100 font-serif">
+      <PageMeta route="/ai-landing" />
       <div className="container mx-auto px-4 py-16">
         {/* Hero Section */}
         <div className="text-center mb-16">
@@ -126,7 +128,7 @@ export const AIAssistantLanding: React.FC = () => {
             Ready to Deploy Your AI Assistant?
           </h2>
           <p className="text-xl mb-8 opacity-90">
-            Join hundreds of businesses already using AI to scale their customer communication
+            Use AI-assisted replies and follow-up workflows to keep inbound communication moving
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button className="bg-white text-purple-600 px-8 py-3 rounded-lg text-lg font-semibold hover:bg-gray-100 transition-colors">

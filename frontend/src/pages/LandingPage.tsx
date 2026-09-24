@@ -9,22 +9,20 @@ import {
   Brain, 
   BarChart3, 
   CheckCircle, 
-  Play,
   Menu,
   X
 } from 'lucide-react'
+import { PageMeta } from '../components/PageMeta'
 import FikiriLogo from '@/components/FikiriLogo'
 import SimpleAnimatedBackground from '@/components/SimpleAnimatedBackground'
-import DemoVideoModal from '@/components/DemoVideoModal'
 import LogoTicker from '@/components/LogoTicker'
 import { useAuth } from '@/contexts/AuthContext'
 import { MarketingChatWidget } from '../components/MarketingChatWidget'
 import { clientPartnerships } from '@/lib/clientPartnerships'
 
 const LandingPage: React.FC = () => {
-  // State for mobile menu and demo video
+  // State for mobile menu
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isDemoVideoOpen, setIsDemoVideoOpen] = useState(false)
   const { isAuthenticated } = useAuth()
   const navigate = useNavigate()
   
@@ -140,6 +138,7 @@ const LandingPage: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-orange-900/30 to-red-900/30 text-white overflow-hidden relative font-serif" style={{
       background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 20%, #FF6B35 40%, #D2691E 60%, #8B0000 80%, #991b1b 100%)'
     }}>
+      <PageMeta route="/landing-classic" />
       {/* Header Navigation */}
       <header className="relative z-20 w-full px-4 sm:px-6 lg:px-8 py-6">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -315,12 +314,12 @@ const LandingPage: React.FC = () => {
               <ArrowRight className="w-5 h-5" aria-hidden="true" />
             </button>
             <button
-              onClick={() => setIsDemoVideoOpen(true)}
+              onClick={() => navigate('/intake')}
               className="px-8 py-4 border border-orange-400 text-white font-semibold rounded-lg hover:bg-orange-500/20 hover:border-orange-300 transition-all duration-300 flex items-center gap-2"
-              aria-label="Watch Fikiri Solutions demo video"
+              aria-label="Start a workflow conversation with Fikiri Solutions"
             >
-              <Play className="w-5 h-5" aria-hidden="true" />
-              Watch Demo
+              Start a workflow conversation
+              <ArrowRight className="w-5 h-5" aria-hidden="true" />
             </button>
           </motion.div>
 
@@ -571,10 +570,7 @@ const LandingPage: React.FC = () => {
               No setup fees • Cancel anytime • 24/7 support
             </p>
             <p className="text-xs text-white/70 mt-2 max-w-xl mx-auto">
-              Most teams save <span className="font-semibold">5–10 hours per week</span> on email follow-up and admin after adopting automation,* freeing owners and managers to focus on higher‑value work.
-            </p>
-            <p className="text-[11px] text-white/50 mt-1 max-w-xl mx-auto">
-              *Based on independent studies of AI and marketing automation tools for small and midsize businesses.
+              Automate email follow-up and routine admin so owners and managers can focus on higher‑value work.
             </p>
           </motion.div>
         </div>
@@ -616,17 +612,11 @@ const LandingPage: React.FC = () => {
             </div>
           </div>
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-white">
-            <p>&copy; {new Date().getFullYear()} Fikiri Solutions. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Fikiri Solutions LLC. All rights reserved.</p>
           </div>
         </div>
       </footer>
 
-      {/* Demo Video Modal */}
-      <DemoVideoModal 
-        isOpen={isDemoVideoOpen}
-        onClose={() => setIsDemoVideoOpen(false)}
-        videoUrl="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" // Replace with your Kling AI generated video URL
-      />
       <MarketingChatWidget />
     </div>
   )

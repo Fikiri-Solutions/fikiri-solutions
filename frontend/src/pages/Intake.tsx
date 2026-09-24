@@ -4,6 +4,7 @@ import { RadiantLayout, Container } from '../components/radiant'
 import { Button } from '../components/radiant/Button'
 import { apiClient } from '../services/apiClient'
 import { AUTOCOMPLETE } from '../constants/autocomplete'
+import { PageMeta } from '../components/PageMeta'
 
 /** Mirrors backend core/contact_api INTAKE_LIMITS */
 const LIMITS = {
@@ -199,6 +200,7 @@ export const Intake: React.FC = () => {
 
   return (
     <RadiantLayout>
+      <PageMeta route="/intake" />
       <div className="relative min-h-dvh pb-[env(safe-area-inset-bottom)]">
         <section className="relative py-10 sm:py-16 z-10">
           <Container className="relative">
@@ -587,6 +589,14 @@ export const Intake: React.FC = () => {
                   </div>
                 </section>
 
+                <p className="font-serif text-xs text-stone-500">
+                  By submitting, you agree we may use this information to evaluate and respond to your
+                  workflow conversation. See our{' '}
+                  <Link to="/privacy" className="text-orange-700 underline hover:text-orange-900">
+                    Privacy Policy
+                  </Link>
+                  . This is not a marketing signup.
+                </p>
                 <Button type="submit" disabled={loading} className="w-full sm:w-auto">
                   {loading ? 'Submitting…' : 'Submit intake'}
                 </Button>

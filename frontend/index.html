@@ -53,6 +53,15 @@
     
     <!-- Preconnect for performance -->
     <link rel="preconnect" href="https://fikirisolutions.onrender.com">
+    <!-- Mobile LCP plate — skip desktop growth MP4; preload static WebP on narrow screens -->
+    <link
+      rel="preload"
+      as="image"
+      type="image/webp"
+      href="/brand/hero/fikiri-hero-mobile.webp"
+      media="(max-width: 767px)"
+      fetchpriority="high"
+    />
     
     <!-- Critical CSS for above-the-fold content (family matches bundled variable font in main.tsx) -->
     <style>

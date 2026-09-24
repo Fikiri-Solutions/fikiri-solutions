@@ -17,6 +17,7 @@ import { MarketingChatWidget } from '../components/MarketingChatWidget'
 import { SectorFitSection } from '../components/SectorFitExplorer'
 import { publicMedia } from '@/lib/publicMedia'
 import { trackSectorExplorerCta } from '../lib/sectorFitAnalytics'
+import { PageMeta } from '../components/PageMeta'
 
 function Hero() {
   const sectorHeadingId = useId()
@@ -256,6 +257,7 @@ function BentoSection() {
 export default function RadiantLandingPage() {
   return (
     <div className="mobile-layout-root relative min-h-dvh overflow-x-hidden pb-[max(7rem,calc(env(safe-area-inset-bottom)+5.5rem))] font-serif text-foreground sm:pb-[env(safe-area-inset-bottom)]">
+      <PageMeta route="/" />
       <MarketingBackdrop />
       <div className="relative z-10">
         <Hero />

@@ -1,36 +1,38 @@
 import React from 'react';
 import { VerticalLanding } from '../components/VerticalLanding';
 import { MarketingChatWidget } from '../components/MarketingChatWidget';
+import { PageMeta } from '../components/PageMeta';
 
 export const RestaurantLanding: React.FC = () => {
   return (
     <>
+    <PageMeta route="/industries/restaurant" />
     <VerticalLanding
       industry="restaurant"
       title="Restaurant Automation Platform"
-      subtitle="Turn every customer interaction into revenue. Automated reservations, menu recommendations, and loyalty programs that keep customers coming back."
+      subtitle="Automated reservations, guest communication, and loyalty follow-up so your team can stay focused on service."
       icon="🍽️"
       painPoints={[
         "Manual reservation management leads to double-bookings",
         "No system to track customer preferences and dietary restrictions",
-        "Missing opportunities to upsell and increase average order value",
+        "Missing opportunities to follow up after visits",
         "Loyalty programs that customers forget to use",
         "Staff spending time on phone calls instead of service",
-        "No data on customer behavior and preferences"
+        "No structured view of guest communication history"
       ]}
       solutions={[
-        "Smart reservation system prevents double-bookings and optimizes seating",
-        "Customer preference tracking enables personalized menu recommendations",
-        "AI-powered upselling increases average order value by 25%",
-        "Automated loyalty program management increases repeat visits",
-        "Staff focus on service while AI handles customer communication",
-        "Customer analytics provide insights for menu and service improvements"
+        "Reservation capture and confirmation workflows that reduce double-booking risk",
+        "Preference tracking to support personalized menu and visit notes",
+        "Follow-up messages that prompt return visits without manual chasing",
+        "Loyalty program reminders and status updates",
+        "Staff focus on service while automation handles routine guest messages",
+        "Guest communication history for clearer handoffs between shifts"
       ]}
       workflows={[
         "Customer calls → AI captures reservation → Table assigned → Confirmation sent",
-        "Customer arrives → Preferences loaded → Personalized menu suggested",
-        "Order placed → AI suggests upsells → Bill optimized → Loyalty points added",
-        "Meal completed → Feedback requested → Next visit scheduled",
+        "Customer arrives → Preferences loaded → Staff notes available",
+        "Order placed → Follow-up preferences recorded → Loyalty points updated",
+        "Meal completed → Feedback requested → Next visit suggested",
         "Loyalty points earned → Reward notification → Return visit booked",
         "Slow period detected → Promotional offers sent → Tables filled"
       ]}
@@ -38,32 +40,23 @@ export const RestaurantLanding: React.FC = () => {
         tier: "Business",
         price: 199,
         features: [
-          "Unlimited reservations",
+          "Reservation and confirmation workflows",
           "Customer preference tracking",
-          "AI menu recommendations",
+          "Menu and visit communication helpers",
           "Loyalty program automation",
-          "Upselling optimization",
-          "Customer analytics dashboard"
+          "Follow-up messaging",
+          "Guest communication history"
         ]
       }}
-      testimonials={[
-        {
-          name: "Maria Santos",
-          business: "Santos Family Restaurant",
-          quote: "Our average order value increased 30% with Fikiri's upselling suggestions. Customers love the personalized recommendations."
-        },
-        {
-          name: "James Wilson",
-          business: "Wilson's Bistro",
-          quote: "The reservation system eliminated our double-booking problems completely. Our staff can focus on what they do best."
-        },
-        {
-          name: "Lisa Park",
-          business: "Park's Korean Kitchen",
-          quote: "Customer retention increased 50% with the automated loyalty program. Our regulars feel truly valued."
-        }
+      engagementCategories={[
+        "Reservation capture and confirmations",
+        "Guest preference and dietary notes",
+        "Loyalty reminders and return-visit follow-up",
+        "Shift handoff communication history",
+        "Promotional and slow-period outreach",
+        "Workflow consulting for front-of-house operations"
       ]}
-      ctaText="Boost Your Restaurant Revenue"
+      ctaText="Improve Restaurant Follow-Up"
       ctaLink="/signup?industry=restaurant"
     />
     <MarketingChatWidget />

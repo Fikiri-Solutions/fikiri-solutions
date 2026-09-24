@@ -263,7 +263,7 @@ export const IndustryAutomation: React.FC = () => {
       'food_truck': 'Location updates, daily menus, event bookings, social media',
       'real_estate': 'Property listings, client consultations, market analysis',
       'property_management': 'Maintenance requests, tenant communication, rent collection',
-      'medical_practice': 'Appointment scheduling, patient reminders, HIPAA compliance',
+      'medical_practice': 'Appointment scheduling, patient reminders, privacy-aware communication',
       'dental_clinic': 'Treatment plans, insurance claims, patient education',
       'veterinary': 'Vaccination reminders, emergency protocols, pet records',
       'landscaping': 'Appointment scheduling, service quotes, seasonal planning',

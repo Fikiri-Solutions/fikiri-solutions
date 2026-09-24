@@ -9,6 +9,7 @@ import { RadiantLayout, Container, Reveal, Subheading } from '../components/radi
 import { MarketingChatWidget } from '../components/MarketingChatWidget'
 import { publicMedia } from '../lib/publicMedia'
 import { cn } from '../lib/utils'
+import { PageMeta } from '../components/PageMeta'
 
 type ServiceCard = {
   id: string
@@ -287,6 +288,7 @@ export const About: React.FC = () => {
 
   return (
     <RadiantLayout>
+      <PageMeta route="/about" />
       <div className="relative min-h-dvh overflow-x-hidden pb-[max(7rem,calc(env(safe-area-inset-bottom)+5.5rem))] sm:pb-[env(safe-area-inset-bottom)]">
         {/* 1. Why Fikiri hero */}
         <section

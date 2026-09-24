@@ -149,7 +149,7 @@ export function Footer({ showCta = true }: { showCta?: boolean }) {
         </div>
 
         <div className="mt-10 border-t border-white/10 pt-5 text-sm text-white/55">
-          &copy; {new Date().getFullYear()} Fikiri Solutions
+          &copy; {new Date().getFullYear()} Fikiri Solutions LLC
         </div>
       </Container>
     </footer>

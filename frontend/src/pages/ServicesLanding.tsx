@@ -1,7 +1,8 @@
 import React from 'react';
-import { CheckCircle, Star, Users, Zap, Shield, Clock } from 'lucide-react';
+import { CheckCircle, Users, Zap, Shield, Clock } from 'lucide-react';
 import { FeatureStatus, getFeatureStatus } from '../components/FeatureStatus';
 import { MarketingChatWidget } from '../components/MarketingChatWidget';
+import { PageMeta } from '../components/PageMeta';
 
 export const ServicesLanding: React.FC = () => {
   const features = [
@@ -20,7 +21,7 @@ export const ServicesLanding: React.FC = () => {
     {
       icon: <Shield className="h-6 w-6 text-purple-500" />,
       title: "Enterprise Security",
-      description: "Bank-level security with SOC2 compliance and data encryption",
+      description: "Security-conscious architecture with encrypted transport and role-based access controls",
       status: getFeatureStatus('auth')
     },
     {
@@ -95,7 +96,7 @@ export const ServicesLanding: React.FC = () => {
         "Custom workflows",
         "API access",
         "White-label options",
-        "SLA guarantee"
+        "Documented support response targets"
       ],
       cta: "Contact Sales",
       popular: false
@@ -104,6 +105,7 @@ export const ServicesLanding: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 font-serif">
+      <PageMeta route="/services-landing" />
       {/* Hero Section */}
       <div className="container mx-auto px-4 py-16">
         <div className="text-center mb-16">
@@ -229,20 +231,22 @@ export const ServicesLanding: React.FC = () => {
           </div>
         </div>
 
-        {/* Social Proof */}
+        {/* Partnerships & focus areas — no fabricated ratings */}
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-8">
-            Trusted by Growing Businesses
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            Built for growing service businesses
           </h2>
-          <div className="flex items-center justify-center space-x-8 opacity-60">
-            <div className="text-2xl font-bold text-gray-400">500+</div>
-            <div className="text-gray-400">Happy Customers</div>
-            <div className="flex items-center">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className="h-5 w-5 text-yellow-400 fill-current" />
-              ))}
-              <span className="ml-2 text-gray-400">4.9/5 Rating</span>
-            </div>
+          <p className="text-gray-600 mb-8 max-w-2xl mx-auto">
+            Platform access plus workflow consulting across email, CRM, and operations.
+            See verified client partnerships on the homepage.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-gray-600">
+            <span className="rounded-full border border-gray-200 px-4 py-2">Email &amp; inbox workflows</span>
+            <span className="rounded-full border border-gray-200 px-4 py-2">CRM &amp; lead follow-up</span>
+            <span className="rounded-full border border-gray-200 px-4 py-2">Industry operations consulting</span>
+            <a href="/" className="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-blue-700 hover:bg-blue-100">
+              View client partnerships
+            </a>
           </div>
         </div>
       </div>

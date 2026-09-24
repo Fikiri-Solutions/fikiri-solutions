@@ -1,33 +1,35 @@
 import React from 'react';
 import { VerticalLanding } from '../components/VerticalLanding';
 import { MarketingChatWidget } from '../components/MarketingChatWidget';
+import { PageMeta } from '../components/PageMeta';
 
 export const MedicalLanding: React.FC = () => {
   return (
     <>
+    <PageMeta route="/industries/medical" />
     <VerticalLanding
       industry="medical practice"
-      title="HIPAA-Compliant Medical Practice Automation"
-      subtitle="HIPAA-compliant reminders, appointment confirmations, and patient intake automation that reduces no-shows and improves patient care."
+      title="Medical Practice Workflow Automation"
+      subtitle="Appointment reminders, confirmations, and intake follow-up designed for secure, privacy-aware practice operations."
       icon="🏥"
       painPoints={[
         "High no-show rates wasting valuable appointment slots",
         "Manual patient intake forms taking up appointment time",
-        "HIPAA compliance concerns with patient communication",
+        "Staff concern about how patient communication is handled",
         "Staff spending hours on appointment confirmations",
         "No system to track patient preferences and history",
         "Missed follow-up appointments and care gaps"
       ]}
       solutions={[
-        "HIPAA-compliant automated reminders reduce no-shows by 40%",
-        "Digital patient intake forms save 15 minutes per appointment",
-        "Secure patient communication meets all HIPAA requirements",
-        "Staff focus on patient care while AI handles scheduling",
-        "Patient preference tracking improves care quality",
-        "Automated follow-up scheduling ensures continuity of care"
+        "Automated reminders and confirmations to reduce no-shows",
+        "Digital intake workflows that save time before appointments",
+        "Role-based access and encrypted transport for practice data",
+        "Staff focus on patient care while automation handles scheduling messages",
+        "Preference tracking to personalize follow-up communication",
+        "Automated follow-up scheduling to support continuity of care"
       ]}
       workflows={[
-        "Appointment scheduled → HIPAA-compliant confirmation sent → Patient preferences recorded",
+        "Appointment scheduled → Confirmation sent → Preferences recorded",
         "48 hours before → Reminder sent → Confirmation requested → Preferences updated",
         "Patient arrives → Intake form pre-filled → Appointment optimized → Care plan updated",
         "Appointment completed → Follow-up scheduled → Care instructions sent",
@@ -38,33 +40,24 @@ export const MedicalLanding: React.FC = () => {
         tier: "Enterprise",
         price: 499,
         features: [
-          "HIPAA-compliant communication",
+          "Privacy-aware messaging workflows",
           "Automated appointment reminders",
           "Digital patient intake",
           "Care plan management",
           "Prescription tracking",
-          "Compliance reporting"
+          "Operational reporting"
         ]
       }}
-      testimonials={[
-        {
-          name: "Dr. Jennifer Martinez",
-          business: "Martinez Family Practice",
-          quote: "Our no-show rate dropped from 25% to 8% with Fikiri's automated reminders. We're seeing 20% more patients."
-        },
-        {
-          name: "Dr. Robert Kim",
-          business: "Kim Cardiology Clinic",
-          quote: "The HIPAA-compliant system gives us peace of mind. Patient satisfaction scores increased significantly."
-        },
-        {
-          name: "Dr. Sarah Johnson",
-          business: "Johnson Pediatrics",
-          quote: "Digital intake forms save us 2 hours daily. Parents love the convenience, and we love the efficiency."
-        }
+      engagementCategories={[
+        "Appointment reminders and confirmations",
+        "Digital intake and preference capture",
+        "Follow-up and continuity messaging",
+        "Staff workload reduction for front-desk tasks",
+        "Secure account access with role-based controls",
+        "Workflow consulting for practice operations"
       ]}
-      ctaText="Ensure HIPAA Compliance"
-      ctaLink="/signup?industry=medical"
+      ctaText="Start a Practice Workflow Conversation"
+      ctaLink="/intake"
     />
     <MarketingChatWidget />
     </>

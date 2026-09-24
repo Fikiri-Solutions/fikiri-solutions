@@ -5,6 +5,7 @@ import { Button } from '../components/radiant/Button'
 import { apiClient } from '../services/apiClient'
 
 import { AUTOCOMPLETE } from '../constants/autocomplete'
+import { PageMeta } from '../components/PageMeta'
 
 const LIMITS = { name: 200, email: 254, phone: 50, company: 200, subject: 200, message: 3000 }
 
@@ -63,6 +64,7 @@ export const Contact: React.FC = () => {
 
   return (
     <RadiantLayout>
+      <PageMeta route="/contact" />
       <div className="relative min-h-dvh pb-[env(safe-area-inset-bottom)]">
         <section className="relative py-10 sm:py-16 z-10">
           <Container className="relative">
@@ -206,6 +208,14 @@ export const Contact: React.FC = () => {
                   />
                   <p className="mt-1 font-serif text-xs text-stone-500">{message.length}/{LIMITS.message} characters</p>
                 </div>
+                <p className="font-serif text-xs text-stone-500">
+                  By submitting, you agree we may use this information to respond to your request.
+                  See our{' '}
+                  <Link to="/privacy" className="text-brand-primary underline hover:text-fikiri-400">
+                    Privacy Policy
+                  </Link>
+                  . This is not a marketing signup.
+                </p>
                 <Button type="submit" disabled={loading} className="w-full sm:w-auto">
                   {loading ? 'Sending…' : 'Send message'}
                 </Button>

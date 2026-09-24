@@ -1,9 +1,9 @@
 import React from 'react';
-import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Home, MessageSquare } from 'lucide-react';
 import { RadiantLayout } from '../components/radiant';
 import { SMS_CONSENT } from '../constants/smsConsent';
+import { PageMeta } from '../components/PageMeta';
 
 /**
  * Public SMS opt-in disclosure page for toll-free verification (CTIA/Twilio).
@@ -19,10 +19,7 @@ const SmsOptIn: React.FC = () => {
   return (
     <RadiantLayout>
       <>
-        <Helmet>
-          <title>SMS Opt-In - Fikiri Solutions</title>
-          <meta name="description" content="Consent to receive SMS text messages from Fikiri Solutions LLC. Opt-in language and proof of consent for toll-free verification." />
-        </Helmet>
+        <PageMeta route="/sms-opt-in" />
 
         <div className="min-h-screen bg-gray-900 font-serif text-white">
           <div className="container mx-auto px-4 py-8 max-w-4xl">
