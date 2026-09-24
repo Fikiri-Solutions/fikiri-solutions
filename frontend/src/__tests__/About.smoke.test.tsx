@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { HelmetProvider } from 'react-helmet-async'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { About } from '../pages/About'
@@ -24,13 +25,15 @@ vi.mock('../components/radiant', async () => {
 
 function renderAbout() {
   return render(
-    <MemoryRouter initialEntries={['/about']}>
-      <Routes>
-        <Route path="/about" element={<About />} />
-        <Route path="/intake" element={<div>Intake page</div>} />
-        <Route path="/pricing" element={<div>Pricing page</div>} />
-      </Routes>
-    </MemoryRouter>
+    <HelmetProvider>
+      <MemoryRouter initialEntries={['/about']}>
+        <Routes>
+          <Route path="/about" element={<About />} />
+          <Route path="/intake" element={<div>Intake page</div>} />
+          <Route path="/pricing" element={<div>Pricing page</div>} />
+        </Routes>
+      </MemoryRouter>
+    </HelmetProvider>
   )
 }
 
