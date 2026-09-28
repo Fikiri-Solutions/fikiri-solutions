@@ -82,6 +82,11 @@ if (import.meta.env.DEV || window.location.hostname === 'localhost' || window.lo
       })
     })
   }
+} else if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  // Check for a new SW immediately on load and reload when it takes control.
+  void import('virtual:pwa-register').then(({ registerSW }) => {
+    registerSW({ immediate: true })
+  })
 }
 
 const stopSupabaseRefresh = registerSupabaseSessionRefresh()
