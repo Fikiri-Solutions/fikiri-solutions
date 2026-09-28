@@ -59,28 +59,51 @@ const TermsOfService: React.FC = () => {
             <div className="prose prose-invert max-w-none">
               <p className="text-gray-300 mb-6">
                 <strong>Effective Date:</strong> October 18, 2025<br />
-                <strong>Last Updated:</strong> March 12, 2026
+                <strong>Last Updated:</strong> September 28, 2026
               </p>
 
               <section className="mb-8">
                 <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Agreement to Terms</h2>
                 <p className="text-gray-300 leading-relaxed">
-                  By accessing or using Fikiri Solutions LLC ("Service") at 
-                  <a href="https://fikirisolutions.com" className="text-brand-primary hover:text-muted-foreground"> https://fikirisolutions.com</a>, 
-                  you agree to be bound by these Terms of Service ("Terms"). If you disagree with any part of these terms, 
+                  By accessing or using Fikiri Solutions LLC, doing business as Fikiri Solutions (&quot;Service&quot;) at{' '}
+                  <a href="https://fikirisolutions.com" className="text-brand-primary hover:text-muted-foreground">https://fikirisolutions.com</a>,
+                  you agree to be bound by these Terms of Service (&quot;Terms&quot;). If you disagree with any part of these terms,
                   you may not access the Service.
                 </p>
               </section>
 
               <section className="mb-8">
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Eligibility</h2>
+                <p className="text-gray-300">
+                  You must be at least 18 years old (or the age of majority where you live) to create an account or use the Service.
+                  By using the Service, you represent that you meet this requirement and that you have authority to bind any business
+                  on whose behalf you use the Service.
+                </p>
+              </section>
+
+              <section className="mb-8">
                 <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Description of Service</h2>
-                <p className="text-gray-300 mb-3">Fikiri Solutions is an AI-powered Gmail automation platform that:</p>
+                <p className="text-gray-300 mb-3">
+                  Fikiri Solutions provides AI-assisted business automation software, which may include features such as:
+                </p>
                 <ul className="list-disc list-inside text-gray-300 space-y-2">
-                  <li><strong>Processes Emails:</strong> Analyzes incoming messages using artificial intelligence</li>
-                  <li><strong>Generates Responses:</strong> Creates intelligent, context-aware email replies</li>
-                  <li><strong>Manages Automation:</strong> Sets up rules and workflows for email management</li>
-                  <li><strong>Provides Analytics:</strong> Offers insights into email patterns and performance</li>
+                  <li><strong>Email workflows:</strong> Analyzing messages, drafting responses, and applying automation you configure (including Gmail when connected)</li>
+                  <li><strong>CRM and leads:</strong> Helping organize contacts and follow-ups</li>
+                  <li><strong>Automations and insights:</strong> Rules, workflows, and analytics related to how you use the product</li>
+                  <li><strong>Related account tools:</strong> Billing, settings, support, and other features we make available over time</li>
                 </ul>
+                <p className="text-gray-300 mt-4">
+                  <strong>AI outputs:</strong> AI-assisted suggestions may be incomplete or incorrect. You are responsible for reviewing
+                  content before sending or relying on it. The Service does not replace your professional, legal, or compliance judgment.
+                </p>
+              </section>
+
+              <section className="mb-8">
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Accounts</h2>
+                <p className="text-gray-300 mb-3">
+                  You are responsible for maintaining the confidentiality of your login credentials and for activity under your account.
+                  Notify us promptly if you suspect unauthorized access. We may suspend accounts that appear compromised or that violate these Terms.
+                </p>
               </section>
 
               <section className="mb-8">
@@ -99,10 +122,10 @@ const TermsOfService: React.FC = () => {
 
                 <h3 className="text-xl font-medium text-green-300 mb-3">Data Usage</h3>
                 <ul className="list-disc list-inside text-gray-300 space-y-2">
-                  <li>We only access Gmail data necessary for Service functionality</li>
-                  <li>We do not read, store, or process emails beyond what's required for automation</li>
-                  <li>You can revoke Gmail access at any time through your Google account settings</li>
-                    </ul>
+                  <li>We access Gmail data only as needed to operate features you use</li>
+                  <li>We use that data to provide and improve your experience with the Service—not to sell it</li>
+                  <li>You can revoke Gmail access at any time through your Google Account settings and, where available, in-app disconnect options</li>
+                </ul>
               </section>
 
               <section className="mb-8">
@@ -197,10 +220,24 @@ const TermsOfService: React.FC = () => {
 
               <section className="mb-8">
                 <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Privacy and Data</h2>
+                <p className="text-gray-300 mb-3">
+                  We collect and use information as described in our{' '}
+                  <a href="/privacy" className="text-brand-primary hover:text-muted-foreground">Privacy Policy</a>.
+                  In short: we collect data to operate Fikiri and improve your experience with our software; we use safeguards
+                  designed to keep it secure; and we do not sell your personal information.
+                </p>
                 <p className="text-gray-300">
-                  How we collect, use, and protect your data is described in our{" "}
-                  <a href="/privacy" className="text-brand-primary hover:text-muted-foreground">Privacy Policy</a>. 
-                  By using the Service, you consent to those practices.
+                  By using the Service, you acknowledge those practices. Where consent is required by law for a specific use
+                  (for example, optional marketing emails), we will ask for it separately.
+                </p>
+              </section>
+
+              <section className="mb-8">
+                <h2 className="text-2xl font-semibold text-muted-foreground mb-4">Changes to These Terms</h2>
+                <p className="text-gray-300">
+                  We may update these Terms from time to time. When we do, we will revise the &quot;Last Updated&quot; date and,
+                  for material changes, provide notice by email and/or a prominent notice in the Service or on our website.
+                  Continued use after the effective date of updated Terms constitutes acceptance of the changes.
                 </p>
               </section>
 
