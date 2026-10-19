@@ -7,7 +7,7 @@ import { Rate } from 'k6/metrics';
  *
  * Env (optional):
  *   API_BASE_URL / PERF_API_BASE_URL — backend root (required; no default — avoids accidental prod load)
- *   FRONTEND_URL — marketing site, e.g. https://www.fikirisolutions.com
+ *   FRONTEND_URL — optional HTML origin. Unset skips page checks (no default host).
  *   K6_PROFILE=staging|soft — caps VUs and uses longer sleeps (Render free / single-worker staging)
  *
  * Dashboard industry routes live under /api/dashboard/industry/* (not /api/industry/*).
@@ -53,7 +53,7 @@ if (!BASE_URL) {
     'Set API_BASE_URL or PERF_API_BASE_URL (e.g. http://localhost:5000 for local npm run k6:perf)',
   );
 }
-const FRONTEND_URL = __ENV.FRONTEND_URL || 'https://www.fikirisolutions.com';
+const FRONTEND_URL = __ENV.FRONTEND_URL || '';
 
 function parseJson(r) {
   try {
@@ -127,31 +127,32 @@ export default function () {
   });
   errorRate.add(!usageCheck);
 
-  // 5) Frontend marketing (SPA — typically 200 HTML)
-  const landingResponse = http.get(`${FRONTEND_URL}/home`);
-  const landingCheck = check(landingResponse, {
-    'landing status 200': (r) => r.status === 200,
-    'landing response time < 5s': (r) => r.timings.duration < 5000,
-    'landing is HTML': (r) =>
-      (r.headers['Content-Type'] && String(r.headers['Content-Type']).includes('text/html')) ||
-      (r.body && r.body.length > 100),
-  });
-  errorRate.add(!landingCheck);
+  // Frontend HTML is opt-in. No default host — a missing FRONTEND_URL must not hit production.
+  if (FRONTEND_URL) {
+    const landingResponse = http.get(`${FRONTEND_URL}/home`);
+    const landingCheck = check(landingResponse, {
+      'landing status 200': (r) => r.status === 200,
+      'landing response time < 5s': (r) => r.timings.duration < 5000,
+      'landing is HTML': (r) =>
+        (r.headers['Content-Type'] && String(r.headers['Content-Type']).includes('text/html')) ||
+        (r.body && r.body.length > 100),
+    });
+    errorRate.add(!landingCheck);
 
-  const industryPageResponse = http.get(`${FRONTEND_URL}/industry`);
-  const industryPageCheck = check(industryPageResponse, {
-    'industry page status 200': (r) => r.status === 200,
-    'industry page response time < 5s': (r) => r.timings.duration < 5000,
-  });
-  errorRate.add(!industryPageCheck);
+    const industryPageResponse = http.get(`${FRONTEND_URL}/industry`);
+    const industryPageCheck = check(industryPageResponse, {
+      'industry page status 200': (r) => r.status === 200,
+      'industry page response time < 5s': (r) => r.timings.duration < 5000,
+    });
+    errorRate.add(!industryPageCheck);
 
-  // 6) Root document (avoids brittle hashed /assets/* paths from Vite builds)
-  const rootResponse = http.get(`${FRONTEND_URL}/`);
-  const rootCheck = check(rootResponse, {
-    'frontend root 200': (r) => r.status === 200,
-    'frontend root time < 5s': (r) => r.timings.duration < 5000,
-  });
-  errorRate.add(!rootCheck);
+    const rootResponse = http.get(`${FRONTEND_URL}/`);
+    const rootCheck = check(rootResponse, {
+      'frontend root 200': (r) => r.status === 200,
+      'frontend root time < 5s': (r) => r.timings.duration < 5000,
+    });
+    errorRate.add(!rootCheck);
+  }
 
   sleep(isSoftProfile ? 3 : 1);
 }

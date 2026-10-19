@@ -268,7 +268,9 @@ pytestmark = pytest.mark.integration
 
 
 def _integration_enabled() -> bool:
-    return os.getenv("RUN_INTEGRATION_TESTS") == "1"
+    # Draft suite (hardcoded ports 3000/8081 and endpoints that are not the live API).
+    # Nightly QA sets RUN_INTEGRATION_TESTS for the focused tests in this directory.
+    return os.getenv("RUN_LEGACY_INTEGRATION_TESTS") == "1"
 
 
 # Pytest integration tests
@@ -276,7 +278,7 @@ def _integration_enabled() -> bool:
 def integration_suite():
     """Pytest fixture for integration test suite"""
     if not _integration_enabled():
-        pytest.skip("Integration tests disabled. Set RUN_INTEGRATION_TESTS=1")
+        pytest.skip("Legacy integration suite disabled. Set RUN_LEGACY_INTEGRATION_TESTS=1")
     suite = IntegrationTestSuite()
     suite.setup_test_environment()
     return suite

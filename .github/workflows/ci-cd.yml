@@ -118,21 +118,16 @@ jobs:
       run:
         working-directory: ./
     
-    services:
-      redis:
-        # AWS Public ECR mirror avoids Docker Hub pull timeouts on GHA runners
-        image: public.ecr.aws/docker/library/redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Install Redis
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y redis-server
+        sudo service redis-server start || redis-server --daemonize yes --bind 127.0.0.1 --port 6379 --protected-mode no
+        redis-cli ping
 
     - name: Set CI Fernet key
       run: |
@@ -466,7 +461,8 @@ jobs:
             "$SLACK_WEBHOOK_URL" || true
         fi
 
-  # Post-production load test (optional; set repo variable K6_CI_ENABLED and secret PERF_API_BASE_URL)
+  # Post-production API load test (optional). Set K6_CI_ENABLED=true and PERF_API_BASE_URL
+  # to the API under test. Page checks run only when FRONTEND_URL is also set.
   k6-load-test:
     runs-on: ubuntu-latest
     needs: deploy-production

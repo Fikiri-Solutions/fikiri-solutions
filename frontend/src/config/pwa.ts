@@ -65,5 +65,9 @@ export const pwaConfig = VitePWA({
     // Do not runtime-cache backend API responses (authenticated JSON, user-specific data).
     runtimeCaching: []
   },
-  // PWA is only enabled in production builds (see vite.config.mts)
+  // Plugin is loaded in dev so the virtual module resolves. The dev server does not
+  // register a service worker; production registration stays in main.tsx.
+  devOptions: {
+    enabled: false,
+  },
 })

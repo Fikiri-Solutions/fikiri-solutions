@@ -44,8 +44,10 @@ export default defineConfig(({ mode }) => ({
     react(),
     // Remove invalid prefetch links with wildcards
     removeInvalidPrefetch(),
-    // Only enable PWA plugin in production builds
-    ...(mode === 'production' ? [pwaConfig] : [])
+    // Keep the plugin in dev so Vite can resolve virtual:pwa-register from main.tsx.
+    // devOptions.enabled is false, so the dev server still does not install a service worker.
+    // Vitest (mode=test) skips it; unit tests do not import that virtual module.
+    ...(mode === 'test' ? [] : [pwaConfig])
   ],
   resolve: {
     alias: {
