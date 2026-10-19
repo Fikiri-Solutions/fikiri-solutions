@@ -59,6 +59,13 @@ jobs:
         echo "PORT=5000" >> .env
         sed -i '/^DATABASE_URL=/d' .env 2>/dev/null || true
         echo "# DATABASE_URL left unset to use SQLite" >> .env
+        # The echoes above run before FERNET_VALUE exists, and test mode disables Redis.
+        sed -i '/^FLASK_ENV=/d; /^FERNET_KEY=/d; /^REDIS_URL=/d' .env
+        FERNET_VALUE="$(python3 -c 'import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())')"
+        echo "FERNET_KEY=${FERNET_VALUE}" >> "$GITHUB_ENV"
+        echo "FERNET_KEY=${FERNET_VALUE}" >> .env
+        echo "REDIS_URL=redis://127.0.0.1:6379/0" >> .env
+        echo "FLASK_ENV=development" >> .env
 
     - name: Point the app at local Redis and the integration suite
       env:
