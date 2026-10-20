@@ -20,10 +20,10 @@
     "@types/dompurify": "^3.0.5",
     "@vercel/analytics": "^1.5.0",
     "@vercel/speed-insights": "^1.2.0",
-    "axios": "^1.19.0",
+    "axios": "^1.20.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^1.2.1",
-    "dompurify": "^3.4.13",
+    "dompurify": "^3.4.17",
     "lucide-react": "^0.263.1",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
@@ -109,7 +109,13 @@
   "overrides": {
     "form-data": "4.0.6",
     "ws": "8.21.0",
-    "socket.io-parser": "4.2.7"
+    "socket.io-parser": "4.2.7",
+    "@types/three": {
+      "fflate": "0.8.3"
+    },
+    "three-stdlib": {
+      "fflate": "0.6.11"
+    }
   },
   "lint-staged": {
     "*.{ts,tsx}": [
