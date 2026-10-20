@@ -1,6 +1,6 @@
 # Asset Provenance Inventory (Marketing / Production)
 
-**Last updated:** 2026-09-23  
+**Last updated:** 2026-10-19  
 **Purpose:** Track license/provenance for production visual assets. Incomplete rows need **owner verification** — do not delete client-owned assets automatically.
 
 ## Fonts (bundled)
@@ -19,6 +19,14 @@
 | Symbolics Technology | `frontend/public/images/clients/symbolics-technology-logo.png` | Owner-created / prepared for partnership display | First-party (owner confirmation 2026-09-23) | Yes | Owner: self-created | Low |
 | Shinkei Nettowaku | `frontend/public/images/clients/shinkei-nettowaku-logo.svg` | Owner-created / prepared for partnership display | First-party (owner confirmation 2026-09-23) | Yes | Owner: self-created | Low |
 | Aim High Hit Higher | `frontend/public/images/clients/aim-high-hit-higher-logo.webp` | Owner-created / prepared for partnership display | First-party (owner confirmation 2026-09-23) | Yes | Owner: self-created | Low |
+| Circa Educational Services | `frontend/public/images/clients/circa-educational-services-logo.webp` | Client site mark (`circaeducationalservices.com`) prepared for partnership display | Client brand use with partnership consent | Yes (display only) | Owner confirmation 2026-10-19 | Low |
+| Creating Good Problems | `frontend/public/images/clients/creating-good-problems-logo.png` | Client site mark (`creatinggoodproblems.com`) prepared for partnership display | Client brand use with partnership consent | Yes (display only) | Owner confirmation 2026-10-19 | Low |
+
+## Landing / marketing stills
+
+| Asset | Path | Source | License | Evidence | Risk |
+|-------|------|--------|---------|----------|------|
+| Landing bento CRM | `frontend/public/images/landing-bento-crm.png` | Higgsfield GPT Image 2.5 refresh (job `4254fc3a-4c54-4f06-bd6b-a9d1a6dbe7b0`, 2026-10-19); black/amber Tier A visual | First-party commission | Rollback: `_backup-pre-higgsfield-2026-10-19/landing-bento-crm.png` | Low |
 
 ## Hero / brand media
 

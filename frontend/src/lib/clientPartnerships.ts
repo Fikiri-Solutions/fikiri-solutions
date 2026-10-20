@@ -61,4 +61,25 @@ export const clientPartnerships: ClientPartnership[] = [
     fallbackMark: 'AH',
     darkLogoPlate: true,
   },
+  {
+    name: 'Circa Educational Services',
+    url: 'https://www.circaeducationalservices.com/',
+    category: 'Tutoring & Literacy Support',
+    summary:
+      'Supporting scheduling, intake, and follow-up systems for personalized reading, writing, and tutoring work.',
+    logoSrc: publicAsset('images/clients/circa-educational-services-logo.webp'),
+    logoAlt: 'Circa Educational Services logo',
+    fallbackMark: 'CE',
+  },
+  {
+    name: 'Creating Good Problems',
+    url: 'https://www.creatinggoodproblems.com/',
+    category: 'Consulting & Coaching',
+    summary:
+      'Supporting intake, booking, and follow-through systems for founder-led consulting and coaching.',
+    logoSrc: publicAsset('images/clients/creating-good-problems-logo.png'),
+    logoAlt: 'Creating Good Problems logo',
+    fallbackMark: 'CG',
+    darkLogoPlate: true,
+  },
 ]

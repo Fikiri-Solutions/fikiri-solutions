@@ -447,7 +447,7 @@ const LandingPage: React.FC = () => {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-16">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-16">
             {clientPartnerships.map((client, index) => (
               <motion.article
                 key={client.name}
@@ -456,33 +456,41 @@ const LandingPage: React.FC = () => {
                 transition={{ duration: 0.8, delay: index * 0.1 }}
                 className="flex flex-col rounded-xl border border-gray-700 bg-gray-800/50 p-6 backdrop-blur-sm"
               >
-                {client.logoSrc ? (
-                  <div
-                    className={
-                      client.darkLogoPlate
-                        ? 'mb-4 flex h-24 items-center justify-center overflow-hidden rounded-lg bg-black p-3 ring-1 ring-white/10 sm:h-28'
-                        : 'mb-4 flex h-24 items-center justify-center overflow-hidden rounded-lg bg-white p-3 ring-1 ring-white/20 sm:h-28'
-                    }
-                  >
-                    <img
-                      src={client.logoSrc}
-                      alt={client.logoAlt}
-                      className="h-full w-full object-contain"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  </div>
-                ) : (
-                  <div
-                    className="mb-4 flex h-24 items-center justify-center rounded-lg bg-orange-500/15 ring-1 ring-orange-400/30 sm:h-28"
-                    role="img"
-                    aria-label={client.logoAlt}
-                  >
-                    <span className="text-2xl font-semibold tracking-widest text-orange-300">
-                      {client.fallbackMark}
-                    </span>
-                  </div>
-                )}
+                <a
+                  href={client.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mb-4 block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/80"
+                  aria-label={`${client.name} website`}
+                >
+                  {client.logoSrc ? (
+                    <div
+                      className={
+                        client.darkLogoPlate
+                          ? 'flex h-24 items-center justify-center overflow-hidden rounded-lg bg-black p-3 ring-1 ring-white/10 sm:h-28'
+                          : 'flex h-24 items-center justify-center overflow-hidden rounded-lg bg-white p-3 ring-1 ring-white/20 sm:h-28'
+                      }
+                    >
+                      <img
+                        src={client.logoSrc}
+                        alt={client.logoAlt}
+                        className="h-full w-full object-contain"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      className="flex h-24 items-center justify-center rounded-lg bg-orange-500/15 ring-1 ring-orange-400/30 sm:h-28"
+                      role="img"
+                      aria-label={client.logoAlt}
+                    >
+                      <span className="text-2xl font-semibold tracking-widest text-orange-300">
+                        {client.fallbackMark}
+                      </span>
+                    </div>
+                  )}
+                </a>
                 <h3 className="text-lg font-semibold text-white">{client.name}</h3>
                 <p className="mt-1 text-sm font-medium text-orange-300">{client.category}</p>
                 <p className="mt-3 flex-1 text-sm leading-relaxed text-white/80">{client.summary}</p>

@@ -19,7 +19,7 @@ function ClientLogoFallback({
 }) {
   return (
     <div
-      className="flex h-16 w-full items-center justify-center rounded-lg bg-gradient-to-br from-orange-500/15 via-amber-500/10 to-transparent ring-1 ring-orange-500/20"
+      className="flex h-20 w-full items-center justify-center rounded-lg bg-gradient-to-br from-orange-500/15 via-amber-500/10 to-transparent ring-1 ring-orange-500/20"
       role="img"
       aria-label={logoAlt}
     >
@@ -51,8 +51,8 @@ function ClientLogo({
     <div
       className={
         darkLogoPlate
-          ? 'flex h-16 w-full items-center justify-center overflow-hidden rounded-lg bg-black p-2.5 ring-1 ring-white/10'
-          : 'flex h-16 w-full items-center justify-center overflow-hidden rounded-lg bg-white p-2.5 ring-1 ring-black/10'
+          ? 'flex h-20 w-full items-center justify-center overflow-hidden rounded-lg bg-black p-2.5 ring-1 ring-white/10'
+          : 'flex h-20 w-full items-center justify-center overflow-hidden rounded-lg bg-white p-2.5 ring-1 ring-black/10'
       }
     >
       <img
@@ -81,12 +81,20 @@ function PartnershipCard({
         className
       )}
     >
-      <ClientLogo
-        logoSrc={client.logoSrc}
-        logoAlt={client.logoAlt}
-        fallbackMark={client.fallbackMark}
-        darkLogoPlate={client.darkLogoPlate}
-      />
+      <a
+        href={client.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/80 focus-visible:ring-offset-2 touch-manipulation"
+        aria-label={`${client.name} website`}
+      >
+        <ClientLogo
+          logoSrc={client.logoSrc}
+          logoAlt={client.logoAlt}
+          fallbackMark={client.fallbackMark}
+          darkLogoPlate={client.darkLogoPlate}
+        />
+      </a>
       <h3 className="mt-3 text-base font-semibold tracking-tight text-stone-900">{client.name}</h3>
       <p className="mt-0.5 text-xs font-medium text-orange-700">{client.category}</p>
       <p className="mt-2 line-clamp-3 flex-1 text-xs leading-relaxed text-stone-600">{client.summary}</p>

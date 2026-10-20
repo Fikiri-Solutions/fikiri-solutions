@@ -63,13 +63,19 @@ describe('ClientPartnerships', () => {
     expect(screen.queryByText(/7-day free trial/i)).not.toBeInTheDocument()
   })
 
-  it('exposes all four real clients with visit links and intake CTA', () => {
+  it('exposes all real clients with logo links, visit links, and intake CTA', () => {
     renderSection()
 
     for (const client of clientPartnerships) {
-      expect(
-        screen.getByRole('link', { name: new RegExp(`${client.name} — Visit site`, 'i') })
-      ).toHaveAttribute('href', client.url)
+      const logoLinks = screen.getAllByRole('link', { name: `${client.name} website` })
+      expect(logoLinks.length).toBeGreaterThan(0)
+      expect(logoLinks[0]).toHaveAttribute('href', client.url)
+
+      const visitLinks = screen.getAllByRole('link', {
+        name: new RegExp(`Visit site \\(${client.name}\\)`, 'i'),
+      })
+      expect(visitLinks.length).toBeGreaterThan(0)
+      expect(visitLinks[0]).toHaveAttribute('href', client.url)
     }
 
     expect(screen.getByRole('link', { name: /start a workflow conversation/i })).toHaveAttribute(
@@ -104,15 +110,18 @@ describe('ClientPartnerships', () => {
 })
 
 describe('clientPartnerships data', () => {
-  it('contains exactly the four real partnerships with local logos', () => {
+  it('contains the six real partnerships with local logos', () => {
     expect(clientPartnerships.map((c) => c.name)).toEqual([
       'ColorScalez',
       'Symbolics Technology',
       'Shinkei Nettowaku Solutions',
       'Aim High Hit Higher Enterprise',
+      'Circa Educational Services',
+      'Creating Good Problems',
     ])
     for (const client of clientPartnerships) {
       expect(client.logoSrc).toMatch(/\/images\/clients\//)
+      expect(client.url).toMatch(/^https:\/\//)
       expect(client.fallbackMark.length).toBeGreaterThan(0)
     }
   })
