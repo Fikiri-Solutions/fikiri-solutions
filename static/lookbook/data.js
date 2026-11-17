@@ -109,5 +109,21 @@ window.FIKIRI_LOOKBOOK = {
       thumbSrc: "assets/mockups/service-b.jpg",
       thumbAlt: "Preview of service industry sample B",
     },
+    {
+      name: "Bakery / foodservice",
+      url: "https://sweet-clafoutis-5aa901.netlify.app/",
+      category: "Hospitality preview",
+      summary: "Neighborhood bakery and wholesale design sample — not a live brand.",
+      thumbSrc: "assets/mockups/sample-c.jpg",
+      thumbAlt: "Preview of bakery / foodservice sample",
+    },
+    {
+      name: "Florist / floral retail",
+      url: "https://subtle-vacherin-540f28.netlify.app/",
+      category: "Retail preview",
+      summary: "Same-day florist design sample — not a live brand.",
+      thumbSrc: "assets/mockups/sample-d.jpg",
+      thumbAlt: "Preview of florist / floral retail sample",
+    },
   ],
 };

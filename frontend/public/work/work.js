@@ -78,6 +78,10 @@
       img.alt = item.thumbAlt || "";
       img.loading = "lazy";
       img.decoding = "async";
+      img.onerror = function () {
+        thumbLink.classList.add("is-missing");
+        img.remove();
+      };
       thumbLink.appendChild(img);
     }
 
