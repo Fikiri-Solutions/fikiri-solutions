@@ -45,7 +45,7 @@ export default async function middleware(request: Request): Promise<Response | u
 
 export const config = {
   matcher: [
-    // Skip internals, static dirs, and any path with a file extension (*.js, *.webp, index.html, …)
-    '/((?!_vercel|assets/|fonts/|icons/|img/|images/|optimized/|media/|brand/|.*\\..*).*)',
+    // Skip internals, static dirs, lookbook /work, and any path with a file extension
+    '/((?!_vercel|work(?:/|$)|assets/|fonts/|icons/|img/|images/|optimized/|media/|brand/|.*\\..*).*)',
   ],
 }

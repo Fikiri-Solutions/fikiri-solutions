@@ -17,6 +17,10 @@
   ],
   "rewrites": [
     {
+      "source": "/work/",
+      "destination": "/work/index.html"
+    },
+    {
       "source": "/((?!work(?:/|$)|assets/|fonts/|icons/|img/|images/|optimized/|media/|brand/|manifest\\.json|manifest\\.webmanifest|sw\\.js|workbox-|registerSW\\.js|robots\\.txt|sitemap\\.xml|clear-cache\\.html|og-image(?:-3f)?\\.png|privacy\\.md|terms\\.md|favicon\\.ico|favicon-\\d+x\\d+\\.png|apple-touch-icon\\.png|masked-icon\\.png|logo\\d+\\.png|pwa-).*)",
       "destination": "/index.html"
     }

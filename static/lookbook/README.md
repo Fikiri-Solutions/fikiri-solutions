@@ -4,6 +4,8 @@ Production path: **`frontend/public/work/`** → `https://fikirisolutions.com/wo
 
 Edit here or under `frontend/public/work/`, then keep both in sync before deploy.
 
+Production routing: `/work` redirects to `/work/` (needed for relative assets); middleware treats `/work` as static so it is not SPA-404’d.
+
 ## Local preview
 
 ```bash

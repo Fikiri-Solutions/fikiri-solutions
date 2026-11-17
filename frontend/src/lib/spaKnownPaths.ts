@@ -85,6 +85,8 @@ export function isKnownSpaPath(pathname: string): boolean {
 export function isStaticAssetPath(pathname: string): boolean {
   const path = normalizePathname(pathname)
   if (path === '/index.html') return true
+  // Standalone lookbook (frontend/public/work) — not an SPA route
+  if (path === '/work' || path.startsWith('/work/')) return true
   // Any path with a file extension (favicon.ico, *.js, *.webp, robots.txt, …)
   if (/\.[a-zA-Z0-9]{1,8}$/.test(path)) return true
   const staticPrefixes = [

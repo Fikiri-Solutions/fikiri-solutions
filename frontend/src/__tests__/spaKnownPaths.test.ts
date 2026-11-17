@@ -36,4 +36,12 @@ describe('spaKnownPaths', () => {
     expect(isStaticAssetPath('/integrations/universal/fikiri-sdk.js')).toBe(true)
     expect(isStaticAssetPath('/contact')).toBe(false)
   })
+
+  it('treats the /work lookbook as a static surface, not SPA 404 bait', () => {
+    expect(isStaticAssetPath('/work')).toBe(true)
+    expect(isStaticAssetPath('/work/')).toBe(true)
+    expect(isStaticAssetPath('/work/index.html')).toBe(true)
+    expect(isStaticAssetPath('/work/assets/mockups/sample-e.jpg')).toBe(true)
+    expect(isKnownSpaPath('/work')).toBe(false)
+  })
 })

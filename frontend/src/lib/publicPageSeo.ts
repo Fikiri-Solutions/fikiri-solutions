@@ -31,6 +31,14 @@ export const PUBLIC_PAGE_SEO: readonly PublicPageSeo[] = [
     priority: 1.0,
   },
   {
+    path: '/work',
+    title: 'Fikiri Solutions — Work',
+    description:
+      'Selected client sites and design previews from Fikiri Solutions — live partnerships plus sales mockups.',
+    changefreq: 'monthly',
+    priority: 0.7,
+  },
+  {
     path: '/about',
     title: 'About Fikiri Solutions | Consulting-First Workflow Systems',
     description:
@@ -161,6 +169,8 @@ export function getPublicPageSeo(path: string): PublicPageSeo | undefined {
 
 export function absoluteUrl(path: string): string {
   if (path === '/') return `${SITE_ORIGIN}/`
+  // Lookbook is served at /work/ so relative asset URLs resolve under that folder.
+  if (path === '/work' || path === '/work/') return `${SITE_ORIGIN}/work/`
   return `${SITE_ORIGIN}${path.startsWith('/') ? path : `/${path}`}`
 }
 
