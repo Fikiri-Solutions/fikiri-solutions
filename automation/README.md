@@ -36,7 +36,7 @@ Flask → Windmill outbound API triggering is **out of scope** for this slice.
 ## Environment setup
 
 ```bash
-cp .env.automation-dev.example .env.automation-dev
+cp automation/env.automation-dev.example automation/.env.automation-dev
 # Set WINDMILL_DB_PASSWORD to a local-only secret
 ```
 
@@ -44,12 +44,14 @@ Fikiri `.env.example` notes the ingress scope; do not invent a parallel shared-s
 
 ## Start / stop automation services
 
+Run from the **repo root**:
+
 ```bash
-docker compose -f docker-compose.automation-dev.yml --env-file .env.automation-dev up -d
-docker compose -f docker-compose.automation-dev.yml --env-file .env.automation-dev ps
-docker compose -f docker-compose.automation-dev.yml --env-file .env.automation-dev down
+docker compose -f automation/docker-compose.automation-dev.yml --env-file automation/.env.automation-dev up -d
+docker compose -f automation/docker-compose.automation-dev.yml --env-file automation/.env.automation-dev ps
+docker compose -f automation/docker-compose.automation-dev.yml --env-file automation/.env.automation-dev down
 # Remove volume only when intentionally wiping Windmill local state:
-# docker compose -f docker-compose.automation-dev.yml --env-file .env.automation-dev down -v
+# docker compose -f automation/docker-compose.automation-dev.yml --env-file automation/.env.automation-dev down -v
 ```
 
 Pinned image: `ghcr.io/windmill-labs/windmill:1.775.2`  

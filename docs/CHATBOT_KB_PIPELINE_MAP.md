@@ -60,7 +60,7 @@
 
 ## 4. How the frontend calls the chatbot
 
-- **Embed / widget**: `integrations/universal/fikiri-sdk.js` — `ChatbotFeature.query(text)` → `POST /api/public/chatbot/query` with `query`, `conversation_id`, `context`, `lead`. API key set at init (`Fikiri.init({ apiKey, apiUrl, features: ['chatbot', ...] })`). Demo: `demo/chatbot-widget.html`, `demo/chatbot-demo.html` use SDK or similar fetch to same URL.
+- **Embed / widget**: `integrations/universal/fikiri-sdk.js` — `ChatbotFeature.query(text)` → `POST /api/public/chatbot/query` with `query`, `conversation_id`, `context`, `lead`. API key set at init (`Fikiri.init({ apiKey, apiUrl, features: ['chatbot', ...] })`). Demo: `examples/chatbot/chatbot-widget.html`, `examples/chatbot/chatbot-demo.html` use SDK or similar fetch to same URL.
 - **Dashboard**: `frontend/src/pages/ChatbotBuilder.tsx` — uses `apiClient` for `/chatbot/faq`, `/chatbot/knowledge/documents`, `/chatbot/knowledge/vectorize`, `/chatbot/knowledge/search`, `/chatbot/faq/statistics`, `/chatbot/faq/categories` (authenticated session). The unified chat in the app uses `/api/chatbot/chat` (multi-channel), not the public `/query` endpoint.
 
 ---

@@ -57,17 +57,16 @@ Fikiri/
 ├── email_automation/         # Email pipeline, jobs, Gmail sync
 ├── integrations/             # External connectors (Gmail, Outlook, iCloud)
 ├── analytics/                # Reporting, dashboard API
+├── automation/               # Windmill CE pilot (compose + env example)
 ├── frontend/                 # React + Vite + TypeScript
-│   └── src/
-│       ├── components/       # UI components (radiant, layout, etc.)
-│       ├── pages/            # Page components
-│       ├── hooks/            # Custom hooks
-│       ├── contexts/         # Auth, theme
-│       └── services/         # API client (single backend entry)
+├── examples/                 # Chatbot demos + CMS/embed samples
+├── deploy/                   # Staging env ref + legacy App Engine yaml
 ├── tests/                    # Backend tests (pytest)
-├── scripts/                  # Automation readiness, DB tools
+├── scripts/                  # Ops scripts (DB, health-check, startup, QA)
 ├── docs/                     # Documentation
+├── static/                   # Static assets (chatbot SDK CSS/JS, lookbook)
 ├── env.template              # Env template (copy to .env)
+├── .env.example              # Short env placeholders
 └── requirements.txt
 ```
 

@@ -1019,7 +1019,7 @@ def setup_routes(app):
     def chatbot_demo():
         """Serve chatbot demo page"""
         try:
-            demo_path = os.path.join(os.path.dirname(__file__), 'demo', 'chatbot-demo.html')
+            demo_path = os.path.join(os.path.dirname(__file__), 'examples', 'chatbot', 'chatbot-demo.html')
             if os.path.exists(demo_path):
                 with open(demo_path, 'r', encoding='utf-8') as f:
                     return f.read()
@@ -1032,7 +1032,7 @@ def setup_routes(app):
     def simple_chatbot_demo():
         """Serve simple chatbot demo page"""
         try:
-            demo_path = os.path.join(os.path.dirname(__file__), 'demo', 'simple-chatbot.html')
+            demo_path = os.path.join(os.path.dirname(__file__), 'examples', 'chatbot', 'simple-chatbot.html')
             if os.path.exists(demo_path):
                 with open(demo_path, 'r', encoding='utf-8') as f:
                     return f.read()
@@ -1045,7 +1045,7 @@ def setup_routes(app):
     def chatbot_widget_demo():
         """Serve chatbot widget demo (floating button + popup)"""
         try:
-            demo_path = os.path.join(os.path.dirname(__file__), 'demo', 'chatbot-widget.html')
+            demo_path = os.path.join(os.path.dirname(__file__), 'examples', 'chatbot', 'chatbot-widget.html')
             if os.path.exists(demo_path):
                 with open(demo_path, 'r', encoding='utf-8') as f:
                     return f.read()

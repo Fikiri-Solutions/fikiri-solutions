@@ -1,7 +1,8 @@
 /** Canonical production origin — keep aligned with index.html / vercel redirects. */
 export const SITE_ORIGIN = 'https://fikirisolutions.com'
 
-export const DEFAULT_OG_IMAGE = `${SITE_ORIGIN}/og-image.png`
+/** 1200×630 social card — versioned filename so chat/link scrapers refresh past cached previews. */
+export const DEFAULT_OG_IMAGE = `${SITE_ORIGIN}/og-image-3f.png`
 
 export type PublicPageSeo = {
   /** Pathname beginning with `/` (use `/` for home). */

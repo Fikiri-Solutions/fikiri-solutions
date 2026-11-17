@@ -3,7 +3,7 @@
 # Never put credentials in this file — use .env (gitignored) or your secret manager.
 
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 echo "🚀 Starting Fikiri Solutions..."
 

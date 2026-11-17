@@ -1,6 +1,6 @@
 #!/bin/bash
 # Automated Health Check Script
-# Run this script every 5 minutes via cron: */5 * * * * /path/to/health-check.sh
+# Run this script every 5 minutes via cron: */5 * * * * /path/to/scripts/health-check.sh
 
 set -e
 

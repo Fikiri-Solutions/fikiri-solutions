@@ -15,6 +15,8 @@ Operational, security, and quality scripts for this repository. **Application ru
 | Script | Purpose |
 |--------|---------|
 | [init_database.py](init_database.py) | Bootstrap DB tables: `python3 scripts/init_database.py` |
+| [start_fikiri.sh](start_fikiri.sh) | Local/bare-metal production-style startup (loads `.env`, activates `venv_local`) |
+| [health-check.sh](health-check.sh) | Cron-friendly prod URL health probe |
 
 Gmail and Outlook OAuth run through the **Flask app** (`core/app_oauth.py`, in-app Integrations). See [docs/CONNECT_GMAIL_OUTLOOK.md](../docs/CONNECT_GMAIL_OUTLOOK.md).
 

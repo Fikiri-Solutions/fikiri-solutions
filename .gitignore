@@ -72,7 +72,6 @@ logs/
 .env*.bak
 .env.automation-dev
 !.env.example
-!.env.automation-dev.example
 frontend/.env
 frontend/.env.local
 frontend/.env.production

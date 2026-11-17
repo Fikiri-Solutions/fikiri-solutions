@@ -15,7 +15,7 @@
 
 2. **Open the demo:**
    - Navigate to `http://localhost:5000/demo/chatbot-demo.html`
-   - Or open `demo/chatbot-demo.html` directly in your browser
+   - Or open `examples/chatbot/chatbot-demo.html` directly in your browser
 
 3. **Enter your API key:**
    - Get your API key from the Fikiri dashboard

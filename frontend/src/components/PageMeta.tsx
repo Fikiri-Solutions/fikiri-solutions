@@ -48,6 +48,10 @@ export function PageMeta(props: PageMetaProps) {
       <meta property="og:description" content={seo.description} />
       <meta property="og:image" content={image} />
       <meta property="og:image:secure_url" content={image} />
+      <meta property="og:image:type" content="image/png" />
+      <meta property="og:image:width" content="1200" />
+      <meta property="og:image:height" content="630" />
+      <meta property="og:image:alt" content="Fikiri Solutions – AI-powered business automation platform" />
       <meta property="og:site_name" content="Fikiri Solutions" />
       <meta property="twitter:card" content="summary_large_image" />
       <meta property="twitter:url" content={url} />

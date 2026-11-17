@@ -1,0 +1,33 @@
+summary: Apollo enrich with hard credit cap
+description: Requires confirm=True. Max 5 people. No phone/waterfall. Free-plan guardrails.
+lock: '!inline f/apollo/enrich_capped.script.lock'
+kind: script
+schema:
+  $schema: 'https://json-schema.org/draft/2020-12/schema'
+  type: object
+  order:
+    - api_key
+    - people
+    - confirm
+    - max_people
+  properties:
+    api_key:
+      type: string
+      description: Apollo API key
+      password: true
+    people:
+      type: array
+      items:
+        type: object
+      default: []
+      description: Shortlist from search_people (apollo_id / name / linkedin_url / domain)
+    confirm:
+      type: boolean
+      default: false
+      description: Must be true to spend credits
+    max_people:
+      type: integer
+      default: 3
+      description: Hard-capped at 5
+  required:
+    - api_key

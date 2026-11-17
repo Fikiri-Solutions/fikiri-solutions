@@ -1,5 +1,7 @@
 # Opt-in Windmill CE development stack only.
-# Usage: docker compose -f docker-compose.automation-dev.yml --env-file .env.automation-dev up -d
+# Usage (from repo root):
+#   cp automation/env.automation-dev.example automation/.env.automation-dev
+#   docker compose -f automation/docker-compose.automation-dev.yml --env-file automation/.env.automation-dev up -d
 # Does not modify production Compose (none in this repo) or app Redis.
 
 name: fikiri-automation-dev

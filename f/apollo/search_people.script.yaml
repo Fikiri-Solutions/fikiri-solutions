@@ -1,0 +1,55 @@
+summary: Apollo people search (0 credits)
+description: Free-plan safe search. No email/phone reveal. Review then enrich_capped.
+lock: '!inline f/apollo/search_people.script.lock'
+kind: script
+schema:
+  $schema: 'https://json-schema.org/draft/2020-12/schema'
+  type: object
+  order:
+    - api_key
+    - person_titles
+    - person_locations
+    - organization_locations
+    - organization_num_employees_ranges
+    - q_organization_keyword_tags
+    - per_page
+    - page
+  properties:
+    api_key:
+      type: string
+      description: Apollo API key (password field in UI)
+      password: true
+    person_titles:
+      type: array
+      items:
+        type: string
+      default: []
+    person_locations:
+      type: array
+      items:
+        type: string
+      default: []
+    organization_locations:
+      type: array
+      items:
+        type: string
+      default: []
+    organization_num_employees_ranges:
+      type: array
+      items:
+        type: string
+      default: []
+    q_organization_keyword_tags:
+      type: array
+      items:
+        type: string
+      default: []
+    per_page:
+      type: integer
+      default: 10
+      description: Capped at 25
+    page:
+      type: integer
+      default: 1
+  required:
+    - api_key

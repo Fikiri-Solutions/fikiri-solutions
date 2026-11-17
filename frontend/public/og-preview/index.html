@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fikiri OG pattern variants</title>
+  <style>
+    :root { --bg:#0c0b0a; --panel:#161412; --text:#f7f3e9; --muted:#a89880; --gold:#f39c12; --line:#2a241e; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Georgia, serif; background: radial-gradient(ellipse at top,#1a1510,var(--bg)); color:var(--text); }
+    header { position:sticky; top:0; z-index:5; backdrop-filter:blur(10px); background:rgba(12,11,10,.85); border-bottom:1px solid var(--line); padding:1rem 1.5rem; display:flex; flex-wrap:wrap; gap:.75rem; align-items:baseline; justify-content:space-between; }
+    header h1 { margin:0; font-size:1.25rem; }
+    header p { margin:0; color:var(--muted); font-size:.95rem; }
+    nav.filters { display:flex; flex-wrap:wrap; gap:.4rem; width:100%; }
+    nav.filters button { background:transparent; color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:.3rem .75rem; cursor:pointer; font:inherit; font-size:.8rem; }
+    nav.filters button.on { color:var(--gold); border-color:var(--gold); }
+    #choice { color:var(--gold); font-weight:bold; }
+    main { max-width:1180px; margin:0 auto; padding:1.5rem; display:grid; gap:1.5rem; grid-template-columns:1fr; }
+    @media (min-width:960px) { main { grid-template-columns:1fr 1fr; } }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; }
+    .card.hidden { display:none; }
+    .card.selected { border-color:var(--gold); box-shadow:0 0 0 1px var(--gold), 0 12px 40px rgba(243,156,18,.15); }
+    .card img { width:100%; height:auto; display:block; background:#000; }
+    .meta { padding:.85rem 1rem 1rem; }
+    .meta h2 { margin:0 0 .35rem; font-size:1.05rem; }
+    .meta code { color:var(--muted); font-size:.8rem; }
+    .pick { align-self:flex-end; margin:.75rem .75rem 0; background:transparent; color:var(--gold); border:1px solid var(--gold); border-radius:999px; padding:.4rem .9rem; cursor:pointer; font:inherit; font-size:.85rem; }
+    .phone { grid-column:1/-1; }
+    .sim { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:1rem; max-width:360px; }
+    .sim h3 { margin:0 0 .75rem; font-size:.95rem; color:var(--muted); font-weight:normal; }
+    .bubble { background:#1e1a16; border-radius:14px; overflow:hidden; border:1px solid var(--line); }
+    .bubble img { width:100%; display:block; }
+    .bubble .txt { padding:.65rem .8rem; font-size:.85rem; }
+    .bubble .url { color:var(--muted); font-size:.75rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Fikiri OG patterns</h1>
+      <p>More 3F-bend motifs, hex/honeycomb, and dots — same charcoal/gold spectrum. Local only.</p>
+    </div>
+    <div id="choice">No selection yet</div>
+    <nav class="filters">
+      <button type="button" class="on" data-filter="all">All</button>
+      <button type="button" data-filter="dots">Dots</button>
+      <button type="button" data-filter="hex">Hex</button>
+      <button type="button" data-filter="f">3F bends</button>
+      <button type="button" data-filter="other">Other</button>
+    </nav>
+  </header>
+  <main>
+        <article class="card" data-id="01-charcoal-gold-dots">
+      <button type="button" class="pick" data-id="01-charcoal-gold-dots">Select this</button>
+      <img src="/og-preview/01-charcoal-gold-dots.png?t=3" alt="Dots (original reference)" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Dots (original reference)</h2><code>01-charcoal-gold-dots.png</code></div>
+    </article>
+    <article class="card" data-id="24-dots-fine-grid">
+      <button type="button" class="pick" data-id="24-dots-fine-grid">Select this</button>
+      <img src="/og-preview/24-dots-fine-grid.png?t=3" alt="Dots fine grid" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Dots fine grid</h2><code>24-dots-fine-grid.png</code></div>
+    </article>
+    <article class="card" data-id="25-dots-halftone">
+      <button type="button" class="pick" data-id="25-dots-halftone">Select this</button>
+      <img src="/og-preview/25-dots-halftone.png?t=3" alt="Dots halftone radial" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Dots halftone radial</h2><code>25-dots-halftone.png</code></div>
+    </article>
+    <article class="card" data-id="26-dots-diagonal-constellation">
+      <button type="button" class="pick" data-id="26-dots-diagonal-constellation">Select this</button>
+      <img src="/og-preview/26-dots-diagonal-constellation.png?t=3" alt="Dots diagonal constellation" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Dots diagonal constellation</h2><code>26-dots-diagonal-constellation.png</code></div>
+    </article>
+    <article class="card" data-id="27-dots-orbital">
+      <button type="button" class="pick" data-id="27-dots-orbital">Select this</button>
+      <img src="/og-preview/27-dots-orbital.png?t=3" alt="Dots orbital rings" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Dots orbital rings</h2><code>27-dots-orbital.png</code></div>
+    </article>
+    <article class="card" data-id="28-dots-with-f-accents">
+      <button type="button" class="pick" data-id="28-dots-with-f-accents">Select this</button>
+      <img src="/og-preview/28-dots-with-f-accents.png?t=3" alt="Dots + F accents" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Dots + F accents</h2><code>28-dots-with-f-accents.png</code></div>
+    </article>
+    <article class="card" data-id="09-hex-honeycomb">
+      <button type="button" class="pick" data-id="09-hex-honeycomb">Select this</button>
+      <img src="/og-preview/09-hex-honeycomb.png?t=3" alt="Hex honeycomb (first)" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Hex honeycomb (first)</h2><code>09-hex-honeycomb.png</code></div>
+    </article>
+    <article class="card" data-id="19-hex-dense">
+      <button type="button" class="pick" data-id="19-hex-dense">Select this</button>
+      <img src="/og-preview/19-hex-dense.png?t=3" alt="Hex dense small" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Hex dense small</h2><code>19-hex-dense.png</code></div>
+    </article>
+    <article class="card" data-id="20-hex-large-double">
+      <button type="button" class="pick" data-id="20-hex-large-double">Select this</button>
+      <img src="/og-preview/20-hex-large-double.png?t=3" alt="Hex large double-wall" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Hex large double-wall</h2><code>20-hex-large-double.png</code></div>
+    </article>
+    <article class="card" data-id="21-hex-radial-fade">
+      <button type="button" class="pick" data-id="21-hex-radial-fade">Select this</button>
+      <img src="/og-preview/21-hex-radial-fade.png?t=3" alt="Hex radial fade fill" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Hex radial fade fill</h2><code>21-hex-radial-fade.png</code></div>
+    </article>
+    <article class="card" data-id="22-hex-perspective">
+      <button type="button" class="pick" data-id="22-hex-perspective">Select this</button>
+      <img src="/og-preview/22-hex-perspective.png?t=3" alt="Hex perspective sides" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Hex perspective sides</h2><code>22-hex-perspective.png</code></div>
+    </article>
+    <article class="card" data-id="23-hex-with-mini-f">
+      <button type="button" class="pick" data-id="23-hex-with-mini-f">Select this</button>
+      <img src="/og-preview/23-hex-with-mini-f.png?t=3" alt="Hex + mini-F centers" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Hex + mini-F centers</h2><code>23-hex-with-mini-f.png</code></div>
+    </article>
+    <article class="card" data-id="13-wing-chevrons">
+      <button type="button" class="pick" data-id="13-wing-chevrons">Select this</button>
+      <img src="/og-preview/13-wing-chevrons.png?t=3" alt="Wing chevrons" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Wing chevrons</h2><code>13-wing-chevrons.png</code></div>
+    </article>
+    <article class="card" data-id="14-triple-wing-field">
+      <button type="button" class="pick" data-id="14-triple-wing-field">Select this</button>
+      <img src="/og-preview/14-triple-wing-field.png?t=3" alt="Triple-wing field (3F bars)" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Triple-wing field (3F bars)</h2><code>14-triple-wing-field.png</code></div>
+    </article>
+    <article class="card" data-id="15-ghost-f-wings">
+      <button type="button" class="pick" data-id="15-ghost-f-wings">Select this</button>
+      <img src="/og-preview/15-ghost-f-wings.png?t=3" alt="Ghost F wings (oversized)" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Ghost F wings (oversized)</h2><code>15-ghost-f-wings.png</code></div>
+    </article>
+    <article class="card" data-id="16-bend-streamlines">
+      <button type="button" class="pick" data-id="16-bend-streamlines">Select this</button>
+      <img src="/og-preview/16-bend-streamlines.png?t=3" alt="Bend streamlines" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Bend streamlines</h2><code>16-bend-streamlines.png</code></div>
+    </article>
+    <article class="card" data-id="17-stacked-f-ribs">
+      <button type="button" class="pick" data-id="17-stacked-f-ribs">Select this</button>
+      <img src="/og-preview/17-stacked-f-ribs.png?t=3" alt="Stacked F ribs" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Stacked F ribs</h2><code>17-stacked-f-ribs.png</code></div>
+    </article>
+    <article class="card" data-id="18-spine-to-wing">
+      <button type="button" class="pick" data-id="18-spine-to-wing">Select this</button>
+      <img src="/og-preview/18-spine-to-wing.png?t=3" alt="Spine-to-wing construction" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Spine-to-wing construction</h2><code>18-spine-to-wing.png</code></div>
+    </article>
+    <article class="card" data-id="07-diagonal-hatch">
+      <button type="button" class="pick" data-id="07-diagonal-hatch">Select this</button>
+      <img src="/og-preview/07-diagonal-hatch.png?t=3" alt="Diagonal hatch" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Diagonal hatch</h2><code>07-diagonal-hatch.png</code></div>
+    </article>
+    <article class="card" data-id="08-linen-weave">
+      <button type="button" class="pick" data-id="08-linen-weave">Select this</button>
+      <img src="/og-preview/08-linen-weave.png?t=3" alt="Linen weave" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Linen weave</h2><code>08-linen-weave.png</code></div>
+    </article>
+    <article class="card" data-id="10-concentric-arcs">
+      <button type="button" class="pick" data-id="10-concentric-arcs">Select this</button>
+      <img src="/og-preview/10-concentric-arcs.png?t=3" alt="Concentric arcs" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Concentric arcs</h2><code>10-concentric-arcs.png</code></div>
+    </article>
+    <article class="card" data-id="11-circuit-traces">
+      <button type="button" class="pick" data-id="11-circuit-traces">Select this</button>
+      <img src="/og-preview/11-circuit-traces.png?t=3" alt="Circuit traces" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Circuit traces</h2><code>11-circuit-traces.png</code></div>
+    </article>
+    <article class="card" data-id="12-film-grain">
+      <button type="button" class="pick" data-id="12-film-grain">Select this</button>
+      <img src="/og-preview/12-film-grain.png?t=3" alt="Film grain + scanlines" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>Film grain + scanlines</h2><code>12-film-grain.png</code></div>
+    </article>
+    <article class="card" data-id="02-ink-black-minimal">
+      <button type="button" class="pick" data-id="02-ink-black-minimal">Select this</button>
+      <img src="/og-preview/02-ink-black-minimal.png?t=3" alt="02-ink-black-minimal" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>02-ink-black-minimal</h2><code>02-ink-black-minimal.png</code></div>
+    </article>
+    <article class="card" data-id="03-sunset-wash">
+      <button type="button" class="pick" data-id="03-sunset-wash">Select this</button>
+      <img src="/og-preview/03-sunset-wash.png?t=3" alt="03-sunset-wash" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>03-sunset-wash</h2><code>03-sunset-wash.png</code></div>
+    </article>
+    <article class="card" data-id="04-cream-parchment">
+      <button type="button" class="pick" data-id="04-cream-parchment">Select this</button>
+      <img src="/og-preview/04-cream-parchment.png?t=3" alt="04-cream-parchment" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>04-cream-parchment</h2><code>04-cream-parchment.png</code></div>
+    </article>
+    <article class="card" data-id="05-gold-rings">
+      <button type="button" class="pick" data-id="05-gold-rings">Select this</button>
+      <img src="/og-preview/05-gold-rings.png?t=3" alt="05-gold-rings" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>05-gold-rings</h2><code>05-gold-rings.png</code></div>
+    </article>
+    <article class="card" data-id="06-neural-mesh">
+      <button type="button" class="pick" data-id="06-neural-mesh">Select this</button>
+      <img src="/og-preview/06-neural-mesh.png?t=3" alt="06-neural-mesh" width="1200" height="630" loading="lazy" />
+      <div class="meta"><h2>06-neural-mesh</h2><code>06-neural-mesh.png</code></div>
+    </article>
+    <section class="phone">
+      <div class="sim">
+        <h3>Chat preview simulation</h3>
+        <div class="bubble">
+          <img id="sim-img" src="/og-preview/01-charcoal-gold-dots.png?t=3" alt="Selected preview" />
+          <div class="txt"><strong>Fikiri Solutions</strong><div>AI-Powered Business Automation Platform</div><div class="url">fikirisolutions.com</div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script>
+    function group(id) {
+      if (id.includes('dot')) return 'dots';
+      if (id.includes('hex')) return 'hex';
+      if (id.includes('wing') || id.includes('ghost-f') || id.includes('bend') || id.includes('spine') || id.includes('rib') || id.includes('chevron') || id.includes('triple-wing') || id.includes('mini-f') || id.includes('f-accent')) return 'f';
+      return 'other';
+    }
+    document.querySelectorAll('.card').forEach(c => c.dataset.group = group(c.dataset.id));
+    document.querySelectorAll('.filters button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filters button').forEach(b => b.classList.remove('on'));
+        btn.classList.add('on');
+        const f = btn.dataset.filter;
+        document.querySelectorAll('.card').forEach(c => {
+          c.classList.toggle('hidden', !(f === 'all' || c.dataset.group === f));
+        });
+      });
+    });
+    const choice = document.getElementById('choice');
+    const sim = document.getElementById('sim-img');
+    document.querySelectorAll('.pick').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', c.dataset.id === id));
+        sim.src = document.querySelector('.card[data-id="'+id+'"] img').src;
+        choice.textContent = 'Selected: ' + id;
+      });
+    });
+  </script>
+</body>
+</html>

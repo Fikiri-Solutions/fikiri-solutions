@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fikiri Solutions — Work</title>
+    <meta
+      name="description"
+      content="Selected client sites and design previews from Fikiri Solutions."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css?v=14" />
+  </head>
+  <body>
+    <a class="skip" href="#work">Skip to work</a>
+
+    <header class="hero" aria-label="Fikiri Solutions work lookbook">
+      <div class="hero-media" aria-hidden="true">
+        <picture>
+          <source media="(max-width: 767px)" srcset="assets/hero-mobile.webp" type="image/webp" />
+          <img
+            class="hero-img"
+            src="assets/hero-desktop.jpg"
+            alt=""
+            width="1024"
+            height="576"
+            fetchpriority="high"
+            decoding="async"
+          />
+        </picture>
+        <div class="hero-veil"></div>
+      </div>
+
+      <div class="hero-copy">
+        <p class="brand">
+          <span class="brand-name">FIKIRI</span>
+          <span class="brand-sub">SOLUTIONS</span>
+        </p>
+        <h1 class="hero-kicker">Selected work</h1>
+        <p class="lede">
+          Live client sites we support — plus a few design previews for sales review.
+        </p>
+        <div class="hero-actions">
+          <a class="btn primary" href="#work">Browse work</a>
+          <a class="btn ghost" href="https://fikirisolutions.com" rel="noopener noreferrer"
+            >fikirisolutions.com</a
+          >
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section id="work" class="band work-band" aria-labelledby="work-heading">
+        <div class="band-head">
+          <p class="eyebrow">Live</p>
+          <h2 id="work-heading">Client sites</h2>
+          <p class="band-lede">
+            Production work you can open. Support and systems language only — no fabricated claims.
+          </p>
+        </div>
+
+        <div class="rail-wrap">
+          <div class="rail-controls" role="group" aria-label="Scroll client work">
+            <button type="button" class="rail-btn" data-rail="live" data-dir="-1" aria-label="Previous">
+              ‹
+            </button>
+            <button type="button" class="rail-btn" data-rail="live" data-dir="1" aria-label="Next">
+              ›
+            </button>
+          </div>
+          <div class="rail" id="live-rail" tabindex="0" aria-label="Live client sites"></div>
+        </div>
+      </section>
+
+      <section id="mockups" class="band mockups-band" aria-labelledby="mockups-heading">
+        <div class="band-head">
+          <p class="eyebrow">Samples</p>
+          <h2 id="mockups-heading">Design previews</h2>
+          <p class="band-lede">
+            Netlify mockups for sales and design review. Not live brands.
+          </p>
+        </div>
+        <ul class="preview-list" id="mockups-list"></ul>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="foot-inner">
+        <p class="foot-brand">Fikiri Solutions</p>
+        <p>
+          <a href="https://fikirisolutions.com">fikirisolutions.com</a>
+          ·
+          <a href="mailto:info@fikirisolutions.com">info@fikirisolutions.com</a>
+        </p>
+      </div>
+    </footer>
+
+    <script src="./data.js?v=14"></script>
+    <script src="./work.js?v=14"></script>
+  </body>
+</html>

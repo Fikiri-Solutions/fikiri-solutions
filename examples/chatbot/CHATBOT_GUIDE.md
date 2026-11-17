@@ -26,8 +26,8 @@
   - `Fikiri.Chatbot.hide()`
 
 ### 3. **Demo Pages** ✅
-- **Full Demo:** `demo/chatbot-demo.html`
-- **Simple Demo:** `demo/simple-chatbot.html`
+- **Full Demo:** `examples/chatbot/chatbot-demo.html`
+- **Simple Demo:** `examples/chatbot/simple-chatbot.html`
 - **Access:** `http://localhost:5000/demo/chatbot` or `/demo/simple`
 
 ---

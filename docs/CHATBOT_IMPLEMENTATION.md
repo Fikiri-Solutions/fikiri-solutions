@@ -34,14 +34,14 @@
   - ✅ Error handling
 
 ### 3. Demo Pages ✅
-- **Full Demo:** `demo/chatbot-demo.html`
+- **Full Demo:** `examples/chatbot/chatbot-demo.html`
   - Beautiful UI with gradient design
   - Real-time chat interface
   - API key setup
   - Source attribution
   - Error handling
   
-- **Simple Demo:** `demo/simple-chatbot.html`
+- **Simple Demo:** `examples/chatbot/simple-chatbot.html`
   - Minimal implementation
   - Easy to understand
   - Perfect for learning
@@ -51,7 +51,7 @@
   - `/demo/simple` - Simple demo
 
 ### 4. Documentation ✅
-- **Guide:** `demo/CHATBOT_GUIDE.md`
+- **Guide:** `examples/chatbot/CHATBOT_GUIDE.md`
   - Complete API reference
   - Implementation examples
   - Troubleshooting guide
