@@ -125,5 +125,13 @@ window.FIKIRI_LOOKBOOK = {
       thumbSrc: "assets/mockups/sample-d.jpg",
       thumbAlt: "Preview of florist / floral retail sample",
     },
+    {
+      name: "Beauty supply / hair retail",
+      url: "https://voluble-khapse-43b88e.netlify.app/",
+      category: "Retail preview",
+      summary: "Beauty supply and hair retail design sample — not a live brand.",
+      thumbSrc: "assets/mockups/sample-e.jpg",
+      thumbAlt: "Preview of beauty supply / hair retail sample",
+    },
   ],
 };
