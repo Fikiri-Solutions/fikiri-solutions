@@ -227,6 +227,12 @@ cases:
     expected_ids: [company_about, company_three_capabilities]
     topic: company
 
+  - name: company_after_pricing_followup
+    query: What does Fikiri do?
+    previous_query: What does Fikiri cost?
+    expected_ids: [company_about, company_three_capabilities]
+    topic: company
+
   - name: what_is_fikiri
     query: What is Fikiri Solutions?
     expected_ids: [company_about, company_three_capabilities]

@@ -236,8 +236,10 @@ def _retrieval_tokens(text: str) -> Set[str]:
 
 
 _STANDALONE_TOPIC_RE = re.compile(
-    r"\b(how much|price|pricing|cost|costs|starter plan|growth plan|business plan|enterprise plan|"
-    r"free trial|\$\d{2,3}|talk to|contact|hipaa|soc\s*2)\b",
+    r"\b(how much|price|prices|pricing|cost|costs|starter plan|growth plan|business plan|enterprise plan|"
+    r"free trial|\$\d{2,3}|talk to|contact|hipaa|soc\s*2|"
+    r"what do you do|what does fikiri do|what does fikiri cost|who is fikiri|what is fikiri|"
+    r"what are your prices|what are your plans|fikiri pricing)\b",
     re.I,
 )
 
@@ -246,12 +248,23 @@ def is_standalone_topic_query(query: str) -> bool:
     return bool(_STANDALONE_TOPIC_RE.search(normalize_query_text(query)))
 
 
+def _primary_router_topic(query: str) -> str | None:
+    topics = _infer_router_topics(normalize_query_text(query))
+    return topics[0][0] if topics else None
+
+
 def effective_query_for_retrieval(query: str, previous_query: str | None = None) -> str:
     current = (query or "").strip()
     previous = (previous_query or "").strip()
     if not current or not previous:
         return current
     if is_standalone_topic_query(current):
+        return current
+    # Do not bleed a prior topic into a clear topic switch
+    # (e.g. pricing → "What does Fikiri do?").
+    current_topic = _primary_router_topic(current)
+    previous_topic = _primary_router_topic(previous)
+    if current_topic and previous_topic and current_topic != previous_topic:
         return current
     content_tokens = _retrieval_tokens(current)
     if len(content_tokens) <= 3 or len(current) <= 32:
