@@ -84,17 +84,26 @@ _MODE_RULES: List[ModeRule] = [
             re.I,
         ),
     ),
+    # Explain how Fikiri works / scopes builds — answer from KB, do not start intake.
+    ModeRule(
+        "engagement_explanation",
+        MODE_ANSWER,
+        re.compile(
+            r"\b(how (?:do|does) (?:you|fikiri) work|how you work with clients|"
+            r"fikiri engagement|how does a fikiri engagement|"
+            r"workflow discovery|same features|features needed|scoped build|"
+            r"custom build(?:-?out)?s?|build something custom|what does a custom|"
+            r"only sell software|do you only sell)\b",
+            re.I,
+        ),
+    ),
     ModeRule(
         "consulting_request",
         MODE_CONSULTING,
         re.compile(
-            r"\b(consulting|implementation help|custom (?:build(?:-?out)?s?|project)|"
+            r"\b(consulting|implementation help|custom project|"
             r"florida smb|done[- ]for[- ]you|professional services|"
-            r"need a quote|help automate|"
-            r"how (?:do|does) (?:you|fikiri) work|how you work with clients|"
-            r"fikiri engagement|workflow discovery|"
-            r"same features|features needed|scoped build|"
-            r"build something custom|only sell software)\b",
+            r"need a quote|help automate|hire (?:you|fikiri))\b",
             re.I,
         ),
     ),
