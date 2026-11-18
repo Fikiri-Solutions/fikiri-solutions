@@ -51,6 +51,13 @@ services:
         sync: false
       - key: SMTP_PASSWORD
         sync: false
+      # Sales-review mode: persist marketing site-bot transcripts for /admin/site-chat.
+      - key: FIKIRI_SITE_BOT_PERSIST_TRANSCRIPTS
+        value: "1"
+      - key: FIKIRI_SITE_BOT_TRANSCRIPT_RETENTION_DAYS
+        value: "90"
+      - key: FIKIRI_SITE_BOT_TRANSCRIPT_HASH_SALT
+        sync: false
     healthCheckPath: /api/health/live
     autoDeploy: true
     branch: main

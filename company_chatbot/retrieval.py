@@ -84,7 +84,7 @@ _TYPO_REPLACEMENTS = (
 )
 
 _TOPIC_RULES: Tuple[Tuple[str, re.Pattern[str], float], ...] = (
-    ("pricing", re.compile(r"\b(price|pricing|cost|plan|trial|starter|growth|business|enterprise|\$?\d{2,3}|how much|free trial|sign up|signup)\b", re.I), 1.0),
+    ("pricing", re.compile(r"\b(price|prices|pricing|cost|costs|plan|plans|trial|starter|growth|business|enterprise|\$?\d{2,3}|how much|free trial|sign up|signup)\b", re.I), 1.0),
     ("product_email", re.compile(r"\b(email assistant|ai email|email automation|inbox assistant|inbox|draft repl|classify|triage)\b", re.I), 1.0),
     ("product_crm", re.compile(r"\b(crm|leads?|pipeline|contacts?|lead management)\b", re.I), 1.0),
     ("workflow_audit", re.compile(r"\b(workflow audit|process audit|intake|operations audit|audit our)\b", re.I), 1.0),
@@ -94,6 +94,20 @@ _TOPIC_RULES: Tuple[Tuple[str, re.Pattern[str], float], ...] = (
     ("boundaries", re.compile(r"\b(hipaa|soc\s*2|soc2|case stud|certified|compliance|guarantee|website design|web design|wordpress|build websites)\b", re.I), 1.0),
     ("company", re.compile(r"\b(what do you do|what does fikiri|who is fikiri|what is fikiri|florida smb|capabilities|offerings?)\b", re.I), 0.9),
     ("contact", re.compile(r"\b(contact|reach|talk to|get in touch|info@|email me|support team)\b", re.I), 0.85),
+)
+
+# Company-overview phrases that must not fire when the query is clearly about pricing.
+_COMPANY_OVERVIEW_PHRASES = frozenset(
+    {
+        "what do you do",
+        "what does fikiri",
+        "who is fikiri",
+    }
+)
+
+_PRICING_INTENT_RE = re.compile(
+    r"\b(cost|costs|price|prices|pricing|how much|\$\d{2,3}|per month|\/mo)\b",
+    re.I,
 )
 
 _PHRASE_CHUNK_BOOSTS: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
@@ -110,6 +124,13 @@ _PHRASE_CHUNK_BOOSTS: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
     ("what do you do", ("company_about", "company_three_capabilities")),
     ("what does fikiri", ("company_about", "company_three_capabilities")),
     ("who is fikiri", ("company_about",)),
+    ("what does fikiri cost", ("pricing_overview", "pricing_starter", "faq_plan_fit")),
+    ("how much does fikiri", ("pricing_overview", "pricing_starter", "faq_plan_fit")),
+    ("what does it cost", ("pricing_overview", "pricing_starter")),
+    ("how much does it cost", ("pricing_overview", "pricing_starter")),
+    ("what are your prices", ("pricing_overview", "pricing_starter", "faq_plan_fit")),
+    ("what are your plans", ("pricing_overview", "faq_plan_fit", "pricing_starter")),
+    ("fikiri pricing", ("pricing_overview", "pricing_starter", "faq_plan_fit")),
     ("how much is starter", ("pricing_starter",)),
     ("starter price", ("pricing_starter",)),
     ("florida smb", ("company_florida_smb", "service_consulting")),
@@ -132,11 +153,13 @@ _PHRASE_CHUNK_BOOSTS: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
 )
 
 _CHUNK_TOPIC_FROM_INTENT: Dict[str, str] = {
+    "pricing_overview": "pricing",
     "pricing_starter": "pricing",
     "pricing_growth": "pricing",
     "pricing_business": "pricing",
     "pricing_enterprise": "pricing",
     "pricing_trial": "pricing",
+    "pricing_plans": "pricing",
     "product_email_assistant": "product_email",
     "product_email": "product_email",
     "product_crm": "product_crm",
@@ -213,7 +236,7 @@ def _retrieval_tokens(text: str) -> Set[str]:
 
 
 _STANDALONE_TOPIC_RE = re.compile(
-    r"\b(how much|price|pricing|starter plan|growth plan|business plan|enterprise plan|"
+    r"\b(how much|price|pricing|cost|costs|starter plan|growth plan|business plan|enterprise plan|"
     r"free trial|\$\d{2,3}|talk to|contact|hipaa|soc\s*2)\b",
     re.I,
 )
@@ -278,30 +301,48 @@ def _chunk_router_topic(chunk: KBChunk) -> str:
 def _topic_adjustment(router_topics: List[Tuple[str, float]], chunk: KBChunk) -> float:
     if not router_topics:
         return 0.0
+    primary_topic, primary_weight = router_topics[0]
     chunk_topic = _chunk_router_topic(chunk)
     matching = [score for topic, score in router_topics if topic == chunk_topic]
     if matching:
         best_match = max(matching)
+        # Stronger primary topic wins: do not fully boost secondary-topic chunks
+        # (e.g. "What does Fikiri cost?" → pricing primary, company secondary).
+        if (
+            chunk_topic != primary_topic
+            and primary_weight >= 0.95
+            and best_match < primary_weight
+        ):
+            return -0.1
         if best_match >= 0.85:
             return 0.28
         if best_match >= 0.7:
             return 0.18
     best_mismatch = max((score for topic, score in router_topics if topic != chunk_topic), default=0.0)
-    primary_topic = router_topics[0][0]
     if best_mismatch >= 0.95 and chunk_topic != primary_topic:
         return -0.12
     return 0.0
 
 
+def _has_pricing_intent(normalized_query: str) -> bool:
+    return bool(_PRICING_INTENT_RE.search(normalized_query))
+
+
 def _phrase_boost(normalized_query: str, chunk: KBChunk) -> float:
     boost = 0.0
+    pricing_intent = _has_pricing_intent(normalized_query)
     for alias in chunk.aliases:
         alias_norm = normalize_query_text(alias)
         if alias_norm and alias_norm in normalized_query:
             boost = max(boost, 0.55)
-    for phrase, chunk_ids in _PHRASE_CHUNK_BOOSTS:
-        if phrase in normalized_query and chunk.id in chunk_ids:
-            boost = max(boost, 0.5)
+    # Longer phrases first so "what does fikiri cost" outranks "what does fikiri".
+    for phrase, chunk_ids in sorted(_PHRASE_CHUNK_BOOSTS, key=lambda item: len(item[0]), reverse=True):
+        if phrase not in normalized_query or chunk.id not in chunk_ids:
+            continue
+        if pricing_intent and phrase in _COMPANY_OVERVIEW_PHRASES:
+            continue
+        boost = max(boost, 0.5)
+        break
     return boost
 
 

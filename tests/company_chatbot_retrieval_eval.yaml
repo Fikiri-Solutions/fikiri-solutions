@@ -47,6 +47,26 @@ cases:
     expected_ids: [integration_outlook, product_ai_email_assistant, product_email_overview]
     topic: integrations
 
+  - name: what_does_fikiri_cost
+    query: What does Fikiri cost?
+    expected_ids: [pricing_overview, pricing_starter]
+    topic: pricing
+
+  - name: how_much_does_fikiri_cost
+    query: How much does Fikiri cost?
+    expected_ids: [pricing_overview, pricing_starter]
+    topic: pricing
+
+  - name: what_are_your_prices
+    query: What are your prices?
+    expected_ids: [pricing_overview, pricing_starter]
+    topic: pricing
+
+  - name: fikiri_pricing_overview
+    query: fikiri pricing
+    expected_ids: [pricing_overview, pricing_starter]
+    topic: pricing
+
   - name: starter_pricing_how_much
     query: How much is Starter?
     expected_ids: [pricing_starter]
@@ -199,6 +219,11 @@ cases:
 
   - name: what_do_you_do
     query: what do you do
+    expected_ids: [company_about, company_three_capabilities]
+    topic: company
+
+  - name: what_does_fikiri_do
+    query: What does Fikiri do?
     expected_ids: [company_about, company_three_capabilities]
     topic: company
 
