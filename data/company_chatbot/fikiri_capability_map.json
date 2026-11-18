@@ -348,6 +348,10 @@
         "service_workflow_audit",
         "service_workflow_audit_focus",
         "service_consulting",
+        "engagement_how_we_work",
+        "engagement_scoped_buildouts",
+        "engagement_platform_plus_custom",
+        "engagement_principles",
         "service_system_fixers"
       ],
       "legacy_family_ids": [

@@ -88,9 +88,13 @@ _MODE_RULES: List[ModeRule] = [
         "consulting_request",
         MODE_CONSULTING,
         re.compile(
-            r"\b(consulting|implementation help|custom (build|project)|"
+            r"\b(consulting|implementation help|custom (?:build(?:-?out)?s?|project)|"
             r"florida smb|done[- ]for[- ]you|professional services|"
-            r"need a quote|help automate)\b",
+            r"need a quote|help automate|"
+            r"how (?:do|does) (?:you|fikiri) work|how you work with clients|"
+            r"fikiri engagement|workflow discovery|"
+            r"same features|features needed|scoped build|"
+            r"build something custom|only sell software)\b",
             re.I,
         ),
     ),

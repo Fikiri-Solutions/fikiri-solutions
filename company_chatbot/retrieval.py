@@ -89,7 +89,17 @@ _TOPIC_RULES: Tuple[Tuple[str, re.Pattern[str], float], ...] = (
     ("product_crm", re.compile(r"\b(crm|leads?|pipeline|contacts?|lead management)\b", re.I), 1.0),
     ("workflow_audit", re.compile(r"\b(workflow audit|process audit|intake|operations audit|audit our)\b", re.I), 1.0),
     ("integrations", re.compile(r"\b(gmail|outlook|google workspace|microsoft 365|integration)\b", re.I), 0.85),
-    ("services", re.compile(r"\b(consulting|implementation|done[- ]for[- ]you|system fixers|custom build)\b", re.I), 0.9),
+    (
+        "services",
+        re.compile(
+            r"\b(consulting|implementation|done[- ]for[- ]you|system fixers|custom build|"
+            r"build-?outs?|how (?:do|does) (?:you|fikiri) work|engagement|"
+            r"scoped build|same features|features needed|workflow discovery|"
+            r"how you work with clients|only sell software|custom tools)\b",
+            re.I,
+        ),
+        1.0,
+    ),
     ("industries", re.compile(r"\b(landscap|restaurant|dental|medical|clinic|hvac|trades|contractor|hospitality|lawn)\b", re.I), 0.95),
     ("boundaries", re.compile(r"\b(hipaa|soc\s*2|soc2|case stud|certified|compliance|guarantee|website design|web design|wordpress|build websites)\b", re.I), 1.0),
     ("company", re.compile(r"\b(what do you do|what does fikiri|who is fikiri|what is fikiri|florida smb|capabilities|offerings?)\b", re.I), 0.9),
@@ -115,6 +125,16 @@ _PHRASE_CHUNK_BOOSTS: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
     ("email assistant", ("product_ai_email_assistant", "product_email_assistant_goal", "product_email_overview")),
     ("email automation", ("product_email_overview", "product_ai_email_assistant", "product_email_classify")),
     ("workflow audit", ("service_workflow_audit", "service_workflow_audit_focus", "contact_intake_path")),
+    ("how do you work", ("engagement_how_we_work", "engagement_scoped_buildouts", "engagement_principles")),
+    ("how does fikiri work", ("engagement_how_we_work", "engagement_scoped_buildouts")),
+    ("how does a fikiri engagement", ("engagement_how_we_work", "engagement_scoped_buildouts")),
+    ("how you work with clients", ("engagement_how_we_work", "engagement_scoped_buildouts")),
+    ("custom build-out", ("engagement_scoped_buildouts", "service_consulting", "engagement_platform_plus_custom")),
+    ("custom build", ("engagement_scoped_buildouts", "service_consulting", "engagement_platform_plus_custom")),
+    ("same features", ("engagement_scoped_buildouts", "engagement_platform_plus_custom")),
+    ("features needed", ("engagement_scoped_buildouts", "engagement_how_we_work")),
+    ("workflow discovery", ("engagement_how_we_work", "service_workflow_audit", "engagement_scoped_buildouts")),
+    ("only sell software", ("engagement_platform_plus_custom", "engagement_how_we_work")),
     ("starter plan", ("pricing_starter",)),
     ("free trial", ("faq_free_trial", "signup_trial")),
     ("lead management", ("product_crm_overview", "product_crm_activity")),
@@ -169,6 +189,10 @@ _CHUNK_TOPIC_FROM_INTENT: Dict[str, str] = {
     "boundary": "boundaries",
     "company": "company",
     "contact": "contact",
+    "service_engagement": "services",
+    "service_scoped_build": "services",
+    "service_platform_custom": "services",
+    "service_principles": "services",
     "service": "services",
 }
 
@@ -239,7 +263,8 @@ _STANDALONE_TOPIC_RE = re.compile(
     r"\b(how much|price|prices|pricing|cost|costs|starter plan|growth plan|business plan|enterprise plan|"
     r"free trial|\$\d{2,3}|talk to|contact|hipaa|soc\s*2|"
     r"what do you do|what does fikiri do|what does fikiri cost|who is fikiri|what is fikiri|"
-    r"what are your prices|what are your plans|fikiri pricing)\b",
+    r"what are your prices|what are your plans|fikiri pricing|"
+    r"how do you work|how does fikiri work|custom build(?:-?out)?s?|same features)\b",
     re.I,
 )
 

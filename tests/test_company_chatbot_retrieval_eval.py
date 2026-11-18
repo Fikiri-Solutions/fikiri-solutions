@@ -33,7 +33,7 @@ def reset_kb_cache():
 
 def test_retrieval_eval_hit_rates():
     cases = _load_cases()
-    assert 50 <= len(cases) <= 95, f"expected 50-95 eval cases, got {len(cases)}"
+    assert 50 <= len(cases) <= 110, f"expected 50-110 eval cases, got {len(cases)}"
 
     hit1 = 0
     hit3 = 0

@@ -275,7 +275,37 @@ cases:
 
   - name: consulting_services
     query: Do you offer implementation consulting?
-    expected_ids: [service_consulting]
+    expected_ids: [service_consulting, engagement_how_we_work]
+
+  - name: how_do_you_work
+    query: How do you work with clients?
+    expected_ids: [engagement_how_we_work, engagement_scoped_buildouts]
+    topic: services
+
+  - name: custom_buildouts_vary
+    query: What does a custom build-out look like?
+    expected_ids: [engagement_scoped_buildouts, service_consulting]
+    topic: services
+
+  - name: same_features_every_project
+    query: Does every project get the same features?
+    expected_ids: [engagement_scoped_buildouts, engagement_platform_plus_custom]
+    topic: services
+
+  - name: build_something_custom
+    query: Can you build something custom for my business?
+    expected_ids: [engagement_scoped_buildouts, service_consulting, engagement_platform_plus_custom]
+    topic: services
+
+  - name: engagement_process
+    query: How does a Fikiri engagement work?
+    expected_ids: [engagement_how_we_work, engagement_scoped_buildouts]
+    topic: services
+
+  - name: only_sell_software
+    query: Do you only sell software?
+    expected_ids: [engagement_platform_plus_custom, engagement_how_we_work]
+    topic: services
     topic: services
 
   - name: system_fixers
