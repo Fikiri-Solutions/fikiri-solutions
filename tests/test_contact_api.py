@@ -241,6 +241,57 @@ class TestContactApi(unittest.TestCase):
         mock_send.assert_called_once()
         self.assertTrue(mock_intake_db.execute_query.called)
 
+    @patch.dict(os.environ, {"FIKIRI_INTAKE_LEAD_OWNER_USER_ID": "1"}, clear=False)
+    @patch("core.contact_api.CONTACT_FROM_EMAIL", "noreply@test.com")
+    @patch("core.contact_api.CONTACT_TO_EMAIL", "info@test.com")
+    @patch("core.contact_api.check_public_intake_rate_limit")
+    @patch("core.lead_form_notifications.send_lead_slack_notification", return_value=True)
+    @patch("core.contact_api._send_contact_email", return_value=True)
+    @patch("core.consultation_intake_service.db_optimizer")
+    @patch("crm.service.enhanced_crm_service")
+    def test_short_form_intake_without_business_name_stores_interests(
+        self, mock_crm, mock_intake_db, mock_send, mock_slack, mock_rl, *_
+    ):
+        from core.rate_limiter import RateLimitResult
+
+        mock_rl.return_value = RateLimitResult(
+            allowed=True, remaining=9, reset_time=0, retry_after=0, limit=10
+        )
+        mock_crm.create_lead.return_value = {"success": True, "data": {"lead_id": 101}}
+        mock_intake_db.execute_query.return_value = None
+
+        payload = {
+            "contact_name": "Alex Rivera",
+            "email": "alex@example.com",
+            "main_pain": "Website redesign and lead follow-up",
+            "service_interests": [
+                "website_design_development",
+                "leads_customer_management",
+            ],
+            "service_detail": "redesign",
+            "preferred_next_step": "follow_up",
+            "correlation_id": "short-form-test-1",
+        }
+        response = self.client.post("/api/intake", json=payload)
+        self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+        data = json.loads(response.data)
+        self.assertTrue(data.get("success"))
+        self.assertEqual(data.get("correlation_id"), "short-form-test-1")
+        self.assertEqual(data.get("preferred_next_step"), "follow_up")
+
+        lead = mock_crm.create_lead.call_args[0][1]
+        self.assertEqual(lead["email"], "alex@example.com")
+        self.assertIsNone(lead.get("company"))
+        meta = lead.get("metadata") or {}
+        self.assertEqual(meta.get("intake_version"), 2)
+        self.assertEqual(
+            meta.get("service_interests"),
+            ["website_design_development", "leads_customer_management"],
+        )
+        self.assertEqual(meta.get("lead_interests"), meta.get("service_interests"))
+        self.assertEqual(meta.get("service_detail"), "redesign")
+        mock_slack.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

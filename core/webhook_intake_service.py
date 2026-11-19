@@ -354,11 +354,24 @@ class WebhookIntakeService:
                     logger.warning(f"⚠️ Failed to sync to Notion: {notion_result.get('error')}")
             # else: notion_connector is None (feature not implemented)
             
-            logger.info(f"✅ Successfully processed lead: {lead_data['email']}")
+            logger.info(
+                "✅ Successfully processed webhook lead source=%s lead_id=%s created=%s",
+                lead_data.get("source"),
+                lead_id,
+                bool(db_result.get("created")),
+            )
+            slack_queued = self._notify_lead_slack(
+                lead_data,
+                lead_id=lead_id,
+                created=bool(db_result.get("created")),
+                submission_id=submission_id,
+            )
             result = {
                 "success": True,
                 "lead_id": lead_id,
-                "message": "Lead processed successfully"
+                "created": bool(db_result.get("created")),
+                "slack_queued": slack_queued,
+                "message": "Lead processed successfully",
             }
             if key:
                 idempotency_manager.update_key_result(key, 'completed', result)
@@ -369,6 +382,49 @@ class WebhookIntakeService:
             if key:
                 idempotency_manager.update_key_result(key, 'failed', {"success": False, "error": str(e)})
             return {"success": False, "error": str(e)}
+
+    def _notify_lead_slack(
+        self,
+        lead_data: Dict[str, Any],
+        *,
+        lead_id: Any,
+        created: bool,
+        submission_id: Optional[Any],
+    ) -> bool:
+        """Enqueue Slack for a newly processed webhook lead. Fail-open; never raises."""
+        try:
+            from core.lead_form_notifications import lead_dedupe_key, send_lead_slack_notification
+
+            source = str(lead_data.get("source") or "webhook")
+            email = str(lead_data.get("email") or "")
+            name = str(lead_data.get("name") or "—")
+            dedupe = lead_dedupe_key(
+                "webhook",
+                source,
+                submission_id or "",
+                email,
+            )
+            return send_lead_slack_notification(
+                title=f"Webhook lead ({source}): {name}",
+                text=str(lead_data.get("notes") or "")[:1500] or "New form submission",
+                fields=[
+                    {"title": "Email", "value": email or "—", "short": True},
+                    {"title": "Phone", "value": lead_data.get("phone") or "—", "short": True},
+                    {"title": "Company", "value": lead_data.get("company") or "—", "short": True},
+                    {"title": "Source", "value": source, "short": True},
+                    {"title": "Lead ID", "value": str(lead_id), "short": True},
+                    {
+                        "title": "DB",
+                        "value": "created" if created else "updated",
+                        "short": True,
+                    },
+                ],
+                dedupe_key=dedupe,
+                blocking=False,
+            )
+        except Exception as e:
+            logger.warning("Webhook lead Slack notify failed: %s", e)
+            return False
     
     def _store_lead_in_db(self, lead_data: Dict[str, Any]) -> Dict[str, Any]:
         """Store lead data in the database"""
@@ -396,7 +452,7 @@ class WebhookIntakeService:
                     ),
                     fetch=False
                 )
-                return {"success": True, "lead_id": lead_id}
+                return {"success": True, "lead_id": lead_id, "created": False}
 
             # Insert lead into database
             query = """
@@ -424,7 +480,7 @@ class WebhookIntakeService:
             
             db_optimizer.execute_query(query, values, fetch=False)
             
-            return {"success": True, "lead_id": lead_data['id']}
+            return {"success": True, "lead_id": lead_data['id'], "created": True}
             
         except Exception as e:
             logger.error(f"❌ Failed to store lead in database: {e}")

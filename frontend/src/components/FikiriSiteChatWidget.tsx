@@ -40,7 +40,7 @@ function nextLineId(): string {
 
 function handoffLabel(handoffType: string | null | undefined): string {
   if (handoffType === 'contact') return 'Contact us'
-  if (handoffType === 'intake') return 'Start workflow intake'
+  if (handoffType === 'intake') return 'Continue to intake'
   return 'Continue'
 }
 
@@ -174,7 +174,9 @@ export const FikiriSiteChatWidget: React.FC = () => {
     return () => window.clearTimeout(timer)
   }, [loading, open])
 
-  const handoffHref = lastReply ? handoffPath(lastReply.handoff) : null
+  const handoffHref = lastReply
+    ? handoffPath(lastReply.handoff, lastReply.intake)
+    : null
   const handoffCta = handoffLabel(lastReply?.handoff.handoff_type)
 
   return (

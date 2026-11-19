@@ -2072,10 +2072,12 @@ class ApiClient {
   /**
    * Public consultation intake → CRM (when FIKIRI_INTAKE_LEAD_OWNER_USER_ID is set) + notification email.
    * Field names match POST /api/intake (see core/consultation_intake_service.py).
+   * Short-form v2: contact_name + email required; business_name optional; service_interests optional.
+   * Legacy long-form keys remain accepted.
    */
   async submitConsultationIntake(payload: {
     leave_blank?: string
-    business_name: string
+    business_name?: string
     contact_name: string
     email: string
     phone?: string
@@ -2096,7 +2098,23 @@ class ApiClient {
     main_pain?: string
     automation_opportunity?: string
     fixed_looks_like?: string
-  }): Promise<{ success: boolean; message?: string; error?: string; error_code?: string }> {
+    service_interests?: string[] | string
+    service_detail?: string | string[]
+    project_clarity?: string
+    timeline_readiness?: string
+    budget_readiness?: string
+    lead_priority_band?: string
+    preferred_next_step?: string
+    correlation_id?: string
+  }): Promise<{
+    success: boolean
+    message?: string
+    error?: string
+    error_code?: string
+    correlation_id?: string
+    crm_ok?: boolean
+    preferred_next_step?: string | null
+  }> {
     const response = await this.client.post('/intake', payload, {
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
     })

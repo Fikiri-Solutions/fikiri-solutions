@@ -3,6 +3,7 @@
  */
 
 import { config } from '../config'
+import { buildIntakeHandoffPath } from '../lib/consultationIntake'
 import type {
   FikiriSiteChatHandoff,
   FikiriSiteChatIntake,
@@ -63,7 +64,12 @@ export async function sendSiteChatMessage(
   })
 }
 
-export function handoffPath(handoff: FikiriSiteChatHandoff): string | null {
+export function handoffPath(
+  handoff: FikiriSiteChatHandoff,
+  intake?: FikiriSiteChatIntake | null
+): string | null {
   if (!handoff.applicable || !handoff.secondary) return null
-  return handoff.secondary
+  const path = handoff.secondary
+  if (!path.startsWith('/intake')) return path
+  return buildIntakeHandoffPath(path, intake?.slots ?? null)
 }

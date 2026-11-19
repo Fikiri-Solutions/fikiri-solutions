@@ -18,9 +18,20 @@ class TestWebhookIntakeService(unittest.TestCase):
         with patch("core.webhook_intake_service.get_sheets_connector", return_value=None):
             from core.webhook_intake_service import WebhookConfig, WebhookIntakeService
 
-            cfg = WebhookConfig(secret_key="secret", allowed_origins=["*"], enable_verification=True)
+            cfg = WebhookConfig(
+                secret_key="your-test-webhook-secret",
+                allowed_origins=["*"],
+                enable_verification=True,
+            )
             self.service = WebhookIntakeService(cfg)
             self._tenant_id = 99
+        # Default: no real Slack posts from webhook lead processing.
+        self._slack_patcher = patch(
+            "core.lead_form_notifications.send_lead_slack_notification",
+            return_value=False,
+        )
+        self._mock_slack = self._slack_patcher.start()
+        self.addCleanup(self._slack_patcher.stop)
 
     def test_verify_webhook_signature_valid_and_invalid(self):
         payload = '{"event":"test"}'
@@ -44,7 +55,7 @@ class TestWebhookIntakeService(unittest.TestCase):
 
         def _store(lead_data):
             captured.update(lead_data)
-            return {"success": True, "lead_id": "lead_x"}
+            return {"success": True, "lead_id": "lead_x", "created": True}
 
         self.service._store_lead_in_db = _store
         self.service.sheets_connector = MagicMock(add_lead=MagicMock(return_value={"success": True}))
@@ -56,12 +67,16 @@ class TestWebhookIntakeService(unittest.TestCase):
             "company": "ACME",
             "message": "Hi"
         }}
+        self._mock_slack.return_value = True
         result = self.service.process_tally_webhook(data, owner_user_id=self._tenant_id)
         self.assertTrue(result.get("success"))
         self.assertIn("lead_id", result)
+        self.assertTrue(result.get("slack_queued"))
         self.assertEqual(captured.get("email"), "a@b.com")
         self.assertEqual(captured.get("source"), "tally")
         self.assertEqual(captured.get("user_id"), self._tenant_id)
+        self._mock_slack.assert_called_once()
+        self.assertIn("webhook", self._mock_slack.call_args.kwargs.get("dedupe_key", ""))
 
     def test_process_typeform_webhook_maps_fields(self):
         captured = {}
@@ -129,10 +144,15 @@ class TestWebhookIntakeService(unittest.TestCase):
 
     def test_webhook_idempotency_prevents_duplicate(self):
         calls = {"count": 0}
+        slack_calls = {"count": 0}
 
         def _store(lead_data):
             calls["count"] += 1
-            return {"success": True, "lead_id": "lead_x"}
+            return {"success": True, "lead_id": "lead_x", "created": True}
+
+        def _slack(**_kwargs):
+            slack_calls["count"] += 1
+            return True
 
         class _Idem:
             def __init__(self):
@@ -157,6 +177,7 @@ class TestWebhookIntakeService(unittest.TestCase):
             "email": "a@b.com",
         }}
 
+        self._mock_slack.side_effect = _slack
         with patch("core.webhook_intake_service.idempotency_manager", new=_Idem()):
             result1 = self.service.process_tally_webhook(data, owner_user_id=self._tenant_id)
             result2 = self.service.process_tally_webhook(data, owner_user_id=self._tenant_id)
@@ -164,6 +185,7 @@ class TestWebhookIntakeService(unittest.TestCase):
         self.assertTrue(result1.get("success"))
         self.assertTrue(result2.get("success"))
         self.assertEqual(calls["count"], 1)
+        self.assertEqual(slack_calls["count"], 1)
 
     def test_store_lead_in_db_failure(self):
         with patch("core.webhook_intake_service.db_optimizer") as mock_db:

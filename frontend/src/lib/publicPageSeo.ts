@@ -50,7 +50,7 @@ export const PUBLIC_PAGE_SEO: readonly PublicPageSeo[] = [
     path: '/contact',
     title: 'Contact Fikiri Solutions',
     description:
-      'Questions, feedback, or a demo? Contact Fikiri Solutions — or complete a consultation intake so we can focus on your workflow.',
+      'Questions, feedback, or a demo? Contact Fikiri Solutions — or start a short consultation intake so we can focus on what you need.',
     changefreq: 'monthly',
     priority: 0.8,
   },
@@ -58,7 +58,7 @@ export const PUBLIC_PAGE_SEO: readonly PublicPageSeo[] = [
     path: '/intake',
     title: 'Consultation Intake | Fikiri Solutions',
     description:
-      'Start a workflow conversation with Fikiri. Share how your business operates so we can prepare a practical consultation.',
+      'Tell Fikiri what you need in about a minute — websites, custom software, automation, and more — then book a consult or request a follow-up.',
     changefreq: 'monthly',
     priority: 0.9,
   },

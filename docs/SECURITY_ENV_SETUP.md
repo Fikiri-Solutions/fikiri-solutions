@@ -27,7 +27,8 @@ If credentials may have appeared in chat, logs, or git history:
 | Microsoft OAuth | `MICROSOFT_CLIENT_*` | Azure App Registration |
 | Yahoo OAuth | `YAHOO_CLIENT_*` | Yahoo Developer Network |
 | SMTP | `SMTP_PASSWORD` | Email provider app password |
-| Slack | `SLACK_WEBHOOK_URL` | Slack app → regenerate webhook |
+| Slack (ops) | `SLACK_WEBHOOK_URL` | Slack app → Incoming Webhook (ops channel) |
+| Slack (leads) | `LEAD_SLACK_WEBHOOK_URL` | Slack app → Incoming Webhook for `#leads` (see `docs/LEAD_SLACK_NOTIFICATIONS.md`) |
 | Pinecone | `PINECONE_API_KEY` | Pinecone console |
 | Twilio | `TWILIO_AUTH_TOKEN`, `TWILIO_ACCOUNT_SID` | Twilio console |
 | Notion | `NOTION_API_KEY` | Notion integrations |

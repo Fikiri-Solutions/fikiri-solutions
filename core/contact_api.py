@@ -185,7 +185,7 @@ def submit_contact():
 
     sent = _send_contact_email(CONTACT_TO_EMAIL, email_subject, body)
 
-    from core.lead_form_notifications import send_lead_slack_notification
+    from core.lead_form_notifications import lead_dedupe_key, send_lead_slack_notification
 
     slack_sent = send_lead_slack_notification(
         title=f"New contact form: {name}",
@@ -202,6 +202,8 @@ def submit_contact():
                 "short": True,
             },
         ],
+        dedupe_key=lead_dedupe_key("contact", email, message[:200]),
+        blocking=False,
     )
 
     # Persist customer submission so it isn't lost if email/Slack sending is temporarily failing.
@@ -327,12 +329,11 @@ def submit_consultation_intake():
             429,
         )
 
-    if not p.get("business_name"):
-        return jsonify({"success": False, "error": "Business name is required"}), 400
     if not p.get("contact_name"):
         return jsonify({"success": False, "error": "Contact name is required"}), 400
     if not validate_intake_email(p.get("email") or ""):
         return jsonify({"success": False, "error": "Valid email is required"}), 400
+    # business_name is optional on short-form intake; never fabricate a company name.
 
     correlation_id = get_or_create_correlation_id(request, data)
     outcome = process_public_intake(
@@ -384,6 +385,9 @@ def submit_consultation_intake():
             {
                 "success": True,
                 "message": "Thank you. We received your intake and will use it to prepare for your conversation.",
+                "correlation_id": correlation_id,
+                "crm_ok": outcome.crm_ok,
+                "preferred_next_step": p.get("preferred_next_step") or None,
             }
         ),
         200,

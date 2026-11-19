@@ -12,4 +12,14 @@ describe('siteChatApi helpers', () => {
     ).toBe('/intake')
     expect(handoffPath({ applicable: false, secondary: '/contact' })).toBeNull()
   })
+
+  it('prefills intake handoff from chat slots', () => {
+    const path = handoffPath(
+      { applicable: true, secondary: '/intake', handoff_type: 'intake' },
+      { active: false, complete: true, slots: { industry: 'dental', contact_email: 'a@b.co' } }
+    )
+    expect(path).toContain('/intake?')
+    expect(path).toContain('industry=dental')
+    expect(path).toContain('email=a%40b.co')
+  })
 })

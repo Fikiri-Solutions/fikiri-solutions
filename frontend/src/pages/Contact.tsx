@@ -76,11 +76,11 @@ export const Contact: React.FC = () => {
                 Questions, feedback, or a demo? We’ll get back to you soon.
               </p>
               <p className="font-serif text-sm text-white/55 mb-8">
-                Booking a consultation? Complete the{' '}
+                Ready for a consult? The{' '}
                 <Link to="/intake" className="text-orange-300 font-medium hover:underline">
-                  consultation intake
+                  short intake
                 </Link>{' '}
-                first (about 10–15 minutes) so we can focus the session on your workflow.
+                takes about a minute so we know what you need before we talk.
               </p>
 
               {success && (

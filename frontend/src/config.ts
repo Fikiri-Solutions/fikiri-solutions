@@ -63,6 +63,13 @@ export const config = {
   version: '1.0.20', // WebSocket gated by VITE_ENABLE_WEBSOCKET
   buildTimestamp: '2026-04-04T00:00:00Z',
   cacheVersion: 'v1.0.20-20260404',
+
+  /**
+   * External consultation calendar (Calendly, Cal.com, etc.).
+   * Empty = show email follow-up only; never invent available slots client-side.
+   * Set VITE_CONSULTATION_BOOKING_URL at build time when a provider link exists.
+   */
+  consultationBookingUrl: String(import.meta.env.VITE_CONSULTATION_BOOKING_URL || '').trim(),
   
   // Development flags
   isDevelopment: typeof window !== 'undefined' && window.location.hostname === 'localhost',
