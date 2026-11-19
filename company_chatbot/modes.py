@@ -143,7 +143,29 @@ _MODE_RULES: List[ModeRule] = [
             r"(?:help|need).{0,16}(?:managing|track) customers|"
             r"something like a crm|incoming leads system|"
             r"tell me about (?:crm|the ai email)|"
-            r"slipping through the cracks|stop missing leads|nobody follows up)\b",
+            r"slipping through the cracks|stop missing leads|nobody follows up|"
+            r"do you have (?:a )?crm|crm for (?:small )?teams|"
+            r"ai assistant respond|respond to customer emails|"
+            r"what(?:'s| is) included in (?:the )?starter|starter plan|"
+            r"how much (?:y'?all|you) charge|charge for this|"
+            r"work wit (?:my )?outlook|wit my outlook|"
+            r"sumthin that answer|answer my emails|"
+            r"same (?:questions|things|faqs)|customers ask the same|"
+            r"forget to pay|chasing payments|running out of|"
+            r"enter the same information|three systems|"
+            r"website (?:doesn'?t|does not) connect|website visitors|"
+            r"which jobs make|don'?t know which jobs|"
+            r"filling out the same paperwork|same paperwork|"
+            r"can (?:system|this) (?:answer|help|connect)|"
+            r"software we use|talk through you|"
+            r"process feels stuck|office not connect|"
+            r"become customer|visit site|"
+            r"forget fi pay|same info in three|"
+            r"who ordered|ordered what|track who|"
+            r"actually pay|outstanding balances|which ones pay|"
+            r"which accounts|profitability|retainers vs|"
+            r"interest forms|forms pile|pile up unanswered|"
+            r"booking requests.{0,24}get lost)\b",
             re.I,
         ),
     ),
@@ -162,7 +184,17 @@ _BUSINESS_NEED_RE = re.compile(
     r"restaurant reservations|dental clinic|website form|intake crm|"
     r"quote request workflow|cleaning business|something that follows|"
     r"automate just|website or|need a site|need a form|"
-    r"can you make|books appointments|stop losing|book and remind)\b",
+    r"can you make|books appointments|stop losing|book and remind|"
+    r"dispatch|double book|scheduling|schedule|paperwork|invoic|"
+    r"quotes? for|follow(?:s|ing)? up|keep track of|"
+    r"running out of|who'?s doing what|three systems|"
+    r"software we already|work with the software|"
+    r"inefficient|office is (?:a )?mess|trucking|barbershop|"
+    r"do you have (?:a )?crm|crm for|starter plan|"
+    r"ai assistant|respond to (?:customer )?emails|"
+    r"included in (?:the )?starter|what(?:'s| is) included|"
+    r"profitability|interest forms|forms pile|retainers vs|"
+    r"who ordered|actually pay|outstanding balances)\b",
     re.I,
 )
 

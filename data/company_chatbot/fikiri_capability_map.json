@@ -104,6 +104,16 @@
         "track customers",
         "managing customers",
         "something like a crm",
+        "do you have a crm",
+        "crm for small",
+        "customer list",
+        "keep track of all my customers",
+        "track of all my customers",
+        "who ordered",
+        "ordered what",
+        "order history",
+        "track who",
+        "customer orders",
         "emails and leads in one place",
         "customer records",
         "stop losing leads",
@@ -206,7 +216,18 @@
         "one workflow",
         "only need one small workflow fixed",
         "automate just our quote request workflow",
-        "quote request workflow"
+        "quote request workflow",
+        "scheduling",
+        "dispatch",
+        "double book",
+        "double booking",
+        "crew schedule",
+        "staff schedules",
+        "who's doing what",
+        "who is doing what",
+        "paperwork",
+        "same information in three",
+        "three systems"
       ],
       "related_families": [
         "forms_and_intake",
@@ -296,7 +317,12 @@
         "dashboard",
         "analytics",
         "reporting",
-        "see what's working"
+        "see what's working",
+        "which ones pay",
+        "actually pay",
+        "outstanding balances",
+        "which accounts",
+        "who paid"
       ],
       "related_families": [
         "crm_and_lead_tracking"

@@ -178,6 +178,22 @@ def test_metadata_snapshots_serialize_safely(monkeypatch):
     json.dumps(assistant)
 
 
+def test_study_meta_captured_for_training_review(monkeypatch):
+    monkeypatch.setenv("FIKIRI_SITE_BOT_PERSIST_TRANSCRIPTS", "1")
+    result = _sample_result()
+    persist_message_turn(
+        session_id="site_study",
+        user_message="restaurant regulars — how do I track who ordered what last time",
+        result=result,
+    )
+    user_msg, assistant = get_transcript_session("site_study")["messages"]
+    assert user_msg["meta"]["purpose"] == "study_training"
+    assert "customer_management" in (user_msg["meta"].get("business_need_ids") or [])
+    assert assistant["meta"]["purpose"] == "study_training"
+    assert assistant["meta"]["mode"] == result.mode
+    assert "routing" in assistant["meta"]
+
+
 def test_parse_json_field_accepts_already_parsed_objects():
     from company_chatbot.transcript_store import _parse_json_field
 

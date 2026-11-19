@@ -162,6 +162,9 @@ _PHRASE_CHUNK_BOOSTS: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
     ("stop missing leads", ("product_email_assistant_goal", "workflow_inquiry_leak", "product_crm_overview")),
     ("slipping through the cracks", ("workflow_inquiry_leak", "product_crm_overview", "product_email_assistant_goal")),
     ("follow up automatically", ("product_email_draft", "product_crm_activity", "product_ai_email_assistant")),
+    ("follows up for me", ("product_email_draft", "product_crm_activity", "product_ai_email_assistant")),
+    ("something that follows up", ("product_email_draft", "product_crm_activity", "product_ai_email_assistant")),
+    ("need something that follows up", ("product_email_draft", "product_crm_activity", "product_ai_email_assistant")),
     ("managing customers", ("product_crm_overview", "product_crm_practical")),
     ("track customers", ("product_crm_overview", "product_crm_activity")),
     ("gmail stuff", ("integration_gmail", "product_ai_email_assistant")),
@@ -279,6 +282,12 @@ def _primary_router_topic(query: str) -> str | None:
 
 
 def effective_query_for_retrieval(query: str, previous_query: str | None = None) -> str:
+    """Blend prior turn only for short/incomplete follow-ups.
+
+    ContextDependencyDetector is eval/diagnostics-only — do not route live
+    retrieval through it (follow-up cues like "What about Gmail?" must keep
+    topic-switch behavior so integration chunks still rank).
+    """
     current = (query or "").strip()
     previous = (previous_query or "").strip()
     if not current or not previous:

@@ -178,6 +178,15 @@ def detect_needs(
         if hits:
             family_scores[family.id] = family_scores.get(family.id, 0.0) + hits * _PHRASE_SCORE
 
+    # Business-need concepts (scheduling, follow-ups, etc.) boost families without
+    # requiring industry-specific aliases.
+    from company_chatbot.business_needs import detect_business_needs
+
+    business_needs = detect_business_needs(effective)
+    for family_id, boost in business_needs.family_boosts.items():
+        if family_id in cmap.families:
+            family_scores[family_id] = family_scores.get(family_id, 0.0) + boost
+
     if _UNCERTAINTY_RE.search(normalized):
         family_scores["consulting_and_workflow_audit"] = (
             family_scores.get("consulting_and_workflow_audit", 0.0) + 1.6
@@ -207,12 +216,57 @@ def detect_needs(
     best_bundle: Optional[BundleDef] = None
     best_bundle_score = 0.0
     detected_family_set = set(detected_families)
+    # Related-family bleed can make Lead Intake win on CRM/reporting questions that
+    # never mentioned website/forms. Prefer audit/custom path unless intake phrases hit.
+    primary_need = business_needs.primary_need_id
+    intake_requires_phrases = primary_need in {
+        "customer_management",
+        "reporting_analytics",
+        "payments_billing",
+        "scheduling_dispatch",
+        "document_automation",
+        "data_sync",
+        "employee_coordination",
+        "inventory",
+        "quotes_invoicing",
+        "integrations",
+    }
     for bundle in cmap.bundles.values():
         bundle_phrase_hits = _phrase_hits(normalized, bundle.client_phrases)
+        if (
+            intake_requires_phrases
+            and bundle.id == "lead_intake_system"
+            and bundle_phrase_hits <= 0
+        ):
+            continue
+        if (
+            primary_need == "customer_management"
+            and bundle.id == "email_workflow_assistant"
+            and bundle_phrase_hits <= 0
+        ):
+            continue
+        if (
+            primary_need in {"reporting_analytics", "customer_management"}
+            and bundle.id in {"booking_and_payments_flow", "email_workflow_assistant"}
+            and bundle_phrase_hits <= 0
+        ):
+            continue
         overlap = len(detected_family_set & set(bundle.family_ids))
         overlap_ratio = overlap / max(len(bundle.family_ids), 1)
         score = bundle_phrase_hits * 1.2 + overlap_ratio * len(bundle.family_ids) * _BUNDLE_FAMILY_OVERLAP_WEIGHT
-        if bundle.id == "workflow_audit_path" and _UNCERTAINTY_RE.search(normalized):
+        if bundle.id == "workflow_audit_path" and (
+            _UNCERTAINTY_RE.search(normalized)
+            or primary_need
+            in {
+                "reporting_analytics",
+                "scheduling_dispatch",
+                "document_automation",
+                "data_sync",
+                "employee_coordination",
+                "inventory",
+                "business_discovery",
+            }
+        ):
             score += 1.5
         if score > best_bundle_score:
             best_bundle_score = score
@@ -279,18 +333,45 @@ def should_use_capability_bridge(needs: NeedsDetectionResult) -> bool:
 def compose_capability_bridge(
     needs: NeedsDetectionResult,
     chunks: Sequence[object],
+    *,
+    original_query: str | None = None,
 ) -> str:
     cmap = _cached_map()
+    from company_chatbot.business_needs import detect_business_needs, qualified_bridge_suffix
+
+    business_needs = detect_business_needs(original_query or needs.query)
     labels = [cmap.families[fid].label for fid in needs.detected_families[:3] if fid in cmap.families]
     if not labels:
         labels = ["workflow automation"]
 
-    opener = (
-        f"That sounds like a mix of {labels[0]}"
-        + (f", {labels[1]}" if len(labels) > 1 else "")
-        + (f", and {labels[2]}" if len(labels) > 2 else "")
-        + "."
-    )
+    claim_text = ""
+    if business_needs.hits:
+        need_labels = [hit.label for hit in business_needs.hits[:2]]
+        opener = (
+            f"That sounds like a {need_labels[0].lower()} problem"
+            + (f" (and {need_labels[1].lower()})" if len(need_labels) > 1 else "")
+            + f", which often connects to {labels[0]}"
+            + (f" and {labels[1]}" if len(labels) > 1 else "")
+            + "."
+        )
+        from company_chatbot.business_needs import load_business_need_taxonomy
+
+        tax = {need.id: need for need in load_business_need_taxonomy()}
+        primary = tax.get(business_needs.primary_need_id or "")
+        if primary and primary.allowed_claims:
+            # Prefer a more specific allowed claim when later claims exist and the
+            # query already matched multiple concept phrases for this need.
+            claim_idx = 0
+            if len(primary.allowed_claims) > 1 and business_needs.hits[0].score >= 2:
+                claim_idx = 1
+            claim_text = " " + primary.allowed_claims[claim_idx]
+    else:
+        opener = (
+            f"That sounds like a mix of {labels[0]}"
+            + (f", {labels[1]}" if len(labels) > 1 else "")
+            + (f", and {labels[2]}" if len(labels) > 2 else "")
+            + "."
+        )
 
     bundle_text = ""
     if needs.suggested_bundle and needs.suggested_bundle in cmap.bundles:
@@ -305,11 +386,29 @@ def compose_capability_bridge(
             + "."
         )
 
-    evidence = getattr(chunks[0], "text", "").strip() if chunks else ""
+    # Only ground with chunks tied to detected needs — avoid unrelated trial/pricing dumps.
+    # Prefer taxonomy claim language when present; keep one short KB sentence otherwise.
+    evidence_text = ""
+    if not claim_text:
+        evidence = ""
+        allowed_ids = set(needs.kb_chunk_ids or [])
+        for chunk in chunks or []:
+            chunk_id = getattr(chunk, "id", None)
+            text = getattr(chunk, "text", "") or ""
+            if not text:
+                continue
+            if allowed_ids and chunk_id not in allowed_ids:
+                continue
+            evidence = text.strip()
+            break
+        if evidence and len(evidence) > 220:
+            evidence = evidence[:217].rstrip() + "…"
+        evidence_text = f" {evidence}" if evidence else ""
+
     next_step = ""
     if needs.suggested_bundle and needs.suggested_bundle in cmap.bundles:
         next_step = " " + cmap.bundles[needs.suggested_bundle].next_step
-    elif needs.detected_families and "consulting_and_workflow_audit" in needs.detected_families:
-        next_step = " Fikiri would usually start by mapping the workflow before picking a first build."
+    else:
+        next_step = qualified_bridge_suffix(business_needs)
 
-    return f"{opener}{bundle_text}{capability_text} {evidence}{next_step}".strip()
+    return f"{opener}{claim_text}{bundle_text}{capability_text}{evidence_text}{next_step}".strip()

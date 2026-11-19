@@ -1,0 +1,516 @@
+{
+  "schema_version": "v1",
+  "purpose": "Reusable business-need categories mapped to verified Fikiri capabilities. Not industry-specific rule packs.",
+  "needs": [
+    {
+      "id": "scheduling_dispatch",
+      "label": "Scheduling and dispatch",
+      "concept_phrases": [
+        "schedule",
+        "scheduling",
+        "dispatch",
+        "double book",
+        "double-book",
+        "appointments",
+        "crew schedule",
+        "who's on the job",
+        "missed appointments",
+        "calendar conflicts",
+        "appointment windows",
+        "where to go next",
+        "on which job",
+        "miss jobs",
+        "calendar",
+        "double booking",
+        "schedules all over"
+      ],
+      "capability_status": "custom_discovery",
+      "capability_families": [
+        "workflow_automation",
+        "payments_and_booking",
+        "consulting_and_workflow_audit"
+      ],
+      "allowed_claims": [
+        "Fikiri builds custom workflow and scheduling-related automation after discovering your current tools.",
+        "Delivery schedules and late notifications are potential custom use cases, not turnkey guarantees."
+      ],
+      "forbidden_claims": [
+        "we already have a logistics product",
+        "guaranteed on-time delivery",
+        "driver app included"
+      ]
+    },
+    {
+      "id": "customer_management",
+      "label": "Customer management",
+      "concept_phrases": [
+        "keep track of customers",
+        "customer list",
+        "client records",
+        "crm",
+        "who is my customer",
+        "customer database",
+        "organize clients",
+        "patient list",
+        "customer view",
+        "keep up wid",
+        "custmer",
+        "spreadsheets",
+        "who ordered",
+        "ordered what",
+        "last order",
+        "order history",
+        "track who",
+        "customer orders",
+        "what they ordered"
+      ],
+      "capability_status": "verified",
+      "capability_families": [
+        "crm_and_lead_tracking"
+      ],
+      "allowed_claims": [
+        "Fikiri CRM helps small teams track contacts, conversations, activity, and next steps.",
+        "Order-history style tracking may be a CRM/custom workflow fit after discovery \u2014 not a turnkey POS."
+      ],
+      "forbidden_claims": [
+        "enterprise CRM replacement for Salesforce at unlimited scale",
+        "restaurant POS included",
+        "we replace your point of sale",
+        "full order management system out of the box"
+      ]
+    },
+    {
+      "id": "followups_communication",
+      "label": "Follow-ups and communication",
+      "concept_phrases": [
+        "follow up",
+        "follow-up",
+        "nobody calls back",
+        "quote follow",
+        "answer emails",
+        "inbox",
+        "notify customers",
+        "late notification",
+        "calls them back",
+        "call back",
+        "slippin",
+        "slip through",
+        "texts and emails",
+        "go cold",
+        "nuh call back",
+        "ask fi quote",
+        "answer email for customer",
+        "when i busy",
+        "answer email"
+      ],
+      "capability_status": "verified",
+      "capability_families": [
+        "email_and_inbox_automation",
+        "crm_and_lead_tracking",
+        "forms_and_intake"
+      ],
+      "allowed_claims": [
+        "Fikiri helps with email follow-up, lead ownership, and structured replies."
+      ],
+      "forbidden_claims": [
+        "we send SMS to every driver automatically out of the box"
+      ]
+    },
+    {
+      "id": "document_automation",
+      "label": "Document automation",
+      "concept_phrases": [
+        "paperwork",
+        "same forms",
+        "fill out forms",
+        "documents",
+        "pdfs",
+        "contracts every time",
+        "same pdfs",
+        "contract paperwork",
+        "intake packets",
+        "daily reports",
+        "rekeys",
+        "rekey"
+      ],
+      "capability_status": "custom_discovery",
+      "capability_families": [
+        "workflow_automation",
+        "consulting_and_workflow_audit"
+      ],
+      "allowed_claims": [
+        "Document-heavy workflows can often be automated after mapping your process."
+      ],
+      "forbidden_claims": [
+        "we replace your entire document management system today"
+      ]
+    },
+    {
+      "id": "quotes_invoicing",
+      "label": "Estimates and invoicing",
+      "concept_phrases": [
+        "quotes",
+        "estimates",
+        "invoices",
+        "invoicing",
+        "proposals",
+        "send a quote",
+        "sending estimates",
+        "estimates by hand",
+        "inovicing",
+        "type out quotes",
+        "quotes one by one"
+      ],
+      "capability_status": "custom_discovery",
+      "capability_families": [
+        "forms_and_intake",
+        "payments_and_booking",
+        "workflow_automation",
+        "consulting_and_workflow_audit"
+      ],
+      "allowed_claims": [
+        "Quote and invoice automation is a common custom workflow Fikiri scopes after discovery."
+      ],
+      "forbidden_claims": [
+        "QuickBooks replacement guaranteed",
+        "automatic payment collection without review"
+      ]
+    },
+    {
+      "id": "lead_intake",
+      "label": "Lead intake",
+      "concept_phrases": [
+        "website visitors",
+        "leads not converting",
+        "incoming leads",
+        "intake",
+        "form submissions",
+        "new inquiries",
+        "turning into customers",
+        "die in the inbox",
+        "webiste",
+        "fill di form",
+        "nuttin nuh happen",
+        "inquiries",
+        "membership inquiries",
+        "visit site",
+        "become customer",
+        "no become customer",
+        "how help",
+        "interest forms",
+        "forms pile",
+        "pile up unanswered",
+        "booking requests",
+        "get lost"
+      ],
+      "capability_status": "verified",
+      "capability_families": [
+        "forms_and_intake",
+        "crm_and_lead_tracking",
+        "website_and_landing_pages"
+      ],
+      "allowed_claims": [
+        "Fikiri helps capture and route website inquiries so leads do not sit unowned."
+      ],
+      "forbidden_claims": [
+        "guaranteed conversion rate increase"
+      ]
+    },
+    {
+      "id": "customer_support",
+      "label": "Customer support",
+      "concept_phrases": [
+        "same questions every day",
+        "customer asks",
+        "faq",
+        "support inbox",
+        "answer customers",
+        "same things every day",
+        "same questions",
+        "faqs",
+        "same ting",
+        "maintenance faqs",
+        "enrollment questions",
+        "setup questions",
+        "comin back",
+        "identical",
+        "same question",
+        "can system answer"
+      ],
+      "capability_status": "verified",
+      "capability_families": [
+        "chatbot_and_knowledge_base",
+        "email_and_inbox_automation"
+      ],
+      "allowed_claims": [
+        "Fikiri can support knowledge-based answers and email triage for repeating customer questions."
+      ],
+      "forbidden_claims": [
+        "fully autonomous support with no human review always"
+      ]
+    },
+    {
+      "id": "reporting_analytics",
+      "label": "Reporting and analytics",
+      "concept_phrases": [
+        "which jobs make money",
+        "reporting",
+        "analytics",
+        "dashboard",
+        "don't know which jobs",
+        "make us money",
+        "mek money",
+        "flying blind",
+        "profitable",
+        "profitability",
+        "profit",
+        "margin",
+        "dashbord",
+        "which jobs",
+        "actually pay",
+        "which ones pay",
+        "who paid",
+        "which accounts",
+        "accounts that pay",
+        "outstanding balances",
+        "have paid",
+        "which ones actually",
+        "retainers vs",
+        "project work"
+      ],
+      "capability_status": "verified_partial",
+      "capability_families": [
+        "reporting_and_dashboards",
+        "consulting_and_workflow_audit"
+      ],
+      "allowed_claims": [
+        "Fikiri includes basic analytics on plans and can help design operational or payment-status reporting in custom work.",
+        "Seeing which accounts have paid vs outstanding is often a CRM + reporting workflow scoped after discovery."
+      ],
+      "forbidden_claims": [
+        "predictive AI profit engine included on Starter",
+        "automatic receivables collection guaranteed"
+      ]
+    },
+    {
+      "id": "data_sync",
+      "label": "Data entry and synchronization",
+      "concept_phrases": [
+        "enter the same information",
+        "three systems",
+        "duplicate data",
+        "sync",
+        "copy between systems",
+        "copy paste",
+        "copy-paste",
+        "datta sync",
+        "nightmare across",
+        "nothing talks",
+        "out of date",
+        "three place",
+        "three software",
+        "same info in three",
+        "can connect"
+      ],
+      "capability_status": "custom_discovery",
+      "capability_families": [
+        "workflow_automation",
+        "consulting_and_workflow_audit"
+      ],
+      "allowed_claims": [
+        "Reducing duplicate data entry usually means integrating the systems you already use \u2014 Fikiri scopes that after discovery."
+      ],
+      "forbidden_claims": [
+        "we sync every SaaS tool instantly"
+      ]
+    },
+    {
+      "id": "employee_coordination",
+      "label": "Employee coordination",
+      "concept_phrases": [
+        "who's doing what",
+        "team doesn't know",
+        "staff assignments",
+        "handoffs between staff",
+        "task ownership",
+        "handoffs",
+        "owns the next step",
+        "who responsible",
+        "who fi handle",
+        "job notes",
+        "job status",
+        "last shift"
+      ],
+      "capability_status": "custom_discovery",
+      "capability_families": [
+        "workflow_automation",
+        "crm_and_lead_tracking",
+        "consulting_and_workflow_audit"
+      ],
+      "allowed_claims": [
+        "Clear ownership and handoffs are a common workflow-design outcome in Fikiri engagements."
+      ],
+      "forbidden_claims": [
+        "full workforce management suite out of the box"
+      ]
+    },
+    {
+      "id": "inventory",
+      "label": "Inventory tracking",
+      "concept_phrases": [
+        "inventory",
+        "running out of supplies",
+        "stock levels",
+        "parts on the truck",
+        "mid-job",
+        "parts missing",
+        "inventry",
+        "stock finish",
+        "supplies a run out",
+        "buying the same parts",
+        "color inventory"
+      ],
+      "capability_status": "unsupported_or_discovery",
+      "capability_families": [
+        "consulting_and_workflow_audit"
+      ],
+      "allowed_claims": [
+        "Inventory systems are not a core packaged Fikiri product; we can discuss whether a custom integration fits."
+      ],
+      "forbidden_claims": [
+        "we provide warehouse WMS",
+        "barcode inventory included"
+      ]
+    },
+    {
+      "id": "payments_billing",
+      "label": "Payments and billing",
+      "concept_phrases": [
+        "forget to pay",
+        "invoices unpaid",
+        "payments",
+        "billing reminders",
+        "collect payment",
+        "forget pay",
+        "chasing payments",
+        "bililng",
+        "reminders",
+        "tuition",
+        "dues collection",
+        "ghost after",
+        "forget fi pay",
+        "chase dem",
+        "a chase",
+        "outstanding balances",
+        "accounts receivable",
+        "who has paid",
+        "which accounts pay"
+      ],
+      "capability_status": "verified_partial",
+      "capability_families": [
+        "payments_and_booking",
+        "workflow_automation"
+      ],
+      "allowed_claims": [
+        "Booking and payment-related workflows are in Fikiri's scope for appropriate builds; reminders can be designed carefully."
+      ],
+      "forbidden_claims": [
+        "we guarantee payment collection"
+      ]
+    },
+    {
+      "id": "website_digital_ops",
+      "label": "Website and digital operations",
+      "concept_phrases": [
+        "website doesn't connect",
+        "site to office",
+        "online presence",
+        "landing page connected",
+        "connect to our office",
+        "hits the office",
+        "doesnt talk",
+        "nuh see di leads",
+        "front desk",
+        "forms go to",
+        "office not connect",
+        "how fix"
+      ],
+      "capability_status": "verified_boundary",
+      "capability_families": [
+        "website_and_landing_pages",
+        "forms_and_intake",
+        "crm_and_lead_tracking"
+      ],
+      "allowed_claims": [
+        "Fikiri focuses on connecting digital intake to office workflows; full WordPress design is bounded."
+      ],
+      "forbidden_claims": [
+        "we are a full-service WordPress design agency for any site"
+      ]
+    },
+    {
+      "id": "integrations",
+      "label": "Existing software integrations",
+      "concept_phrases": [
+        "work with the software we already have",
+        "integrate with",
+        "connect to our tools",
+        "gmail",
+        "outlook",
+        "existing software",
+        "software we already",
+        "aint replacing",
+        "werk wit",
+        "connect dem",
+        "tools we got",
+        "shopify",
+        "quickbooks",
+        "software we use now",
+        "talk through you",
+        "plus email"
+      ],
+      "capability_status": "verified_partial",
+      "capability_families": [
+        "email_and_inbox_automation",
+        "workflow_automation",
+        "consulting_and_workflow_audit"
+      ],
+      "allowed_claims": [
+        "Fikiri supports Gmail/Outlook email workflows and custom integrations after confirming your stack."
+      ],
+      "forbidden_claims": [
+        "integrates with every ERP on day one"
+      ]
+    },
+    {
+      "id": "business_discovery",
+      "label": "Business discovery / unclear needs",
+      "concept_phrases": [
+        "things are inefficient",
+        "don't know what to fix",
+        "office is a mess",
+        "not sure what I need",
+        "operations are chaotic",
+        "where to start",
+        "chaostic",
+        "not smooth",
+        "duct-taped",
+        "inherited messy",
+        "whey fi fix",
+        "process feels stuck",
+        "feels stuck",
+        "busy but process"
+      ],
+      "capability_status": "verified",
+      "capability_families": [
+        "consulting_and_workflow_audit"
+      ],
+      "allowed_claims": [
+        "Fikiri often starts with workflow discovery when the problem is clear but the solution is not."
+      ],
+      "forbidden_claims": [
+        "we will fix everything without discovery"
+      ]
+    }
+  ]
+}

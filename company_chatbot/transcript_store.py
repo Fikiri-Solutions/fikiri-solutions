@@ -117,7 +117,57 @@ def ensure_site_chat_transcript_tables() -> None:
         """,
         fetch=False,
     )
+    # Additive study/training column — safe on existing prod tables.
+    try:
+        db_optimizer.execute_query(
+            "ALTER TABLE site_chat_messages ADD COLUMN IF NOT EXISTS meta_json TEXT",
+            fetch=False,
+        )
+    except Exception:
+        # SQLite older than IF NOT EXISTS support: ignore duplicate-column failures.
+        try:
+            db_optimizer.execute_query(
+                "ALTER TABLE site_chat_messages ADD COLUMN meta_json TEXT",
+                fetch=False,
+            )
+        except Exception:
+            pass
     _TABLES_READY = True
+
+
+def _build_study_meta(user_message: str, result: MessageResult) -> Dict[str, Any]:
+    """Lightweight labels for later review/training — stored server-side only."""
+    meta: Dict[str, Any] = {
+        "purpose": "study_training",
+        "schema_version": "site_chat_study_v1",
+        "mode": result.mode,
+        "grounded": bool(result.grounded),
+    }
+    try:
+        from company_chatbot.business_needs import detect_business_needs
+
+        needs = detect_business_needs(user_message or "")
+        meta["business_need_ids"] = list(needs.need_ids)
+        meta["primary_need_id"] = needs.primary_need_id
+    except Exception:
+        meta["business_need_ids"] = []
+        meta["primary_need_id"] = None
+
+    trace = getattr(result, "routing_trace", None)
+    if trace is not None and hasattr(trace, "to_dict"):
+        meta["routing"] = trace.to_dict()
+    else:
+        # Capture matched rule for study without enabling public routing_trace.
+        try:
+            from company_chatbot.modes import detect_mode
+            from company_chatbot.routing_trace import RoutingTrace
+
+            local_trace = RoutingTrace()
+            detect_mode(user_message or "", routing_trace=local_trace)
+            meta["routing"] = local_trace.to_dict()
+        except Exception:
+            pass
+    return meta
 
 
 def is_persist_enabled() -> bool:
@@ -210,12 +260,14 @@ def _persist_message_turn_impl(
         fetch=False,
     )
 
+    study_meta = _build_study_meta(user_message, result)
+
     db_optimizer.execute_query(
         """
         INSERT INTO site_chat_messages (
             session_id, role, content, mode, grounded, confidence,
-            sources_json, intake_json, handoff_json, lead_assessment_json, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            sources_json, intake_json, handoff_json, lead_assessment_json, meta_json, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             session_id,
@@ -228,6 +280,14 @@ def _persist_message_turn_impl(
             None,
             None,
             None,
+            _safe_json(
+                {
+                    "purpose": "study_training",
+                    "schema_version": "site_chat_study_v1",
+                    "business_need_ids": study_meta.get("business_need_ids") or [],
+                    "primary_need_id": study_meta.get("primary_need_id"),
+                }
+            ),
             now,
         ),
         fetch=False,
@@ -237,8 +297,8 @@ def _persist_message_turn_impl(
         """
         INSERT INTO site_chat_messages (
             session_id, role, content, mode, grounded, confidence,
-            sources_json, intake_json, handoff_json, lead_assessment_json, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            sources_json, intake_json, handoff_json, lead_assessment_json, meta_json, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             session_id,
@@ -251,6 +311,7 @@ def _persist_message_turn_impl(
             _safe_json(result.intake) if result.intake else None,
             _safe_json(result.handoff.to_dict()),
             _safe_json(assessment.to_dict()),
+            _safe_json(study_meta),
             now,
         ),
         fetch=False,
@@ -437,7 +498,7 @@ def get_transcript_session(session_id: str) -> Optional[Dict[str, Any]]:
     messages = db_optimizer.execute_query(
         """
         SELECT role, content, mode, grounded, confidence, sources_json, intake_json,
-               handoff_json, lead_assessment_json, created_at
+               handoff_json, lead_assessment_json, created_at, meta_json
         FROM site_chat_messages
         WHERE session_id = ?
         ORDER BY created_at ASC, id ASC
@@ -562,10 +623,18 @@ def _parse_json_field(raw: Any) -> Any:
 
 def _message_row(row: Any) -> Dict[str, Any]:
     def _get(key: str, idx: int):
-        return row[key] if hasattr(row, "keys") else row[idx]
+        if hasattr(row, "keys"):
+            try:
+                return row[key]
+            except (KeyError, IndexError):
+                return None
+        try:
+            return row[idx]
+        except (IndexError, TypeError):
+            return None
 
     grounded_raw = _get("grounded", 3)
-    return {
+    payload = {
         "role": _get("role", 0),
         "content": _get("content", 1),
         "mode": _get("mode", 2),
@@ -577,6 +646,10 @@ def _message_row(row: Any) -> Dict[str, Any]:
         "lead_assessment": _parse_json_field(_get("lead_assessment_json", 8)),
         "created_at": _get("created_at", 9),
     }
+    meta = _parse_json_field(_get("meta_json", 10))
+    if meta is not None:
+        payload["meta"] = meta
+    return payload
 
 
 def clear_transcript_tables_for_tests() -> None:

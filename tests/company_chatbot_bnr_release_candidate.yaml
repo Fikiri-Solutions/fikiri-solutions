@@ -1,0 +1,283 @@
+# Fresh BNR release-candidate set — NOT the previously observed 30 holdout.
+# Labels are provisional until independent human review.
+# Do NOT use this file to tune routing, phrases, or capability maps.
+schema_version: bnr_release_candidate_v1
+suite: business_need_release_candidate
+review_status: awaiting_independent_labels
+split_policy: pristine_until_reviewed
+case_count_target: 24
+
+cases:
+  - id: rc_sched_01
+    need_id: scheduling_dispatch
+    language_category: standard_en
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "Our service vans keep overlapping appointments on the same afternoon."}]
+    expected:
+      need_ids_any: [scheduling_dispatch]
+      modes_allowed: [answer, explore_fit, consulting, workflow_audit]
+      fallback_forbidden: true
+      must_acknowledge_problem: true
+      forbidden_substrings: [guaranteed on-time, driver app included]
+
+  - id: rc_crm_orders_01
+    need_id: customer_management
+    language_category: standard_en
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "I need to see which customers ordered from us last month and what they bought."}]
+    expected:
+      need_ids_any: [customer_management]
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      must_acknowledge_problem: true
+      forbidden_substrings: [point of sale, POS included]
+
+  - id: rc_pay_status_01
+    need_id: reporting_analytics
+    language_category: informal_us
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "honestly i cant tell which accounts paid and which still owe us"}]
+    expected:
+      need_ids_any: [reporting_analytics, payments_billing, customer_management]
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      must_acknowledge_problem: true
+      forbidden_substrings: [guaranteed payment collection]
+
+  - id: rc_followup_01
+    need_id: followups_communication
+    language_category: typo_en
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "quotes go out then nobody ever folows up"}]
+    expected:
+      need_ids_any: [followups_communication, quotes_invoicing]
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      must_acknowledge_problem: true
+
+  - id: rc_intake_01
+    need_id: lead_intake
+    language_category: non_native_en
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "People come to website but never become real customers. What can help?"}]
+    expected:
+      need_ids_any: [lead_intake]
+      modes_allowed: [answer, explore_fit]
+      fallback_forbidden: true
+      must_acknowledge_problem: true
+
+  - id: rc_support_01
+    need_id: customer_support
+    language_category: standard_en
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "Our customers email the same five questions every week."}]
+    expected:
+      need_ids_any: [customer_support]
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      must_acknowledge_problem: true
+      forbidden_substrings: [medical diagnosis]
+
+  - id: rc_docs_01
+    need_id: document_automation
+    language_category: informal_us
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "we rewrite the same intake packet for every new client ugh"}]
+    expected:
+      need_ids_any: [document_automation]
+      modes_allowed: [answer, consulting, workflow_audit]
+      fallback_forbidden: true
+      must_acknowledge_problem: true
+
+  - id: rc_invoice_01
+    need_id: quotes_invoicing
+    language_category: standard_en
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "Can estimates turn into invoices without retyping everything?"}]
+    expected:
+      need_ids_any: [quotes_invoicing]
+      modes_allowed: [answer, consulting]
+      fallback_forbidden: true
+      must_acknowledge_problem: true
+      forbidden_substrings: [QuickBooks replacement]
+
+  - id: rc_sync_01
+    need_id: data_sync
+    language_category: standard_en
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "We type customer details into three apps every time."}]
+    expected:
+      need_ids_any: [data_sync]
+      modes_allowed: [answer, consulting, workflow_audit]
+      fallback_forbidden: true
+      must_acknowledge_problem: true
+
+  - id: rc_coord_01
+    need_id: employee_coordination
+    language_category: standard_en
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "Office and field staff disagree about who owns each open job."}]
+    expected:
+      need_ids_any: [employee_coordination]
+      modes_allowed: [answer, consulting, workflow_audit]
+      fallback_forbidden: true
+      must_acknowledge_problem: true
+
+  - id: rc_inv_01
+    need_id: inventory
+    language_category: standard_en
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "We keep running short on parts mid-job."}]
+    expected:
+      need_ids_any: [inventory]
+      modes_allowed: [answer, consulting, contact, explore_fit]
+      clarification_or_limitation_ok: true
+      must_acknowledge_problem: true
+      forbidden_substrings: [warehouse WMS, barcode inventory included]
+
+  - id: rc_web_01
+    need_id: website_digital_ops
+    language_category: informal_us
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "pretty website but the office never sees what comes in"}]
+    expected:
+      need_ids_any: [website_digital_ops, lead_intake]
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      must_acknowledge_problem: true
+      forbidden_substrings: [WordPress marketing site]
+
+  - id: rc_int_01
+    need_id: integrations
+    language_category: standard_en
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "We already have tools. Can Fikiri connect to what we use today?"}]
+    expected:
+      need_ids_any: [integrations]
+      modes_allowed: [answer, consulting]
+      fallback_forbidden: true
+      must_acknowledge_problem: true
+      forbidden_substrings: [every ERP]
+
+  - id: rc_disc_01
+    need_id: business_discovery
+    language_category: jamaican_influenced
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "Tings inefficient but mi nuh know whey fi start."}]
+    expected:
+      need_ids_any: [business_discovery]
+      modes_allowed: [answer, explore_fit, workflow_audit, consulting]
+      fallback_forbidden: true
+      must_acknowledge_problem: true
+
+  - id: rc_pay_01
+    need_id: payments_billing
+    language_category: standard_en
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "Clients ignore invoices until we chase them manually."}]
+    expected:
+      need_ids_any: [payments_billing]
+      modes_allowed: [answer, consulting]
+      fallback_forbidden: true
+      must_acknowledge_problem: true
+      forbidden_substrings: [guarantee every customer pays]
+
+  - id: rc_multi_01
+    need_id: lead_intake
+    language_category: standard_en
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "Website forms, no follow-up, and I can't see who is a real opportunity."}]
+    expected:
+      need_ids_any: [lead_intake, followups_communication, customer_management]
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      must_acknowledge_problem: true
+
+  - id: rc_contrast_delete_01
+    need_id: customer_management
+    language_category: standard_en
+    contrast: true
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "Can you wipe our entire customer database automatically every night?"}]
+    expected:
+      modes_allowed: [answer, fallback, contact, explore_fit]
+      fallback_forbidden: false
+      clarification_or_limitation_ok: true
+      forbidden_substrings: [wipe your customer database, delete all customers nightly]
+
+  - id: rc_handoff_01
+    need_id: business_discovery
+    language_category: standard_en
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "This is getting specific — can I talk to someone on your team?"}]
+    expected:
+      modes_allowed: [contact]
+      fallback_forbidden: true
+      handoff_expected: true
+
+  - id: rc_logistics_01
+    need_id: scheduling_dispatch
+    language_category: standard_en
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns:
+      - user: "I run a small courier service. Drivers clash on routes and customers call when we're late."
+    expected:
+      need_ids_any: [scheduling_dispatch, followups_communication]
+      modes_allowed: [answer, consulting]
+      fallback_forbidden: true
+      must_acknowledge_problem: true
+      forbidden_substrings: [logistics product, guaranteed on-time delivery]
+
+  - id: rc_amb_01
+    need_id: business_discovery
+    language_category: informal_us
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "idk things feel stuck"}]
+    expected:
+      need_ids_any: [business_discovery]
+      modes_allowed: [answer, explore_fit, fallback, workflow_audit, consulting]
+      clarification_or_limitation_ok: true
+      must_acknowledge_problem: false
+
+  - id: rc_report_jobs_01
+    need_id: reporting_analytics
+    language_category: standard_en
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "Which types of jobs actually make us money after costs?"}]
+    expected:
+      need_ids_any: [reporting_analytics]
+      modes_allowed: [answer, consulting]
+      fallback_forbidden: true
+      must_acknowledge_problem: true
+
+  - id: rc_crm_01
+    need_id: customer_management
+    language_category: slang
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "yall got something like a crm for a tiny team?"}]
+    expected:
+      need_ids_any: [customer_management]
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      must_acknowledge_problem: true
+
+  - id: rc_simple_en_01
+    need_id: business_discovery
+    language_category: simplified_en
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "Please explain in simple English how you help small businesses."}]
+    expected:
+      need_ids_any: [business_discovery, customer_management]
+      modes_allowed: [answer, explore_fit]
+      fallback_forbidden: true
+      must_acknowledge_problem: true
+
+  - id: rc_hipaa_01
+    need_id: customer_support
+    language_category: standard_en
+    provenance: {source: release_candidate_v1, review_status: awaiting_independent_labels, used_for_tuning: false}
+    turns: [{user: "Are you HIPAA certified for patient email?"}]
+    expected:
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      forbidden_substrings: [we are HIPAA certified, HIPAA certified]

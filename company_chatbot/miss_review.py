@@ -195,6 +195,22 @@ def build_alias_proposal(turn: TranscriptTurn, miss: MissSignals) -> AliasPropos
     }
     if families:
         eval_case["expected_families"] = families[:3]
+    if turn.previous_user_message:
+        eval_case["previous_query"] = turn.previous_user_message
+
+    from company_chatbot.golden_candidates import build_golden_candidate
+
+    golden_candidate = build_golden_candidate(
+        miss_id=miss_id_for(turn.session_id, turn.turn_index),
+        query=user_phrase,
+        previous_query=turn.previous_user_message or None,
+        retrieved_ids=chunk_ids,
+        expected_ids=chunk_ids[:1] or [primary_chunk],
+        topic=(top_chunks[0].topic if top_chunks else None),
+        failure_labels=list(miss.signals or []),
+        notes="Human must confirm expected_ids before promotion.",
+    )
+    eval_case["golden_candidate"] = golden_candidate
 
     cursor_patch = _build_cursor_patch(
         miss_id=miss_id_for(turn.session_id, turn.turn_index),
@@ -276,6 +292,17 @@ def _build_cursor_patch(
             f"# retrieval_top: {miss.retrieval_top_chunk_id}",
         ]
     )
+    candidate = eval_case.get("golden_candidate")
+    if isinstance(candidate, dict):
+        from company_chatbot.golden_candidates import candidate_to_yaml_fragment
+
+        lines.extend(
+            [
+                "",
+                "## Rich golden candidate (DO NOT auto-promote — human labels required)",
+                candidate_to_yaml_fragment(candidate).rstrip(),
+            ]
+        )
     return "\n".join(lines) + "\n"
 
 

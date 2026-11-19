@@ -55,7 +55,17 @@ def test_message_requires_session_and_body(client):
     assert response.status_code == 400
 
 
-def test_message_returns_mode_response_handoff_no_api_key(client):
+def test_message_returns_mode_response_handoff_no_api_key(client, monkeypatch):
+    notify_calls = {"count": 0}
+
+    def _notify(**_kwargs):
+        notify_calls["count"] += 1
+        return True
+
+    monkeypatch.setattr(
+        "company_chatbot.handoff_notify.notify_site_chat_handoff",
+        _notify,
+    )
     start = _data(client.post("/api/site/chat/session/start"))
     response = client.post(
         "/api/site/chat/message",
@@ -75,6 +85,7 @@ def test_message_returns_mode_response_handoff_no_api_key(client):
     assert data["lead_assessment"]["tier"] in ("casual", "possible", "warm", "hot")
     assert isinstance(data["lead_assessment"]["synopsis"], str)
     assert data["lead_assessment"]["recommended_handoff"] == "/contact"
+    assert notify_calls["count"] == 1
 
 
 def test_message_unknown_session_404(client):
@@ -192,3 +203,108 @@ def test_site_chat_succeeds_when_transcript_write_fails(client, monkeypatch):
     )
     assert data["schema_version"] == "v1"
     assert data["response"]
+
+
+def _source_ids(payload: dict) -> list[str]:
+    sources = payload.get("sources") or []
+    ids = []
+    for src in sources:
+        if isinstance(src, dict):
+            ids.append(str(src.get("chunk_id") or src.get("id") or ""))
+    return [chunk_id for chunk_id in ids if chunk_id]
+
+
+def test_blackbox_pricing_answer_mode_and_sources(client, monkeypatch):
+    """Layer-4: deterministic pricing journey through /api/site/chat/message."""
+    monkeypatch.setattr(
+        "company_chatbot.handoff_notify.notify_site_chat_handoff",
+        lambda **_kwargs: True,
+    )
+    start = _data(client.post("/api/site/chat/session/start"))
+    data = _data(
+        client.post(
+            "/api/site/chat/message",
+            json={
+                "session_id": start["session_id"],
+                "message": "What does Fikiri cost?",
+            },
+        )
+    )
+    assert data["mode"] == "answer"
+    assert data["response"]
+    lowered = data["response"].lower()
+    assert "fill out the intake form" not in lowered
+    source_ids = _source_ids(data)
+    assert any(chunk_id.startswith("pricing_") for chunk_id in source_ids), source_ids
+
+
+def test_blackbox_pricing_then_company_avoids_intake(client, monkeypatch):
+    monkeypatch.setattr(
+        "company_chatbot.handoff_notify.notify_site_chat_handoff",
+        lambda **_kwargs: True,
+    )
+    start = _data(client.post("/api/site/chat/session/start"))
+    sid = start["session_id"]
+    _data(
+        client.post(
+            "/api/site/chat/message",
+            json={"session_id": sid, "message": "What does Fikiri cost?"},
+        )
+    )
+    data = _data(
+        client.post(
+            "/api/site/chat/message",
+            json={"session_id": sid, "message": "What does Fikiri do?"},
+        )
+    )
+    assert data["mode"] == "answer"
+    assert data.get("intake", {}).get("active") is not True
+    lowered = data["response"].lower()
+    assert "fill out the intake form" not in lowered
+    source_ids = _source_ids(data)
+    assert any(chunk_id.startswith("company_") for chunk_id in source_ids), source_ids
+    assert not any(chunk_id.startswith("pricing_") for chunk_id in source_ids), source_ids
+
+
+def test_blackbox_human_help_contact_handoff(client, monkeypatch):
+    monkeypatch.setattr(
+        "company_chatbot.handoff_notify.notify_site_chat_handoff",
+        lambda **_kwargs: True,
+    )
+    start = _data(client.post("/api/site/chat/session/start"))
+    sid = start["session_id"]
+    _data(
+        client.post(
+            "/api/site/chat/message",
+            json={"session_id": sid, "message": "What does Fikiri cost?"},
+        )
+    )
+    data = _data(
+        client.post(
+            "/api/site/chat/message",
+            json={"session_id": sid, "message": "I want to talk to a human"},
+        )
+    )
+    assert data["mode"] == "contact"
+    assert data["handoff"]["applicable"] is True
+    assert data["handoff"]["secondary"] == "/contact"
+
+
+def test_blackbox_engagement_does_not_force_intake(client, monkeypatch):
+    monkeypatch.setattr(
+        "company_chatbot.handoff_notify.notify_site_chat_handoff",
+        lambda **_kwargs: True,
+    )
+    start = _data(client.post("/api/site/chat/session/start"))
+    data = _data(
+        client.post(
+            "/api/site/chat/message",
+            json={
+                "session_id": start["session_id"],
+                "message": "How do you work with clients?",
+            },
+        )
+    )
+    assert data["mode"] == "answer"
+    assert data.get("intake", {}).get("active") is not True
+    assert "fill out the intake form" not in data["response"].lower()

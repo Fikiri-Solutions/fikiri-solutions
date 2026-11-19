@@ -214,7 +214,8 @@ notify_responsible_team(handoff)  # after response path; fail-open
 | Intake slots (email, industry, pain, timeline) | `intake.py` | Buying modes only |
 | Transcript persistence | `transcript_store.py` | Flagged; fail-open; hashed IP/UA |
 | Staff transcript + miss APIs | `routes/admin_site_chat_api.py` | Owner/admin JWT |
-| Slack webhook plumbing (product ops) | `core/monitoring.py`, `services/automation_engine.py` | `SLACK_WEBHOOK_URL` — **not** wired to site bot |
+| Slack webhook plumbing (product ops) | `core/monitoring.py`, `services/automation_engine.py` | `SLACK_WEBHOOK_URL` for ops |
+| Site-bot explicit handoff → Slack | `company_chatbot/handoff_notify.py`, `routes/site_chatbot_api.py` | Uses `LEAD_SLACK_WEBHOOK_URL` (fallback ops); guard/contact/intake-complete only |
 | Inline routing trace (runtime) | `routing_trace.py` | Flagged; not persisted |
 
 ### Missing (smallest connection for later slices)
@@ -223,8 +224,7 @@ notify_responsible_team(handoff)  # after response path; fail-open
 |-----|----------------|
 | Soft “turns remaining ≤ 2 + unresolved” handoff | Cap currently fires as hard stop with generic message; no structured capture |
 | Structured software handoff summary object | Lead synopsis exists; software-specific payload does not |
-| Site-bot → Slack adapter | Monitoring/automation Slack exists; site bot does not call it |
-| Deduped notification record | Prevent duplicate Slack spam |
+| Durable Slack delivery receipt store | In-process dedupe + logs exist; durable per-handoff delivery audit is future |
 | Scheduled transcript purge | Retention function exists; not operational |
 | Persisted content length bound | Abuse / disk safety |
 | Explicit outcome enum on session | Resolved / Guided / Qualified / Safe unresolved |

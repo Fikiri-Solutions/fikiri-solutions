@@ -40,6 +40,8 @@ cases:
     previous_query: Tell me about the AI email assistant
     expected_ids: [integration_gmail, product_ai_email_assistant]
     topic: integrations
+    context_dependency: followup
+    tags: [followup, routing]
 
   - name: outlook_followup_with_context
     query: What about Outlook?
@@ -230,8 +232,16 @@ cases:
   - name: company_after_pricing_followup
     query: What does Fikiri do?
     previous_query: What does Fikiri cost?
-    expected_ids: [company_about, company_three_capabilities]
     topic: company
+    context_dependency: standalone
+    tags: [turn_contamination, routing, regression]
+    retrieval:
+      required: [company_about]
+      acceptable: [company_three_capabilities]
+      forbidden: [pricing_overview, pricing_starter, pricing_growth, pricing_business]
+    provenance:
+      source: production_miss
+      regression: true
 
   - name: what_is_fikiri
     query: What is Fikiri Solutions?
@@ -279,8 +289,19 @@ cases:
 
   - name: how_do_you_work
     query: How do you work with clients?
-    expected_ids: [engagement_how_we_work, engagement_scoped_buildouts]
     topic: services
+    expected_mode: answer
+    forbidden_modes: [intake, consulting, fallback]
+    forbidden_actions: [start_intake, begin_intake]
+    retrieval:
+      required: [engagement_how_we_work]
+      acceptable: [engagement_scoped_buildouts, engagement_platform_plus_custom]
+      forbidden: [contact_intake_path]
+    must_not:
+      modes: [intake]
+      actions: [start_intake]
+      phrases: ["fill out the intake form"]
+    tags: [engagement, negative_contract]
 
   - name: custom_buildouts_vary
     query: What does a custom build-out look like?
@@ -415,8 +436,12 @@ cases:
 
   - name: messy_follows_up_for_me
     query: I need something that follows up for me
-    expected_ids: [product_email_draft, product_crm_activity, product_ai_email_assistant]
     expected_families: [lead_followup, inbox_email]
+    tags: [lead_followup, regression]
+    retrieval:
+      required: [product_email_draft]
+      acceptable: [product_crm_activity, product_ai_email_assistant, product_email_assistant_goal]
+      forbidden: [pricing_overview, pricing_starter, contact_intake_path]
 
   - name: messy_gmail_stuff
     query: Do y'all do Gmail stuff?
@@ -482,3 +507,74 @@ cases:
     query: Nobody follows up after we get a website form
     expected_ids: [workflow_inquiry_leak, product_crm_overview, contact_intake_path]
     expected_families: [lead_followup, crm_tracking]
+
+  # --- Multi-turn / contamination contracts (post-audit P2) ---
+  - name: mt_pricing_then_company_standalone
+    query: What does Fikiri do?
+    previous_query: What does Fikiri cost?
+    topic: company
+    context_dependency: standalone
+    tags: [turn_contamination, multi_turn, regression]
+    retrieval:
+      required: [company_about]
+      acceptable: [company_three_capabilities]
+      forbidden: [pricing_overview, pricing_starter, pricing_growth, pricing_business]
+
+  - name: mt_email_then_gmail_topic_switch
+    query: What about Gmail?
+    previous_query: Tell me about the AI email assistant
+    topic: integrations
+    context_dependency: followup
+    tags: [multi_turn, integrations]
+    retrieval:
+      required: [integration_gmail]
+      acceptable: [product_ai_email_assistant]
+      forbidden: [pricing_overview, pricing_starter]
+
+  - name: mt_email_then_outlook_topic_switch
+    query: What about Outlook?
+    previous_query: Tell me about the AI email assistant
+    topic: integrations
+    context_dependency: followup
+    tags: [multi_turn, integrations]
+    retrieval:
+      required: [integration_outlook]
+      acceptable: [product_ai_email_assistant]
+      forbidden: [pricing_overview]
+
+  - name: mt_assistant_then_drafting
+    query: Can it draft replies for my team?
+    previous_query: Do you have an inbox assistant?
+    topic: product_email
+    tags: [multi_turn, drafting]
+    retrieval:
+      required: [product_email_draft]
+      acceptable: [product_ai_email_assistant, product_email_overview]
+      forbidden: [pricing_starter, contact_intake_path]
+
+  - name: mt_short_ambiguous_followup_gmail
+    query: And Outlook?
+    previous_query: Do you integrate with Gmail?
+    topic: integrations
+    tags: [multi_turn, ambiguous_followup]
+    expected_ids: [integration_outlook, integration_gmail, product_ai_email_assistant]
+
+  - name: mt_human_help_after_pricing
+    query: I want to talk to a human
+    previous_query: What does Fikiri cost?
+    tags: [multi_turn, contact]
+    # Retrieval may still surface contact/pricing; routing contract is API-layer.
+    expected_ids: [contact_info, contact_intake_path, pricing_overview]
+
+  - name: mt_coverage_engagement_after_company
+    query: How do you work with clients on custom build-outs?
+    previous_query: What does Fikiri do?
+    topic: services
+    context_dependency: standalone
+    tags: [multi_turn, engagement]
+    retrieval:
+      required: [engagement_how_we_work]
+      acceptable: [engagement_scoped_buildouts, engagement_platform_plus_custom]
+      forbidden: [contact_intake_path]
+    forbidden_modes: [intake]
+    forbidden_actions: [start_intake]

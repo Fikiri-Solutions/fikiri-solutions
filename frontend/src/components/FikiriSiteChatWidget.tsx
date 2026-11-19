@@ -190,8 +190,12 @@ export const FikiriSiteChatWidget: React.FC = () => {
             <div className="pointer-events-none absolute -right-6 -top-8 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
             <div className="relative flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/25">
-                  <FikiriLogo variant="white" size="xs" className="!h-7 w-7" />
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full ring-1 ring-white/25">
+                  <FikiriLogo
+                    variant="circle"
+                    size="xs"
+                    className="!h-full !w-full !max-w-none scale-110 object-cover"
+                  />
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold tracking-tight text-white">
@@ -268,10 +272,14 @@ export const FikiriSiteChatWidget: React.FC = () => {
               >
                 {line.role === 'assistant' && (
                   <div
-                    className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-black/5"
+                    className="mt-0.5 h-7 w-7 shrink-0 overflow-hidden rounded-full shadow-sm ring-1 ring-black/5"
                     aria-hidden
                   >
-                    <FikiriLogo variant="circle" size="xs" className="!h-5 w-5" />
+                    <FikiriLogo
+                      variant="circle"
+                      size="xs"
+                      className="!h-full !w-full !max-w-none scale-110 object-cover"
+                    />
                   </div>
                 )}
                 <div
@@ -339,8 +347,12 @@ export const FikiriSiteChatWidget: React.FC = () => {
 
             {loading && (
               <div className="flex items-center gap-2 px-1 text-xs text-neutral-600">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-black/5">
-                  <FikiriLogo variant="circle" size="xs" className="!h-5 w-5" />
+                <div className="h-7 w-7 overflow-hidden rounded-full shadow-sm ring-1 ring-black/5">
+                  <FikiriLogo
+                    variant="circle"
+                    size="xs"
+                    className="!h-full !w-full !max-w-none scale-110 object-cover"
+                  />
                 </div>
                 <div className="flex items-center gap-2 rounded-2xl rounded-bl-md border border-neutral-200 bg-white px-3 py-2 text-neutral-700">
                   <Loader2 className="h-3.5 w-3.5 animate-spin text-[#B33B1E]" />
@@ -409,10 +421,11 @@ export const FikiriSiteChatWidget: React.FC = () => {
         type="button"
         onClick={togglePanel}
         className={cn(
-          'group relative inline-flex h-12 w-12 items-center justify-center rounded-full text-white shadow-lg transition sm:h-14 sm:w-14',
-          'bg-gradient-to-br from-[#992D1E] to-[#B33B1E] hover:from-[#B33B1E] hover:to-[#C55A0F]',
-          'ring-4 ring-white/90',
-          open && 'scale-95 opacity-90'
+          'group relative inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-full text-white shadow-lg transition sm:h-14 sm:w-14',
+          open
+            ? 'bg-gradient-to-br from-[#992D1E] to-[#B33B1E] hover:from-[#B33B1E] hover:to-[#C55A0F] scale-95 opacity-90'
+            : 'bg-[#140f0c] hover:brightness-110',
+          'ring-4 ring-white/90'
         )}
         aria-label={open ? 'Minimize Fikiri assistant' : 'Open Fikiri assistant'}
         aria-expanded={open}
@@ -421,7 +434,11 @@ export const FikiriSiteChatWidget: React.FC = () => {
           <X className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden />
         ) : (
           <>
-            <FikiriLogo variant="white" size="xs" className="!h-7 w-7 sm:!h-8 sm:w-8" />
+            <FikiriLogo
+              variant="circle"
+              size="xs"
+              className="!h-full !w-full !max-w-none scale-110 object-cover"
+            />
             <span className="absolute -right-0.5 -top-0.5 flex h-3 w-3 sm:h-3.5 sm:w-3.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-fikiri-100 opacity-60" />
               <span className="relative inline-flex h-3 w-3 rounded-full bg-fikiri-100 ring-2 ring-white sm:h-3.5 sm:w-3.5" />

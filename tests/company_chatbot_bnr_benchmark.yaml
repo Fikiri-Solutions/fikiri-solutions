@@ -1,0 +1,4376 @@
+schema_version: bnr_v1
+suite: business_need_recognition
+case_count: 150
+split_policy: per_need last 2 of 10 = holdout (~20%)
+cases:
+- id: bnr_scheduling_dispatch_00
+  need_id: scheduling_dispatch
+  style: std
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Our HVAC crews keep missing appointment windows. Can software help with
+      scheduling?
+  expected:
+    need_ids_any:
+    - scheduling_dispatch
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_scheduling_dispatch_01
+  need_id: scheduling_dispatch
+  style: informal
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: dispatch is a mess, drivers dont know where to go next
+  expected:
+    need_ids_any:
+    - scheduling_dispatch
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_scheduling_dispatch_02
+  need_id: scheduling_dispatch
+  style: typo
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: barbershop keeps double booking clients all the time
+  expected:
+    need_ids_any:
+    - scheduling_dispatch
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_scheduling_dispatch_03
+  need_id: scheduling_dispatch
+  style: non_native
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: I need system for staff schedule, people miss jobs
+  expected:
+    need_ids_any:
+    - scheduling_dispatch
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_scheduling_dispatch_04
+  need_id: scheduling_dispatch
+  style: patois
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Mi crew dem schedule mash up. Unu can help wit dat?
+  expected:
+    need_ids_any:
+    - scheduling_dispatch
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_scheduling_dispatch_05
+  need_id: scheduling_dispatch
+  style: industry
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: I run a trucking company and dispatch is getting out of hand.
+  expected:
+    need_ids_any:
+    - scheduling_dispatch
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_scheduling_dispatch_06
+  need_id: scheduling_dispatch
+  style: multi_need
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Can you help reduce scheduling conflicts and notify customers when deliveries
+      are late?
+  expected:
+    need_ids_any:
+    - scheduling_dispatch
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_scheduling_dispatch_07
+  need_id: scheduling_dispatch
+  style: ambiguous
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: calendar stuff is broken
+  expected:
+    need_ids_any:
+    - scheduling_dispatch
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: false
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_scheduling_dispatch_08
+  need_id: scheduling_dispatch
+  style: holdout_a
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: cleaning company staff schedules all over the place, who is on which job?
+  expected:
+    need_ids_any:
+    - scheduling_dispatch
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_scheduling_dispatch_09
+  need_id: scheduling_dispatch
+  style: holdout_b
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: landscaping teams double book jobs every friday
+  expected:
+    need_ids_any:
+    - scheduling_dispatch
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_customer_management_00
+  need_id: customer_management
+  style: std
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Do you have a CRM for small teams?
+  expected:
+    need_ids_any:
+    - customer_management
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_customer_management_01
+  need_id: customer_management
+  style: informal
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: gotta keep track of all my customers somehow
+  expected:
+    need_ids_any:
+    - customer_management
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_customer_management_02
+  need_id: customer_management
+  style: typo
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: need a custmer list that doesnt live in spreadsheets
+  expected:
+    need_ids_any:
+    - customer_management
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_customer_management_03
+  need_id: customer_management
+  style: non_native
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: You have CRM? How it help my leads?
+  expected:
+    need_ids_any:
+    - customer_management
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_customer_management_04
+  need_id: customer_management
+  style: patois
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Mi need keep up wid mi customers proper.
+  expected:
+    need_ids_any:
+    - customer_management
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_customer_management_05
+  need_id: customer_management
+  style: industry
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Dental office patient list is chaos — can you help organize clients?
+  expected:
+    need_ids_any:
+    - customer_management
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_customer_management_06
+  need_id: customer_management
+  style: multi_need
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: I need CRM plus email follow-up in one place
+  expected:
+    need_ids_any:
+    - customer_management
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_customer_management_07
+  need_id: customer_management
+  style: contrast
+  split: dev
+  contrast: true
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Can you delete every customer record automatically each night?
+  expected:
+    need_ids_any:
+    - customer_management
+    modes_allowed:
+    - answer
+    - fallback
+    - contact
+    - explore_fit
+    fallback_forbidden: false
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    - delete every customer
+    - guarantee every invoice
+    - guarantee every customer pays
+    - medical diagnoses
+    human_review: answer_quality
+- id: bnr_customer_management_08
+  need_id: customer_management
+  style: holdout_a
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: restaurant regulars — how do I track who ordered what last time
+  expected:
+    need_ids_any:
+    - customer_management
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_customer_management_09
+  need_id: customer_management
+  style: holdout_b
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: law office client files are everywhere, need one customer view
+  expected:
+    need_ids_any:
+    - customer_management
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_followups_communication_00
+  need_id: followups_communication
+  style: std
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: People ask for quotes and nobody calls them back.
+  expected:
+    need_ids_any:
+    - followups_communication
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_followups_communication_01
+  need_id: followups_communication
+  style: informal
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: i need sumthin that answer my emails when im busy
+  expected:
+    need_ids_any:
+    - followups_communication
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_followups_communication_02
+  need_id: followups_communication
+  style: typo
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: follow ups keep slippin thru the cracks
+  expected:
+    need_ids_any:
+    - followups_communication
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_followups_communication_03
+  need_id: followups_communication
+  style: non_native
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: System can answer email for customer when I busy?
+  expected:
+    need_ids_any:
+    - followups_communication
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_followups_communication_04
+  need_id: followups_communication
+  style: patois
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Nobody nuh call back di people weh ask fi quote.
+  expected:
+    need_ids_any:
+    - followups_communication
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_followups_communication_05
+  need_id: followups_communication
+  style: industry
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Church visitors fill a card and nobody follows up during the week.
+  expected:
+    need_ids_any:
+    - followups_communication
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_followups_communication_06
+  need_id: followups_communication
+  style: multi_need
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Website form leads plus email replies — can you cover both?
+  expected:
+    need_ids_any:
+    - followups_communication
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_followups_communication_07
+  need_id: followups_communication
+  style: ambiguous
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: communication is bad
+  expected:
+    need_ids_any:
+    - followups_communication
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: false
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_followups_communication_08
+  need_id: followups_communication
+  style: holdout_a
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: auto shops get texts and emails and nothing is owned
+  expected:
+    need_ids_any:
+    - followups_communication
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_followups_communication_09
+  need_id: followups_communication
+  style: holdout_b
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: real estate leads go cold because nobody follows up
+  expected:
+    need_ids_any:
+    - followups_communication
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_document_automation_00
+  need_id: document_automation
+  style: std
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: We spend all day filling out the same paperwork.
+  expected:
+    need_ids_any:
+    - document_automation
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_document_automation_01
+  need_id: document_automation
+  style: informal
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: same pdfs over and over, killing us
+  expected:
+    need_ids_any:
+    - document_automation
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_document_automation_02
+  need_id: document_automation
+  style: typo
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: can u automte contract paperwork for new clients
+  expected:
+    need_ids_any:
+    - document_automation
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_document_automation_03
+  need_id: document_automation
+  style: non_native
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Too much same documents every day, can automate?
+  expected:
+    need_ids_any:
+    - document_automation
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_document_automation_04
+  need_id: document_automation
+  style: patois
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Paperwork a kill wi. Unu do automation fi dat?
+  expected:
+    need_ids_any:
+    - document_automation
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_document_automation_05
+  need_id: document_automation
+  style: industry
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Home care agency intake packets take hours — any automation?
+  expected:
+    need_ids_any:
+    - document_automation
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_document_automation_06
+  need_id: document_automation
+  style: multi_need
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Paperwork plus getting it into our CRM without retyping
+  expected:
+    need_ids_any:
+    - document_automation
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_document_automation_07
+  need_id: document_automation
+  style: ambiguous
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: documents
+  expected:
+    need_ids_any:
+    - document_automation
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: false
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_document_automation_08
+  need_id: document_automation
+  style: holdout_a
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: construction daily reports are copy-paste misery
+  expected:
+    need_ids_any:
+    - document_automation
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_document_automation_09
+  need_id: document_automation
+  style: holdout_b
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: insurance office rekeys the same forms constantly
+  expected:
+    need_ids_any:
+    - document_automation
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_quotes_invoicing_00
+  need_id: quotes_invoicing
+  style: std
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Can I automate quotes for customers?
+  expected:
+    need_ids_any:
+    - quotes_invoicing
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_quotes_invoicing_01
+  need_id: quotes_invoicing
+  style: informal
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: sending estimates by hand is ridiculous
+  expected:
+    need_ids_any:
+    - quotes_invoicing
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_quotes_invoicing_02
+  need_id: quotes_invoicing
+  style: typo
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: inovicing takes forever after every job
+  expected:
+    need_ids_any:
+    - quotes_invoicing
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_quotes_invoicing_03
+  need_id: quotes_invoicing
+  style: non_native
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: I want know how automate invoice after work done
+  expected:
+    need_ids_any:
+    - quotes_invoicing
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_quotes_invoicing_04
+  need_id: quotes_invoicing
+  style: patois
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Wi still a type out quotes one by one.
+  expected:
+    need_ids_any:
+    - quotes_invoicing
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_quotes_invoicing_05
+  need_id: quotes_invoicing
+  style: industry
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Plumbing estimates — can those be automated without losing review?
+  expected:
+    need_ids_any:
+    - quotes_invoicing
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_quotes_invoicing_06
+  need_id: quotes_invoicing
+  style: multi_need
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Quotes that become invoices and payment reminders
+  expected:
+    need_ids_any:
+    - quotes_invoicing
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_quotes_invoicing_07
+  need_id: quotes_invoicing
+  style: contrast
+  split: dev
+  contrast: true
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Can you guarantee every invoice gets paid in 24 hours?
+  expected:
+    need_ids_any:
+    - quotes_invoicing
+    modes_allowed:
+    - answer
+    - fallback
+    - contact
+    - explore_fit
+    fallback_forbidden: false
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    - delete every customer
+    - guarantee every invoice
+    - guarantee every customer pays
+    - medical diagnoses
+    human_review: answer_quality
+- id: bnr_quotes_invoicing_08
+  need_id: quotes_invoicing
+  style: holdout_a
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: event planners need faster proposals without typos
+  expected:
+    need_ids_any:
+    - quotes_invoicing
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_quotes_invoicing_09
+  need_id: quotes_invoicing
+  style: holdout_b
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: roofing company quotes sit in email drafts for days
+  expected:
+    need_ids_any:
+    - quotes_invoicing
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_lead_intake_00
+  need_id: lead_intake
+  style: std
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Website visitors aren't turning into customers.
+  expected:
+    need_ids_any:
+    - lead_intake
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_lead_intake_01
+  need_id: lead_intake
+  style: informal
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: leads come in and die in the inbox
+  expected:
+    need_ids_any:
+    - lead_intake
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_lead_intake_02
+  need_id: lead_intake
+  style: typo
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: webiste form leads nowhere
+  expected:
+    need_ids_any:
+    - lead_intake
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_lead_intake_03
+  need_id: lead_intake
+  style: non_native
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: People visit site but no become customer, how help?
+  expected:
+    need_ids_any:
+    - lead_intake
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_lead_intake_04
+  need_id: lead_intake
+  style: patois
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Dem fill di form an nuttin nuh happen after.
+  expected:
+    need_ids_any:
+    - lead_intake
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_lead_intake_05
+  need_id: lead_intake
+  style: industry
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Gym membership inquiries from the site never get owned.
+  expected:
+    need_ids_any:
+    - lead_intake
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_lead_intake_06
+  need_id: lead_intake
+  style: multi_need
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Need intake from website into CRM with follow-up
+  expected:
+    need_ids_any:
+    - lead_intake
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_lead_intake_07
+  need_id: lead_intake
+  style: ambiguous
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: not getting customers
+  expected:
+    need_ids_any:
+    - lead_intake
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: false
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_lead_intake_08
+  need_id: lead_intake
+  style: holdout_a
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: salon booking requests from Instagram and site get lost
+  expected:
+    need_ids_any:
+    - lead_intake
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_lead_intake_09
+  need_id: lead_intake
+  style: holdout_b
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: nonprofit donation interest forms pile up unanswered
+  expected:
+    need_ids_any:
+    - lead_intake
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_customer_support_00
+  need_id: customer_support
+  style: std
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Customers ask the same things every day.
+  expected:
+    need_ids_any:
+    - customer_support
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_customer_support_01
+  need_id: customer_support
+  style: informal
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: same faqs on repeat in our inbox
+  expected:
+    need_ids_any:
+    - customer_support
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_customer_support_02
+  need_id: customer_support
+  style: typo
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: support questions keep comin back identical
+  expected:
+    need_ids_any:
+    - customer_support
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_customer_support_03
+  need_id: customer_support
+  style: non_native
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Customer ask same question, can system answer?
+  expected:
+    need_ids_any:
+    - customer_support
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_customer_support_04
+  need_id: customer_support
+  style: patois
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: People a ask di same ting every day.
+  expected:
+    need_ids_any:
+    - customer_support
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_customer_support_05
+  need_id: customer_support
+  style: industry
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Property management tenants ask the same maintenance FAQs constantly.
+  expected:
+    need_ids_any:
+    - customer_support
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_customer_support_06
+  need_id: customer_support
+  style: multi_need
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: FAQ answers plus escalate hard issues to a human
+  expected:
+    need_ids_any:
+    - customer_support
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_customer_support_07
+  need_id: customer_support
+  style: contrast
+  split: dev
+  contrast: true
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Can your bot give medical diagnoses to customers?
+  expected:
+    need_ids_any:
+    - customer_support
+    modes_allowed:
+    - answer
+    - fallback
+    - contact
+    - explore_fit
+    fallback_forbidden: false
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    - delete every customer
+    - guarantee every invoice
+    - guarantee every customer pays
+    - medical diagnoses
+    human_review: answer_quality
+- id: bnr_customer_support_08
+  need_id: customer_support
+  style: holdout_a
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: school office parents email the same enrollment questions
+  expected:
+    need_ids_any:
+    - customer_support
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_customer_support_09
+  need_id: customer_support
+  style: holdout_b
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: SaaS trial users ask the same setup questions
+  expected:
+    need_ids_any:
+    - customer_support
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_reporting_analytics_00
+  need_id: reporting_analytics
+  style: std
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: I don't know which jobs make us money.
+  expected:
+    need_ids_any:
+    - reporting_analytics
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_reporting_analytics_01
+  need_id: reporting_analytics
+  style: informal
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: flying blind on which work is profitable
+  expected:
+    need_ids_any:
+    - reporting_analytics
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_reporting_analytics_02
+  need_id: reporting_analytics
+  style: typo
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: need a dashbord for job profit
+  expected:
+    need_ids_any:
+    - reporting_analytics
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_reporting_analytics_03
+  need_id: reporting_analytics
+  style: non_native
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: How I see which jobs give most money?
+  expected:
+    need_ids_any:
+    - reporting_analytics
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_reporting_analytics_04
+  need_id: reporting_analytics
+  style: patois
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Mi nuh know which job a mek money.
+  expected:
+    need_ids_any:
+    - reporting_analytics
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_reporting_analytics_05
+  need_id: reporting_analytics
+  style: industry
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Fleet jobs look busy but I can't see margin by route.
+  expected:
+    need_ids_any:
+    - reporting_analytics
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_reporting_analytics_06
+  need_id: reporting_analytics
+  style: multi_need
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Reporting tied to CRM stages and closed work
+  expected:
+    need_ids_any:
+    - reporting_analytics
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_reporting_analytics_07
+  need_id: reporting_analytics
+  style: ambiguous
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: numbers
+  expected:
+    need_ids_any:
+    - reporting_analytics
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: false
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_reporting_analytics_08
+  need_id: reporting_analytics
+  style: holdout_a
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: bakery wholesale accounts — which ones actually pay
+  expected:
+    need_ids_any:
+    - reporting_analytics
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_reporting_analytics_09
+  need_id: reporting_analytics
+  style: holdout_b
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: agency retainers vs project work profitability unclear
+  expected:
+    need_ids_any:
+    - reporting_analytics
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_data_sync_00
+  need_id: data_sync
+  style: std
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: We enter the same information in three systems.
+  expected:
+    need_ids_any:
+    - data_sync
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_data_sync_01
+  need_id: data_sync
+  style: informal
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: copy paste between tools all day
+  expected:
+    need_ids_any:
+    - data_sync
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_data_sync_02
+  need_id: data_sync
+  style: typo
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: datta sync is a nightmare across apps
+  expected:
+    need_ids_any:
+    - data_sync
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_data_sync_03
+  need_id: data_sync
+  style: non_native
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Same info in three software, can connect?
+  expected:
+    need_ids_any:
+    - data_sync
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_data_sync_04
+  need_id: data_sync
+  style: patois
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Wi a type di same ting in three place.
+  expected:
+    need_ids_any:
+    - data_sync
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_data_sync_05
+  need_id: data_sync
+  style: industry
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Clinic uses scheduling software, billing software, and a spreadsheet — nothing
+      talks.
+  expected:
+    need_ids_any:
+    - data_sync
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_data_sync_06
+  need_id: data_sync
+  style: multi_need
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Sync form intake into CRM and email without retyping
+  expected:
+    need_ids_any:
+    - data_sync
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_data_sync_07
+  need_id: data_sync
+  style: contrast
+  split: dev
+  contrast: true
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Hack into our competitor's CRM and copy their leads
+  expected:
+    need_ids_any:
+    - data_sync
+    modes_allowed:
+    - answer
+    - fallback
+    - contact
+    - explore_fit
+    fallback_forbidden: false
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    - delete every customer
+    - guarantee every invoice
+    - guarantee every customer pays
+    - medical diagnoses
+    human_review: answer_quality
+- id: bnr_data_sync_08
+  need_id: data_sync
+  style: holdout_a
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: warehouse scans don't reach the office spreadsheet
+  expected:
+    need_ids_any:
+    - data_sync
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_data_sync_09
+  need_id: data_sync
+  style: holdout_b
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: membership software and email list always out of date
+  expected:
+    need_ids_any:
+    - data_sync
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_employee_coordination_00
+  need_id: employee_coordination
+  style: std
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: My team doesn't know who's doing what.
+  expected:
+    need_ids_any:
+    - employee_coordination
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_employee_coordination_01
+  need_id: employee_coordination
+  style: informal
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: handoffs between staff are chaos
+  expected:
+    need_ids_any:
+    - employee_coordination
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_employee_coordination_02
+  need_id: employee_coordination
+  style: typo
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: nobdy owns the next step on jobs
+  expected:
+    need_ids_any:
+    - employee_coordination
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_employee_coordination_03
+  need_id: employee_coordination
+  style: non_native
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Staff not know who responsible for customer
+  expected:
+    need_ids_any:
+    - employee_coordination
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_employee_coordination_04
+  need_id: employee_coordination
+  style: patois
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Mi team dem nuh know who fi handle what.
+  expected:
+    need_ids_any:
+    - employee_coordination
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_employee_coordination_05
+  need_id: employee_coordination
+  style: industry
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Moving company crews show up without knowing job notes.
+  expected:
+    need_ids_any:
+    - employee_coordination
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_employee_coordination_06
+  need_id: employee_coordination
+  style: multi_need
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Ownership of leads plus who follows up today
+  expected:
+    need_ids_any:
+    - employee_coordination
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_employee_coordination_07
+  need_id: employee_coordination
+  style: ambiguous
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: team issues
+  expected:
+    need_ids_any:
+    - employee_coordination
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: false
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_employee_coordination_08
+  need_id: employee_coordination
+  style: holdout_a
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: field techs and office argue about job status
+  expected:
+    need_ids_any:
+    - employee_coordination
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_employee_coordination_09
+  need_id: employee_coordination
+  style: holdout_b
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: shift managers don't see what the last shift finished
+  expected:
+    need_ids_any:
+    - employee_coordination
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_inventory_00
+  need_id: inventory
+  style: std
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: We keep running out of supplies mid-job.
+  expected:
+    need_ids_any:
+    - inventory
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_inventory_01
+  need_id: inventory
+  style: informal
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: parts missing when we get to the site
+  expected:
+    need_ids_any:
+    - inventory
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_inventory_02
+  need_id: inventory
+  style: typo
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: inventry is a guess every week
+  expected:
+    need_ids_any:
+    - inventory
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_inventory_03
+  need_id: inventory
+  style: non_native
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Stock finish too fast, you have inventory system?
+  expected:
+    need_ids_any:
+    - inventory
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_inventory_04
+  need_id: inventory
+  style: patois
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Supplies a run out an wi nuh know early.
+  expected:
+    need_ids_any:
+    - inventory
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_inventory_05
+  need_id: inventory
+  style: industry
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Catering kitchen inventory is guesswork before events.
+  expected:
+    need_ids_any:
+    - inventory
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_inventory_06
+  need_id: inventory
+  style: multi_need
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Inventory alerts tied to scheduled jobs
+  expected:
+    need_ids_any:
+    - inventory
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_inventory_07
+  need_id: inventory
+  style: ambiguous
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: supplies
+  expected:
+    need_ids_any:
+    - inventory
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: false
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_inventory_08
+  need_id: inventory
+  style: holdout_a
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: auto shop keeps buying the same parts twice
+  expected:
+    need_ids_any:
+    - inventory
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_inventory_09
+  need_id: inventory
+  style: holdout_b
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: salon color inventory vanishes without tracking
+  expected:
+    need_ids_any:
+    - inventory
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_payments_billing_00
+  need_id: payments_billing
+  style: std
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Customers forget to pay invoices.
+  expected:
+    need_ids_any:
+    - payments_billing
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_payments_billing_01
+  need_id: payments_billing
+  style: informal
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: chasing payments is half my week
+  expected:
+    need_ids_any:
+    - payments_billing
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_payments_billing_02
+  need_id: payments_billing
+  style: typo
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: bililng reminders would help a lot
+  expected:
+    need_ids_any:
+    - payments_billing
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_payments_billing_03
+  need_id: payments_billing
+  style: non_native
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Customer forget pay, can automate reminder?
+  expected:
+    need_ids_any:
+    - payments_billing
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_payments_billing_04
+  need_id: payments_billing
+  style: patois
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: People forget fi pay an wi a chase dem.
+  expected:
+    need_ids_any:
+    - payments_billing
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_payments_billing_05
+  need_id: payments_billing
+  style: industry
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Tutoring studio families forget monthly tuition.
+  expected:
+    need_ids_any:
+    - payments_billing
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_payments_billing_06
+  need_id: payments_billing
+  style: multi_need
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Invoices plus polite payment reminders without sounding spammy
+  expected:
+    need_ids_any:
+    - payments_billing
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_payments_billing_07
+  need_id: payments_billing
+  style: contrast
+  split: dev
+  contrast: true
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Can you guarantee every customer pays within 24 hours?
+  expected:
+    need_ids_any:
+    - payments_billing
+    modes_allowed:
+    - answer
+    - fallback
+    - contact
+    - explore_fit
+    fallback_forbidden: false
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    - delete every customer
+    - guarantee every invoice
+    - guarantee every customer pays
+    - medical diagnoses
+    human_review: answer_quality
+- id: bnr_payments_billing_08
+  need_id: payments_billing
+  style: holdout_a
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: membership dues collection is inconsistent
+  expected:
+    need_ids_any:
+    - payments_billing
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_payments_billing_09
+  need_id: payments_billing
+  style: holdout_b
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: freelance clients ghost after the work is done
+  expected:
+    need_ids_any:
+    - payments_billing
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_website_digital_ops_00
+  need_id: website_digital_ops
+  style: std
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Our website doesn't connect to our office systems.
+  expected:
+    need_ids_any:
+    - website_digital_ops
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_website_digital_ops_01
+  need_id: website_digital_ops
+  style: informal
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: site is pretty but nothing hits the office
+  expected:
+    need_ids_any:
+    - website_digital_ops
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_website_digital_ops_02
+  need_id: website_digital_ops
+  style: typo
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: landing page doesnt talk to crm
+  expected:
+    need_ids_any:
+    - website_digital_ops
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_website_digital_ops_03
+  need_id: website_digital_ops
+  style: non_native
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Website and office not connect, how fix?
+  expected:
+    need_ids_any:
+    - website_digital_ops
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_website_digital_ops_04
+  need_id: website_digital_ops
+  style: patois
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Di website pretty but office nuh see di leads.
+  expected:
+    need_ids_any:
+    - website_digital_ops
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_website_digital_ops_05
+  need_id: website_digital_ops
+  style: industry
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Boutique hotel site bookings never reach the front desk tools.
+  expected:
+    need_ids_any:
+    - website_digital_ops
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_website_digital_ops_06
+  need_id: website_digital_ops
+  style: multi_need
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Website intake into CRM and email follow-up
+  expected:
+    need_ids_any:
+    - website_digital_ops
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_website_digital_ops_07
+  need_id: website_digital_ops
+  style: contrast
+  split: dev
+  contrast: true
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Build us a full WordPress marketing site with custom design and SEO package
+  expected:
+    need_ids_any:
+    - website_digital_ops
+    modes_allowed:
+    - answer
+    - fallback
+    - contact
+    - explore_fit
+    fallback_forbidden: false
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    - delete every customer
+    - guarantee every invoice
+    - guarantee every customer pays
+    - medical diagnoses
+    human_review: answer_quality
+- id: bnr_website_digital_ops_08
+  need_id: website_digital_ops
+  style: holdout_a
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: church website forms go to a random inbox
+  expected:
+    need_ids_any:
+    - website_digital_ops
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_website_digital_ops_09
+  need_id: website_digital_ops
+  style: holdout_b
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: clinic site appointment requests never reach scheduling
+  expected:
+    need_ids_any:
+    - website_digital_ops
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_integrations_00
+  need_id: integrations
+  style: std
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Can this work with the software we already have?
+  expected:
+    need_ids_any:
+    - integrations
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_integrations_01
+  need_id: integrations
+  style: informal
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: we aint replacing everything, just connect what we got
+  expected:
+    need_ids_any:
+    - integrations
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_integrations_02
+  need_id: integrations
+  style: typo
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: does it werk wit outlook and our current tools
+  expected:
+    need_ids_any:
+    - integrations
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_integrations_03
+  need_id: integrations
+  style: non_native
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Can connect to software we use now?
+  expected:
+    need_ids_any:
+    - integrations
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_integrations_04
+  need_id: integrations
+  style: patois
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Wi already have tools. Unu can connect dem?
+  expected:
+    need_ids_any:
+    - integrations
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_integrations_05
+  need_id: integrations
+  style: industry
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Logistics TMS plus email — can those talk through you?
+  expected:
+    need_ids_any:
+    - integrations
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_integrations_06
+  need_id: integrations
+  style: multi_need
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Gmail plus CRM plus our booking tool
+  expected:
+    need_ids_any:
+    - integrations
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_integrations_07
+  need_id: integrations
+  style: ambiguous
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: integrations?
+  expected:
+    need_ids_any:
+    - integrations
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: false
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_integrations_08
+  need_id: integrations
+  style: holdout_a
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: QuickBooks and inbox are separate worlds for us
+  expected:
+    need_ids_any:
+    - integrations
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_integrations_09
+  need_id: integrations
+  style: holdout_b
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Shopify orders never notify our ops chat
+  expected:
+    need_ids_any:
+    - integrations
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_business_discovery_00
+  need_id: business_discovery
+  style: std
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: I know things are inefficient but don't know what to fix.
+  expected:
+    need_ids_any:
+    - business_discovery
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_business_discovery_01
+  need_id: business_discovery
+  style: informal
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: office is a mess idk where to start
+  expected:
+    need_ids_any:
+    - business_discovery
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_business_discovery_02
+  need_id: business_discovery
+  style: typo
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: ops are chaostic not sure what we need
+  expected:
+    need_ids_any:
+    - business_discovery
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_business_discovery_03
+  need_id: business_discovery
+  style: non_native
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Business not smooth, what you recommend first?
+  expected:
+    need_ids_any:
+    - business_discovery
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_business_discovery_04
+  need_id: business_discovery
+  style: patois
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Tings inefficient but mi nuh know whey fi fix first.
+  expected:
+    need_ids_any:
+    - business_discovery
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_business_discovery_05
+  need_id: business_discovery
+  style: industry
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Family-owned machine shop — busy but process feels stuck.
+  expected:
+    need_ids_any:
+    - business_discovery
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_business_discovery_06
+  need_id: business_discovery
+  style: multi_need
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: Maybe CRM or email or website — not sure which first
+  expected:
+    need_ids_any:
+    - business_discovery
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_business_discovery_07
+  need_id: business_discovery
+  style: ambiguous
+  split: dev
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: help
+  expected:
+    need_ids_any:
+    - business_discovery
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: false
+    clarification_or_limitation_ok: true
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_business_discovery_08
+  need_id: business_discovery
+  style: holdout_a
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: we're growing and everything feels duct-taped
+  expected:
+    need_ids_any:
+    - business_discovery
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality
+- id: bnr_business_discovery_09
+  need_id: business_discovery
+  style: holdout_b
+  split: holdout
+  contrast: false
+  provenance:
+    source: bnr_generator_v1
+    review_status: draft_unvalidated
+    independent_of_golden: true
+  turns:
+  - user: new manager inherited messy workflows, need a starting point
+  expected:
+    need_ids_any:
+    - business_discovery
+    modes_allowed:
+    - answer
+    - explore_fit
+    - workflow_audit
+    - consulting
+    - contact
+    fallback_forbidden: true
+    clarification_or_limitation_ok: false
+    forbidden_substrings:
+    - guaranteed ROI
+    - HIPAA certified
+    - we guarantee
+    - hack into
+    - medical diagnosis
+    human_review: answer_quality

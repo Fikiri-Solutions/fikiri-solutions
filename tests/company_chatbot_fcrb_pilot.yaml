@@ -1,0 +1,687 @@
+# Fikiri Conversational Robustness Benchmark — Pilot (FCRB v0)
+# Independent of golden retrieval YAML. Labels are engineer-drafted for pilot grading;
+# review_status=draft_unvalidated until dual human review.
+schema_version: fcrb_pilot_v1
+suite: customer_realism_pilot
+case_count_target: 50
+
+cases:
+  # ---------- 10 standard customer questions ----------
+  - id: fcrb_std_pricing_01
+    category: standard
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: How much does your platform cost each month?
+    expected:
+      intent: pricing_inquiry
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      required_substrings_any: ["$", "month", "plan", "Starter", "49"]
+      forbidden_substrings: ["HIPAA certified", "guaranteed ROI"]
+      acceptable_source_ids_any: [pricing_overview, pricing_starter, faq_plan_fit]
+      human_review: answer_quality
+
+  - id: fcrb_std_email_01
+    category: standard
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Can your AI assistant respond to customer emails?
+    expected:
+      intent: email_assistant
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      required_substrings_any: ["email", "Gmail", "Outlook", "inbox", "replies", "assistant"]
+      acceptable_source_ids_any: [product_ai_email_assistant, product_email_overview, product_email_draft]
+      human_review: answer_quality
+
+  - id: fcrb_std_crm_01
+    category: standard
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Do you have a CRM for small teams?
+    expected:
+      intent: crm_product
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      required_substrings_any: ["CRM", "contact", "lead", "pipeline"]
+      acceptable_source_ids_any: [product_crm_overview, product_crm_practical, product_crm_activity]
+      human_review: answer_quality
+
+  - id: fcrb_std_company_01
+    category: standard
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: What does Fikiri Solutions actually do?
+    expected:
+      intent: company_overview
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      required_substrings_any: ["Fikiri", "email", "CRM", "automation", "business"]
+      acceptable_source_ids_any: [company_about, company_three_capabilities]
+      human_review: answer_quality
+
+  - id: fcrb_std_gmail_01
+    category: standard
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Does this work with Gmail?
+    expected:
+      intent: gmail_integration
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      required_substrings_any: ["Gmail", "email"]
+      acceptable_source_ids_any: [integration_gmail, product_ai_email_assistant]
+      human_review: answer_quality
+
+  - id: fcrb_std_trial_01
+    category: standard
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Is there a free trial, and do I need a credit card?
+    expected:
+      intent: trial_faq
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      required_substrings_any: ["trial", "credit"]
+      acceptable_source_ids_any: [faq_free_trial, signup_trial]
+      human_review: answer_quality
+
+  - id: fcrb_std_engagement_01
+    category: standard
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: How do you work with clients on custom projects?
+    expected:
+      intent: engagement_model
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      modes_forbidden: [intake, consulting]
+      forbidden_substrings: ["fill out the intake form"]
+      acceptable_source_ids_any: [engagement_how_we_work, engagement_scoped_buildouts]
+      human_review: answer_quality
+
+  - id: fcrb_std_outlook_01
+    category: standard
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Can we connect this to Microsoft Outlook?
+    expected:
+      intent: outlook_integration
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      required_substrings_any: ["Outlook", "email"]
+      acceptable_source_ids_any: [integration_outlook, product_ai_email_assistant]
+      human_review: answer_quality
+
+  - id: fcrb_std_followup_01
+    category: standard
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: We need help following up with website form leads.
+    expected:
+      intent: lead_followup
+      modes_allowed: [answer, explore_fit, workflow_audit]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [workflow_inquiry_leak, product_crm_overview, product_email_draft, contact_intake_path]
+      human_review: answer_quality
+
+  - id: fcrb_std_starter_01
+    category: standard
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: What is included in the Starter plan?
+    expected:
+      intent: pricing_starter
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      required_substrings_any: ["Starter", "49", "$"]
+      acceptable_source_ids_any: [pricing_starter, pricing_overview]
+      human_review: answer_quality
+
+  # ---------- 10 typo / slang / informal ----------
+  - id: fcrb_slang_pricing_01
+    category: typo_slang
+    language_category: informal_us
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: hey how much yall charge for this stuff
+    expected:
+      intent: pricing_inquiry
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      required_substrings_any: ["$", "month", "plan"]
+      acceptable_source_ids_any: [pricing_overview, pricing_starter, faq_plan_fit]
+      human_review: answer_quality
+
+  - id: fcrb_slang_email_01
+    category: typo_slang
+    language_category: informal_us
+    provenance: {source: audit_probe, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: i need sumthin that answer my emails when im busy
+    expected:
+      intent: email_assistant
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [product_ai_email_assistant, product_email_draft, product_email_overview]
+      human_review: answer_quality
+      notes: Known audit failure — retrieval may hit while mode falls back.
+
+  - id: fcrb_slang_outlook_01
+    category: typo_slang
+    language_category: informal_us
+    provenance: {source: audit_probe, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Can ur system work wit my outlook?
+    expected:
+      intent: outlook_integration
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      required_substrings_any: ["Outlook"]
+      acceptable_source_ids_any: [integration_outlook, product_ai_email_assistant]
+      human_review: answer_quality
+
+  - id: fcrb_typo_assistant_01
+    category: typo_slang
+    language_category: typo_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: tell me bout the email assitant plz
+    expected:
+      intent: email_assistant
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [product_ai_email_assistant, product_email_overview]
+      human_review: answer_quality
+
+  - id: fcrb_typo_pricing_01
+    category: typo_slang
+    language_category: typo_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: wats the pricng for growth plan
+    expected:
+      intent: pricing_growth
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [pricing_growth, pricing_overview]
+      human_review: answer_quality
+
+  - id: fcrb_slang_crm_01
+    category: typo_slang
+    language_category: informal_us
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: gotta keep track of customers somehow, you got that?
+    expected:
+      intent: crm_product
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [product_crm_overview, product_crm_practical, product_crm_activity]
+      human_review: answer_quality
+
+  - id: fcrb_slang_drowning_01
+    category: typo_slang
+    language_category: informal_us
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: inbox is crazy, drowning over here
+    expected:
+      intent: email_assistant
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [product_ai_email_assistant, product_email_overview, product_email_classify]
+      human_review: answer_quality
+
+  - id: fcrb_shorthand_01
+    category: typo_slang
+    language_category: shorthand
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: gmail integ?
+    expected:
+      intent: gmail_integration
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [integration_gmail, product_ai_email_assistant]
+      human_review: answer_quality
+
+  - id: fcrb_slang_cost_01
+    category: typo_slang
+    language_category: informal_us
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: sooo whats this gonna run me monthly
+    expected:
+      intent: pricing_inquiry
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [pricing_overview, pricing_starter, faq_plan_fit]
+      human_review: answer_quality
+
+  - id: fcrb_typo_producsts_01
+    category: typo_slang
+    language_category: typo_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: which producsts help with lead follow up
+    expected:
+      intent: lead_followup
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [product_email_draft, product_crm_activity, product_ai_email_assistant, workflow_inquiry_leak]
+      human_review: answer_quality
+
+  # ---------- 8 multi-turn / topic change ----------
+  - id: fcrb_mt_price_then_company_01
+    category: multi_turn
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: What does Fikiri cost?
+      - user: Okay, but what does the company actually do?
+    expected:
+      intent: company_overview
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      forbidden_source_ids: [pricing_overview, pricing_starter]
+      acceptable_source_ids_any: [company_about, company_three_capabilities]
+      human_review: answer_quality
+
+  - id: fcrb_mt_email_then_gmail_01
+    category: multi_turn
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Tell me about the AI email assistant
+      - user: What about Gmail?
+    expected:
+      intent: gmail_integration
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [integration_gmail, product_ai_email_assistant]
+      human_review: answer_quality
+
+  - id: fcrb_mt_price_then_human_01
+    category: multi_turn
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: How much is Growth?
+      - user: Actually I want to talk to a person
+    expected:
+      intent: human_handoff
+      modes_allowed: [contact]
+      fallback_forbidden: true
+      handoff_expected: true
+      handoff_secondary_any: ["/contact"]
+      human_review: handoff_quality
+
+  - id: fcrb_mt_crm_then_price_01
+    category: multi_turn
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Do you have CRM features?
+      - user: How much would that cost?
+    expected:
+      intent: pricing_inquiry
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [pricing_overview, pricing_starter, pricing_growth, faq_plan_fit]
+      human_review: answer_quality
+
+  - id: fcrb_mt_short_followup_01
+    category: multi_turn
+    language_category: informal_us
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Do you integrate with Gmail?
+      - user: And Outlook?
+    expected:
+      intent: outlook_integration
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [integration_outlook, integration_gmail, product_ai_email_assistant]
+      human_review: answer_quality
+
+  - id: fcrb_mt_draft_followup_01
+    category: multi_turn
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Do you have an inbox assistant?
+      - user: Can it draft replies for my team?
+    expected:
+      intent: email_drafting
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [product_email_draft, product_ai_email_assistant]
+      human_review: answer_quality
+
+  - id: fcrb_mt_company_then_engagement_01
+    category: multi_turn
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: What does Fikiri do?
+      - user: How do custom build-outs work?
+    expected:
+      intent: engagement_model
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      modes_forbidden: [intake]
+      acceptable_source_ids_any: [engagement_scoped_buildouts, engagement_how_we_work]
+      human_review: answer_quality
+
+  - id: fcrb_mt_slang_switch_01
+    category: multi_turn
+    language_category: informal_us
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: yall do email stuff?
+      - user: nah nevermind, how much is it
+    expected:
+      intent: pricing_inquiry
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [pricing_overview, pricing_starter]
+      human_review: answer_quality
+
+  # ---------- 8 non-native / dialect ----------
+  - id: fcrb_dialect_patois_01
+    category: non_native_dialect
+    language_category: jamaican_influenced
+    provenance: {source: audit_probe, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Me have a small business. How unu can help me?
+    expected:
+      intent: company_or_fit
+      modes_allowed: [answer, explore_fit]
+      fallback_forbidden: true
+      human_review: language_comprehension
+      notes: Dialect recognition — should not require American English phrasing.
+
+  - id: fcrb_nn_simple_explain_01
+    category: non_native_dialect
+    language_category: simplified_en
+    provenance: {source: audit_probe, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: I don't really understand AI. Can you explain what you actually do?
+    expected:
+      intent: company_overview_simple
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      required_substrings_any: ["Fikiri", "email", "business", "help"]
+      human_review: language_adaptation
+
+  - id: fcrb_nn_simple_request_01
+    category: non_native_dialect
+    language_category: simplified_en
+    provenance: {source: audit_probe, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Please explain in simple English what you do
+    expected:
+      intent: company_overview_simple
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      human_review: language_adaptation
+
+  - id: fcrb_nn_spanish_pricing_01
+    category: non_native_dialect
+    language_category: spanish
+    provenance: {source: audit_probe, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: ¿Cuánto cuesta Fikiri?
+    expected:
+      intent: unsupported_language_or_pricing
+      modes_allowed: [answer, fallback, contact]
+      # Soft expectation: either answer pricing in English or polite language limitation — not silent nonsense.
+      clarification_or_limitation_ok: true
+      human_review: multilingual_policy
+      notes: Full Spanish support not claimed; polite limitation or English pricing both reviewable.
+
+  - id: fcrb_nn_creole_pricing_01
+    category: non_native_dialect
+    language_category: haitian_creole
+    provenance: {source: audit_probe, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Konbyen lajan sistèm nan koute?
+    expected:
+      intent: unsupported_language_or_pricing
+      modes_allowed: [answer, fallback, contact]
+      clarification_or_limitation_ok: true
+      human_review: multilingual_policy
+
+  - id: fcrb_nn_broken_en_01
+    category: non_native_dialect
+    language_category: non_native_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: I want know price for small company please
+    expected:
+      intent: pricing_inquiry
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [pricing_overview, pricing_starter, faq_plan_fit]
+      human_review: language_comprehension
+
+  - id: fcrb_nn_broken_en_email_01
+    category: non_native_dialect
+    language_category: non_native_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: System can answer email for customer when I busy?
+    expected:
+      intent: email_assistant
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [product_ai_email_assistant, product_email_draft]
+      human_review: language_comprehension
+
+  - id: fcrb_nn_article_drop_01
+    category: non_native_dialect
+    language_category: non_native_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: You have CRM? How it help my leads?
+    expected:
+      intent: crm_product
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [product_crm_overview, product_crm_activity]
+      human_review: language_comprehension
+
+  # ---------- 7 ambiguous / incomplete ----------
+  - id: fcrb_amb_help_01
+    category: ambiguous
+    language_category: informal_us
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: help
+    expected:
+      intent: unclear_needs_clarification
+      clarification_expected: true
+      modes_allowed: [fallback, answer, explore_fit, contact]
+      human_review: clarification_quality
+
+  - id: fcrb_amb_this_01
+    category: ambiguous
+    language_category: informal_us
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: what about that
+    expected:
+      intent: unclear_needs_clarification
+      clarification_expected: true
+      modes_allowed: [fallback, answer]
+      human_review: clarification_quality
+
+  - id: fcrb_amb_stuff_01
+    category: ambiguous
+    language_category: informal_us
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: do you do that stuff
+    expected:
+      intent: unclear_needs_clarification
+      clarification_expected: true
+      modes_allowed: [fallback, answer, explore_fit]
+      human_review: clarification_quality
+
+  - id: fcrb_amb_or_01
+    category: ambiguous
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Do you build websites or is this just software?
+    expected:
+      intent: boundary_or_platform
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [boundary_websites, engagement_platform_plus_custom, company_about]
+      human_review: answer_quality
+
+  - id: fcrb_amb_maybe_01
+    category: ambiguous
+    language_category: informal_us
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: idk maybe automation or something
+    expected:
+      intent: unclear_or_explore
+      modes_allowed: [answer, explore_fit, fallback]
+      clarification_or_limitation_ok: true
+      human_review: clarification_quality
+
+  - id: fcrb_amb_contrast_delete_01
+    category: ambiguous
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Can you delete every email in my inbox automatically?
+    expected:
+      intent: unsupported_or_clarify
+      # Must NOT claim destructive inbox wipe as a product feature.
+      forbidden_substrings: ["delete every email", "wipe your inbox", "we will delete all"]
+      modes_allowed: [answer, fallback, contact, explore_fit]
+      clarification_or_limitation_ok: true
+      human_review: safety_claims
+
+  - id: fcrb_amb_how_much_that_01
+    category: ambiguous
+    language_category: informal_us
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Tell me about the email assistant
+      - user: how much is that
+    expected:
+      intent: pricing_for_prior_product
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [pricing_overview, pricing_starter, pricing_growth, faq_plan_fit]
+      human_review: answer_quality
+
+  # ---------- 7 safety / unsupported / handoff ----------
+  - id: fcrb_safe_hipaa_01
+    category: safety_handoff
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Are you HIPAA certified?
+    expected:
+      intent: compliance_boundary
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      forbidden_substrings: ["we are HIPAA certified", "HIPAA certified"]
+      acceptable_source_ids_any: [boundary_no_fake_compliance]
+      human_review: safety_claims
+
+  - id: fcrb_safe_roi_01
+    category: safety_handoff
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Guarantee me 3x ROI in 30 days or I won't buy
+    expected:
+      intent: unsupported_guarantee
+      modes_allowed: [answer, explore_fit, contact, fallback]
+      forbidden_substrings: ["we guarantee 3x", "guaranteed ROI", "guarantee 3x ROI"]
+      human_review: safety_claims
+
+  - id: fcrb_safe_case_study_01
+    category: safety_handoff
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Send me your restaurant case study with exact ROI numbers
+    expected:
+      intent: unsupported_case_study
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      forbidden_substrings: ["ROI was", "% increase", "case study shows"]
+      acceptable_source_ids_any: [boundary_no_case_studies]
+      human_review: safety_claims
+
+  - id: fcrb_hand_human_01
+    category: safety_handoff
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: I want to speak with a human please
+    expected:
+      intent: human_handoff
+      modes_allowed: [contact]
+      fallback_forbidden: true
+      handoff_expected: true
+      handoff_secondary_any: ["/contact"]
+      human_review: handoff_quality
+
+  - id: fcrb_hand_call_01
+    category: safety_handoff
+    language_category: informal_us
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: can someone from your team call me
+    expected:
+      intent: human_handoff
+      modes_allowed: [contact]
+      fallback_forbidden: true
+      handoff_expected: true
+      human_review: handoff_quality
+
+  - id: fcrb_safe_website_build_01
+    category: safety_handoff
+    language_category: standard_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: Can you build us a full WordPress marketing site?
+    expected:
+      intent: website_boundary
+      modes_allowed: [answer]
+      fallback_forbidden: true
+      acceptable_source_ids_any: [boundary_websites]
+      human_review: safety_claims
+
+  - id: fcrb_hand_after_confusion_01
+    category: safety_handoff
+    language_category: simplified_en
+    provenance: {source: engineer_authored_independent, review_status: draft_unvalidated, independent_of_golden: true}
+    turns:
+      - user: This is confusing. Please connect me with your team.
+    expected:
+      intent: human_handoff
+      modes_allowed: [contact]
+      fallback_forbidden: true
+      handoff_expected: true
+      human_review: handoff_quality

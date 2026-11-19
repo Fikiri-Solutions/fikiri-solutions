@@ -99,8 +99,22 @@ def handle_message(session_id: str, message: str) -> MessageResult:
         return _attach_routing_trace(result, routing_trace)
 
     if session.intake_active:
-        interrupt_mode = detect_mode(text, routing_trace=routing_trace)
-        if interrupt_mode in (config.MODE_ANSWER, config.MODE_CONTACT):
+        # Local trace so interrupt decisions work even when observability tracing is off.
+        interrupt_trace = routing_trace if routing_trace is not None else RoutingTrace()
+        interrupt_mode = detect_mode(text, routing_trace=interrupt_trace)
+        matched_rule = interrupt_trace.mode.matched_rule
+        # Pain-slot answers often look like business needs ("slow manual scheduling").
+        # Keep intake unless this is a clear product/FAQ/contact interrupt.
+        intake_safe_answer_rules = {
+            "business_need_bridge",
+            "mixed_scope_answer",
+            "vague_office_pain",
+        }
+        should_interrupt = interrupt_mode == config.MODE_CONTACT or (
+            interrupt_mode == config.MODE_ANSWER
+            and matched_rule not in intake_safe_answer_rules
+        )
+        if should_interrupt:
             session.intake_active = False
             result = _dispatch_mode(interrupt_mode, text, session, previous_user_message)
             save_session(session)
@@ -355,7 +369,11 @@ def _handle_fallback(
     needs = detect_needs(message, previous_query=previous_user_message or None, effective_query=effective)
     if needs.detected_families and needs.confidence >= 0.35:
         retrieval = retrieve(effective, previous_query=previous_user_message or None)
-        response = compose_capability_bridge(needs, retrieval.chunks[:2])
+        response = compose_capability_bridge(
+            needs,
+            retrieval.chunks[:2],
+            original_query=message,
+        )
         return _base_result(
             config.MODE_ANSWER,
             response,

@@ -107,6 +107,18 @@ def site_chat_message():
         user_agent=(request.headers.get("User-Agent") or "").strip() or None,
     )
 
+    # Fail-open: Slack after persist; never blocks the visitor response.
+    try:
+        from company_chatbot.handoff_notify import notify_site_chat_handoff
+
+        notify_site_chat_handoff(
+            session_id=session_id,
+            result=result,
+            user_message=message,
+        )
+    except Exception:
+        logger.exception("Site chat handoff Slack notify failed")
+
     return create_success_response(
         {**result.to_dict(config.SCHEMA_VERSION), "session_id": session_id},
         "Site chat message processed",
