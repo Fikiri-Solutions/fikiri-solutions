@@ -79,6 +79,7 @@ def ensure_site_chat_transcript_tables() -> None:
             intake_json TEXT,
             handoff_json TEXT,
             lead_assessment_json TEXT,
+            meta_json TEXT,
             created_at TEXT NOT NULL
         )
         """,
@@ -117,14 +118,14 @@ def ensure_site_chat_transcript_tables() -> None:
         """,
         fetch=False,
     )
-    # Additive study/training column — safe on existing prod tables.
+    # Existing prod DBs created before study meta need an additive column.
+    # Postgres: IF NOT EXISTS. SQLite: plain ADD, ignore duplicate-column errors.
     try:
         db_optimizer.execute_query(
             "ALTER TABLE site_chat_messages ADD COLUMN IF NOT EXISTS meta_json TEXT",
             fetch=False,
         )
     except Exception:
-        # SQLite older than IF NOT EXISTS support: ignore duplicate-column failures.
         try:
             db_optimizer.execute_query(
                 "ALTER TABLE site_chat_messages ADD COLUMN meta_json TEXT",
