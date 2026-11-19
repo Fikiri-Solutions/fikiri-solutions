@@ -61,6 +61,25 @@ def test_critical_scenario(scenario):
         assert last.intake.get("complete") is True
 
 
+def test_company_overview_variants_do_not_fallback():
+    """Regression: common 'what do you do / services' phrasings must answer from KB."""
+    for message in (
+        "what do you all do?",
+        "what services do you offer?",
+        "what products do you have",
+        "I just asked what services do you offer?",
+    ):
+        clear_sessions_for_tests()
+        result = handle_message(start_session().session_id, message)
+        assert result.mode == "answer", message
+        assert "i'm not sure i understood" not in result.response.lower(), message
+        lowered = result.response.lower()
+        assert any(
+            needle in lowered
+            for needle in ("fikiri", "email", "crm", "capabilities", "consulting", "workflow")
+        ), result.response
+
+
 def test_email_assistant_transcript_no_three_identical_fallbacks():
     session = start_session()
     messages = [

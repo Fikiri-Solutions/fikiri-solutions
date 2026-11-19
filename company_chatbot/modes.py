@@ -132,8 +132,14 @@ _MODE_RULES: List[ModeRule] = [
         MODE_ANSWER,
         re.compile(
             r"\b(pricing|price|cost|how much|free trial|features?|"
-            r"what do you (do|offer)|what does fikiri|what (?:is|are) fikiri|who is fikiri|"
-            r"tell me about fikiri|integrations?|faq|hours|"
+            # Company overview variants — keep these answering from KB, not fallback.
+            r"what do you(?: all)? do|what (?:do )?y'?all do|"
+            r"what do you offer|what (?:services|products|solutions) do you (?:offer|have|provide)|"
+            r"what services|services do you offer|what products do you have|"
+            r"what can you (?:do|help(?: with)?)|what (?:can|does) fikiri (?:do|offer|help)|"
+            r"what does fikiri|what (?:is|are) fikiri|who is fikiri|who are you|"
+            r"tell me about (?:fikiri|your (?:company|services|products|offerings?))|"
+            r"integrations?|faq|hours|"
             r"gmail|outlook|google workspace|microsoft 365|"
             r"email automation|how does email|automation|"
             r"i(?:'m| am) drowning in emails|too many emails|automate my inbox|"

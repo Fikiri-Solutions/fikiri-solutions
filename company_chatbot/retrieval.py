@@ -102,7 +102,18 @@ _TOPIC_RULES: Tuple[Tuple[str, re.Pattern[str], float], ...] = (
     ),
     ("industries", re.compile(r"\b(landscap|restaurant|dental|medical|clinic|hvac|trades|contractor|hospitality|lawn)\b", re.I), 0.95),
     ("boundaries", re.compile(r"\b(hipaa|soc\s*2|soc2|case stud|certified|compliance|guarantee|website design|web design|wordpress|build websites)\b", re.I), 1.0),
-    ("company", re.compile(r"\b(what do you do|what does fikiri|who is fikiri|what is fikiri|florida smb|capabilities|offerings?)\b", re.I), 0.9),
+    (
+        "company",
+        re.compile(
+            r"\b(what do you(?: all)? do|what (?:do )?y'?all do|"
+            r"what (?:services|products|solutions) do you (?:offer|have|provide)|"
+            r"what services|services do you offer|what products|"
+            r"what does fikiri|who is fikiri|what is fikiri|florida smb|"
+            r"capabilities|offerings?)\b",
+            re.I,
+        ),
+        0.9,
+    ),
     ("contact", re.compile(r"\b(contact|reach|talk to|get in touch|info@|email me|support team)\b", re.I), 0.85),
 )
 
@@ -110,8 +121,13 @@ _TOPIC_RULES: Tuple[Tuple[str, re.Pattern[str], float], ...] = (
 _COMPANY_OVERVIEW_PHRASES = frozenset(
     {
         "what do you do",
+        "what do you all do",
+        "what do yall do",
         "what does fikiri",
         "who is fikiri",
+        "what services do you offer",
+        "what products do you have",
+        "what do you offer",
     }
 )
 
@@ -142,6 +158,13 @@ _PHRASE_CHUNK_BOOSTS: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
     ("outlook", ("integration_outlook", "product_ai_email_assistant")),
     ("crm", ("product_crm_overview", "product_crm_activity", "product_crm_practical")),
     ("what do you do", ("company_about", "company_three_capabilities")),
+    ("what do you all do", ("company_about", "company_three_capabilities")),
+    ("what do yall do", ("company_about", "company_three_capabilities")),
+    ("what services do you offer", ("company_three_capabilities", "company_about")),
+    ("what services", ("company_three_capabilities", "company_about")),
+    ("services do you offer", ("company_three_capabilities", "company_about")),
+    ("what products do you have", ("company_three_capabilities", "company_about")),
+    ("what do you offer", ("company_three_capabilities", "company_about")),
     ("what does fikiri", ("company_about", "company_three_capabilities")),
     ("who is fikiri", ("company_about",)),
     ("what does fikiri cost", ("pricing_overview", "pricing_starter", "faq_plan_fit")),
@@ -388,7 +411,8 @@ def _phrase_boost(normalized_query: str, chunk: KBChunk) -> float:
             continue
         if pricing_intent and phrase in _COMPANY_OVERVIEW_PHRASES:
             continue
-        boost = max(boost, 0.5)
+        # Overview phrases often reduce to stopwords + "all"; keep company chunks on top.
+        boost = max(boost, 0.9 if phrase in _COMPANY_OVERVIEW_PHRASES else 0.5)
         break
     return boost
 

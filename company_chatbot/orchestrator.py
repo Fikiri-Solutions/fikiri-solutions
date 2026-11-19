@@ -367,8 +367,8 @@ def _handle_fallback(
 
     effective = effective_query_for_retrieval(message, previous_user_message or None)
     needs = detect_needs(message, previous_query=previous_user_message or None, effective_query=effective)
+    retrieval = retrieve(effective, previous_query=previous_user_message or None)
     if needs.detected_families and needs.confidence >= 0.35:
-        retrieval = retrieve(effective, previous_query=previous_user_message or None)
         response = compose_capability_bridge(
             needs,
             retrieval.chunks[:2],
@@ -388,6 +388,31 @@ def _handle_fallback(
             grounded=True,
             confidence=needs.confidence,
             sources=[{"chunk_id": c.id, "topic": c.topic} for c in retrieval.chunks[:2]],
+        )
+
+    # Company-overview rescue: retrieval already found about/capabilities chunks, but
+    # mode missed a phrasing variant ("what do you all do?", "what services...").
+    overview_ids = {"company_about", "company_three_capabilities", "company_outcomes"}
+    overview_chunks = [c for c in (retrieval.chunks or []) if c.id in overview_ids]
+    if overview_chunks:
+        primary = overview_chunks[0].text.strip()
+        overview_text = primary
+        if len(overview_chunks) > 1:
+            overview_text = f"{primary} {overview_chunks[1].text.strip()}"
+        return _base_result(
+            config.MODE_ANSWER,
+            overview_text,
+            session,
+            HandoffMetadata(
+                applicable=True,
+                primary=config.HANDOFF_PRIMARY_WIDGET,
+                secondary=config.HANDOFF_SECONDARY_INTAKE,
+                handoff_type="intake",
+            ),
+            LeadIntentMetadata(signals=["company_overview_rescue", "product_interest"]),
+            grounded=True,
+            confidence=max(0.55, float(getattr(overview_chunks[0], "score", 0.55) or 0.55)),
+            sources=[{"chunk_id": c.id, "topic": c.topic} for c in overview_chunks[:2]],
         )
 
     response = (
