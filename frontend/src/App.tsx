@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom'
-import { Suspense, useMemo, lazy, type ComponentType } from 'react'
+import { Suspense, useEffect, useMemo, lazy, type ComponentType } from 'react'
 import { HelmetProvider } from 'react-helmet-async'
 import { QueryProvider } from './providers/QueryProvider'
 import { ToastProvider } from './components/Toast'
@@ -95,12 +95,12 @@ const TenantDetail = named(() => import('./pages/admin/TenantDetail'), 'TenantDe
 const AdminAuditLog = named(() => import('./pages/admin/AdminAuditLog'), 'AdminAuditLog')
 const AdminMfaSecurity = named(() => import('./pages/admin/AdminMfaSecurity'), 'AdminMfaSecurity')
 const AdminSiteChat = named(() => import('./pages/admin/AdminSiteChat'), 'AdminSiteChat')
+const AdminMarketingFunnel = named(
+  () => import('./pages/admin/AdminMarketingFunnel'),
+  'AdminMarketingFunnel'
+)
 
-const Analytics = lazy(async () => {
-  const module = await import('@vercel/analytics/react')
-  return { default: module.Analytics }
-})
-
+/** Free Speed Insights only — pauses at the team limit; no overage charges. Web Analytics stays off (usage-billed on Pro). */
 const SpeedInsights = lazy(async () => {
   const module = await import('@vercel/speed-insights/react')
   return { default: module.SpeedInsights }
@@ -132,12 +132,17 @@ function LegacyIntegrationsIndexRedirect() {
 function App() {
   const features = getFeatureConfig()
   useWarmRoutes() // Warm dashboard chunk after first paint (authenticated only)
-  const showObservability = useMemo(() => {
-    if (import.meta.env.PROD) {
-      return true
-    }
+  const enableSiteTelemetry = useMemo(() => {
+    if (import.meta.env.PROD) return true
     return import.meta.env.VITE_ENABLE_ANALYTICS === 'true'
   }, [])
+
+  useEffect(() => {
+    if (!enableSiteTelemetry) return
+    void import('./lib/microsoftClarity').then(({ initMicrosoftClarity }) => {
+      initMicrosoftClarity()
+    })
+  }, [enableSiteTelemetry])
 
   return (
     <ErrorBoundary>
@@ -361,6 +366,7 @@ function App() {
                             <Route path="audit" element={<AdminAuditLog />} />
                             <Route path="security" element={<AdminMfaSecurity />} />
                             <Route path="site-chat" element={<AdminSiteChat />} />
+                            <Route path="marketing" element={<AdminMarketingFunnel />} />
                           </Route>
                           
                           {/* 404 route */}
@@ -368,9 +374,8 @@ function App() {
                         </Routes>
                       </Suspense>
                     </div>
-                    {showObservability && (
+                    {enableSiteTelemetry && (
                       <Suspense fallback={null}>
-                        <Analytics />
                         <SpeedInsights />
                       </Suspense>
                     )}
