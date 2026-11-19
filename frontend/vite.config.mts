@@ -71,7 +71,7 @@ export default defineConfig(({ mode }) => ({
           animations: ['framer-motion'],
           charts: ['recharts'],
           query: ['@tanstack/react-query'],
-          analytics: ['@vercel/analytics/react', '@vercel/speed-insights/react'],
+          analytics: ['@vercel/speed-insights/react'],
         },
         // Optimize chunk names for better caching
         chunkFileNames: 'assets/[name]-[hash].js',

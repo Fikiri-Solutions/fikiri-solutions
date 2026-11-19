@@ -161,7 +161,6 @@ export const Intake: React.FC = () => {
     setStep(nextStep)
     setHydrated(true)
     // Only on mount / search change — intentional.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search])
 
   // Persist in-progress answers (best practice: don't punish refresh).
