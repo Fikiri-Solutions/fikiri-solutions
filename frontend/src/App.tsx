@@ -95,10 +95,6 @@ const TenantDetail = named(() => import('./pages/admin/TenantDetail'), 'TenantDe
 const AdminAuditLog = named(() => import('./pages/admin/AdminAuditLog'), 'AdminAuditLog')
 const AdminMfaSecurity = named(() => import('./pages/admin/AdminMfaSecurity'), 'AdminMfaSecurity')
 const AdminSiteChat = named(() => import('./pages/admin/AdminSiteChat'), 'AdminSiteChat')
-const AdminMarketingFunnel = named(
-  () => import('./pages/admin/AdminMarketingFunnel'),
-  'AdminMarketingFunnel'
-)
 
 /** Free Speed Insights only — pauses at the team limit; no overage charges. Web Analytics stays off (usage-billed on Pro). */
 const SpeedInsights = lazy(async () => {
@@ -366,7 +362,6 @@ function App() {
                             <Route path="audit" element={<AdminAuditLog />} />
                             <Route path="security" element={<AdminMfaSecurity />} />
                             <Route path="site-chat" element={<AdminSiteChat />} />
-                            <Route path="marketing" element={<AdminMarketingFunnel />} />
                           </Route>
                           
                           {/* 404 route */}
