@@ -39,6 +39,12 @@ import {
   type ShortIntakeFormState,
   type TimelineReadinessId,
 } from '../lib/consultationIntake'
+import {
+  trackBookingClicked,
+  trackIntakeStarted,
+  trackIntakeStepViewed,
+  trackIntakeSubmitted,
+} from '../services/siteMarketingAnalytics'
 
 const STEP_ORDER: IntakeStepId[] = [
   'services',
@@ -173,6 +179,17 @@ export const Intake: React.FC = () => {
     }
   }, [step, hydrated, success])
 
+  // Anonymous funnel telemetry (first-party; no PII).
+  useEffect(() => {
+    if (!hydrated || success) return
+    trackIntakeStarted(source)
+  }, [hydrated, success, source])
+
+  useEffect(() => {
+    if (!hydrated || success) return
+    trackIntakeStepViewed(step)
+  }, [hydrated, success, step])
+
   const toggleService = (id: ServiceInterestId) => {
     setForm((prev) => {
       const has = prev.service_interests.includes(id)
@@ -299,11 +316,21 @@ export const Intake: React.FC = () => {
       clearPrefillStorage()
       clearIntakeDraft()
       clearIntakeCorrelationId()
+      trackIntakeSubmitted({
+        source,
+        preferredNextStep: preferred,
+        priorityBand: deriveLeadPriorityBand(
+          nextForm.project_clarity,
+          nextForm.timeline_readiness,
+          nextForm.budget_readiness
+        ),
+      })
 
       if (preferred === 'book' && bookingUrl) {
         // Lead is persisted first; calendar is external — do not claim the slot is booked.
         window.open(bookingUrl, '_blank', 'noopener,noreferrer')
         setBookingOpened(true)
+        trackBookingClicked('intake_success')
       }
     } catch (err: unknown) {
       setError(apiClient.handleError(err))
@@ -415,9 +442,10 @@ export const Intake: React.FC = () => {
                     <Button
                       type="button"
                       className="w-full sm:w-auto"
-                      onClick={() =>
+                      onClick={() => {
+                        trackBookingClicked('intake_success')
                         window.open(bookingUrl, '_blank', 'noopener,noreferrer')
-                      }
+                      }}
                     >
                       Open calendar
                     </Button>

@@ -134,7 +134,7 @@ const PrivacyPolicy: React.FC = () => {
                   <strong>We do not sell your personal information.</strong> We do not sell Google user data. We share information only as needed to run the Service, including:
                 </p>
                 <ul className="list-disc list-inside text-gray-300 mb-4 space-y-2">
-                  <li><strong>Service providers (subprocessors):</strong> Vendors that host infrastructure, databases, payments, transactional email, analytics, or security on our behalf (for example, cloud hosting, application hosting, payment processing such as Stripe, and first-party site analytics such as Vercel Analytics). They may process data only to provide services to us and must protect it appropriately.</li>
+                  <li><strong>Service providers (subprocessors):</strong> Vendors that host infrastructure, databases, payments, transactional email, performance monitoring, or security on our behalf (for example, cloud hosting, application hosting, payment processing such as Stripe, and free-tier performance monitoring such as Vercel Speed Insights). They may process data only to provide services to us and must protect it appropriately.</li>
                   <li><strong>Legal and safety:</strong> When required by law, court order, or government request, or to protect the rights, safety, or property of Fikiri, our users, or the public</li>
                   <li><strong>Business transfers:</strong> In connection with a merger, financing, or acquisition, subject to ongoing privacy commitments</li>
                   <li><strong>Professional advisors:</strong> Lawyers, auditors, or insurers as needed in the ordinary course of business</li>
@@ -180,7 +180,7 @@ const PrivacyPolicy: React.FC = () => {
                 </p>
                 <ul className="list-disc list-inside text-gray-300 mb-4 space-y-2">
                   <li><strong>Essential / functional:</strong> Keep you signed in, maintain session security, and remember preferences needed for the Service to work</li>
-                  <li><strong>Analytics / performance:</strong> Understand page views, feature usage, and performance (including tools such as Vercel Analytics and Speed Insights) so we can improve the product experience</li>
+                  <li><strong>Analytics / performance:</strong> Understand feature usage and conversion funnels using first-party analytics on our own systems, plus free-tier performance metrics (Vercel Speed Insights). We do not use Vercel Web Analytics. No third-party advertising trackers.</li>
                   <li><strong>Security:</strong> Support fraud detection, rate limiting, and abuse prevention</li>
                 </ul>
                 <p className="text-gray-300 mb-3">

@@ -1286,6 +1286,27 @@ def stop_impersonation():
     return create_success_response(response_data, "Impersonation stopped")
 
 
+@admin_platform_bp.route("/marketing-funnel", methods=["GET"])
+@handle_api_errors
+@jwt_required
+@require_platform_capability("platform.ops.read")
+def marketing_funnel_summary():
+    """Compact public intake + chatbot funnel overview (no PII)."""
+    from core.admin_security import admin_lockdown_active, lockdown_response
+    from core.site_marketing_events import build_marketing_funnel_summary
+
+    if admin_lockdown_active():
+        return lockdown_response()
+
+    try:
+        lookback_days = int(request.args.get("lookback_days", 7))
+    except (TypeError, ValueError):
+        lookback_days = 7
+
+    payload = build_marketing_funnel_summary(lookback_days=lookback_days)
+    return create_success_response(payload, "Marketing funnel summary retrieved")
+
+
 @admin_platform_bp.route("/audit", methods=["GET"])
 @handle_api_errors
 @jwt_required

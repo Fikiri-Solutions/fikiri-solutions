@@ -14,6 +14,12 @@ import {
   formatSiteChatTranscript,
   isSiteChatDevToolsEnabled,
 } from '../utils/siteChatDevTools'
+import {
+  trackChatbotFallback,
+  trackChatbotFirstMessage,
+  trackChatbotHandoff,
+  trackChatbotOpened,
+} from '../services/siteMarketingAnalytics'
 
 type ChatRole = 'assistant' | 'user'
 
@@ -63,6 +69,7 @@ export const FikiriSiteChatWidget: React.FC = () => {
   const [lastReply, setLastReply] = useState<SiteChatMessageData | null>(null)
   const sessionIdRef = useRef<string | null>(null)
   const bootstrappedRef = useRef(false)
+  const firstMessageTrackedRef = useRef(false)
   const scrollAnchorRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const devTools = useMemo(() => isSiteChatDevToolsEnabled(), [])
@@ -94,6 +101,7 @@ export const FikiriSiteChatWidget: React.FC = () => {
   const openPanel = useCallback(async () => {
     setOpen(true)
     setError(null)
+    trackChatbotOpened()
     if (bootstrappedRef.current) return
     bootstrappedRef.current = true
     setLoading(true)
@@ -127,6 +135,10 @@ export const FikiriSiteChatWidget: React.FC = () => {
 
       try {
         const sessionId = await ensureSession()
+        if (!firstMessageTrackedRef.current) {
+          firstMessageTrackedRef.current = true
+          trackChatbotFirstMessage()
+        }
         const reply = await sendSiteChatMessage(sessionId, text)
         setLastReply(reply)
         appendLine({
@@ -135,6 +147,9 @@ export const FikiriSiteChatWidget: React.FC = () => {
           grounded: reply.grounded,
           sources: reply.sources,
         })
+        if ((reply.mode || '').toLowerCase() === 'fallback') {
+          trackChatbotFallback(reply.mode)
+        }
       } catch {
         setError('Could not send your message. Please try again or use the links below.')
       } finally {
@@ -379,6 +394,7 @@ export const FikiriSiteChatWidget: React.FC = () => {
             <div className="border-t border-neutral-200 bg-neutral-50 px-4 py-2.5">
               <Link
                 to={handoffHref}
+                onClick={() => trackChatbotHandoff(lastReply?.handoff.handoff_type)}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#B33B1E] px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#992D1E]"
               >
                 {handoffCta}

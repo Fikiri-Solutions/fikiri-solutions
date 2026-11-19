@@ -2393,6 +2393,13 @@ class ApiClient {
     return response.data?.data ?? response.data
   }
 
+  async getMarketingFunnelSummary(lookbackDays: number = 7): Promise<Record<string, unknown>> {
+    const response = await this.client.get('/admin/platform/marketing-funnel', {
+      params: { lookback_days: lookbackDays },
+    })
+    return response.data?.data ?? response.data
+  }
+
   async getProductAnalyticsStatus(): Promise<{
     analytics_enabled: boolean
     accessibility_signals_enabled: boolean

@@ -2,8 +2,8 @@
  * Privacy-safe Sector Fit Explorer analytics (Phase 4).
  *
  * Observational only — must never affect matching, delay UI, or include raw input.
- * Public homepage visitors are unauthenticated, so events go to Vercel Analytics.
- * Product-analytics JWT ingest is intentionally not used here (would 401 anonymously).
+ * Vercel Analytics is disabled (usage-billed on Pro). Tracking is a no-op unless a
+ * test injects a sink via _setSectorFitAnalyticsTrackForTests.
  */
 
 import type {
@@ -31,7 +31,7 @@ let lastUsedFollowUp = false
 let startedEmitted = false
 let trackImpl: TrackFn | null | undefined
 
-/** Override sink for tests; pass null to restore lazy Vercel import. */
+/** Override sink for tests; pass null to clear. */
 export function _setSectorFitAnalyticsTrackForTests(track: TrackFn | null): void {
   trackImpl = track
 }
@@ -40,7 +40,7 @@ export function _resetSectorFitAnalyticsForTests(): void {
   lastResultFingerprint = ''
   lastUsedFollowUp = false
   startedEmitted = false
-  trackImpl = undefined
+  trackImpl = null
 }
 
 export function getInputLengthBucket(length: number): SectorExplorerInputLengthBucket {
@@ -80,27 +80,14 @@ function resultFingerprint(payload: SectorExplorerResultPayload): string {
   ].join(':')
 }
 
-async function getTrack(): Promise<TrackFn | null> {
-  if (trackImpl !== undefined) return trackImpl
-  try {
-    const mod = await import('@vercel/analytics')
-    trackImpl = typeof mod.track === 'function' ? mod.track : null
-  } catch {
-    trackImpl = null
-  }
-  return trackImpl
-}
-
 function emitSafe(eventName: string, data: Record<string, string | number | boolean | null>): void {
-  void (async () => {
-    try {
-      const track = await getTrack()
-      if (!track) return
-      track(eventName, data)
-    } catch {
-      // Analytics must never break the explorer
-    }
-  })()
+  try {
+    const track = trackImpl
+    if (!track) return
+    track(eventName, data)
+  } catch {
+    // Analytics must never break the explorer
+  }
 }
 
 /** Once per page mount / tab until reset — explorer became interactive surface. */

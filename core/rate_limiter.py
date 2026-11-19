@@ -110,6 +110,13 @@ class EnhancedRateLimiter:
                 3600,
                 'Product analytics event batches per user per hour',
             ),
+            'site_marketing_events': RateLimit(
+                'site_marketing_events',
+                RateLimitType.IP,
+                60,
+                3600,
+                'Public marketing funnel event batches per IP per hour',
+            ),
         }
         self._connect_redis()
         self._initialize_tables()

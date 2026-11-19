@@ -187,6 +187,7 @@ from routes.admin_site_chat_api import admin_site_chat_bp
 from routes.admin_platform_api import admin_platform_bp
 from routes.internal_automation_api import internal_automation_bp
 from routes.product_analytics_api import product_analytics_bp
+from routes.site_marketing_events_api import site_marketing_events_bp
 
 # Global services dictionary
 services = {}
@@ -1092,6 +1093,7 @@ def register_blueprints(app):
         (admin_platform_bp, 'admin_platform'),
         (internal_automation_bp, 'internal_automation'),
         (product_analytics_bp, 'product_analytics'),
+        (site_marketing_events_bp, 'site_marketing_events'),
     ]
 
     if os.getenv("GOOGLE_RISC_ENABLED", "").strip().lower() in ("1", "true", "yes"):
