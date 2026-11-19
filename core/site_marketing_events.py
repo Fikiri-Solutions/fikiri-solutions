@@ -112,7 +112,7 @@ def ensure_site_marketing_event_tables() -> None:
     db_optimizer.execute_query(
         """
         CREATE TABLE IF NOT EXISTS site_marketing_events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGSERIAL PRIMARY KEY,
             event_name TEXT NOT NULL,
             session_ref TEXT NOT NULL,
             dedupe_key TEXT NOT NULL DEFAULT '',

@@ -76,8 +76,21 @@ def test_intake_complete_with_email_is_explicit():
     assert is_explicit_human_handoff(result) is True
 
 
+def test_lead_dedupe_key_is_exportable():
+    """Regression: handoff notify imports lead_dedupe_key; missing export fail-opens notify."""
+    from core.lead_form_notifications import lead_dedupe_key
+
+    key = lead_dedupe_key("site_chat", "site_abc", "contact")
+    assert isinstance(key, str) and key
+
+
 @patch("core.lead_form_notifications.send_lead_slack_notification", return_value=True)
 def test_notify_calls_helper_for_contact(mock_send):
+    # Import surface used by notify_site_chat_handoff must resolve before the call.
+    from core.lead_form_notifications import lead_dedupe_key as _lead_dedupe_key
+
+    assert callable(_lead_dedupe_key)
+
     result = _result(
         mode="contact",
         handoff=HandoffMetadata(applicable=True, handoff_type="contact", secondary="/contact"),

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import uuid
 
 import pytest
 from cryptography.fernet import Fernet
@@ -10,6 +11,7 @@ from flask import Flask
 
 os.environ.setdefault("FERNET_KEY", Fernet.generate_key().decode())
 
+from core.database_optimization import db_optimizer
 from core.site_marketing_events import (
     build_marketing_funnel_summary,
     ensure_site_marketing_event_tables,
@@ -18,11 +20,20 @@ from core.site_marketing_events import (
 from routes.site_marketing_events_api import site_marketing_events_bp
 
 
+def _session_ref(prefix: str = "sess") -> str:
+    return f"{prefix}_{uuid.uuid4().hex[:12]}"
+
+
 @pytest.fixture(autouse=True)
 def _env(monkeypatch):
     monkeypatch.setenv("SITE_MARKETING_EVENTS_ENABLED", "true")
     monkeypatch.setenv("FERNET_KEY", Fernet.generate_key().decode())
     ensure_site_marketing_event_tables()
+    # Isolate from leftover rows in local/shared SQLite.
+    try:
+        db_optimizer.execute_query("DELETE FROM site_marketing_events", fetch=False)
+    except Exception:
+        pass
     yield
 
 
@@ -36,7 +47,7 @@ def client():
 
 def test_ingest_approved_events():
     result = ingest_site_marketing_events(
-        session_ref="sess_abc12345",
+        session_ref=_session_ref("abc"),
         events=[
             {"event_name": "intake_started", "properties": {"source_kind": "organic"}},
             {
@@ -52,7 +63,7 @@ def test_ingest_approved_events():
 
 
 def test_dedupe_same_session_step():
-    ref = "sess_dedupe_001"
+    ref = _session_ref("dedupe")
     first = ingest_site_marketing_events(
         session_ref=ref,
         events=[
@@ -80,7 +91,7 @@ def test_dedupe_same_session_step():
 
 def test_rejects_prohibited_properties():
     result = ingest_site_marketing_events(
-        session_ref="sess_pii_block",
+        session_ref=_session_ref("pii"),
         events=[
             {
                 "event_name": "intake_started",
@@ -94,7 +105,7 @@ def test_rejects_prohibited_properties():
 
 def test_rejects_unknown_event():
     result = ingest_site_marketing_events(
-        session_ref="sess_unknown_evt",
+        session_ref=_session_ref("unknown"),
         events=[{"event_name": "page_view", "properties": {}}],
     )
     assert result["accepted"] == 0
@@ -104,7 +115,7 @@ def test_rejects_unknown_event():
 def test_disabled_writes_nothing(monkeypatch):
     monkeypatch.setenv("SITE_MARKETING_EVENTS_ENABLED", "false")
     result = ingest_site_marketing_events(
-        session_ref="sess_disabled",
+        session_ref=_session_ref("disabled"),
         events=[{"event_name": "chatbot_opened", "properties": {"path_bucket": "/"}}],
     )
     assert result["accepted"] == 0
@@ -115,7 +126,7 @@ def test_public_post_endpoint(client):
     response = client.post(
         "/api/site/events",
         json={
-            "session_ref": "sess_http_0001",
+            "session_ref": _session_ref("http"),
             "events": [
                 {
                     "event_name": "chatbot_opened",
@@ -132,7 +143,7 @@ def test_public_post_endpoint(client):
 
 def test_funnel_summary_shape():
     ingest_site_marketing_events(
-        session_ref="sess_summary_01",
+        session_ref=_session_ref("summary"),
         events=[
             {"event_name": "intake_started", "properties": {"source_kind": "site_chatbot"}},
             {"event_name": "intake_submitted", "properties": {"source_kind": "site_chatbot"}},

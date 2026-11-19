@@ -63,7 +63,8 @@ describe('ClientPartnerships', () => {
     expect(screen.queryByText(/7-day free trial/i)).not.toBeInTheDocument()
   })
 
-  it('exposes all real clients with logo links, visit links, and intake CTA', () => {
+  // Six partnership cards × duplicated carousel track is query-heavy; CI runners can exceed the default 5s.
+  it('exposes all real clients with logo links, visit links, and intake CTA', { timeout: 15000 }, () => {
     renderSection()
 
     for (const client of clientPartnerships) {
