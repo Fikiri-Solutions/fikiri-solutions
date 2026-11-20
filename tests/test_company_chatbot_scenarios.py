@@ -80,6 +80,47 @@ def test_company_overview_variants_do_not_fallback():
         ), result.response
 
 
+def test_overview_probe_conversation_stays_useful():
+    """Regression: probing after a simple services question must not collapse into loops."""
+    clear_sessions_for_tests()
+    session_id = start_session().session_id
+    transcript = [
+        "hey",
+        "what do you all do?",
+        "what services do you offer?",
+        "you dont understand at all?",
+        "I just asked what services do you offer?",
+        "crm",
+        "But you cant tell me about a service?",
+        "now youre responding to anything.",
+    ]
+    generic = "i'm not sure i understood"
+    stuck = "i got stuck there"
+    results = []
+    for message in transcript:
+        results.append(handle_message(session_id, message))
+
+    # First real question and services ask must be substantive answers.
+    assert results[1].mode == "answer"
+    assert results[2].mode == "answer"
+    assert generic not in results[1].response.lower()
+    assert generic not in results[2].response.lower()
+
+    # Confusion / re-ask must recover with substance, not stuck handoff or generic loop.
+    for idx in (3, 4, 6, 7):
+        text = results[idx].response.lower()
+        assert stuck not in text, transcript[idx]
+        assert generic not in text, transcript[idx]
+        assert any(
+            needle in text
+            for needle in ("email", "crm", "pricing", "workflow", "capabilities", "assistant")
+        ), (transcript[idx], results[idx].response)
+
+    # CRM still works; follow-up service ask must not stay stuck on CRM-only bridge language.
+    assert "crm" in results[5].response.lower()
+    assert "customer management problem" not in results[6].response.lower()
+
+
 def test_email_assistant_transcript_no_three_identical_fallbacks():
     session = start_session()
     messages = [

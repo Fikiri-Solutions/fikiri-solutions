@@ -98,6 +98,25 @@ def handle_message(session_id: str, message: str) -> MessageResult:
         save_session(session)
         return _attach_routing_trace(result, routing_trace)
 
+    # Meta confusion ("you don't understand", "can't tell me about a service") should
+    # recover with a direct services summary — not industry bleed or stuck handoff.
+    from company_chatbot.company_overview import is_meta_conversation_complaint
+    from company_chatbot.conversational import conversational_reply
+
+    if is_meta_conversation_complaint(text) and not session.intake_active:
+        casual = conversational_reply(text)
+        if casual:
+            result = _base_result(
+                config.MODE_FALLBACK,
+                casual,
+                session,
+                HandoffMetadata(applicable=False),
+                LeadIntentMetadata(signals=["meta_complaint_recovery"]),
+            )
+            result = _finalize_response(session, result, previous_user_message)
+            save_session(session)
+            return _attach_routing_trace(result, routing_trace)
+
     if session.intake_active:
         # Local trace so interrupt decisions work even when observability tracing is off.
         interrupt_trace = routing_trace if routing_trace is not None else RoutingTrace()
@@ -240,6 +259,44 @@ def _guard_handoff_result(session: SessionState, reason: str, previous_user_mess
     return _finalize_response(session, result, previous_user_message)
 
 
+def _alternate_company_overview_result(
+    session: SessionState, repeated_response: str
+) -> MessageResult | None:
+    """If we were about to repeat the same overview, answer with a different company chunk."""
+    from company_chatbot.company_overview import OVERVIEW_CHUNK_IDS
+    from company_chatbot.retrieval import load_kb_chunks
+
+    by_id = {chunk.id: chunk for chunk in load_kb_chunks()}
+    prior = " ".join((repeated_response or "").split()).lower()
+    for chunk_id in OVERVIEW_CHUNK_IDS:
+        chunk = by_id.get(chunk_id)
+        if not chunk:
+            continue
+        text = (chunk.text or "").strip()
+        if not text:
+            continue
+        if " ".join(text.split()).lower() == prior:
+            continue
+        if prior and " ".join(text.split()).lower() in prior and len(text) < len(prior):
+            # Prefer a fresh primary sentence rather than a subset of the repeated reply.
+            continue
+        return _base_result(
+            config.MODE_ANSWER,
+            text,
+            session,
+            HandoffMetadata(
+                applicable=True,
+                primary=config.HANDOFF_PRIMARY_WIDGET,
+                secondary=config.HANDOFF_SECONDARY_CONTACT,
+            ),
+            LeadIntentMetadata(signals=["company_overview_alternate"]),
+            grounded=True,
+            confidence=0.7,
+            sources=[{"chunk_id": chunk.id, "topic": chunk.topic}],
+        )
+    return None
+
+
 def _finalize_response(
     session: SessionState, result: MessageResult, previous_user_message: str = ""
 ) -> MessageResult:
@@ -249,7 +306,32 @@ def _finalize_response(
         last_user_message=previous_user_message,
         current_user_message=session.last_user_message,
     ):
-        return _guard_handoff_result(session, "repeat_response", previous_user_message)
+        from company_chatbot.company_overview import (
+            is_company_overview_question,
+            is_meta_conversation_complaint,
+        )
+        from company_chatbot.conversational import conversational_reply
+
+        current = session.last_user_message or ""
+        # Don't punish basic company questions / confusion with an immediate stuck handoff.
+        if is_company_overview_question(current) or is_meta_conversation_complaint(current):
+            alternate = _alternate_company_overview_result(session, result.response)
+            if alternate is not None:
+                result = alternate
+            else:
+                casual = conversational_reply(current)
+                if casual:
+                    result = _base_result(
+                        config.MODE_FALLBACK,
+                        casual,
+                        session,
+                        HandoffMetadata(applicable=False),
+                        LeadIntentMetadata(signals=["overview_repeat_recovery"]),
+                    )
+                else:
+                    return _guard_handoff_result(session, "repeat_response", previous_user_message)
+        else:
+            return _guard_handoff_result(session, "repeat_response", previous_user_message)
 
     intake_complete = bool(result.intake.get("complete"))
     assessment = assess_lead(

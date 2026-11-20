@@ -19,7 +19,10 @@ _WHAT_RE = re.compile(r"^what[\s!.?]*$", re.I)
 _HUH_RE = re.compile(r"^(huh|\?+)[\s!.?]*$", re.I)
 _HELP_ME_RE = re.compile(r"^help me[\s!.?]*$", re.I)
 _CONFUSED_RE = re.compile(
-    r"^(i don'?t understand|don'?t understand|confused|not helping|this isn'?t helping)[\s!.?]*$",
+    r"\b(i don'?t understand|don'?t understand|you don'?t understand|you dont understand|"
+    r"confused|not helping|this isn'?t helping|isn'?t helping|"
+    r"can'?t tell me about|cant tell me about|"
+    r"now you'?re responding|responding to anything|back to this loop)\b",
     re.I,
 )
 
@@ -60,8 +63,9 @@ _HELP_ME_REPLY = (
 )
 
 _CONFUSED_REPLY = (
-    "Sorry that wasn't clear. Try asking about pricing, the AI email assistant, fit for your "
-    "business, or say workflow audit — or continue at fikirisolutions.com/intake."
+    "Sorry — let me be direct. Fikiri helps with email automation, CRM, and an AI assistant for "
+    "daily operations, usually starting from your workflow. Ask about pricing, CRM, Gmail/Outlook, "
+    "or say workflow audit — or continue at fikirisolutions.com/intake."
 )
 
 
@@ -76,7 +80,7 @@ def conversational_reply(message: str) -> Optional[str]:
         return _ACK_REPLY
     if _HELP_ME_RE.match(text):
         return _HELP_ME_REPLY
-    if _CONFUSED_RE.match(text):
+    if _CONFUSED_RE.search(text):
         return _CONFUSED_REPLY
     if _WHY_RE.match(text):
         return _WHY_REPLY

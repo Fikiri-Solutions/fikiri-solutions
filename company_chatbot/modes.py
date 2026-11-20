@@ -139,6 +139,8 @@ _MODE_RULES: List[ModeRule] = [
             r"what can you (?:do|help(?: with)?)|what (?:can|does) fikiri (?:do|offer|help)|"
             r"what does fikiri|what (?:is|are) fikiri|who is fikiri|who are you|"
             r"tell me about (?:fikiri|your (?:company|services|products|offerings?))|"
+            r"about (?:a |your )?services?|tell me about (?:a |your )?service|"
+            r"i just asked what services|just asked what (?:services|products)|"
             r"integrations?|faq|hours|"
             r"gmail|outlook|google workspace|microsoft 365|"
             r"email automation|how does email|automation|"

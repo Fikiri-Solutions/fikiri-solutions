@@ -165,6 +165,10 @@ _PHRASE_CHUNK_BOOSTS: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
     ("services do you offer", ("company_three_capabilities", "company_about")),
     ("what products do you have", ("company_three_capabilities", "company_about")),
     ("what do you offer", ("company_three_capabilities", "company_about")),
+    ("about a service", ("company_three_capabilities", "company_about")),
+    ("about your service", ("company_three_capabilities", "company_about")),
+    ("tell me about a service", ("company_three_capabilities", "company_about")),
+    ("tell me about your service", ("company_three_capabilities", "company_about")),
     ("what does fikiri", ("company_about", "company_three_capabilities")),
     ("who is fikiri", ("company_about",)),
     ("what does fikiri cost", ("pricing_overview", "pricing_starter", "faq_plan_fit")),
@@ -288,7 +292,11 @@ def _retrieval_tokens(text: str) -> Set[str]:
 _STANDALONE_TOPIC_RE = re.compile(
     r"\b(how much|price|prices|pricing|cost|costs|starter plan|growth plan|business plan|enterprise plan|"
     r"free trial|\$\d{2,3}|talk to|contact|hipaa|soc\s*2|"
-    r"what do you do|what does fikiri do|what does fikiri cost|who is fikiri|what is fikiri|"
+    r"what do you(?: all)? do|what (?:do )?y'?all do|what do you offer|"
+    r"what (?:services|products|solutions) do you (?:offer|have|provide)|"
+    r"what services|services do you offer|what products do you have|"
+    r"about (?:a |your )?services?|tell me about (?:a |your )?service|"
+    r"what does fikiri do|what does fikiri cost|who is fikiri|what is fikiri|"
     r"what are your prices|what are your plans|fikiri pricing|"
     r"how do you work|how does fikiri work|custom build(?:-?out)?s?|same features)\b",
     re.I,
@@ -296,6 +304,13 @@ _STANDALONE_TOPIC_RE = re.compile(
 
 
 def is_standalone_topic_query(query: str) -> bool:
+    from company_chatbot.company_overview import (
+        is_company_overview_question,
+        is_meta_conversation_complaint,
+    )
+
+    if is_company_overview_question(query) or is_meta_conversation_complaint(query):
+        return True
     return bool(_STANDALONE_TOPIC_RE.search(normalize_query_text(query)))
 
 
