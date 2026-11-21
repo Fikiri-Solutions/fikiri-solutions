@@ -1,0 +1,25 @@
+---
+description: Fikiri risk-based tests — focused checks for small changes, full unit gate for critical changes and releases
+alwaysApply: false
+---
+
+# Regression testing
+
+Follow `docs/REGRESSION_TESTING.md`. This file is the short copy.
+
+Unit gate, once, for a critical change or a release:
+
+```bash
+pytest tests/ -m "not contract and not integration" -q
+cd frontend && npx vitest run
+```
+
+That marker expression is required. `--ignore=tests/integration` still runs `tests/contract` and is not the gate.
+
+Quick fix: nearest test or the file's linter. A behavior bug gets a regression test. A typo does not. Do not start the unit gate.
+
+Feature: the test module for the change, with one success path and one failure path. Do not start the unit gate.
+
+Critical, whatever the task was called: auth, payments, permissions, admin, migrations, CRM uniqueness or merge, outbound email, queues, workflow state, or the production SQLite guard. Unit gate once, plus that area's tests.
+
+CI still runs the unit gate on every pipeline (`docs/CI_CD_STRATEGY.md`).

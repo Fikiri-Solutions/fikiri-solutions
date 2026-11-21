@@ -1,0 +1,15 @@
+---
+description: Fikiri Render, WSGI, and production URL constraints
+globs: render.yaml,wsgi.py
+alwaysApply: false
+---
+
+# Deploy config
+
+Production Redis is the Upstash URL. Do not point production config at localhost.
+
+Keep `API_BASE_URL`, `FRONTEND_URL`, and `CORS_ORIGINS` consistent with each other. Keep dev, staging, and prod config separate. Do not put dev keys in a prod image.
+
+The WSGI entry is `wsgi:wsgi_app`. Gunicorn uses `geventwebsocket.gunicorn.workers.GeventWebSocketWorker` with `SOCKETIO_ASYNC_MODE=gevent`.
+
+Prove the change locally before a deploy.

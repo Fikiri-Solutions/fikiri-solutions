@@ -1,0 +1,17 @@
+---
+description: Fikiri queue and workflow gate — contracts, real state transitions, and failure tests
+globs: email_automation/jobs.py,email_automation/email_workflow_state.py,email_automation/pipeline.py,routes/jobs.py,routes/internal_automation_api.py
+alwaysApply: false
+---
+
+# Queue and workflow gate
+
+Follow `docs/CURSOR_QUALITY_GATE.md` before calling this work done.
+
+- Write the contract: claim, expected behavior, code location, pass or fail.
+- Name the event, from-state, to-state, and side effect. A status such as `retrying` needs a real re-enqueue or scheduler.
+- Cover partial failure, exhausted retries, idempotency, and auth scope.
+- Each critical path has a success test and one failure, retry, or idempotency test.
+- Report findings as critical, high, medium, or low.
+
+This change is critical under `docs/REGRESSION_TESTING.md`. Run that unit gate once.

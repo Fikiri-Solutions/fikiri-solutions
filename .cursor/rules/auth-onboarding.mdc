@@ -1,0 +1,19 @@
+---
+description: Fikiri JWT, login, signup, whoami, and the linear onboarding steps
+globs: routes/auth.py,core/jwt_auth.py,core/user_auth.py,core/app_onboarding.py,core/onboarding_jobs.py,core/auth_session_version.py,core/oauth_token_manager.py,core/app_oauth.py,frontend/src/contexts/AuthContext.tsx,frontend/src/store/auth.ts,frontend/src/pages/Onboarding.tsx,tests/test_auth_routes.py,tests/test_jwt_auth.py,tests/test_onboarding_routes.py
+alwaysApply: false
+---
+
+# Auth and onboarding
+
+Use `JWT_SECRET_KEY` from the environment. Never generate or log secrets.
+
+Login and signup return `access_token`, `refresh_token`, and the user object. Invalidate those tokens on password change, onboarding reset, and email change.
+
+- Login checks the password hash, returns 401 on failure, and includes `onboarding_step`.
+- Signup rejects a duplicate email, starts onboarding at step 1, and creates a company only after business info is collected.
+- `whoami` returns the latest server state, not a cached user.
+
+Steps run 1 → 2 → 3 → 4, then the dashboard. Completion sets `onboarding_step` to 4. Forward movement is one step. Backward movement is allowed. A skip returns `STEP_SKIP_NOT_ALLOWED`.
+
+On mount, the client calls `/onboarding/status`. After an update it calls `/auth/whoami` and redirects from `onboarding_step` only. Do not store the step, passwords, or tokens in localStorage.

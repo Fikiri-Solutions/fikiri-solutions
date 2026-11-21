@@ -1,0 +1,20 @@
+---
+description: Fikiri LLM routing, schema validation, and pipeline limits
+globs: core/ai/**/*.py
+alwaysApply: false
+---
+
+# AI pipeline
+
+All LLM work goes through `core/ai/llm_router.py`, `core/ai/llm_client.py`, and `core/ai/validators.py`. Routes, services, and the frontend do not call a provider SDK directly.
+
+Order: preprocess, detect intent, choose a model, call the model, postprocess, validate the schema, log latency and cost, return the structured result.
+
+- The API result is the schema, not free text.
+- Set a temperature bound and `max_tokens`. Truncate long threads before the call.
+- Retry provider failures with exponential backoff and jitter, and log the failure.
+- Do not run a model over a whole table or a long mailbox in one call.
+- Keep the pipeline linear. Pass a summary into the next step when the full output is not required.
+- Log `latency_ms` and `cost_usd` when the call reports them. Do not log the raw prompt or response when it holds personal data.
+
+Read `.cursor/rules/email.mdc` when the call classifies or replies to mail.

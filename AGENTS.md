@@ -1,74 +1,37 @@
 # AGENTS.md
 
-## Cursor Cloud specific instructions
+Operational facts for this repo. Boundaries and safeguards are in `.cursorrules`. Test tiers are in `docs/REGRESSION_TESTING.md`.
 
-### Services overview
+## Services
 
-| Service | Port | Start command |
+| Service | Port | Start |
 |---|---|---|
-| Flask backend (API) | 5000 | `cd /workspace && PORT=5000 FLASK_ENV=development script -qefc "python3 app.py" /dev/null &` |
-| Vite frontend (React) | 5174 | `cd /workspace/frontend && npx vite --host 0.0.0.0 --port 5174 &` |
+| Flask API | 5000 | `PORT=5000 FLASK_ENV=development python3 app.py`. A non-TTY needs `script -qefc "python3 app.py" /dev/null` so Flask-SocketIO will start. |
+| Vite | 5174 | `cd frontend && npx vite --host 0.0.0.0 --port 5174` |
 
-### Gotchas
+The frontend proxies `http://localhost:5000`.
 
-- **Backend port must be 5000**: The frontend's Vite proxy and `config.ts` hardcode the backend at `http://localhost:5000`. Always start the backend with `PORT=5000`.
-- **SocketIO + non-TTY**: Flask-SocketIO 5.6+ refuses to start with Werkzeug in non-TTY environments. Wrap the backend start with `script -qefc "..." /dev/null` to provide a pseudo-TTY.
-- **Gunicorn on Render**: use `geventwebsocket.gunicorn.workers.GeventWebSocketWorker` and `SOCKETIO_ASYNC_MODE=gevent` (Gunicorn 26 removes the `eventlet` worker). If deploy logs show `Running 'gunicorn --worker-class eventlet ...'`, the **Render dashboard Start Command** is overriding `render.yaml`—either delete that override (Blueprint) or set it to match `render.yaml`; `requirements.txt` still lists `eventlet>=0.40.3` so a legacy `eventlet` worker command does not fail with `ModuleNotFoundError`.
-- **WSGI entry point is `wsgi:wsgi_app`, not `app:wsgi_app`**: `wsgi.py` calls `gevent.monkey.patch_all()` before importing the app. Without this, every outbound HTTPS call (Google OAuth token exchange, Stripe SDK, …) crashes with `RecursionError: maximum recursion depth exceeded` deep inside `ssl.SSLSocket.read`, because `flask` / `requests` / `stripe` are imported by `app.py` and cache the unpatched stdlib `ssl`/`socket` primitives. If the Render dashboard Start Command still points at `app:wsgi_app`, the safety-net block at the top of `app.py` will patch on import — but the canonical entry is `wsgi:wsgi_app`.
-- **Fernet key**: The `.env` must contain a valid Fernet key (32 url-safe base64-encoded bytes). Generate with: `python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Without it, backend imports fail at `integrations/gmail/gmail_client.py`.
-- **`python-dotenv`**: Not in `requirements.txt` but needed for `.env` loading. The update script installs it alongside `requirements.txt`.
-- **Redis is optional**: The backend gracefully degrades to in-memory/SQLite fallbacks if Redis is unavailable. No need to install Redis for local dev.
-- **DATABASE_URL**: Must be commented out in `.env` for local dev; otherwise the backend attempts a PostgreSQL connection. SQLite (`data/fikiri.db`) is used automatically.
-- **Signup**: `/api/auth/signup` uses `get_jwt_manager().generate_tokens()` and returns access/refresh tokens. Confirm with `pytest tests/test_auth_routes.py -v -k signup` (or full auth test run). If token generation ever fails, create the user via signup then use `/api/auth/login` to get tokens.
-- **Transactional email (verification, welcome, password reset)**: Jobs are stored in SQLite (`email_jobs`) and a **background send runs only for that new job id** after each queue (not a full backlog flush). Delivery still requires **`SMTP_USERNAME` and `SMTP_PASSWORD`** (and usually `SMTP_HOST` or **`SMTP_SERVER`** as alias / `SMTP_PORT` / `FROM_EMAIL`). Gmail app passwords may be pasted **with spaces**; the job manager strips spaces from `SMTP_PASSWORD`. Without SMTP, the API can still return 200 “queued” but no message leaves the server—check logs for `SMTP credentials not configured` or `Email sending failed`.
-- **Null MX / test domains**: Recipients on `example.com`, `example.net`, `example.org` (IANA documentation zones with Null MX) or addresses ending in `.test` / `.invalid` (RFC 2606) are **not sent via SMTP**; jobs succeed locally so you do not get Gmail “Address not found” bounces to your FROM address. Playwright `authenticate-new-user` uses `@example.test` for ephemeral signups.
-- **Gmail SMTP `535 BadCredentials`**: Google rejects normal account passwords for `smtp.gmail.com:587` unless you use an **[App Password](https://support.google.com/accounts/answer/185833)** (2FA required) or OAuth-based sending. Set `SMTP_USERNAME` to the **full Gmail address** and `SMTP_PASSWORD` to the 16-character app password.
-- **Stale `email_jobs` rows**: If you previously queued many pending jobs, they stay in SQLite until sent or failed. After fixing SMTP, you can mark ancient pending rows failed (e.g. via SQL on `email_jobs`) so they are not processed by a manual `process_jobs()` call later.
-- **SQLite time comparisons**: Python often stores datetimes as ISO strings with a **`T`**. Comparing those strings directly to `datetime('now')` (space-separated) can sort wrong. Use `datetime(column)` in SQL (see [docs/SQLITE_DATETIME_COMPARISONS.md](docs/SQLITE_DATETIME_COMPARISONS.md)).
-- **Mailbox AI cost gate**: `FIKIRI_EMAIL_PIPELINE_AI_GATE=1` (or `true`/`yes`/`on`) enforces `ai_responses` tier caps plus `ai_budget_guardrails` on `email_automation.pipeline.orchestrate_incoming` before the first LLM analyze, and records usage after a successful analyze. Unset = legacy behavior (no gate). Tier/budget check **exceptions** fail open with a warning so mail sync is not bricked by accounting errors. See `core/email_pipeline_ai_gate.py` and [docs/ENVIRONMENT_CONFIG.md](docs/ENVIRONMENT_CONFIG.md).
+## Runtime
 
-### E2E tests (Playwright)
+- Gunicorn uses `geventwebsocket.gunicorn.workers.GeventWebSocketWorker` and `SOCKETIO_ASYNC_MODE=gevent`. The entry is `wsgi:wsgi_app`. `wsgi.py` patches gevent before importing the app. `app:wsgi_app` or an `eventlet` worker means the Render start command is overriding `render.yaml`.
+- `.env` needs a Fernet key or `integrations/gmail/gmail_client.py` fails on import. Generate one with `python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. `python-dotenv` is installed with requirements; it is not listed in `requirements.txt`.
+- Redis is optional. Comment out `DATABASE_URL` locally so SQLite (`data/fikiri.db`) is used.
+- Signup returns tokens from `get_jwt_manager().generate_tokens()`.
+- Transactional mail is stored in `email_jobs` and sends that new job only. Delivery needs `SMTP_USERNAME` and `SMTP_PASSWORD` (`SMTP_SERVER` aliases `SMTP_HOST`). Gmail needs an app password. `example.com`, `example.net`, `example.org`, `.test`, and `.invalid` are not sent through SMTP. Pending rows stay until they are sent or marked failed.
+- Compare SQLite datetimes with `datetime(column)`. See `docs/SQLITE_DATETIME_COMPARISONS.md`.
+- `FIKIRI_EMAIL_PIPELINE_AI_GATE=1` applies AI tier caps on `email_automation.pipeline.orchestrate_incoming`. Unset keeps the old path. Accounting errors fail open.
+- E2E signup is rate limited to 3/hour per IP unless `FLASK_ENV=development` or `FIKIRI_TEST_MODE=1`. Default user: `test@example.com` / `TestPassword123!`. See `docs/E2E_TEST_PLAN.md`.
 
-- **Run the backend with `FLASK_ENV=development`** (or `FIKIRI_TEST_MODE=1`) when running E2E locally so signup isn’t rate limited (signup is 3/hour per IP otherwise; setup creates users every run).
-- If you can’t change the backend env, the 429 fallback in auth setup (log in as default test user and save that state) still avoids failing the run when the limit is hit.
-- Auth env: set `TEST_USER_EMAIL` and `TEST_USER_PASSWORD` to a valid user, or unset them to use defaults (`test@example.com` / `TestPassword123!`). See [docs/E2E_TEST_PLAN.md](docs/E2E_TEST_PLAN.md).
+## Checks
 
-### Regression testing (required on every change)
+Policy: `docs/REGRESSION_TESTING.md`.
 
-See `.cursor/rules/regression-testing.mdc`. Summary:
+- Unit gate, for a critical change or a release: `pytest tests/ -m "not contract and not integration" -q` and `cd frontend && npx vitest run`
+- Lint: `flake8 app.py --max-line-length=120`, `black --check .`, `isort --check .`, `cd frontend && npx eslint .`
+- Types: `cd frontend && npx tsc --noEmit` (known existing errors in `Dashboard.tsx`)
+- Build: `cd frontend && npm run build`
+- Known existing Vitest failures in Toast tests
 
-- Run **full** backend + frontend test suites before marking work done — not only tests near edited files.
-- Any bug fix: reproduce → fix root cause → **add a regression test** → re-run full suite.
-- New features: tests in the same change; critical paths need success + at least one failure branch (`docs/CURSOR_QUALITY_GATE.md`).
-
-### Lint / Test / Build commands
-
-See `README.md` for canonical commands. Quick reference:
-- **Backend lint**: `flake8 app.py --max-line-length=120` / `black --check .` / `isort --check .`
-- **Backend tests**: `pytest tests/ -v --ignore=tests/integration` (unit tests; integration tests require a running backend)
-- **Frontend lint**: `cd frontend && npx eslint .`
-- **Frontend type-check**: `cd frontend && npx tsc --noEmit` (3 pre-existing errors in `Dashboard.tsx`)
-- **Frontend tests**: `cd frontend && npx vitest run` (some pre-existing Toast test failures)
-- **Frontend build**: `cd frontend && npm run build`
-
-### Admin routes (when building)
-
-- **No separate admin portal.** Keep one app; add an `/admin` section with role-based access.
-- **Privileged system:** Follow [docs/ADMIN_PORTAL_SECURITY.md](docs/ADMIN_PORTAL_SECURITY.md). Phase **1.5** (MFA/step-up, audit, session controls, rate limits, privilege-escalation tests) **gates** all destructive ops and billing overrides.
-- **RBAC + server-side enforcement:** Capability-based permissions; backend must enforce every admin action. Never rely on frontend hiding alone.
-- **Audit log** all admin actions (success and denied): actor, action, target, capability, outcome, timestamp, IP, correlation id — never passwords/tokens.
-- Strategy overview: [docs/ADMIN_ROUTES_STRATEGY.md](docs/ADMIN_ROUTES_STRATEGY.md).
-
-### Quality gate (automation, queues, workflows)
-
-Before marking queue/workflow/automation features "done", follow the protocol in [docs/CURSOR_QUALITY_GATE.md](docs/CURSOR_QUALITY_GATE.md):
-
-- Build a **contract table** (claim → expected behavior → code location → pass/fail).
-- Model **state transitions** explicitly (event → from_state → to_state → side effects); reject labels like `retrying` with no re-enqueue or scheduler.
-- Run a **failure-first review**: partial failures, retries exhausted, idempotency, auth scoping, HTTP contract.
-- Require **branch-complete tests** (success + at least one failure/retry/idempotency branch per critical path).
-- Report findings by **severity** (critical / high / medium / low).
-
-Prompt to use: *"Before writing code, create a contract-vs-implementation checklist for this feature. Then implement with explicit state-transition guarantees. After coding, run a failure-first review: partial failure handling, retries, idempotency, auth scoping, and HTTP contract consistency. Do not report success until each claim has code evidence and test coverage for success + failure branches."*
+Admin edits: `.cursor/rules/admin.mdc`. Queue or workflow edits: `.cursor/rules/quality-gate.mdc`.
 
 @AGENTS.wmill.md

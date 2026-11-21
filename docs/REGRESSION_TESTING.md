@@ -1,31 +1,53 @@
 # Regression testing policy
 
-Every change must make the app **strictly better or neutral** — never worse silently.
+CI still runs the full unit gate on every pipeline (`docs/CI_CD_STRATEGY.md`). Local agent work follows the risk of the change.
 
-## Full suite (required before "done")
+## Unit gate
 
-From repo root:
+From the repo root:
 
 ```bash
 pytest tests/ -m "not contract and not integration" -q
 cd frontend && npx vitest run
 ```
 
-Run both on **every** feature, fix, or refactor — not only tests near edited files.
+`pytest.ini` marks `contract` (sandbox provider credentials, including `tests/contract`) and `integration` (staging DB or Redis, including `tests/integration`). The marker expression is the unit gate.
 
-## When a bug is found
+`pytest tests/ -v --ignore=tests/integration` is not the gate. It still runs `tests/contract`.
 
-1. Reproduce (failing test or minimal steps).
-2. Fix root cause.
-3. Add a **regression test** in the same change.
-4. Re-run full backend + frontend suites.
+Run `pytest tests/ -m integration` only when DB and Redis are available. Run `pytest tests/ -m contract` only when sandbox credentials are available.
 
-## Quality gate
+## Quick fix
 
-For queues, workflows, and automation, also follow [CURSOR_QUALITY_GATE.md](./CURSOR_QUALITY_GATE.md) (contract table, state transitions, failure branches).
+Copy, styles, comments, or a localized bug outside the critical list.
 
-## Cursor / agent enforcement
+- Run the nearest test, or the linter for the files touched.
+- A behavior bug gets a regression test in the same change.
+- A typo does not need a new test.
+- Do not start the unit gate.
 
-- `.cursor/rules` — section 11
-- `.cursorrules` — section 9
-- `AGENTS.md` — Regression testing summary
+## Feature
+
+One subsystem, and not a critical change.
+
+- Run the test module for that change.
+- Include a success path and one failure path.
+- Do not start the unit gate.
+
+## Critical change
+
+Run the unit gate once, plus the test module for the area. A bug fix adds a regression test.
+
+Critical means any of: authentication, payments, permissions, admin actions, migrations, CRM uniqueness or merge, outbound email, queues, workflow state, or the production SQLite guard.
+
+The label "quick fix" does not apply if the diff touches that list.
+
+Queues and workflows also follow `docs/CURSOR_QUALITY_GATE.md`.
+
+## Release
+
+Run the unit gate. Run integration and contract tests when that environment is available.
+
+## When a test fails
+
+Fix that failure. Do not rerun a suite that already passed. Do not claim a test passed unless the command ran.

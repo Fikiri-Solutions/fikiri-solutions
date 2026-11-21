@@ -1,0 +1,32 @@
+---
+description: Fikiri task classes — quick fix, feature, architecture, and MCP — and which tests each class runs
+alwaysApply: false
+---
+
+# Fikiri task routing
+
+Pick one class. Domain rules are in `.cursorrules`. Read the subsystem file named there before editing that area. Do not re-read `.cursorrules`.
+
+## Quick fix
+
+Copy, styling, or a localized bug in a known area. Search, then open only the files the search names. Smallest patch. Tests: `docs/REGRESSION_TESTING.md`.
+
+## Feature
+
+One subsystem or endpoint. Name the files before opening more. A short outline only when the API or schema changes. Tests: `docs/REGRESSION_TESTING.md`.
+
+## Architecture
+
+Auth, billing, permissions, migrations, queues, or a cross-service change. State the contract, data change, and rollback before editing. This class is critical. Tests: `docs/REGRESSION_TESTING.md`.
+
+## MCP and external systems
+
+Render, Supabase, Neon, Vercel, Windmill, or the browser, and only for live state the repo cannot answer.
+
+- Inspect that one namespace, then one tool. Do not load the full tool catalog.
+- One filtered call, then stop.
+- Deploy, migrate, or change production data only when the user asked in this turn.
+
+## Stop
+
+Report the files changed, the checks you ran, and anything still broken. Do not restate the task.

@@ -1,0 +1,17 @@
+---
+description: Fikiri CRM contact schema, unique email, and merge-on-update
+globs: crm/**/*.py
+alwaysApply: false
+---
+
+# CRM
+
+`crm/service.py` is the only place that creates or updates contacts. Do not import `crm/minimal_service.py` or `core/minimal_crm_service.py`.
+
+Contact fields: id, user_id, email, name, phone, company, source, stage, score, created_at, updated_at, last_contact, notes, tags, metadata.
+
+- Email is unique, case-insensitive.
+- An update merges into the existing contact.
+- Look up by id or email. Do not add a join when a lookup will do.
+
+There is no `crm/workflows/` package. Add one only when CRM complexity requires it.

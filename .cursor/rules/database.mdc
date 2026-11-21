@@ -1,0 +1,25 @@
+---
+description: Fikiri Postgres production database, SQLite fallback, and migration safety
+globs: core/database_init.py,core/database_optimization.py,core/postgres_compat.py,migrations/**/*.py,scripts/migrations/**/*.py,scripts/migrations/**/*.sql
+alwaysApply: false
+---
+
+# Database and migrations
+
+Production is Supabase Postgres through `DATABASE_URL` and psycopg2. The app does not use `supabase-py` for production paths. `SUPABASE_URL` and `SUPABASE_KEY` are not `DATABASE_URL`.
+
+The Session pooler (port 5432) is the default. The transaction pooler (port 6543) does not support prepared statements or `LISTEN/NOTIFY`.
+
+SQLite is the local, test, and staging fallback. Do not weaken the production Postgres `RuntimeError` in `core/database_optimization.py`.
+
+Before a table change, read `core/database_init.py` and the current migrations.
+
+- Prefer a new nullable column, index, or table.
+- Do not drop or rename a column unless the user asked and a backfill is written down.
+- Update every read, write, and serializer that touches the column in the same change.
+- Say so when a migration could lock a large Postgres table.
+- Keep one logical write in one transaction.
+- Use bulk writes instead of row-by-row loops.
+- Datetime comparisons that run on both engines follow `docs/SQLITE_DATETIME_COMPARISONS.md`.
+
+Frontend Supabase Auth is not the source of truth for the user or `onboarding_step`. Flask JWT is. A browser query with the anon key needs RLS; call that out before adding one.

@@ -1,0 +1,15 @@
+---
+description: Fikiri operational logging without secrets or a new logger
+globs: core/enterprise_logging.py,core/structured_logging.py,core/activity_logger.py
+alwaysApply: false
+---
+
+# Logging
+
+Use `core.enterprise_logging`. Do not add a logging package. `core/logging.py` is not a module in this repo. `core/structured_logging.py` is legacy; do not point new calls at it.
+
+When a log line is structured, include event, service, severity, and trace_id. Add user_id when the request has one. LLM lines include latency_ms and cost_usd when those values exist.
+
+Do not log secrets, raw tokens, full email bodies, or full prompts and responses that contain personal data. Prefer an id or a short summary.
+
+Read this file before adding logs in another module. The glob attaches when the logger itself is open.

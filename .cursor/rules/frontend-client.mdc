@@ -1,0 +1,17 @@
+---
+description: Fikiri Vite frontend API client, auth state, and request feedback
+globs: frontend/src/**/*.ts,frontend/src/**/*.tsx
+alwaysApply: false
+---
+
+# Frontend
+
+This app is Vite + React + TypeScript. Tailwind is the styling system. Do not add a second CSS system for something Tailwind already covers.
+
+- Call the backend through `frontend/src/services/apiClient.ts`. The API URL is `config.apiUrl` inside that client.
+- Send credentials when the endpoint needs them. On an expired JWT, refresh and retry once.
+- Auth state lives in `AuthContext`. Compute derived values while rendering.
+- The onboarding step comes from the server. Do not persist it, passwords, or tokens in localStorage.
+- Import logos from `frontend/src/assets/logos/`.
+- Every async action shows a loading state, then success or a short error. Disable the submit control while the request runs. Do not render a raw error object.
+- Paginate or virtualize a long list.

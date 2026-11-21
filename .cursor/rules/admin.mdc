@@ -1,0 +1,17 @@
+---
+description: Fikiri admin actions stay in this app, are enforced on the server, and are audited
+globs: routes/admin_platform_api.py,routes/admin_site_chat_api.py,frontend/src/components/AdminReauthModal.tsx
+alwaysApply: false
+---
+
+# Admin
+
+No separate admin portal. Admin UI stays in this app.
+
+The backend enforces every admin action. Hiding a control is not authorization.
+
+Destructive actions and billing overrides stay behind the Phase 1.5 controls in `docs/ADMIN_PORTAL_SECURITY.md`: MFA or step-up, audit, session controls, rate limits, and privilege-escalation tests.
+
+Audit success and denial: actor, action, target, capability, outcome, timestamp, IP, and correlation id. Never log passwords or tokens.
+
+Strategy: `docs/ADMIN_ROUTES_STRATEGY.md`.

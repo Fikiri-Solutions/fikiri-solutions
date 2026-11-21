@@ -1,0 +1,22 @@
+---
+description: Fikiri HTTP envelope and Redis key and fallback rules for route handlers
+globs: routes/**/*.py
+alwaysApply: false
+---
+
+# API and Redis
+
+Every endpoint returns `{ success, message?, data? }`. Never return a raw exception or a raw database row.
+
+Log the endpoint and `user_id` when the request has one. Do not log tokens, secrets, or full email bodies. Logger: `.cursor/rules/logging.mdc`. Schema changes: `.cursor/rules/database.mdc`.
+
+Redis keys look like `fikiri:<domain>:<resource>:<identifier>`.
+
+- Email metadata: about 300 seconds.
+- Classification and lead-score cache: about 600–1800 seconds. Mail classification uses about 1800 seconds unless the user set an override.
+- Rate-limit windows: 60–300 seconds.
+- Queue items have no TTL. Workers manage them.
+
+If Redis is down, use the in-memory fallback and keep serving. Do not change behavior Upstash relies on.
+
+For a bug in this layer, check backend versus frontend, stale state, token refresh, the database write, then the redirect or route. Confirm the shape in the existing schema before editing.

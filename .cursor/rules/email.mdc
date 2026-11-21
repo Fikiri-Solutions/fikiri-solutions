@@ -1,0 +1,17 @@
+---
+description: Fikiri inbound mail classification, replies, and CRM lead merge
+globs: email_automation/**/*.py,integrations/gmail/**/*.py,integrations/outlook/**/*.py,routes/email_triage.py
+alwaysApply: false
+---
+
+# Email
+
+Mail goes through `integrations/gmail/gmail_client.py` or `integrations/outlook/outlook_client.py`, then `email_automation/actions.py`, `parser.py`, `service_manager.py`, and `jobs.py`. `email_automation/pipeline.py` only orchestrates those modules.
+
+Each processed message carries intent, sentiment, priority (`low`, `medium`, or `high`), `actionability_score` from 0 to 1, extracted contact info, and a category: lead, question, support, spam, newsletter, or other.
+
+- Format and validate a reply before a person sees it. Never send the raw model output.
+- Strip trackers and unsafe HTML links when practical.
+- Create or merge a CRM lead for a new sender through `crm/service.py`.
+- Cache metadata for about 300 seconds and classifications for about 1800 seconds, unless the user has set an override.
+- A workflow-state change also follows `.cursor/rules/quality-gate.mdc`.
